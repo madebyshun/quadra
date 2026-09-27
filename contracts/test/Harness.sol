@@ -51,6 +51,7 @@ contract Harness {
 
     error AssertFailed(string what);
     error AssertEqFailedUint(string what, uint256 expected, uint256 actual);
+    error AssertEqFailedInt(string what, int256 expected, int256 actual);
     error AssertEqFailedBytes32(string what, bytes32 expected, bytes32 actual);
     error AssertEqFailedAddress(string what, address expected, address actual);
 
@@ -64,6 +65,24 @@ contract Harness {
 
     function assertEq(uint256 actual, uint256 expected, string memory what) internal pure {
         if (actual != expected) revert AssertEqFailedUint(what, expected, actual);
+    }
+
+    /**
+     * Deliberately NOT an `assertEq` overload.
+     *
+     * Solidity allows an implicit `uintN → int256` widening, so adding
+     * `assertEq(int256, int256, string)` beside the `uint256` one makes every
+     * existing `assertEq(pool.nextIndex(), 2, ...)` ambiguous and the whole suite
+     * stops compiling. A separate name costs four characters at each call site and
+     * has no blast radius.
+     *
+     * Worth having at all because `publicAmountFor` returns a signed value whose
+     * sign is the entire point: casting it to compare against the `uint256`
+     * overload would turn a sign error — the exact bug this contract just had — into
+     * a passing test.
+     */
+    function assertEqInt(int256 actual, int256 expected, string memory what) internal pure {
+        if (actual != expected) revert AssertEqFailedInt(what, expected, actual);
     }
 
     function assertEq(bytes32 actual, bytes32 expected, string memory what) internal pure {

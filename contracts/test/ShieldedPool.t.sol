@@ -32,9 +32,15 @@ import {
  *
  * What IS testable, and is where the bugs in a pool like this actually live: the
  * nullifier bookkeeping, the root window, the field bounds, the token accounting,
- * the payout and fee split, the ordering of state writes against external calls,
- * and the exact vector handed to the verifier. Each of those can be wrong while
- * every proof verifies perfectly.
+ * the relationship between what moves and what is proven, the ordering of state
+ * writes against external calls, and the exact vector handed to the verifier. Each
+ * of those can be wrong while every proof verifies perfectly.
+ *
+ * ── The section worth reading first ──────────────────────────────────────────
+ * "what moves must equal what was proven" is not a section of ordinary accounting
+ * tests. It is the regression suite for a real insolvency this contract had, in
+ * which the fee was charged against the payout on a withdrawal and against the
+ * pool on a deposit. Every test there fails against the previous implementation.
  */
 contract ShieldedPoolTest is Harness {
     uint256 private constant FIELD_SIZE =
@@ -52,7 +58,8 @@ contract ShieldedPoolTest is Harness {
     event Deposit(bytes32 indexed commitment, uint32 leafIndex, uint256 timestamp);
     event NewCommitment(bytes32 indexed commitment, uint32 leafIndex);
     event NewNullifier(bytes32 indexed nullifier);
-    event Withdrawal(address indexed recipient, uint256 amount, uint256 fee);
+    event Withdrawal(address indexed recipient, uint256 amount);
+    event FeePaid(address indexed relayer, uint256 fee);
 
     function setUp() public {
         hasher = new TestHasher();
@@ -77,32 +84,59 @@ contract ShieldedPoolTest is Harness {
      * A proof struct that will be accepted, with distinct nullifiers and
      * commitments derived from `seed`. The `proof` bytes are arbitrary because the
      * double ignores them — that is exactly what the double is for.
+     *
+     * It carries no amount. That used to be a `publicAmount` field here, and moving
+     * it into `ExtData` is the fix these tests exist to pin: the number the circuit
+     * proves over is now derived from what actually moves, so no calldata can state
+     * one value while the transfers imply another.
+     *
+     * ⚠️ This makes an external call (`pool.getLastRoot`), so it must be hoisted
+     * ABOVE any `vm.expectRevert()` — otherwise the root read is the "next call" the
+     * cheatcode is waiting on, and every such test fails with "next call did not
+     * revert as expected" while pointing at the line that does revert. Eleven tests
+     * failed this way at once when the fixture stopped taking an amount and the calls
+     * became short enough to inline. `_ext`, `_in` and `_out` are `pure` and safe to
+     * inline anywhere.
      */
-    function _args(uint256 seed, int256 publicAmount)
-        internal
-        view
-        returns (ShieldedPool.Proof memory)
-    {
+    function _args(uint256 seed) internal view returns (ShieldedPool.Proof memory) {
         return ShieldedPool.Proof({
             root: pool.getLastRoot(),
             inputNullifiers: [_field("nullifier-a", seed), _field("nullifier-b", seed)],
             outputCommitments: [_field("commitment-a", seed), _field("commitment-b", seed)],
-            publicAmount: publicAmount,
             proof: hex"c0ffee"
         });
     }
 
-    function _ext(address recipient, uint256 fee)
+    function _ext(address recipient, int256 extAmount, uint256 fee)
         internal
         pure
         returns (ShieldedPool.ExtData memory)
     {
-        return ShieldedPool.ExtData({recipient: recipient, relayer: RELAYER, fee: fee});
+        return ShieldedPool.ExtData({
+            recipient: recipient,
+            relayer: RELAYER,
+            extAmount: extAmount,
+            fee: fee
+        });
+    }
+
+    /** Money in, no payout details to fill, no relayer. */
+    function _in(uint256 amount) internal pure returns (ShieldedPool.ExtData memory) {
+        return _ext(address(0), int256(amount), 0);
+    }
+
+    /** Money out, to a named recipient. */
+    function _out(address recipient, uint256 amount)
+        internal
+        pure
+        returns (ShieldedPool.ExtData memory)
+    {
+        return _ext(recipient, -int256(amount), 0);
     }
 
     /** A deposit, so later tests have a funded pool and a non-empty tree. */
     function _deposit(uint256 seed, uint256 amount) internal {
-        pool.transact(_args(seed, int256(amount)), _ext(address(0), 0));
+        pool.transact(_args(seed), _in(amount));
     }
 
     /* ── construction ───────────────────────────────────────────────────────── */
@@ -142,7 +176,7 @@ contract ShieldedPoolTest is Harness {
         uint256 amount = 500e8;
         bytes32 rootBefore = pool.getLastRoot();
 
-        pool.transact(_args(1, int256(amount)), _ext(address(0), 0));
+        pool.transact(_args(1), _in(amount));
 
         assertEq(token.balanceOf(address(pool)), amount, "pool holds the deposit");
         assertEq(token.balanceOf(address(this)), 1_000_000e8 - amount, "depositor paid it");
@@ -156,8 +190,8 @@ contract ShieldedPoolTest is Harness {
      * of outputs from leaking what kind of transaction this was.
      */
     function test_depositAppendsBothCommitments() public {
-        ShieldedPool.Proof memory args = _args(1, 100e8);
-        pool.transact(args, _ext(address(0), 0));
+        ShieldedPool.Proof memory args = _args(1);
+        pool.transact(args, _in(100e8));
 
         assertEq(pool.nextIndex(), 2, "exactly two leaves");
         assertTrue(pool.isSpent(args.inputNullifiers[0]), "first nullifier burned");
@@ -165,24 +199,24 @@ contract ShieldedPoolTest is Harness {
     }
 
     function test_depositEmitsDepositWithTheFirstLeafIndex() public {
-        ShieldedPool.Proof memory args = _args(1, 100e8);
+        ShieldedPool.Proof memory args = _args(1);
 
         vm.expectEmit(address(pool));
         emit Deposit(args.outputCommitments[0], 0, block.timestamp);
 
-        pool.transact(args, _ext(address(0), 0));
+        pool.transact(args, _in(100e8));
     }
 
     function test_depositEmitsBothCommitmentsWithTheirIndices() public {
         _deposit(1, 100e8);
-        ShieldedPool.Proof memory args = _args(2, 100e8);
+        ShieldedPool.Proof memory args = _args(2);
 
         vm.expectEmit(address(pool));
         emit NewCommitment(args.outputCommitments[0], 2);
         vm.expectEmit(address(pool));
         emit NewCommitment(args.outputCommitments[1], 3);
 
-        pool.transact(args, _ext(address(0), 0));
+        pool.transact(args, _in(100e8));
     }
 
     /* ── withdrawals ────────────────────────────────────────────────────────── */
@@ -191,52 +225,80 @@ contract ShieldedPoolTest is Harness {
         _deposit(1, 1000e8);
         uint256 amount = 400e8;
 
-        pool.transact(_args(2, -int256(amount)), _ext(ALICE, 0));
+        pool.transact(_args(2), _out(ALICE, amount));
 
         assertEq(token.balanceOf(ALICE), amount, "alice received the withdrawal");
         assertEq(token.balanceOf(address(pool)), 600e8, "the pool is down by exactly that");
     }
 
-    function test_withdrawalSplitsTheRelayerFee() public {
+    /**
+     * 🔴 The recipient gets what the recipient was promised, and the fee is on top.
+     *
+     * This test asserted the opposite until the fee asymmetry was fixed: the payout
+     * used to be `extAmount - fee`, so a user withdrawing 400 with a 25 fee received
+     * 375. Two things were wrong with that. The visible one is that a user could not
+     * name the amount they wanted to receive without first knowing what the relayer
+     * would charge. The expensive one is in the next section.
+     */
+    function test_aWithdrawalPaysTheRecipientInFullAndTheRelayerOnTop() public {
         _deposit(1, 1000e8);
-        uint256 amount = 400e8;
-        uint256 fee = 25e8;
 
-        pool.transact(_args(2, -int256(amount)), _ext(ALICE, fee));
+        pool.transact(_args(2), _ext(ALICE, -int256(400e8), 25e8));
 
-        assertEq(token.balanceOf(ALICE), amount - fee, "recipient gets the net");
-        assertEq(token.balanceOf(RELAYER), fee, "relayer gets the fee");
-        assertEq(token.balanceOf(address(pool)), 600e8, "total leaving the pool is unchanged");
+        assertEq(token.balanceOf(ALICE), 400e8, "recipient gets what was asked for");
+        assertEq(token.balanceOf(RELAYER), 25e8, "relayer gets the fee");
+        assertEq(token.balanceOf(address(pool)), 575e8, "and the pool paid both");
     }
 
-    function test_withdrawalEmitsTheNetAndTheFeeSeparately() public {
+    /**
+     * Two events, and each fires only when its own transfer happens.
+     *
+     * The single `Withdrawal(recipient, amount, fee)` this replaced was emitted with
+     * `recipient` set to the relayer and `amount` set to zero for a fee-only
+     * transaction, so the indexed field sometimes named the payee and sometimes named
+     * the relayer — unfilterable, and unreadable without first knowing which case you
+     * were in.
+     */
+    function test_aWithdrawalWithAFeeEmitsBothEventsSeparately() public {
         _deposit(1, 1000e8);
 
         vm.expectEmit(address(pool));
-        emit Withdrawal(ALICE, 375e8, 25e8);
+        emit Withdrawal(ALICE, 400e8);
+        vm.expectEmit(address(pool));
+        emit FeePaid(RELAYER, 25e8);
 
-        pool.transact(_args(2, -int256(400e8)), _ext(ALICE, 25e8));
+        pool.transact(_args(2), _ext(ALICE, -int256(400e8), 25e8));
     }
 
-    /** A fee equal to the whole withdrawal is legal; the recipient simply gets zero. */
-    function test_aFeeMayConsumeTheEntireWithdrawal() public {
+    function test_aWithdrawalWithoutAFeeEmitsOnlyTheWithdrawal() public {
         _deposit(1, 1000e8);
-        pool.transact(_args(2, -int256(100e8)), _ext(ALICE, 100e8));
 
-        assertEq(token.balanceOf(ALICE), 0, "nothing left for the recipient");
-        assertEq(token.balanceOf(RELAYER), 100e8, "the relayer took all of it");
+        vm.expectEmit(address(pool));
+        emit Withdrawal(ALICE, 400e8);
+
+        pool.transact(_args(2), _out(ALICE, 400e8));
     }
 
-    function test_refusesAFeeLargerThanTheWithdrawal() public {
+    /**
+     * A fee larger than the withdrawal is legal now, and `FeeExceedsWithdrawal` is
+     * gone.
+     *
+     * Not a loosening. That error existed because the fee was carved out of the
+     * payout, so a fee above it would have underflowed — it was a guard on an
+     * implementation detail, not a rule about money. With the two paid
+     * independently, `extAmount` and `fee` are simply two amounts leaving the pool,
+     * and their sum is what `publicAmount` says left. A user who asks to receive 10
+     * and agrees to pay a relayer 50 has made a bad deal, not an invalid one, and
+     * the circuit is what refuses it if their notes cannot cover 60.
+     */
+    function test_allowsAFeeLargerThanTheWithdrawal() public {
         _deposit(1, 1000e8);
-        ShieldedPool.Proof memory args = _args(2, -int256(100e8));
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ShieldedPool.FeeExceedsWithdrawal.selector, 101e8, 100e8
-            )
-        );
-        pool.transact(args, _ext(ALICE, 101e8));
+        pool.transact(_args(2), _ext(ALICE, -int256(10e8), 50e8));
+
+        assertEq(token.balanceOf(ALICE), 10e8, "the recipient got what they asked for");
+        assertEq(token.balanceOf(RELAYER), 50e8, "and the relayer its fee");
+        assertEq(token.balanceOf(address(pool)), 940e8, "the pool is down by the sum");
     }
 
     /**
@@ -246,16 +308,54 @@ contract ShieldedPoolTest is Harness {
      */
     function test_refusesAZeroRecipient() public {
         _deposit(1, 1000e8);
-        ShieldedPool.Proof memory args = _args(2, -int256(100e8));
+        ShieldedPool.Proof memory args = _args(2);
 
         vm.expectRevert(ShieldedPool.RecipientIsZero.selector);
-        pool.transact(args, _ext(address(0), 0));
+        pool.transact(args, _out(address(0), 100e8));
+    }
+
+    /**
+     * And a zero relayer, for a reason that is not symmetry.
+     *
+     * The pool has already accounted the fee as having left — `publicAmount` includes
+     * it and the circuit proved the notes cover it. Sending it to the burn address
+     * would leave the remaining notes backed by tokens nobody can move, which is the
+     * same shortfall `_pullExactly` refuses a lossy token to avoid.
+     */
+    function test_refusesAZeroRelayerWhenAFeeIsCharged() public {
+        _deposit(1, 1000e8);
+        ShieldedPool.Proof memory args = _args(2);
+
+        ShieldedPool.ExtData memory ext = ShieldedPool.ExtData({
+            recipient: ALICE,
+            relayer: address(0),
+            extAmount: -int256(100e8),
+            fee: 5e8
+        });
+
+        vm.expectRevert(ShieldedPool.RelayerIsZero.selector);
+        pool.transact(args, ext);
+    }
+
+    /** With no fee there is nothing to send, so a zero relayer is merely unused. */
+    function test_allowsAZeroRelayerWhenNoFeeIsCharged() public {
+        _deposit(1, 1000e8);
+
+        ShieldedPool.ExtData memory ext = ShieldedPool.ExtData({
+            recipient: ALICE,
+            relayer: address(0),
+            extAmount: -int256(100e8),
+            fee: 0
+        });
+
+        pool.transact(_args(2), ext);
+        assertEq(token.balanceOf(ALICE), 100e8, "the withdrawal went through");
     }
 
     /* ── the transfer that moves nothing across the boundary ────────────────── */
 
     /**
-     * 🔴 `publicAmount == 0` with no fee is NOT a no-op, and refusing it would be a
+     * 🔴 `extAmount == 0` with no fee is NOT a no-op, and refusing it would be a
      * real bug.
      *
      * It is two notes in, two notes out, nothing crossing the boundary — a merge or
@@ -267,8 +367,8 @@ contract ShieldedPoolTest is Harness {
         _deposit(1, 1000e8);
         uint256 poolBefore = token.balanceOf(address(pool));
 
-        ShieldedPool.Proof memory args = _args(2, 0);
-        pool.transact(args, _ext(address(0), 0));
+        ShieldedPool.Proof memory args = _args(2);
+        pool.transact(args, _ext(address(0), 0, 0));
 
         assertEq(token.balanceOf(address(pool)), poolBefore, "no money moved");
         assertEq(pool.nextIndex(), 4, "but two new notes exist");
@@ -279,20 +379,147 @@ contract ShieldedPoolTest is Harness {
         _deposit(1, 1000e8);
 
         vm.expectEmit(address(pool));
-        emit Withdrawal(RELAYER, 0, 5e8);
+        emit FeePaid(RELAYER, 5e8);
 
-        pool.transact(_args(2, 0), _ext(address(0), 5e8));
+        pool.transact(_args(2), _ext(address(0), 0, 5e8));
 
         assertEq(token.balanceOf(RELAYER), 5e8, "the fee came out of the pool");
         assertEq(token.balanceOf(address(pool)), 995e8, "which is down by exactly the fee");
     }
 
-    /** A relayed deposit: money in, and the relayer paid from the pool's balance. */
+    /** A relayed deposit: money in, and the relayer paid out of what just arrived. */
     function test_aRelayerMayBePaidOnADeposit() public {
-        pool.transact(_args(1, int256(100e8)), _ext(address(0), 3e8));
+        pool.transact(_args(1), _ext(address(0), int256(100e8), 3e8));
 
         assertEq(token.balanceOf(RELAYER), 3e8, "relayer paid");
         assertEq(token.balanceOf(address(pool)), 97e8, "out of the deposit just received");
+    }
+
+    /* ── what moves must equal what was proven ──────────────────────────────── */
+
+    /**
+     * 🔴 The regression suite for a real insolvency. Every test in this section
+     * fails against the implementation that came before it.
+     *
+     * The old contract took `publicAmount` as a calldata field and then paid the fee
+     * out of the payout on a withdrawal but on top of it on a deposit or an internal
+     * transfer. So the conservation law it enforced was
+     * `sum(inputs) + publicAmount - (publicAmount < 0 ? 0 : fee) == sum(outputs)` —
+     * a different equation depending on the sign of one of its own terms — while
+     * `IVerifier` documented, and any sane circuit would implement, the
+     * unconditional `sum(inputs) + publicAmount == sum(outputs)`.
+     *
+     * Built against that spec, a relayed deposit of 100 with a fee of 3 created notes
+     * worth 100 while the pool kept 97: the fee was silently taken from other
+     * depositors. A relayed internal transfer was worse — `publicAmount` was 0, so
+     * the notes proved nothing left, and the fee left anyway, repeatably. Nothing
+     * reverts in either case. The shortfall lands on whoever withdraws last, who did
+     * nothing wrong and cannot tell what happened, which is exactly the failure
+     * `_pullExactly` exists to prevent, arriving through the other door.
+     *
+     * The property that catches all of it is one sentence: **the pool's token balance
+     * changes by exactly `publicAmount`.** Stated that way it needs no cases, which
+     * is the point — a law with a case analysis in it is a law with somewhere for a
+     * bug to live.
+     */
+    function _assertBalanceMovedBy(uint256 before, int256 publicAmount, string memory what)
+        internal
+        view
+    {
+        uint256 now_ = token.balanceOf(address(pool));
+        if (publicAmount >= 0) {
+            assertEq(now_, before + uint256(publicAmount), what);
+        } else {
+            assertEq(now_, before - uint256(-publicAmount), what);
+        }
+    }
+
+    function test_aRelayedDepositLeavesTheProvenAmountBehind() public {
+        ShieldedPool.ExtData memory ext = _ext(address(0), int256(100e8), 3e8);
+        int256 publicAmount = pool.publicAmountFor(ext);
+        assertEqInt(publicAmount, 97e8, "97 is what the notes are allowed to claim");
+
+        pool.transact(_args(1), ext);
+
+        _assertBalanceMovedBy(0, publicAmount, "the pool holds exactly what was proven");
+    }
+
+    /**
+     * The one that was a free withdrawal. `publicAmount` used to be 0 here while 5e8
+     * left the building.
+     */
+    function test_aRelayedInternalTransferProvesTheFeeItPays() public {
+        _deposit(1, 1000e8);
+        uint256 before = token.balanceOf(address(pool));
+
+        ShieldedPool.ExtData memory ext = _ext(address(0), 0, 5e8);
+        int256 publicAmount = pool.publicAmountFor(ext);
+        assertEqInt(publicAmount, -int256(5e8), "the fee is a withdrawal, and is proven as one");
+
+        pool.transact(_args(2), ext);
+
+        _assertBalanceMovedBy(before, publicAmount, "down by exactly the proven amount");
+    }
+
+    function test_aRelayedWithdrawalProvesTheSumOfBothPayments() public {
+        _deposit(1, 1000e8);
+        uint256 before = token.balanceOf(address(pool));
+
+        ShieldedPool.ExtData memory ext = _ext(ALICE, -int256(75e8), 25e8);
+        int256 publicAmount = pool.publicAmountFor(ext);
+        assertEqInt(publicAmount, -int256(100e8), "recipient plus relayer");
+
+        pool.transact(_args(2), ext);
+
+        assertEq(token.balanceOf(ALICE), 75e8, "recipient side of the boundary");
+        assertEq(token.balanceOf(RELAYER), 25e8, "relayer side");
+        _assertBalanceMovedBy(before, publicAmount, "and the pool paid the sum, once");
+    }
+
+    /**
+     * The same law over every combination of direction and fee, which is the form
+     * that would have caught the bug without anyone having to think of the internal
+     * transfer as a special case.
+     */
+    function testFuzz_theBalanceAlwaysMovesByExactlyPublicAmount(
+        int64 rawAmount,
+        uint64 rawFee
+    ) public {
+        int256 extAmount = int256(rawAmount) % 500e8;
+        uint256 fee = uint256(rawFee) % 100e8;
+        // a payout needs somewhere to go; a deposit or a merge does not
+        address recipient = extAmount < 0 ? ALICE : address(0);
+
+        _deposit(1, 1000e8);
+        uint256 before = token.balanceOf(address(pool));
+
+        ShieldedPool.ExtData memory ext = _ext(recipient, extAmount, fee);
+        int256 publicAmount = pool.publicAmountFor(ext);
+
+        pool.transact(_args(2), ext);
+
+        _assertBalanceMovedBy(before, publicAmount, "conserved, whatever the shape");
+    }
+
+    /**
+     * And the arithmetic on its own, so a failure tells you whether the derivation or
+     * the transfers are at fault. `% 2` keeps `extAmount` and `fee` well inside the
+     * bound so this exercises the subtraction and not the guards around it.
+     */
+    function testFuzz_publicAmountIsExtAmountMinusFee(int128 rawAmount, uint128 rawFee)
+        public
+        view
+    {
+        int256 extAmount = int256(rawAmount) / 2;
+        uint256 fee = uint256(rawFee) / 2;
+        vm.assume(uint256(extAmount < 0 ? -extAmount : extAmount) <= pool.MAX_NOTE_VALUE());
+        vm.assume(fee <= pool.MAX_NOTE_VALUE());
+
+        assertEqInt(
+            pool.publicAmountFor(_ext(ALICE, extAmount, fee)),
+            extAmount - int256(fee),
+            "one subtraction, no cases"
+        );
     }
 
     /* ── nullifiers ─────────────────────────────────────────────────────────── */
@@ -308,7 +535,7 @@ contract ShieldedPoolTest is Harness {
     function test_refusesTheSameNullifierTwiceInOneTransaction() public {
         _deposit(1, 1000e8);
 
-        ShieldedPool.Proof memory args = _args(2, -int256(100e8));
+        ShieldedPool.Proof memory args = _args(2);
         args.inputNullifiers[1] = args.inputNullifiers[0];
 
         vm.expectRevert(
@@ -316,16 +543,16 @@ contract ShieldedPoolTest is Harness {
                 ShieldedPool.DuplicateNullifier.selector, args.inputNullifiers[0]
             )
         );
-        pool.transact(args, _ext(ALICE, 0));
+        pool.transact(args, _out(ALICE, 100e8));
     }
 
     function test_refusesANullifierAlreadySpent() public {
         _deposit(1, 1000e8);
 
-        ShieldedPool.Proof memory first = _args(2, -int256(100e8));
-        pool.transact(first, _ext(ALICE, 0));
+        ShieldedPool.Proof memory first = _args(2);
+        pool.transact(first, _out(ALICE, 100e8));
 
-        ShieldedPool.Proof memory second = _args(3, -int256(100e8));
+        ShieldedPool.Proof memory second = _args(3);
         second.inputNullifiers[0] = first.inputNullifiers[0];
         second.root = pool.getLastRoot();
 
@@ -334,16 +561,16 @@ contract ShieldedPoolTest is Harness {
                 ShieldedPool.AlreadySpent.selector, first.inputNullifiers[0]
             )
         );
-        pool.transact(second, _ext(ALICE, 0));
+        pool.transact(second, _out(ALICE, 100e8));
     }
 
     function test_refusesASecondNullifierAlreadySpent() public {
         _deposit(1, 1000e8);
 
-        ShieldedPool.Proof memory first = _args(2, -int256(100e8));
-        pool.transact(first, _ext(ALICE, 0));
+        ShieldedPool.Proof memory first = _args(2);
+        pool.transact(first, _out(ALICE, 100e8));
 
-        ShieldedPool.Proof memory second = _args(3, -int256(100e8));
+        ShieldedPool.Proof memory second = _args(3);
         second.inputNullifiers[1] = first.inputNullifiers[1];
         second.root = pool.getLastRoot();
 
@@ -352,19 +579,19 @@ contract ShieldedPoolTest is Harness {
                 ShieldedPool.AlreadySpent.selector, first.inputNullifiers[1]
             )
         );
-        pool.transact(second, _ext(ALICE, 0));
+        pool.transact(second, _out(ALICE, 100e8));
     }
 
     function test_emitsBothNullifiers() public {
         _deposit(1, 1000e8);
-        ShieldedPool.Proof memory args = _args(2, -int256(100e8));
+        ShieldedPool.Proof memory args = _args(2);
 
         vm.expectEmit(address(pool));
         emit NewNullifier(args.inputNullifiers[0]);
         vm.expectEmit(address(pool));
         emit NewNullifier(args.inputNullifiers[1]);
 
-        pool.transact(args, _ext(ALICE, 0));
+        pool.transact(args, _out(ALICE, 100e8));
     }
 
     /* ── roots ──────────────────────────────────────────────────────────────── */
@@ -372,11 +599,11 @@ contract ShieldedPoolTest is Harness {
     function test_refusesAnUnknownRoot() public {
         _deposit(1, 1000e8);
         bytes32 fake = _field("not-a-root", 0);
-        ShieldedPool.Proof memory args = _args(2, -int256(100e8));
+        ShieldedPool.Proof memory args = _args(2);
         args.root = fake;
 
         vm.expectRevert(abi.encodeWithSelector(ShieldedPool.UnknownRoot.selector, fake));
-        pool.transact(args, _ext(ALICE, 0));
+        pool.transact(args, _out(ALICE, 100e8));
     }
 
     /**
@@ -386,11 +613,11 @@ contract ShieldedPoolTest is Harness {
      */
     function test_refusesRootZero() public {
         _deposit(1, 1000e8);
-        ShieldedPool.Proof memory args = _args(2, -int256(100e8));
+        ShieldedPool.Proof memory args = _args(2);
         args.root = bytes32(0);
 
         vm.expectRevert(abi.encodeWithSelector(ShieldedPool.UnknownRoot.selector, bytes32(0)));
-        pool.transact(args, _ext(ALICE, 0));
+        pool.transact(args, _out(ALICE, 100e8));
     }
 
     /**
@@ -402,14 +629,14 @@ contract ShieldedPoolTest is Harness {
         _deposit(1, 1000e8);
         bytes32 staleRoot = pool.getLastRoot();
 
-        ShieldedPool.Proof memory args = _args(2, -int256(100e8));
+        ShieldedPool.Proof memory args = _args(2);
         args.root = staleRoot;
 
         // Somebody else deposits in between, moving the root twice.
         _deposit(3, 50e8);
         assertNotEq(pool.getLastRoot(), staleRoot, "the root really did move");
 
-        pool.transact(args, _ext(ALICE, 0));
+        pool.transact(args, _out(ALICE, 100e8));
         assertEq(token.balanceOf(ALICE), 100e8, "the older proof was still honoured");
     }
 
@@ -417,17 +644,17 @@ contract ShieldedPoolTest is Harness {
 
     function test_acceptsTheLargestPermittedMagnitude() public view {
         uint256 max = pool.MAX_NOTE_VALUE();
-        assertEq(pool.publicAmountFor(int256(max)), max, "the bound itself is allowed");
+        assertEq(pool.fieldEncode(int256(max)), max, "the bound itself is allowed");
     }
 
     function test_refusesAnAmountAboveTheBound() public {
         uint256 tooBig = pool.MAX_NOTE_VALUE() + 1;
-        ShieldedPool.Proof memory args = _args(1, int256(tooBig));
+        ShieldedPool.Proof memory args = _args(1);
 
         vm.expectRevert(
             abi.encodeWithSelector(ShieldedPool.AmountTooLarge.selector, tooBig)
         );
-        pool.transact(args, _ext(address(0), 0));
+        pool.transact(args, _in(tooBig));
     }
 
     /**
@@ -436,32 +663,71 @@ contract ShieldedPoolTest is Harness {
      */
     function test_refusesANegativeAmountBelowTheBound() public {
         uint256 tooBig = pool.MAX_NOTE_VALUE() + 1;
-        ShieldedPool.Proof memory args = _args(1, -int256(tooBig));
+        ShieldedPool.Proof memory args = _args(1);
 
         vm.expectRevert(
             abi.encodeWithSelector(ShieldedPool.AmountTooLarge.selector, tooBig)
         );
-        pool.transact(args, _ext(ALICE, 0));
+        pool.transact(args, _out(ALICE, tooBig));
+    }
+
+    /**
+     * The fee is bounded too, and separately.
+     *
+     * Easy to leave out, because a fee is "small" in every case anyone pictures. It
+     * is a caller-supplied `uint256` that gets subtracted from a signed value, so
+     * without its own check an absurd one would be the way to drive `publicAmount`
+     * somewhere the field cannot represent.
+     */
+    function test_refusesAFeeAboveTheBound() public {
+        uint256 tooBig = pool.MAX_NOTE_VALUE() + 1;
+        ShieldedPool.Proof memory args = _args(1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ShieldedPool.AmountTooLarge.selector, tooBig)
+        );
+        pool.transact(args, _ext(ALICE, 0, tooBig));
+    }
+
+    /**
+     * 🔴 Both parts within the bound does not make their difference so, and this is
+     * the one path where `fieldEncode`'s own check is the only thing standing there.
+     *
+     * `publicAmountFor` bounds `extAmount` and `fee` individually, so a withdrawal at
+     * the ceiling with a fee at the ceiling derives `-2·MAX_NOTE_VALUE` — twice the
+     * largest value the circuit can hold, from two inputs that each passed. The
+     * alternative design gives `extAmount` and `fee` half the bound each so their sum
+     * always fits; that is one more constant for the circuit to agree with, in
+     * exchange for forbidding nothing anyone will ever do.
+     */
+    function test_refusesADerivedAmountAboveTheBoundEvenWhenBothPartsFit() public {
+        uint256 max = pool.MAX_NOTE_VALUE();
+        ShieldedPool.Proof memory args = _args(1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ShieldedPool.AmountTooLarge.selector, 2 * max)
+        );
+        pool.transact(args, _ext(ALICE, -int256(max), max));
     }
 
     /**
      * 🔴 An oversized amount must be refused BEFORE any money moves.
      *
-     * `publicAmountFor` applies the same bound, but it runs inside `_publicInputs`,
-     * which is called after the token pull. If `transact` did not check first, an
-     * over-sized deposit would transfer tokens in and then revert — correct only
-     * because the revert unwinds it, and fragile the moment any part of this path
-     * stops being atomic.
+     * `publicAmountFor` and `fieldEncode` are both reached again from inside
+     * `_publicInputs`, which runs after the token pull. If `transact` did not check
+     * first, an over-sized deposit would transfer tokens in and then revert — correct
+     * only because the revert unwinds it, and fragile the moment any part of this
+     * path stops being atomic.
      */
     function test_anOversizedAmountMovesNoMoneyAtAll() public {
         uint256 balanceBefore = token.balanceOf(address(this));
         uint256 tooBig = pool.MAX_NOTE_VALUE() + 1;
-        ShieldedPool.Proof memory args = _args(1, int256(tooBig));
+        ShieldedPool.Proof memory args = _args(1);
 
         vm.expectRevert(
             abi.encodeWithSelector(ShieldedPool.AmountTooLarge.selector, tooBig)
         );
-        pool.transact(args, _ext(address(0), 0));
+        pool.transact(args, _in(tooBig));
 
         assertEq(token.balanceOf(address(this)), balanceBefore, "no tokens left the caller");
         assertEq(token.balanceOf(address(pool)), 0, "and none reached the pool");
@@ -471,11 +737,11 @@ contract ShieldedPoolTest is Harness {
     /* ── field encoding of the public amount ────────────────────────────────── */
 
     function test_encodesAPositiveAmountAsItself() public view {
-        assertEq(pool.publicAmountFor(1000), 1000, "a deposit is its own magnitude");
+        assertEq(pool.fieldEncode(1000), 1000, "a deposit is its own magnitude");
     }
 
     function test_encodesZeroAsZero() public view {
-        assertEq(pool.publicAmountFor(0), 0, "nothing crossing the boundary");
+        assertEq(pool.fieldEncode(0), 0, "nothing crossing the boundary");
     }
 
     /**
@@ -485,19 +751,18 @@ contract ShieldedPoolTest is Harness {
      * function rather than documenting the convention.
      */
     function test_encodesANegativeAmountAsAFieldSubtraction() public view {
-        assertEq(pool.publicAmountFor(-1000), FIELD_SIZE - 1000, "a withdrawal wraps");
+        assertEq(pool.fieldEncode(-1000), FIELD_SIZE - 1000, "a withdrawal wraps");
     }
 
     /**
-     * `publicAmountFor` enforces the bound itself, and reaching that revert takes a
-     * direct call — `transact` checks first, so its own check shields this one.
+     * `fieldEncode` enforces the bound itself, and reaching that revert from a
+     * plausible transaction takes the two-at-the-ceiling case above — `transact`
+     * checks first, so its own check shields this one everywhere else.
      *
      * Not a redundancy worth removing. This function is public precisely so a client
      * can encode an amount before building a proof, and a client asking it to encode
      * an impossible amount should be told so at that point rather than discovering it
-     * from a reverted transaction after paying for a proof. It was also the last
-     * uncovered branch in the contract, which is how it got noticed: a bound that
-     * only the caller-of-last-resort can trip is still a bound somebody trips.
+     * from a reverted transaction after paying for a proof.
      */
     function test_theEncoderRefusesAnOversizedAmountOnItsOwn() public {
         uint256 tooBig = pool.MAX_NOTE_VALUE() + 1;
@@ -505,7 +770,7 @@ contract ShieldedPoolTest is Harness {
         vm.expectRevert(
             abi.encodeWithSelector(ShieldedPool.AmountTooLarge.selector, tooBig)
         );
-        pool.publicAmountFor(int256(tooBig));
+        pool.fieldEncode(int256(tooBig));
     }
 
     function test_theEncoderRefusesAnOversizedWithdrawalOnItsOwn() public {
@@ -514,11 +779,11 @@ contract ShieldedPoolTest is Harness {
         vm.expectRevert(
             abi.encodeWithSelector(ShieldedPool.AmountTooLarge.selector, tooBig)
         );
-        pool.publicAmountFor(-int256(tooBig));
+        pool.fieldEncode(-int256(tooBig));
     }
 
     function test_hashesExtDataIntoTheField() public view {
-        uint256 hashed = pool.hashExtData(_ext(ALICE, 25e8));
+        uint256 hashed = pool.hashExtData(_ext(ALICE, -int256(100e8), 25e8));
         assertTrue(hashed < FIELD_SIZE, "the circuit has to be able to hold it");
     }
 
@@ -526,14 +791,34 @@ contract ShieldedPoolTest is Harness {
      * `extDataHash` is what binds the payout details to the proof. If two different
      * `ExtData` values hashed alike, a relayer could swap the recipient for their own
      * address and the proof would still verify.
+     *
+     * `extAmount` is bound here as well as being the source of `input[1]`. That looks
+     * redundant and is not: `input[1]` is a quantity the circuit does arithmetic
+     * with, and this is a destination. A client may legitimately sign two
+     * transactions that differ only in how much they send to the same address, and
+     * the hash has to tell them apart.
      */
     function test_differentPayoutDetailsHashDifferently() public view {
-        uint256 toAlice = pool.hashExtData(_ext(ALICE, 0));
-        uint256 toRelayer = pool.hashExtData(_ext(RELAYER, 0));
-        uint256 withFee = pool.hashExtData(_ext(ALICE, 1));
+        uint256 toAlice = pool.hashExtData(_ext(ALICE, -int256(100e8), 0));
+        uint256 toRelayer = pool.hashExtData(_ext(RELAYER, -int256(100e8), 0));
+        uint256 withFee = pool.hashExtData(_ext(ALICE, -int256(100e8), 1));
+        uint256 otherAmount = pool.hashExtData(_ext(ALICE, -int256(101e8), 0));
 
         assertTrue(toAlice != toRelayer, "recipient is bound");
         assertTrue(toAlice != withFee, "fee is bound");
+        assertTrue(toAlice != otherAmount, "extAmount is bound");
+    }
+
+    /**
+     * And the sign of `extAmount` is bound, which a magnitude-only field would have
+     * lost. Depositing 100 and withdrawing 100 to the same address must not share a
+     * hash, or a proof for one is a proof for the other.
+     */
+    function test_theDirectionOfTheAmountIsBound() public view {
+        uint256 inward = pool.hashExtData(_ext(ALICE, int256(100e8), 0));
+        uint256 outward = pool.hashExtData(_ext(ALICE, -int256(100e8), 0));
+
+        assertTrue(inward != outward, "a deposit and a withdrawal are different proofs");
     }
 
     /* ── the vector handed to the verifier ──────────────────────────────────── */
@@ -554,12 +839,11 @@ contract ShieldedPoolTest is Harness {
             new ShieldedPool(LEVELS, hasher, expecting, IERC20(address(token)));
         token.approve(address(fresh), type(uint256).max);
 
-        ShieldedPool.ExtData memory ext = _ext(address(0), 0);
+        ShieldedPool.ExtData memory ext = _in(100e8);
         ShieldedPool.Proof memory args = ShieldedPool.Proof({
             root: fresh.getLastRoot(),
             inputNullifiers: [_field("nullifier-a", 7), _field("nullifier-b", 7)],
             outputCommitments: [_field("commitment-a", 7), _field("commitment-b", 7)],
-            publicAmount: 100e8,
             proof: hex"c0ffee"
         });
 
@@ -578,13 +862,54 @@ contract ShieldedPoolTest is Harness {
         assertEq(fresh.nextIndex(), 2, "the transaction went through, so the vector matched");
     }
 
+    /**
+     * 🔴 The strongest form of the insolvency regression: the vector and the balance,
+     * asserted against each other in one transaction.
+     *
+     * A relayed deposit of 100 with a fee of 3 must tell the verifier **97**, and
+     * must end with 97 in the pool. The old implementation told it 100 and kept 97,
+     * and a correct circuit would have minted notes for the difference. Because
+     * `ExpectingVerifier` reverts on any vector but the one it was handed, the
+     * transaction going through *is* the assertion on `input[1]`, and the balance
+     * check after it closes the loop.
+     */
+    function test_handsTheVerifierTheDerivedAmountAndThenHoldsExactlyIt() public {
+        ExpectingVerifier expecting = new ExpectingVerifier();
+        ShieldedPool fresh =
+            new ShieldedPool(LEVELS, hasher, expecting, IERC20(address(token)));
+        token.approve(address(fresh), type(uint256).max);
+
+        ShieldedPool.ExtData memory ext = _ext(address(0), int256(100e8), 3e8);
+        ShieldedPool.Proof memory args = ShieldedPool.Proof({
+            root: fresh.getLastRoot(),
+            inputNullifiers: [_field("nullifier-a", 11), _field("nullifier-b", 11)],
+            outputCommitments: [_field("commitment-a", 11), _field("commitment-b", 11)],
+            proof: hex"c0ffee"
+        });
+
+        uint256[7] memory built;
+        built[0] = uint256(args.root);
+        built[1] = 97e8; // 100 pulled in, 3 paid straight out to the relayer
+        built[2] = uint256(keccak256(abi.encode(ext))) % FIELD_SIZE;
+        built[3] = uint256(args.inputNullifiers[0]);
+        built[4] = uint256(args.inputNullifiers[1]);
+        built[5] = uint256(args.outputCommitments[0]);
+        built[6] = uint256(args.outputCommitments[1]);
+
+        expecting.expect(built, hex"c0ffee");
+        fresh.transact(args, ext);
+
+        assertEq(token.balanceOf(address(fresh)), 97e8, "and the balance agrees with the vector");
+        assertEq(token.balanceOf(RELAYER), 3e8, "the relayer was paid from the deposit");
+    }
+
     function test_thePublicHelperAgreesWithTheSameVector() public view {
-        ShieldedPool.ExtData memory ext = _ext(ALICE, 25e8);
-        ShieldedPool.Proof memory args = _args(9, -int256(100e8));
+        ShieldedPool.ExtData memory ext = _ext(ALICE, -int256(75e8), 25e8);
+        ShieldedPool.Proof memory args = _args(9);
 
         uint256[7] memory got = pool.publicInputs(args, ext);
         assertEq(got[0], uint256(args.root), "root");
-        assertEq(got[1], FIELD_SIZE - 100e8, "publicAmount, field-encoded");
+        assertEq(got[1], FIELD_SIZE - 100e8, "publicAmount: recipient plus relayer, encoded");
         assertEq(got[2], pool.hashExtData(ext), "extDataHash");
         assertEq(got[3], uint256(args.inputNullifiers[0]), "nullifier 0");
         assertEq(got[4], uint256(args.inputNullifiers[1]), "nullifier 1");
@@ -613,18 +938,45 @@ contract ShieldedPoolTest is Harness {
             root: rootBefore,
             inputNullifiers: [_field("nullifier-a", 5), _field("nullifier-b", 5)],
             outputCommitments: [_field("commitment-a", 5), _field("commitment-b", 5)],
-            publicAmount: 100e8,
             proof: hex"00"
         });
 
         vm.expectRevert(ShieldedPool.InvalidProof.selector);
-        fresh.transact(args, _ext(address(0), 0));
+        fresh.transact(args, _in(100e8));
 
         assertEq(fresh.getLastRoot(), rootBefore, "root unchanged");
         assertEq(fresh.nextIndex(), 0, "tree unchanged");
         assertFalse(fresh.isSpent(args.inputNullifiers[0]), "no nullifier burned");
         assertEq(token.balanceOf(address(fresh)), 0, "no tokens held");
         assertEq(token.balanceOf(address(this)), callerBefore, "caller paid nothing");
+    }
+
+    /**
+     * 🔴 And a rejected proof pays no relayer, which is a different claim.
+     *
+     * Verification sits between the pull and both payments, so a bad proof on a
+     * relayed deposit must leave the relayer with nothing even though the tokens
+     * briefly arrived. Worth its own test because "the revert unwinds it" is an
+     * argument about ordering, and the fee is the payment most likely to be moved
+     * earlier by someone reasoning that the relayer did the work regardless.
+     */
+    function test_aRejectedProofPaysNoRelayer() public {
+        RejectingVerifier rejecting = new RejectingVerifier();
+        ShieldedPool fresh =
+            new ShieldedPool(LEVELS, hasher, rejecting, IERC20(address(token)));
+        token.approve(address(fresh), type(uint256).max);
+
+        ShieldedPool.Proof memory args = ShieldedPool.Proof({
+            root: fresh.getLastRoot(),
+            inputNullifiers: [_field("nullifier-a", 12), _field("nullifier-b", 12)],
+            outputCommitments: [_field("commitment-a", 12), _field("commitment-b", 12)],
+            proof: hex"00"
+        });
+
+        vm.expectRevert(ShieldedPool.InvalidProof.selector);
+        fresh.transact(args, _ext(address(0), int256(100e8), 3e8));
+
+        assertEq(token.balanceOf(RELAYER), 0, "the relayer was not paid for a bad proof");
     }
 
     /* ── tokens that do not deliver ─────────────────────────────────────────── */
@@ -648,7 +1000,6 @@ contract ShieldedPoolTest is Harness {
             root: fresh.getLastRoot(),
             inputNullifiers: [_field("nullifier-a", 4), _field("nullifier-b", 4)],
             outputCommitments: [_field("commitment-a", 4), _field("commitment-b", 4)],
-            publicAmount: 100e8,
             proof: hex"01"
         });
 
@@ -658,7 +1009,7 @@ contract ShieldedPoolTest is Harness {
                 ShieldedPool.TokenDidNotDeliver.selector, 100e8, 99e8
             )
         );
-        fresh.transact(args, _ext(address(0), 0));
+        fresh.transact(args, _in(100e8));
     }
 
     /**
@@ -678,7 +1029,6 @@ contract ShieldedPoolTest is Harness {
             root: fresh.getLastRoot(),
             inputNullifiers: [_field("nullifier-a", 6), _field("nullifier-b", 6)],
             outputCommitments: [_field("commitment-a", 6), _field("commitment-b", 6)],
-            publicAmount: 100e8,
             proof: hex"02"
         });
 
@@ -687,7 +1037,7 @@ contract ShieldedPoolTest is Harness {
                 ShieldedPool.TokenDidNotDeliver.selector, 100e8, 100e8 + 1
             )
         );
-        fresh.transact(args, _ext(address(0), 0));
+        fresh.transact(args, _in(100e8));
     }
 
     /**
@@ -708,7 +1058,6 @@ contract ShieldedPoolTest is Harness {
             root: fresh.getLastRoot(),
             inputNullifiers: [_field("nullifier-a", 8), _field("nullifier-b", 8)],
             outputCommitments: [_field("commitment-a", 8), _field("commitment-b", 8)],
-            publicAmount: 100e8,
             proof: hex"03"
         });
 
@@ -717,7 +1066,7 @@ contract ShieldedPoolTest is Harness {
                 SafeTransfer.TransferFromFailed.selector, address(broken), address(this), 100e8
             )
         );
-        fresh.transact(args, _ext(address(0), 0));
+        fresh.transact(args, _in(100e8));
 
         assertFalse(fresh.isSpent(args.inputNullifiers[0]), "nullifier still unspent");
         assertEq(fresh.nextIndex(), 0, "tree did not grow");
@@ -731,12 +1080,32 @@ contract ShieldedPoolTest is Harness {
      */
     function test_anUnderfundedWithdrawalFailsLoudly() public {
         _deposit(1, 100e8);
-        ShieldedPool.Proof memory args = _args(2, -int256(500e8));
+        ShieldedPool.Proof memory args = _args(2);
 
         vm.expectRevert();
-        pool.transact(args, _ext(ALICE, 0));
+        pool.transact(args, _out(ALICE, 500e8));
 
         assertEq(token.balanceOf(ALICE), 0, "alice received nothing");
+        assertEq(token.balanceOf(address(pool)), 100e8, "the pool is intact");
+    }
+
+    /**
+     * And a fee the pool cannot cover fails the same way, after the recipient has
+     * already been paid inside the same call.
+     *
+     * The atomicity is the whole defence: `_payOut` runs before `_payFee`, so without
+     * the revert unwinding it a relayer could be stiffed on a transaction that
+     * nonetheless delivered the withdrawal.
+     */
+    function test_anUnpayableFeeUndoesThePayoutToo() public {
+        _deposit(1, 100e8);
+        ShieldedPool.Proof memory args = _args(2);
+
+        vm.expectRevert();
+        pool.transact(args, _ext(ALICE, -int256(90e8), 50e8));
+
+        assertEq(token.balanceOf(ALICE), 0, "the payout was undone");
+        assertEq(token.balanceOf(RELAYER), 0, "and the fee never happened");
         assertEq(token.balanceOf(address(pool)), 100e8, "the pool is intact");
     }
 
@@ -757,10 +1126,9 @@ contract ShieldedPoolTest is Harness {
                     root: small.getLastRoot(),
                     inputNullifiers: [_field("na", i), _field("nb", i)],
                     outputCommitments: [_field("ca", i), _field("cb", i)],
-                    publicAmount: 1e8,
                     proof: hex"04"
                 }),
-                _ext(address(0), 0)
+                _in(1e8)
             );
         }
         assertEq(small.remainingCapacity(), 0, "four leaves, two transactions");
@@ -769,12 +1137,11 @@ contract ShieldedPoolTest is Harness {
             root: small.getLastRoot(),
             inputNullifiers: [_field("na", 99), _field("nb", 99)],
             outputCommitments: [_field("ca", 99), _field("cb", 99)],
-            publicAmount: 1e8,
             proof: hex"04"
         });
 
         vm.expectRevert(MerkleTreeWithHistory.TreeIsFull.selector);
-        small.transact(args, _ext(address(0), 0));
+        small.transact(args, _in(1e8));
     }
 
     /* ── fuzz ───────────────────────────────────────────────────────────────── */
@@ -787,7 +1154,7 @@ contract ShieldedPoolTest is Harness {
         uint256 amount = uint256(raw);
         vm.assume(amount <= 1_000_000e8);
 
-        pool.transact(_args(1, int256(amount)), _ext(address(0), 0));
+        pool.transact(_args(1), _in(amount));
 
         assertEq(token.balanceOf(address(pool)), amount, "pool up by the amount");
         assertEq(token.balanceOf(address(this)), 1_000_000e8 - amount, "caller down by it");
@@ -795,21 +1162,29 @@ contract ShieldedPoolTest is Harness {
     }
 
     /**
-     * The fee split never creates or destroys tokens, whatever the split is. An
+     * The two payments never create or destroy tokens, whatever the split is. An
      * off-by-one here would be a slow leak rather than a visible failure.
+     *
+     * Note what this now asserts and did not before: the recipient gets `amount` and
+     * the relayer gets `fee`, so their sum is `amount + fee` and the pool is down by
+     * that. The old version fuzzed a split of a fixed total, which is the shape that
+     * hid the bug — it could only ever check that one number was divided correctly,
+     * never that the number itself was the one the circuit had proven.
      */
-    function testFuzz_theFeeSplitConservesTheWithdrawal(uint96 rawAmount, uint96 rawFee)
+    function testFuzz_bothPaymentsAreExactAndComeFromThePool(uint96 rawAmount, uint96 rawFee)
         public
     {
-        uint256 amount = uint256(rawAmount) % 1000e8 + 1;
-        uint256 fee = uint256(rawFee) % (amount + 1);
+        uint256 amount = uint256(rawAmount) % 500e8;
+        uint256 fee = uint256(rawFee) % 500e8;
 
         _deposit(1, 1000e8);
-        pool.transact(_args(2, -int256(amount)), _ext(ALICE, fee));
+        pool.transact(_args(2), _ext(ALICE, -int256(amount), fee));
 
-        assertEq(token.balanceOf(ALICE) + token.balanceOf(RELAYER), amount, "nothing vanished");
+        assertEq(token.balanceOf(ALICE), amount, "the recipient got exactly the amount");
         assertEq(token.balanceOf(RELAYER), fee, "the relayer got exactly the fee");
-        assertEq(token.balanceOf(address(pool)), 1000e8 - amount, "the pool paid exactly once");
+        assertEq(
+            token.balanceOf(address(pool)), 1000e8 - amount - fee, "and the pool paid both once"
+        );
     }
 
     /**
@@ -820,9 +1195,9 @@ contract ShieldedPoolTest is Harness {
     function testFuzz_fieldEncodingRoundTrips(uint256 raw) public view {
         uint256 magnitude = raw % (pool.MAX_NOTE_VALUE() + 1);
 
-        assertEq(pool.publicAmountFor(int256(magnitude)), magnitude, "deposits are identity");
+        assertEq(pool.fieldEncode(int256(magnitude)), magnitude, "deposits are identity");
 
-        uint256 encoded = pool.publicAmountFor(-int256(magnitude));
+        uint256 encoded = pool.fieldEncode(-int256(magnitude));
         if (magnitude == 0) {
             assertEq(encoded, 0, "zero has no sign");
         } else {
@@ -834,10 +1209,16 @@ contract ShieldedPoolTest is Harness {
     function testFuzz_extDataHashAlwaysLandsInTheField(
         address recipient,
         address relayer,
+        int256 extAmount,
         uint256 fee
     ) public view {
         uint256 hashed = pool.hashExtData(
-            ShieldedPool.ExtData({recipient: recipient, relayer: relayer, fee: fee})
+            ShieldedPool.ExtData({
+                recipient: recipient,
+                relayer: relayer,
+                extAmount: extAmount,
+                fee: fee
+            })
         );
         assertTrue(hashed < FIELD_SIZE, "always a field element");
     }
@@ -846,9 +1227,19 @@ contract ShieldedPoolTest is Harness {
     function testFuzz_refusesEveryOversizedAmount(uint256 raw) public {
         uint256 max = pool.MAX_NOTE_VALUE();
         vm.assume(raw > max && raw <= uint256(type(int256).max));
-        ShieldedPool.Proof memory args = _args(1, int256(raw));
+        ShieldedPool.Proof memory args = _args(1);
 
         vm.expectRevert(abi.encodeWithSelector(ShieldedPool.AmountTooLarge.selector, raw));
-        pool.transact(args, _ext(address(0), 0));
+        pool.transact(args, _in(raw));
+    }
+
+    /** And every oversized fee, which is the check that did not exist before. */
+    function testFuzz_refusesEveryOversizedFee(uint256 raw) public {
+        uint256 max = pool.MAX_NOTE_VALUE();
+        vm.assume(raw > max);
+        ShieldedPool.Proof memory args = _args(1);
+
+        vm.expectRevert(abi.encodeWithSelector(ShieldedPool.AmountTooLarge.selector, raw));
+        pool.transact(args, _ext(ALICE, 0, raw));
     }
 }

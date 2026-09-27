@@ -27,9 +27,9 @@ pragma solidity 0.8.28;
  *
  *   [0] root               the Merkle root the input notes were proven against
  *   [1] publicAmount       net value entering the pool, in field arithmetic —
- *                          see `ShieldedPool.publicAmountFor`
+ *                          `extAmount - fee`, encoded by `ShieldedPool.fieldEncode`
  *   [2] extDataHash        keccak256(extData) % FIELD_SIZE, binding recipient,
- *                          relayer and fee to this proof
+ *                          relayer, extAmount and fee to this proof
  *   [3] inputNullifier[0]
  *   [4] inputNullifier[1]
  *   [5] outputCommitment[0]
@@ -46,9 +46,33 @@ pragma solidity 0.8.28;
  *   - sum(inputs) + publicAmount == sum(outputs)
  *   - every output amount fits the range the field allows
  *
+ * ── `publicAmount` is not the amount the user typed, and that distinction was
+ *    once an insolvency ────────────────────────────────────────────────────────
+ * The third bullet is unconditional, and it always was — the version of
+ * `ShieldedPool` before this one did not honour it. It took `publicAmount` as a
+ * calldata field and then paid the relayer's fee *out of* the payout on a
+ * withdrawal but *on top of* it on a deposit or an internal transfer, so the law
+ * it actually enforced was `sum(inputs) + publicAmount - (publicAmount < 0 ? 0 :
+ * fee) == sum(outputs)`. A circuit written to this file — the correct equation —
+ * would have made every relayed deposit skim its fee from other depositors' money,
+ * and every relayed internal transfer a repeatable withdrawal against notes that
+ * proved nothing left. Nothing reverts in either case; the shortfall surfaces as a
+ * failed withdrawal for whoever is last.
+ *
+ * So the rule is stated once, in one direction: **`publicAmount` is everything the
+ * pool's balance changes by, including the fee.** `ShieldedPool` derives it
+ * (`publicAmountFor`) rather than accepting it, so no calldata can claim one value
+ * while the transfers imply another — if two things must be equal, have one of
+ * them. `extAmount` is the recipient's side of the boundary and is what a user
+ * names; `fee` is the relayer's; `publicAmount` is their difference and is the only
+ * one of the three the circuit does arithmetic with.
+ *
  * `extDataHash` earns its slot: without it a relayer could take a valid proof
  * out of the mempool, point the payout at themselves and submit it. The proof
  * would still verify, because the recipient was never part of what was proven.
+ * It binds `extAmount` as well as the addresses, which is redundant with `[1]` on
+ * purpose — `[1]` is a quantity and this is a destination, and a client may
+ * legitimately sign two transactions that differ only in how much they send.
  */
 interface IVerifier {
     /**

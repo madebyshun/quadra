@@ -54,26 +54,40 @@ contract ShieldedPool is MerkleTreeWithHistory {
     using SafeTransfer for IERC20;
 
     /**
-     * What a withdrawal is for, hashed into the proof so it cannot be edited in
-     * the mempool.
+     * What actually moves, hashed into the proof so it cannot be edited in the
+     * mempool.
      *
      * Without this binding a relayer could lift a valid proof out of a pending
      * transaction, swap `recipient` for their own address and submit it first.
      * The proof still verifies — the recipient was never part of what it proved.
+     *
+     * `extAmount` is what crosses the contract's boundary: positive is pulled in
+     * from `msg.sender`, negative is paid out to `recipient`. It is **not** the
+     * number the circuit proves over; see `publicAmountFor` for why those are two
+     * different quantities and what went wrong when they were one.
      */
     struct ExtData {
         address recipient;
         address relayer;
+        int256 extAmount;
         uint256 fee;
     }
 
-    /** Everything the verifier is asked about, in one argument. */
+    /**
+     * Everything the verifier is asked about, in one argument.
+     *
+     * 🔴 There is deliberately no `publicAmount` field. It is **derived** from
+     * `ExtData` by `publicAmountFor`, so the calldata cannot state one value while
+     * the token movement implies another. An earlier version took it as a
+     * parameter, which made the two independent and let them disagree — see the
+     * history in `publicAmountFor`. The same reasoning as the commitment tree
+     * assigning leaf indices instead of a counter promising to agree with one: if
+     * two things must be equal, have one of them.
+     */
     struct Proof {
         bytes32 root;
         bytes32[2] inputNullifiers;
         bytes32[2] outputCommitments;
-        /** Signed: positive is a deposit, negative is a withdrawal. */
-        int256 publicAmount;
         bytes proof;
     }
 
@@ -103,7 +117,20 @@ contract ShieldedPool is MerkleTreeWithHistory {
     event Deposit(bytes32 indexed commitment, uint32 leafIndex, uint256 timestamp);
     event NewCommitment(bytes32 indexed commitment, uint32 leafIndex);
     event NewNullifier(bytes32 indexed nullifier);
-    event Withdrawal(address indexed recipient, uint256 amount, uint256 fee);
+
+    /**
+     * Two events, not one with a zero in it.
+     *
+     * These used to be a single `Withdrawal(recipient, amount, fee)`, emitted with
+     * `recipient` set to the relayer and `amount` set to zero when the only thing
+     * that moved was a fee. An indexed field that sometimes names the payee and
+     * sometimes names the relayer cannot be filtered on, and the reader has to know
+     * which case they are in before they can interpret either number. Each event now
+     * fires exactly when its own transfer happens, and a transaction can emit
+     * neither, either, or both.
+     */
+    event Withdrawal(address indexed recipient, uint256 amount);
+    event FeePaid(address indexed relayer, uint256 fee);
 
     error VerifierNotSet();
     error TokenNotSet();
@@ -112,8 +139,8 @@ contract ShieldedPool is MerkleTreeWithHistory {
     error DuplicateNullifier(bytes32 nullifier);
     error InvalidProof();
     error AmountTooLarge(uint256 amount);
-    error FeeExceedsWithdrawal(uint256 fee, uint256 amount);
     error RecipientIsZero();
+    error RelayerIsZero();
     error TokenDidNotDeliver(uint256 asked, uint256 delivered);
 
     constructor(uint32 _levels, IHasher _hasher, IVerifier _verifier, IERC20 _token)
@@ -144,23 +171,28 @@ contract ShieldedPool is MerkleTreeWithHistory {
         if (!isKnownRoot(args.root)) revert UnknownRoot(args.root);
 
         /**
-         * `publicAmountFor` below applies the same bound, so this looks
-         * redundant — it is not. That call happens inside `_publicInputs`, which
-         * runs *after* the token pull. Checking here means an over-sized amount
-         * reverts before any money has moved, rather than relying on the revert
-         * to unwind a transfer that already happened.
+         * Every bound applied before any money moves.
+         *
+         * `publicAmountFor` bounds `extAmount` and `fee` individually and
+         * `fieldEncode` bounds the derived result, and both are reached again from
+         * inside `_publicInputs` — which runs *after* the token pull. Checking here
+         * as well means an over-sized amount reverts before a transfer has
+         * happened, rather than relying on the revert to unwind one.
          */
-        uint256 magnitude = _magnitude(args.publicAmount);
-        if (magnitude > MAX_NOTE_VALUE) revert AmountTooLarge(magnitude);
+        int256 publicAmount = publicAmountFor(extData);
+        fieldEncode(publicAmount);
+        uint256 outward = _magnitude(extData.extAmount);
 
         /**
-         * `publicAmount == 0` with no fee is NOT a no-op and must not be
-         * rejected: it is two notes in, two notes out, nothing crossing the
-         * boundary — a merge or a re-split. That is how a wallet consolidates
-         * dust, and how it breaks the amount correlation this pool's shape
-         * otherwise leaks (see the caveat at the top). An early version refused
-         * it as "nothing to do", which would have removed the one move a user
-         * has for repairing their own privacy.
+         * There is deliberately no "nothing to do" check here.
+         *
+         * `extAmount == 0` with no fee is not a no-op: it is two notes in, two notes
+         * out, nothing crossing the boundary — a merge or a re-split. That is how a
+         * wallet consolidates dust, and how it breaks the amount correlation this
+         * pool's shape otherwise leaks (see the caveat at the top). Rejecting it as
+         * pointless would remove the one move a user has for repairing their own
+         * privacy, and it is not free to the caller either way: it still spends two
+         * nullifiers and still costs gas, so there is nothing to protect them from.
          */
 
         /**
@@ -171,7 +203,7 @@ contract ShieldedPool is MerkleTreeWithHistory {
          * written is what guarantees that without an explicit unwind. The
          * verification below still gates every commitment and every payout.
          */
-        if (args.publicAmount > 0) _pullExactly(magnitude);
+        if (extData.extAmount > 0) _pullExactly(outward);
 
         if (!verifier.verifyProof(args.proof, _publicInputs(args, extData))) {
             revert InvalidProof();
@@ -180,10 +212,21 @@ contract ShieldedPool is MerkleTreeWithHistory {
         _spend(args.inputNullifiers);
         _appendOutputs(args.outputCommitments);
 
-        if (args.publicAmount < 0) _payOut(magnitude, extData);
-        else if (extData.fee != 0) _payFee(extData);
+        /**
+         * Both payments, independently, and **not** as an if/else.
+         *
+         * This was `if (publicAmount < 0) _payOut(...); else if (fee != 0)
+         * _payFee(...)`, which is where the insolvency in `publicAmountFor`'s
+         * history came from: on a withdrawal the fee was carved out of the payout,
+         * and on a deposit or a transfer it was paid on top, so one field meant two
+         * different things depending on the sign of another. Now the recipient gets
+         * exactly `extAmount` and the relayer gets exactly `fee`, always, and the
+         * sum of the two is what `publicAmount` says left the pool.
+         */
+        if (extData.extAmount < 0) _payOut(outward, extData);
+        if (extData.fee != 0) _payFee(extData);
 
-        if (args.publicAmount > 0) {
+        if (extData.extAmount > 0) {
             emit Deposit(args.outputCommitments[0], nextIndex - 2, block.timestamp);
         }
     }
@@ -205,14 +248,60 @@ contract ShieldedPool is MerkleTreeWithHistory {
     }
 
     /**
+     * What the circuit proves the pool's balance changed by.
+     *
+     * 🔴 **This is not `extAmount`, and conflating the two was a real insolvency.**
+     * The version before this one took `publicAmount` as a calldata field and paid
+     * the fee out of it on a withdrawal but on top of it on a deposit, so the
+     * conservation law the circuit enforced was
+     * `sumIns + publicAmount - (publicAmount < 0 ? 0 : fee) == sumOuts` — a
+     * different equation depending on the sign of one of its own terms. Meanwhile
+     * `IVerifier` documented the unconditional `sumIns + publicAmount == sumOuts`,
+     * which is the equation any sane circuit would implement. Built to that spec,
+     * every relayed deposit would have skimmed its fee from *other depositors'*
+     * money, and every relayed internal transfer (`extAmount == 0`, `fee > 0`)
+     * would have been a repeatable withdrawal from a pool that had proven nothing
+     * left it. Nothing reverts; the shortfall lands on whoever withdraws last —
+     * the exact failure `_pullExactly` exists to prevent, arriving by the other
+     * door.
+     *
+     * The fix is subtraction, once, here: whatever leaves the pool leaves it,
+     * whether a recipient or a relayer receives it. `extAmount` is the recipient's
+     * side of the boundary and `fee` is the relayer's; their difference from the
+     * pool's perspective is what the notes must account for.
+     *
+     * Both terms are bounded before the subtraction so it cannot come near
+     * `int256`'s range — `MAX_NOTE_VALUE` is 2^248 and `int256` holds 2^255, so
+     * two bounded values cannot overflow even summed.
+     */
+    function publicAmountFor(ExtData calldata extData) public pure returns (int256) {
+        if (extData.fee > MAX_NOTE_VALUE) revert AmountTooLarge(extData.fee);
+        uint256 outward = _magnitude(extData.extAmount);
+        if (outward > MAX_NOTE_VALUE) revert AmountTooLarge(outward);
+
+        // casting to 'int256' is safe because the line above has proven the value
+        // at most 2^248, which is far inside int256's positive range.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return extData.extAmount - int256(extData.fee);
+    }
+
+    /**
      * A signed amount as the field element the circuit sees.
      *
      * Negative values are represented as `FIELD_SIZE - magnitude`, which is what
      * subtraction means inside the field. Exposed because a client that encodes
      * this differently is the single most likely reason a correct proof is
      * rejected, and a shared function is cheaper than a shared convention.
+     *
+     * The bound is re-applied rather than assumed. `publicAmountFor` bounds its two
+     * inputs individually, so the derived value can reach `-2·MAX_NOTE_VALUE`; the
+     * circuit sees one field element and has one bound, so that is where it has to
+     * be checked. In practice this only forbids `extAmount` and `fee` both sitting
+     * near the ceiling at once, which is 2^248 base units of an 8-decimal token —
+     * about 10^66 whole tokens. One constant for the circuit to agree with is worth
+     * more than that edge.
      */
-    function publicAmountFor(int256 amount) public pure returns (uint256) {
+    function fieldEncode(int256 amount) public pure returns (uint256) {
         uint256 magnitude = _magnitude(amount);
         if (magnitude > MAX_NOTE_VALUE) revert AmountTooLarge(magnitude);
         return amount >= 0 ? magnitude : FIELD_SIZE - magnitude;
@@ -247,6 +336,14 @@ contract ShieldedPool is MerkleTreeWithHistory {
      * Reduced into the field because the circuit has to be able to hold it, and
      * keccak's full 256-bit range does not fit. Folding rather than truncating:
      * the top bits still affect the result.
+     *
+     * Note that `extAmount` is now bound twice — once here inside the hash, and
+     * once as `input[1]` via `publicAmountFor`. That is redundancy, not confusion:
+     * `input[1]` is the number the circuit does arithmetic with, and this hash is
+     * what stops a relayer editing the *destination* of money whose quantity is
+     * already proven. Removing `extAmount` from the struct would leave the hash
+     * unable to distinguish two transactions that pay different amounts to the same
+     * recipient, which is a thing a client may legitimately sign twice.
      */
     function hashExtData(ExtData calldata extData) public pure returns (uint256) {
         return uint256(keccak256(abi.encode(extData))) % FIELD_SIZE;
@@ -260,7 +357,7 @@ contract ShieldedPool is MerkleTreeWithHistory {
         returns (uint256[7] memory input)
     {
         input[0] = uint256(args.root);
-        input[1] = publicAmountFor(args.publicAmount);
+        input[1] = fieldEncode(publicAmountFor(extData));
         input[2] = hashExtData(extData);
         input[3] = uint256(args.inputNullifiers[0]);
         input[4] = uint256(args.inputNullifiers[1]);
@@ -313,24 +410,38 @@ contract ShieldedPool is MerkleTreeWithHistory {
         if (delivered != amount) revert TokenDidNotDeliver(amount, delivered);
     }
 
+    /**
+     * The recipient's side of the boundary, in full.
+     *
+     * No fee arithmetic here, deliberately. A withdrawal of 75 with a fee of 25
+     * pays the recipient 75 and the relayer 25, and the proof says 100 left the
+     * pool. The previous version paid the recipient 50 and called the difference a
+     * fee, which meant a user could not name the amount they wanted to receive
+     * without first knowing what the relayer would charge.
+     */
     function _payOut(uint256 amount, ExtData calldata extData) private {
         if (extData.recipient == address(0)) revert RecipientIsZero();
-        if (extData.fee > amount) revert FeeExceedsWithdrawal(extData.fee, amount);
-
-        uint256 net = amount - extData.fee;
-        if (net != 0) token.safeTransfer(extData.recipient, net);
-        if (extData.fee != 0) token.safeTransfer(extData.relayer, extData.fee);
-        emit Withdrawal(extData.recipient, net, extData.fee);
+        token.safeTransfer(extData.recipient, amount);
+        emit Withdrawal(extData.recipient, amount);
     }
 
     /**
-     * A fee on a transfer that moves nothing in or out — the shape a relayer
-     * takes for submitting a note-to-note payment on someone's behalf. It comes
-     * out of the pool's balance, which is sound only because the circuit proved
-     * the inputs exceeded the outputs by exactly this much.
+     * The relayer's side, independently of whether anything else moved.
+     *
+     * A fee with `extAmount == 0` is the shape a relayer takes for submitting a
+     * note-to-note payment on someone's behalf: nothing crosses the boundary for
+     * the user, and the fee comes out of the pool's balance. That is sound only
+     * because `publicAmount` is `-fee` in that case, so the circuit proved the
+     * inputs exceeded the outputs by exactly this much. When the same equation was
+     * not enforced for this case, this function was the drain.
+     *
+     * The zero-address check is not symmetry with `_payOut`. A burn address here
+     * would destroy a fee the pool has already accounted as spent, leaving notes
+     * backed by tokens nobody can ever move.
      */
     function _payFee(ExtData calldata extData) private {
+        if (extData.relayer == address(0)) revert RelayerIsZero();
         token.safeTransfer(extData.relayer, extData.fee);
-        emit Withdrawal(extData.relayer, 0, extData.fee);
+        emit FeePaid(extData.relayer, extData.fee);
     }
 }
