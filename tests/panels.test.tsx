@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AdaptersProvider, useAdapters } from "@/adapters/AdaptersProvider";
@@ -352,6 +352,334 @@ describe("SendPanel: paying out", () => {
     await waitFor(() => expect(within(panel).getByText(/Not on chain/)).toBeInTheDocument());
     expect(panel.textContent).not.toMatch(/basescan/i);
     expect(within(panel).queryByRole("link")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Taking the notes out as a file, and putting them back.
+ *
+ * The format itself is `tests/backup.test.ts` and the cache behaviour is
+ * `tests/adapters.test.ts`. What is left for here is the part only a panel has: whether
+ * the user is *told* the things that stop them losing money — that the browser is not a
+ * backup, that the file is plaintext, and that the app cannot confirm the download.
+ */
+describe("SendPanel: backup and restore", () => {
+  /**
+   * jsdom has no `URL.createObjectURL`. Assigned rather than stubbed for the reasons in
+   * `tests/download.test.ts`, and the urls are collected so a test can prove a real blob
+   * was produced rather than the button merely not throwing.
+   */
+  const objectUrls: Blob[] = [];
+
+  beforeEach(() => {
+    objectUrls.length = 0;
+    (URL as unknown as { createObjectURL: (b: Blob) => string }).createObjectURL = (b) => {
+      objectUrls.push(b);
+      return `blob:quadra/${objectUrls.length}`;
+    };
+    (URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL = () => {};
+  });
+
+  afterEach(() => {
+    delete (URL as unknown as Record<string, unknown>).createObjectURL;
+    delete (URL as unknown as Record<string, unknown>).revokeObjectURL;
+  });
+
+  const picker = () => screen.getByLabelText("Backup file to restore") as HTMLInputElement;
+
+  /** Deposit once, so there is something worth backing up. */
+  async function withNote(value = "5") {
+    const mounted = await mount(<SendPanel />);
+    await userEvent.clear(amount("Amount to deposit"));
+    await userEvent.type(amount("Amount to deposit"), value);
+    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
+    await waitFor(() => expect(screen.getByLabelText(/^Note 0x/)).toBeInTheDocument());
+    return mounted;
+  }
+
+  /** The bytes the export button actually handed the browser. */
+  function exportedText(): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(r.error);
+      r.readAsText(objectUrls[0] as Blob);
+    });
+  }
+
+  /**
+   * 🔴 The warning, not the feature. A user who never learns that this browser is the only
+   * place the money exists does not go looking for an export button, so this sentence is
+   * load-bearing in a way the buttons are not — and it has to be where they are *before*
+   * they deposit, which is the last moment it is free to act on.
+   */
+  it("warns that the browser is the only copy, in the deposit flow", async () => {
+    await mount(<SendPanel />);
+    const warning = screen.getByText(/live in this browser and nowhere else/);
+    expect(warning).toBeInTheDocument();
+    expect(warning).toHaveTextContent("no copy on any server");
+    /** Present before any deposit — the point is to be read first. */
+    expect(screen.getByText("No notes yet. Put something in above.")).toBeInTheDocument();
+  });
+
+  it("says the backup file is plaintext and to treat it like cash", async () => {
+    await mount(<SendPanel />);
+    expect(screen.getByText(/plain text/)).toHaveTextContent("keep it like cash");
+  });
+
+  it("says restoring only works into an empty browser, before anyone tries", async () => {
+    await mount(<SendPanel />);
+    expect(screen.getByText(/only works into a browser with no notes/)).toBeInTheDocument();
+  });
+
+  it("has nothing to export until there is a note", async () => {
+    await mount(<SendPanel />);
+    expect(screen.getByRole("button", { name: "Export a backup" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Export a backup" })).toBeEnabled(),
+    );
+  });
+
+  it("hands the browser a real file with the notes in it", async () => {
+    await withNote();
+    await userEvent.click(screen.getByRole("button", { name: "Export a backup" }));
+
+    await waitFor(() => expect(objectUrls).toHaveLength(1));
+    expect((objectUrls[0] as Blob).type).toBe("application/json");
+    const parsed = JSON.parse(await exportedText()) as { format: string; pool: { notes: unknown[] } };
+    expect(parsed.format).toBe("quadra.pool.backup.v1");
+    expect(parsed.pool.notes).toHaveLength(1);
+  });
+
+  /**
+   * ⚠️ "Saving", never "Saved". Whether the file reached a disk is decided by the download
+   * UI and the user, and neither tells the app. A tick here would be the product asserting
+   * a fact it cannot observe, about the only file standing between the user and total loss.
+   */
+  it("says the file is being saved and to go and check it, not that it is backed up", async () => {
+    await withNote();
+    await userEvent.click(screen.getByRole("button", { name: "Export a backup" }));
+
+    const panel = out("Send output");
+    await waitFor(() => expect(within(panel).getByText(/quadra-pool-backup-/)).toBeInTheDocument());
+    expect(panel.textContent).toMatch(/check the file is there/);
+    expect(panel.textContent).toMatch(/secrets included/);
+    expect(panel.textContent).not.toMatch(/backed up|Saved|✓/);
+  });
+
+  /**
+   * 🔴 The reason `Output` is a union. `Anchor` renders a `local` anchoring as "Not on
+   * chain: …" in the warning colour, which is right after a deposit and wrong after an
+   * export — not being on chain is the feature. Reusing the receipt path would have made
+   * every successful backup look like a failed one.
+   */
+  it("does not dress a successful export up as an on-chain warning", async () => {
+    await withNote();
+    await userEvent.click(screen.getByRole("button", { name: "Export a backup" }));
+
+    const panel = out("Send output");
+    await waitFor(() => expect(within(panel).getByText(/Saving quadra-pool/)).toBeInTheDocument());
+    expect(panel.textContent).not.toMatch(/Not on chain/);
+  });
+
+  it("counts one note as a note and several as notes", async () => {
+    await withNote();
+    await userEvent.click(screen.getByRole("button", { name: "Export a backup" }));
+    await waitFor(() =>
+      expect(within(out("Send output")).getByText(/1 note, secrets included/)).toBeInTheDocument(),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
+    await userEvent.click(screen.getByRole("button", { name: "Export a backup" }));
+    await waitFor(() =>
+      expect(within(out("Send output")).getByText(/all 2 notes/)).toBeInTheDocument(),
+    );
+  });
+
+  /** A backup written by one browser, as the user would actually hand it over. */
+  async function backupFile(
+    name = "quadra-pool-backup-2026-09-28.json",
+    amounts: readonly bigint[] = [2_500_000n],
+  ): Promise<File> {
+    const source = new LocalShieldedPool();
+    for (const amount of amounts) {
+      await source.deposit(
+        { address: USDC.address, symbol: USDC.symbol, decimals: USDC.decimals },
+        amount,
+      );
+    }
+    const { body } = await source.exportBackup();
+    return new File([body], name, { type: "application/json" });
+  }
+
+  it("restores the notes from a picked file and lists them", async () => {
+    await mount(<SendPanel />);
+    await userEvent.upload(picker(), await backupFile());
+
+    await waitFor(() => expect(screen.getByText("2.5 USDC")).toBeInTheDocument());
+    expect(within(out("Send output")).getByText(/Restored 1 note from/)).toBeInTheDocument();
+  });
+
+  /**
+   * The plural half of the count — and worth more than the word it pins.
+   *
+   * A restore that reported "3 notes" while landing only the first would satisfy the
+   * single-note test above and read on screen as an unqualified success. So the count in
+   * the message is checked against the notes actually listed, which is the only thing
+   * that distinguishes a restore from a claim about one. It is also why the amounts are
+   * all different: three notes of equal value cannot show a dropped one.
+   */
+  it("restores every note in a multi-note backup, not just the first", async () => {
+    await mount(<SendPanel />);
+    await userEvent.upload(
+      picker(),
+      await backupFile("three-notes.json", [1_000_000n, 2_000_000n, 3_000_000n]),
+    );
+
+    await waitFor(() =>
+      expect(within(out("Send output")).getByText(/Restored 3 notes from/)).toBeInTheDocument(),
+    );
+    expect(screen.getByText("1 USDC")).toBeInTheDocument();
+    expect(screen.getByText("2 USDC")).toBeInTheDocument();
+    expect(screen.getByText("3 USDC")).toBeInTheDocument();
+    /** The legend totals them, so a note listed but not counted would show up here. */
+    expect(screen.getByText(/6 USDC in 3/)).toBeInTheDocument();
+  });
+
+  it("names the file it restored from, so a wrong pick is visible", async () => {
+    await mount(<SendPanel />);
+    await userEvent.upload(picker(), await backupFile("from-the-old-laptop.json"));
+    await waitFor(() =>
+      expect(within(out("Send output")).getByText(/from-the-old-laptop\.json/)).toBeInTheDocument(),
+    );
+  });
+
+  it("tells the user to check the restored amounts rather than trusting the count", async () => {
+    await mount(<SendPanel />);
+    await userEvent.upload(picker(), await backupFile());
+    await waitFor(() =>
+      expect(out("Send output").textContent).toMatch(/Check the amounts below/),
+    );
+  });
+
+  it("refuses to restore over notes this browser already holds, and keeps them", async () => {
+    await withNote("7");
+    await userEvent.upload(picker(), await backupFile());
+
+    await waitFor(() =>
+      expect(within(out("Send output")).getByText(/already holds notes/)).toBeInTheDocument(),
+    );
+    /** The refusal is inert: the note that was here is still here and still listed. */
+    expect(screen.getByText("7 USDC")).toBeInTheDocument();
+    expect(screen.queryByText("2.5 USDC")).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⚠️ Both files are named `.json` deliberately. `userEvent.upload` honours the input's
+   * `accept`, so a `.txt` never reaches the handler and the test would pass by never
+   * running the code. It is also the realistic case: a truncated or corrupted backup keeps
+   * the name it was exported under, and `accept` is a dialog filter a real user gets past
+   * with drag-and-drop anyway — so the contents are the only thing worth checking.
+   */
+  it("says which kind of wrong file it was handed", async () => {
+    await mount(<SendPanel />);
+    await userEvent.upload(picker(), new File(["not json"], "truncated.json"));
+    await waitFor(() =>
+      expect(within(out("Send output")).getByText(/not even JSON/)).toBeInTheDocument(),
+    );
+
+    await userEvent.upload(picker(), new File(['{"hello":true}'], "other.json"));
+    await waitFor(() =>
+      expect(
+        within(out("Send output")).getByText(/A backup starts with "format"/),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("names an empty file instead of complaining about its contents", async () => {
+    await mount(<SendPanel />);
+    await userEvent.upload(picker(), new File([""], "half-written.json"));
+    await waitFor(() =>
+      expect(
+        within(out("Send output")).getByText(/half-written\.json is empty/),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  /**
+   * 🔴 Clearing the input is not tidiness. A file input fires no `change` event when the
+   * user picks the same file twice, so without the reset the second attempt does nothing
+   * at all — no notes, no error, no reaction. And the second attempt is the normal case:
+   * it is what someone does after a refusal they have just gone and fixed.
+   *
+   * MEASURED: with the `.finally` reset removed, **each half of this test fails on its
+   * own** — the `value` assertion reads back `C:\fakepath\truncated.json`, and the re-pick
+   * genuinely fires nothing, leaving the deposit receipt on screen. The mechanical half was
+   * checked first and caught it; the behavioural half was then checked alone, because a
+   * test that only ever asserts the mechanism would keep passing if `userEvent.upload`
+   * stopped honouring input state and the real bug came back.
+   */
+  it("lets the same file be picked again after a refusal", async () => {
+    await mount(<SendPanel />);
+    const file = new File(["not json"], "truncated.json");
+
+    await userEvent.upload(picker(), file);
+    await waitFor(() =>
+      expect(within(out("Send output")).getByText(/not even JSON/)).toBeInTheDocument(),
+    );
+    /** The mechanism, asserted directly: the input is empty again, ready for a re-pick. */
+    expect(picker().value).toBe("");
+
+    /**
+     * Something else happens in between, so the CRT is no longer showing the first error.
+     * That is what makes the re-pick observable: if the second `upload` fired no event, the
+     * deposit receipt would still be on screen.
+     */
+    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
+    await waitFor(() => expect(out("Send output").textContent).toMatch(/You put/));
+
+    await userEvent.upload(picker(), file);
+    await waitFor(() =>
+      expect(within(out("Send output")).getByText(/not even JSON/)).toBeInTheDocument(),
+    );
+  });
+
+  /**
+   * A cancelled picker must say so. Printing nothing is the tempting shape and it is
+   * indistinguishable, from the user's side, from a restore that failed silently.
+   */
+  it("says nothing was restored when the picker is cancelled", async () => {
+    await mount(<SendPanel />);
+    await act(async () => {
+      picker().dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await waitFor(() =>
+      expect(within(out("Send output")).getByText(/No file picked/)).toBeInTheDocument(),
+    );
+  });
+
+  /** An export that throws must reach the user, not the console. */
+  it("surfaces a failed export instead of swallowing it", async () => {
+    const value = stub();
+    await mount(
+      <SendPanel />,
+      patch(value, {
+        pool: patch(value.pool, {
+          exportBackup: () => Promise.reject(new Error("This browser refused to read the pool.")),
+        }),
+      }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Export a backup" })).toBeEnabled(),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Export a backup" }));
+
+    await waitFor(() =>
+      expect(within(out("Send output")).getByText(/refused to read the pool/)).toBeInTheDocument(),
+    );
+    expect(objectUrls).toHaveLength(0);
   });
 });
 

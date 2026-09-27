@@ -12,6 +12,11 @@ import {
   tagWithScheme,
 } from "@/lib/note";
 import { IncrementalMerkleTree } from "@/lib/tree";
+/**
+ * Aliased so the methods below cannot be mistaken for recursive calls, and so a reader
+ * sees at a glance which one is the file format and which one is the pool operation.
+ */
+import { exportBackup as writeBackup, importBackup as readBackup } from "@/lib/backup";
 import type { NoteStore } from "@/adapters/local/store";
 import { MemoryNoteStore, STORE_VERSION, decodePool, encodeNote } from "@/adapters/local/store";
 
@@ -340,6 +345,59 @@ export class LocalShieldedPool implements ShieldedPool {
     return this.serialize(async () => {
       await this.ready();
       return [...this.spent];
+    });
+  }
+
+  /**
+   * Hand the notes out as a file, and take them back from one.
+   *
+   * 🔴 These two are methods on the pool and not free functions the UI calls with a
+   * store, and that is a correctness requirement rather than a matter of layering.
+   *
+   * A restore writes the pool file. This object has already hydrated from the *old*
+   * file — `this.tree` is built, `this.store` and `this.spent` are populated — and it
+   * will never look at the disk again, because `ready()` short-circuits once `tree` is
+   * set. So an import performed outside the pool leaves the live object holding the
+   * pre-restore state, and the next deposit calls `persist()`, which writes
+   * `this.store` back over the file. **The restored notes are destroyed by the first
+   * thing the user does after restoring them, silently, with the file possibly already
+   * deleted.** Routing through here is what lets the cache be dropped in the same
+   * serialized step as the write, so there is no window in which the two disagree.
+   *
+   * Serialized with everything else for the ordinary reason too: a restore landing
+   * between an insert and its `persist()` would interleave two pools' state.
+   */
+  async exportBackup(): Promise<{ filename: string; body: string }> {
+    return this.serialize(() => writeBackup(this.disk));
+  }
+
+  async importBackup(text: string): Promise<{ notes: number }> {
+    return this.serialize(async () => {
+      const result = await readBackup(this.disk, text);
+
+      /**
+       * Everything hydrated from the previous file goes, and `tree = null` is what makes
+       * the next `ready()` read the disk again.
+       *
+       * ⚠️ Ordered after the write, and the reason is narrower than it first looks —
+       * MEASURED, by moving these three lines above `readBackup` and running the suite:
+       * **all 134 tests still passed.** Clearing early is self-healing in the ordinary
+       * case, because a refusal leaves the disk untouched and `tree = null` sends the
+       * next `ready()` back to it, so the object repairs itself on the following call.
+       *
+       * What the early order really costs is that the repair is a **second disk read
+       * that has to succeed**. A store can refuse a read — `LocalStorageNoteStore.load`
+       * throws rather than answering `null` on a record it cannot parse — and then
+       * picking the wrong file, an operation that changed nothing, is what makes the
+       * notes unreadable. Clearing after the write needs no repair, so it cannot need a
+       * read that fails. `tests/adapters.test.ts` pins this with a store that can be read
+       * exactly once; it is the only test that tells the two orders apart.
+       */
+      this.tree = null;
+      this.store.length = 0;
+      this.spent.clear();
+      await this.ready();
+      return result;
     });
   }
 

@@ -119,6 +119,69 @@ describe("standInHash.hash", () => {
   });
 });
 
+/**
+ * The only tests in this file that are not property tests.
+ *
+ * Every other assertion here is relational — `a === a`, `a !== b`, `isInField(a)`.
+ * All of them hold for *any* deterministic hash, so all of them survive a change to
+ * the function itself: the commitment for a note becomes a different number, notes
+ * already in the tree become unreachable, and the suite stays green. These vectors
+ * are what make the output itself load-bearing. They are not "the right answer" in
+ * any deep sense — they are *this build's* answer, which is what a note already on
+ * someone's disk was hashed with. Recomputed independently in node rather than
+ * printed from this module, so a vector is a second opinion and not an echo.
+ *
+ * 🔴 **What these do NOT catch, MEASURED — do not mistake them for the guard against
+ * templating the domain tag.** `encodeDomain` prefixes a frozen `"quadra.v1."`, and
+ * `brand.ts` explains why it must never become `` `${BRAND.slug}.v1.` ``. The obvious
+ * conclusion is that these vectors enforce that. They do not: the mutation was
+ * applied and **all 722 tests passed**, because `BRAND.slug` is `"quadra"` today, so
+ * the template produces a byte-identical string and the hash does not move. The bug
+ * is *dormant* — it detonates at the rename, long after the commit that introduced
+ * it, and no output-based test can see it before then. A textual check is the only
+ * shape that works, and it lives in `tests/brand.test.ts`.
+ *
+ * Worth keeping anyway, and MEASURED to be: encoding field elements little-endian
+ * instead of big-endian — a plausible one-character slip, and a silent one — fails
+ * **these three tests and nothing else**, with the other 727 green. Every property
+ * above survives it, because a byte-swapped hash is still deterministic, still in
+ * field, still collision-free, and still distinguishes `H(1, 256)` from `H(256, 1)`.
+ * A change to the fold or to whether the tag is mixed in at all lands here too.
+ *
+ * ⚠️ Deliberately the opposite shape from `tests/field.test.ts`, which forbids a
+ * hard-coded expectation and reads the Solidity instead. Not a contradiction: the
+ * field modulus has a second source of truth to cross-check against, so restating
+ * it by hand would hide drift. The stand-in hash has none — there is no circuit yet —
+ * so a literal is the only option. When a real Poseidon lands these numbers change,
+ * and that is expected; what must never change silently is the hash a shipped build
+ * already committed people's money under.
+ */
+describe("the stand-in hash is pinned, not merely deterministic", () => {
+  it("reproduces a checked-in commitment vector", async () => {
+    expect(await standInHash.hash("note.commitment", [1n, 2n])).toBe(
+      15651940423848809792688220238560112134862758184330509773191514973302489237587n,
+    );
+  });
+
+  /** A second domain, so the pin covers the tag and not just the input encoding. */
+  it("reproduces a checked-in nullifier vector, including a zero leaf index", async () => {
+    expect(await standInHash.hash("note.nullifier", [1n, 0n])).toBe(
+      15521506200110996857438823717691969871331755065588542143695186727693646330160n,
+    );
+  });
+
+  /**
+   * The same inputs under a different tag, pinned to a third literal. Without this
+   * the two vectors above would still pass if `encodeDomain` stopped mixing the tag
+   * in at all — both would be hashes of their inputs alone, each still stable.
+   */
+  it("reproduces a vector that differs from the commitment only by its tag", async () => {
+    expect(await standInHash.hash("note.nullifier", [1n, 2n])).toBe(
+      19856055577956189897130104373621973836771656583806586693548944844123648239767n,
+    );
+  });
+});
+
 describe("the fold target", () => {
   /**
    * Exported purely so this can be asserted. A masked fold (`digest & mask`) would

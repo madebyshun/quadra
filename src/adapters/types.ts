@@ -161,6 +161,26 @@ export interface ShieldedPool {
    * visible instead of a surprise on deployment day.
    */
   witness(noteId: string): Promise<NoteWitness>;
+  /**
+   * Hand the notes out as a file, and take them back from one. See `lib/backup.ts`.
+   *
+   * On the interface for the same reason as `witness()`, and the reason is easy to get
+   * backwards: a live pool does **not** make these unnecessary. The chain holds
+   * commitments and nullifiers; it holds no secret, so it cannot reconstruct a note and
+   * cannot restore anybody. A deployed pool's user is in exactly the same position as a
+   * local one's — the notes are the money, the notes are in the browser, and a cleared
+   * site-data dialog ends them. Putting these here means an on-chain adapter cannot be
+   * written without answering "and how does its user get their notes back?", which is
+   * otherwise the question that only comes up after someone has lost some.
+   *
+   * ⚠️ `importBackup` is a pool operation and not a store operation, even though the
+   * file format work happens in `lib/backup.ts`. A restore replaces the state the live
+   * object has already cached; doing it around the pool means the next write puts the
+   * old notes back over the restored ones. The note on `LocalShieldedPool.importBackup`
+   * has the measurement.
+   */
+  exportBackup(): Promise<{ filename: string; body: string }>;
+  importBackup(text: string): Promise<{ notes: number }>;
   /** True when this is backed by a deployed pool rather than local state. */
   readonly isLive: boolean;
 }

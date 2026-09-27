@@ -7,6 +7,7 @@ import { HttpCatalog } from "@/adapters/http/catalog";
 import type { Note, NoteWitness } from "@/adapters/types";
 import type { NoteStore, StoredNote, StoredPool } from "@/adapters/local/store";
 import { LocalStorageNoteStore, MemoryNoteStore, STORE_KEY, STORE_VERSION } from "@/adapters/local/store";
+import { BACKUP_FORMAT } from "@/lib/backup";
 import { AAPL_BASE } from "@/config/pair";
 import { BLUEAGENT } from "@/config/upstream";
 import { CONTRACTS, USDC } from "@/config/chain";
@@ -865,6 +866,263 @@ describe("LocalShieldedPool: the money survives a reload", () => {
 });
 
 /**
+ * Restoring into a pool that is already awake.
+ *
+ * `tests/backup.test.ts` covers the file format against a bare store. This block covers
+ * the thing a store cannot see: a `LocalShieldedPool` object that has already hydrated
+ * holds the *old* notes in `this.store`, the old nullifiers in `this.spent`, and a built
+ * `this.tree` — and `ready()` short-circuits on that tree, so it will never read the disk
+ * again on its own.
+ *
+ * 🔴 So the failure mode here is not a bad restore, it is a restore that WORKS and is
+ * then thrown away. Import outside the pool and the file on disk is right while the live
+ * object is wrong; the next deposit calls `persist()`, which writes `this.store` — the
+ * pre-restore notes — back over the restored file. The user restored their money, saw a
+ * success message, did one more thing, and lost it, with the backup file possibly already
+ * deleted. Nothing throws at any point.
+ *
+ * Every test below fails if the cache-drop in `importBackup` is removed. That was checked
+ * by removing it, not assumed: see the mutation table in TASKS.md step 1g.
+ */
+describe("LocalShieldedPool: restoring into a live object", () => {
+  const to = "0x6666666666666666666666666666666666666666";
+
+  /** A filled pool, its backup text, and a second empty browser to restore it into. */
+  async function backedUp(): Promise<{ text: string; source: LocalShieldedPool; notes: Note[] }> {
+    const disk = new MemoryNoteStore();
+    const source = new LocalShieldedPool(standInHash, disk);
+    await source.deposit(usdc, parseAmount("2.5", 6));
+    await source.deposit(aaplc, parseAmount("1.25", 8));
+    const { body } = await source.exportBackup();
+    return { text: body, source, notes: await source.notes() };
+  }
+
+  it("exports through the pool with the same bytes the module would write", async () => {
+    const { text } = await backedUp();
+    expect(JSON.parse(text)).toMatchObject({ format: BACKUP_FORMAT });
+  });
+
+  it("refuses to export a pool with nothing in it", async () => {
+    const empty = new LocalShieldedPool(standInHash, new MemoryNoteStore());
+    await expect(empty.exportBackup()).rejects.toThrow("nothing to back up");
+  });
+
+  /**
+   * The plain case, and the weakest of these: this one passes even with the cache-drop
+   * removed, because a pool that has never been asked anything has no cache to be wrong.
+   * It is here to prove the restore works at all, so that the tests below are testing
+   * staleness rather than a broken import.
+   */
+  it("restores into a pool that has not been touched yet", async () => {
+    const { text, notes } = await backedUp();
+    const fresh = new LocalShieldedPool(standInHash, new MemoryNoteStore());
+
+    expect(await fresh.importBackup(text)).toEqual({ notes: 2 });
+    expect((await fresh.notes()).map((n) => [n.token.symbol, n.amount])).toEqual(
+      notes.map((n) => [n.token.symbol, n.amount]),
+    );
+  });
+
+  it("serves the restored notes from a pool that had already hydrated as empty", async () => {
+    const { text, notes, source } = await backedUp();
+    const fresh = new LocalShieldedPool(standInHash, new MemoryNoteStore());
+
+    /** The whole point: this call builds the tree and latches "no notes here". */
+    expect(await fresh.notes()).toEqual([]);
+    await fresh.importBackup(text);
+
+    expect((await fresh.notes()).map((n) => n.id)).toEqual(notes.map((n) => n.id));
+    /**
+     * Compared against the pool the file came from — the same object, not a second
+     * `backedUp()`, whose notes would carry freshly drawn secrets and so a different
+     * root for entirely uninteresting reasons.
+     */
+    expect((await fresh.root()).value).toBe((await source.root()).value);
+  });
+
+  /**
+   * 🔴 The data-loss test. Everything above could pass while this one fails, because the
+   * others only ask the pool to *read* — and a stale cache reads as a cosmetic bug right
+   * up to the first write, which is where it eats the file.
+   */
+  it("does not put the pre-restore notes back on the next deposit", async () => {
+    const { text, notes } = await backedUp();
+    const target = new MemoryNoteStore();
+    const fresh = new LocalShieldedPool(standInHash, target);
+    await fresh.notes();
+
+    await fresh.importBackup(text);
+    await fresh.deposit(usdc, parseAmount("9", 6));
+
+    /** Read the disk, not the object: the object is what would be lying. */
+    const saved = (await target.load()) as StoredPool;
+    expect(saved.notes).toHaveLength(3);
+    expect(saved.notes.map((n) => n.id)).toEqual(expect.arrayContaining(notes.map((n) => n.id)));
+    /** And reopening that file finds all three, in one contiguous tree. */
+    expect(await new LocalShieldedPool(standInHash, target).notes()).toHaveLength(3);
+  });
+
+  /**
+   * The same hazard through the other cache. `this.spent` is the spend authority, so a
+   * stale one is worse than stale notes: it either un-spends a note that is spent, or
+   * blocks one that is not.
+   */
+  it("restores the spend authority, not just the notes", async () => {
+    const disk = new MemoryNoteStore();
+    const source = new LocalShieldedPool(standInHash, disk);
+    const spend = await source.deposit(usdc, parseAmount("5", 6));
+    const keep = await source.deposit(usdc, parseAmount("3", 6));
+    await source.withdraw(spend.id, to);
+    const { body } = await source.exportBackup();
+
+    const fresh = new LocalShieldedPool(standInHash, new MemoryNoteStore());
+    await fresh.notes();
+    await fresh.importBackup(body);
+
+    /** Spent stays spent across the restore — a backup that un-spends is a double-spend. */
+    await expect(fresh.withdraw(spend.id, to)).rejects.toThrow("A note spends once.");
+    /**
+     * And the note that was never spent is still spendable. Asserted on the amount in the
+     * summary rather than on "it resolved": a restore that mixed the two notes up would
+     * resolve just as happily while paying out the wrong one.
+     */
+    await expect(fresh.withdraw(keep.id, to)).resolves.toMatchObject({
+      summary: expect.stringContaining("3 USDC"),
+    });
+  });
+
+  it("appends after a restore at the right leaf index, so witnesses still fold", async () => {
+    const { text } = await backedUp();
+    const fresh = new LocalShieldedPool(standInHash, new MemoryNoteStore());
+    await fresh.notes();
+    await fresh.importBackup(text);
+
+    const added = await fresh.deposit(usdc, parseAmount("9", 6));
+    /** Two restored leaves occupy 0 and 1; a stale tree would hand this one 0. */
+    expect(added.leafIndex).toBe(2);
+
+    const w = await fresh.witness(added.id);
+    expect(await foldWitness(w)).toBe((await fresh.root()).value);
+  });
+
+  /**
+   * A refusal must be inert. `importBackup` checks the file before it writes, so a
+   * rejected import has to leave the live object exactly as it was — if it cleared the
+   * caches first and then threw, a user who picked the wrong file would watch their notes
+   * disappear from a pool that is still perfectly intact on disk.
+   */
+  it("leaves a live pool untouched when the file is refused", async () => {
+    const disk = new MemoryNoteStore();
+    const pool = new LocalShieldedPool(standInHash, disk);
+    const note = await pool.deposit(usdc, parseAmount("4", 6));
+    const before = await pool.root();
+
+    await expect(pool.importBackup("not json at all")).rejects.toThrow("not even JSON");
+    await expect(pool.importBackup('{"format":"something.else"}')).rejects.toThrow(
+      "not a Quadra backup",
+    );
+
+    expect((await pool.notes()).map((n) => n.id)).toEqual([note.id]);
+    expect((await pool.root()).value).toBe(before.value);
+    /** Still usable, which is the claim: an inert refusal, not a half-cleared pool. */
+    await expect(pool.withdraw(note.id, to)).resolves.toMatchObject({
+      summary: expect.stringContaining("4 USDC"),
+    });
+  });
+
+  /**
+   * A store that hands its record over exactly once, then refuses.
+   *
+   * Not a contrived failure: `LocalStorageNoteStore.load` throws rather than answering
+   * `null` when it finds a record it cannot parse, precisely so a user who owns money is
+   * never shown an empty pool. So "the first read worked and the next one will not" is a
+   * state this app already builds for.
+   */
+  function readableOnce(inner: NoteStore): NoteStore {
+    let reads = 0;
+    return {
+      load: async () => {
+        reads += 1;
+        if (reads > 1) throw new Error("This browser refused to read the pool again.");
+        return inner.load();
+      },
+      save: (pool) => inner.save(pool),
+    };
+  }
+
+  /**
+   * 🔴 The only test here that can tell the two cache-drop orderings apart, and it exists
+   * because the obvious ones cannot.
+   *
+   * Moving the `tree = null` block above `readBackup` leaves all the other tests green:
+   * a refusal does not write the disk, so `tree = null` just sends the next `ready()` back
+   * to a file that is still correct and the object silently repairs itself. That repair is
+   * a second disk read — and a store is allowed to refuse one. Here the first read
+   * succeeds and the next does not, so the early order turns "you picked the wrong file"
+   * into "your notes are gone", while the shipped order needs no repair at all.
+   *
+   * Written after the mutation survived, not before. A test where both orders agree proves
+   * only that the code agrees with itself.
+   */
+  it("keeps serving notes after a refusal even if the disk cannot be read again", async () => {
+    const inner = new MemoryNoteStore();
+    const seed = new LocalShieldedPool(standInHash, inner);
+    const note = await seed.deposit(usdc, parseAmount("6", 6));
+
+    const pool = new LocalShieldedPool(standInHash, readableOnce(inner));
+    /** The one read this store allows, spent on hydration. */
+    expect((await pool.notes()).map((n) => n.id)).toEqual([note.id]);
+
+    await expect(pool.importBackup("not json at all")).rejects.toThrow("not even JSON");
+
+    /** Served from the cache the refusal did not touch. A re-read here would throw. */
+    expect((await pool.notes()).map((n) => n.id)).toEqual([note.id]);
+    expect((await pool.witness(note.id)).leafIndex).toBe(0);
+  });
+
+  it("refuses to restore over notes this browser already holds", async () => {
+    const { text } = await backedUp();
+    const occupied = new LocalShieldedPool(standInHash, new MemoryNoteStore());
+    const mine = await occupied.deposit(usdc, parseAmount("7", 6));
+
+    await expect(occupied.importBackup(text)).rejects.toThrow("already holds notes");
+    /** Refused, and nothing of mine moved. */
+    expect((await occupied.notes()).map((n) => n.id)).toEqual([mine.id]);
+  });
+
+  /**
+   * Serialized with everything else, which is not decoration: a restore that interleaved
+   * with a deposit would write one pool's notes into the other's tree. Fired without
+   * awaiting in between, so both are on the queue at once.
+   */
+  it("does not interleave with a concurrent deposit", async () => {
+    const { text } = await backedUp();
+    const fresh = new LocalShieldedPool(standInHash, new MemoryNoteStore());
+
+    const [imported, deposited] = await Promise.all([
+      fresh.importBackup(text),
+      fresh.deposit(usdc, parseAmount("9", 6)),
+    ]);
+
+    expect(imported).toEqual({ notes: 2 });
+    /** Whichever order the queue picked, the result is three notes and no gap. */
+    const indices = (await fresh.notes()).map((n) => n.leafIndex).sort((a, b) => a - b);
+    expect(indices).toEqual([0, 1, 2]);
+    expect(await fresh.witness(deposited.id)).toMatchObject({ leafIndex: deposited.leafIndex });
+  });
+
+  /** A round trip through the pool, ending where it started. */
+  it("exports what it imported, byte for byte", async () => {
+    const { text } = await backedUp();
+    const fresh = new LocalShieldedPool(standInHash, new MemoryNoteStore());
+    await fresh.importBackup(text);
+
+    const again = await fresh.exportBackup();
+    expect(JSON.parse(again.body).pool).toEqual(JSON.parse(text).pool);
+  });
+});
+
+/**
  * Every way a saved record can be wrong, and the refusal it earns.
  *
  * These matter more than they look. The alternative to refusing is skipping the bad
@@ -1110,6 +1368,24 @@ describe("LocalStorageNoteStore", () => {
     const a = new LocalStorageNoteStore("quadra.test.a");
     await a.save({ version: STORE_VERSION, notes: [], nullifiers: [] });
     expect(await new LocalStorageNoteStore("quadra.test.b").load()).toBeNull();
+  });
+
+  /**
+   * 🔴 The key, as a literal. Every other assertion in this file imports `STORE_KEY`,
+   * which means all of them would keep passing if its value changed — they would just
+   * be checking a different key, consistently.
+   *
+   * What that blindness costs: `brand.ts` warns against templating this from
+   * `BRAND.slug`, because a rename would then point the app at a key nobody has ever
+   * written. Existing users' notes stay on disk under `quadra.pool.v1` while the app
+   * reports an empty pool, and "empty pool" is the state someone reasonably responds
+   * to by depositing again. This line is what makes that edit go red.
+   *
+   * Spelled out rather than built from parts for the same reason — a `.includes("v1")`
+   * would pass for any prefix, which is precisely the half that must not move.
+   */
+  it("is stored under exactly the key already on users' disks", () => {
+    expect(STORE_KEY).toBe("quadra.pool.v1");
   });
 
   /**

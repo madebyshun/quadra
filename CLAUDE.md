@@ -33,8 +33,8 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. **653 tests in 21 files**, 100% on all four
-metrics, measured 2026-09-27.
+in one go. Do not report "done" on a subset. **730 tests in 23 files**, 100% on all four
+metrics, measured 2026-09-28.
 
 That count is a dated measurement, not a target — it is here so a fresh clone that comes
 back with *fewer* tests tells you something is wrong with the checkout rather than with
@@ -139,6 +139,28 @@ Dev server is `npm run dev` on **port 5273**.
   rejection-sampling test asserting "it drew twice" would have been written around whatever the spy
   happened to report and would have passed while measuring nothing. Script every draw instead; see
   `withScriptedBytes` in `tests/field.test.ts`.
+- 🔴 **A pinned output vector cannot catch a defect that is dormant at today's values.**
+  MEASURED 2026-09-28. `STORE_KEY` and the hash domain tag were both unpinned — every test
+  imported the constant it was checking, so either could change and stay green. The intuitive
+  fix is to assert the output: a checked-in hash vector, the key's literal value. Then
+  templating the tag from `BRAND.slug` was applied and **all 722 tests passed**, because
+  `BRAND.slug` is `"quadra"` today, so the template expands to a byte-identical string and
+  nothing observable moves. The bug detonates at the rename — a commit later, in a different
+  file, as "every note is unspendable". **When a mutation is a no-op at current values, no
+  behavioural test can see it; check its shape instead.** The guard is textual and lives in
+  `tests/brand.test.ts`. Keep the vectors anyway: an endianness flip in the same file is
+  caught by those three tests and nothing else, with 727 green.
+- **Renaming: the line is prose vs identifier, not brand vs internal.** `brand.ts` used to
+  claim nothing else hardcoded a brand string, which was false and invited the edit above —
+  grep the slug, template what turns up. Four strings are identifiers in data that already
+  exists and must keep their shipped value forever: `STORE_KEY`, the hash domain tag,
+  `BACKUP_FORMAT`, and the empty-leaf preimage. A name shown to a person may change; a name
+  some byte on a disk or on chain is already keyed to may not. `backupFilename` is the
+  counter-example — derived from the slug, because nothing reads it back.
+- **A comment that quotes a forbidden pattern will trip a textual check on that pattern.** The
+  frozen-string test above failed first on the two doc comments warning against the thing it
+  forbids. Strip comments before checking — which also strengthens a presence check from "the
+  literal is somewhere in the file" to "the literal is in the code".
 - **A test may read a constant out of the Solidity, and one does.** `tests/field.test.ts` extracts
   `FIELD_SIZE` and `MAX_NOTE_VALUE` from `contracts/src/` rather than restating them, because a
   copied constant drifts silently and only disagrees where the two halves meet. Consequence worth
@@ -222,10 +244,19 @@ src/
                    note.ts   — commitment + nullifier derivation over that hash
                    tree.ts   — the commitment tree, mirroring MerkleTreeWithHistory.sol,
                                plus the Merkle paths the contract cannot serve
+                   backup.ts — the backup file format. localStorage is not a backup;
+                               this is. Plaintext secrets by necessity and labelled as
+                               such, never half-encrypted. Validates an import through
+                               `decodePool`, the same function the loader uses, so an
+                               import cannot succeed into a pool that will not open
+                   download.ts — handing that file to a disk and reading one back. The
+                               only DOM in the backup path, kept out of backup.ts so
+                               rule 4 can be audited without a `URL` or `document` in
+                               view. There is no `fetch` here and must never be one
   pages/           /docs /api /verify /404
   ui/              Window, Taskbar, Gel (button), Crt (output box)
   styles/          reset.css + theme.css — the XP/Aqua design system
-tests/             21 files, mirrors src/. field.test.ts also reads contracts/src/*.sol
+tests/             23 files, mirrors src/. field.test.ts also reads contracts/src/*.sol
 tools/quadra-mcp/  stdio MCP server, read-only
 scripts/           measure-catalog.ts — hand-run, hits the network
                    check-contract-coverage.ts — the forge coverage gate

@@ -5,7 +5,7 @@ Read `CLAUDE.md` first — it has the constraints and the rules that exist becau
 something broke. This file is only the work.
 
 **Before you start anything:** `npm install`, then `npm run gate`. It must be green
-(tsc clean, **653 tests in 21 files**, 100% on statements/branches/functions/lines, build
+(tsc clean, **730 tests in 23 files**, 100% on statements/branches/functions/lines, build
 succeeds). If it is not green on a fresh checkout, fix that before touching a task — you
 are looking at drift, not at your own change.
 
@@ -538,6 +538,135 @@ destroys every note, and the notes ARE the money — there is no server-side cop
 The pool now refuses loudly when the file is *damaged*, but nothing warns a user before the
 file is *gone*. That needs an export/restore path and a plain-language warning in the
 deposit flow before this is shown to anyone holding real funds. Not started.
+
+### Step 1g also DONE (2026-09-28) — the notes can leave this browser, which 1f made urgent
+
+This closes the follow-up 1f ended on. Persistence made the app *look* durable without
+making it durable: before 1f nobody could believe their notes would survive anything,
+because nothing did. After 1f they survive a refresh and not a cleared-site-data dialog,
+and the notes are the money. `src/lib/backup.ts` is the export/restore format;
+`src/lib/download.ts` hands the file to a disk and reads one back.
+
+**Decisions worth defending:**
+
+1. **The file holds the secrets in plaintext, and every string in the UI says so.** A
+   backup without secrets restores nothing, so the file is exactly as valuable as the pool.
+   The warning is not behind a `<details>`: "keep it like cash — not in a shared folder,
+   not in email."
+2. **This does not weaken hard rule 4, and the distinction is written into the module
+   header because it looks like it might.** Rule 4 is about a secret reaching a *third
+   party* — a server, a URL, a log. A file the user saves to their own disk is the user
+   taking custody of their own money. So nothing in either module touches `fetch`, nothing
+   runs without an explicit click, and `download.ts` exists solely to keep `URL` and
+   `document` out of `backup.ts` so rule 4 can be audited in one file.
+3. **🔴 Not half-encrypted.** A passphrase wrapper (WebCrypto PBKDF2 + AES-GCM, no new
+   dependency) is the obvious next step and is deliberately absent rather than stubbed: a
+   half-built encryption path is worse than a plainly-labelled plaintext one, because the
+   label is what makes the user careful. **Still an open decision — see the list below.**
+4. **The export message says "Saving…", never "Saved" or "✓".** Nothing in a browser can
+   observe whether a download reached a disk — that is decided by the download UI and the
+   user, neither of which reports back. So the UI tells them to go and check, which is the
+   action that makes the backup real. There is a test asserting the absence of those words.
+5. **A successful backup is not rendered through `Anchor`.** It would print "Not on chain:
+   …" in the warning colour, which is correct after a deposit and actively misleading after
+   an export, where not being on chain is the entire feature. Hence the `Output` union.
+6. **Three import refusals, in order** — not-a-backup-file, then already-holds-notes, then
+   validated through `decodePool`, *the same function the loader uses*. That last one
+   matters: validating with a looser check of its own would let an import report success and
+   leave behind a pool that throws on open, which the user discovers on the next page load
+   with the file possibly already deleted.
+7. **Merging two pools is refused, not implemented.** Both number their leaves from zero, so
+   a merge produces duplicate indices and a root belonging to nobody — which `decodePool`
+   would then refuse forever.
+
+🔴 **The write-back hazard is why these are pool methods and not free functions the UI
+calls with a store.** A restore writes the pool file, but the live object has already
+hydrated from the *old* one and never looks at the disk again, because `ready()`
+short-circuits once `tree` is set. An import performed outside the pool therefore leaves the
+object holding pre-restore state, and the next deposit calls `persist()` and writes it back
+over the file. **The restored notes would be destroyed by the first thing the user does
+after restoring them, silently.** Routing through the pool lets the cache be dropped in the
+same serialized step as the write.
+
+**Verified by breaking it. Six mutations — and three of the six taught something:**
+
+| Mutation | Result |
+|---|---|
+| delete the cache-drop after a restore | 4 red; the plain-case test survives, as predicted — a pool never asked anything has no cache to be wrong |
+| **M8** clear the cache *before* the write | **0 red — all 134 green. The source comment was wrong.** |
+| **M9** drop the file-input reset | both halves of the re-pick test fail *independently* |
+| **M10** template the hash domain tag from `BRAND.slug` | **0 red — all 722 green** |
+| M11 template `STORE_KEY` from `BRAND.slug` | 2 red, after M10's fix |
+| M12 encode field elements little-endian | 3 red — and *only* the three pinned vectors |
+
+**M8 is the important one, and it was a comment bug rather than a test bug.** The comment
+claimed the after-the-write order existed because "a refusal must leave this object exactly
+as it was". False: clearing early is self-healing, because a refusal leaves the disk
+untouched and `tree = null` sends the next `ready()` back to it. What the early order
+actually costs is that the repair is **a second disk read that has to succeed** — and a
+store may refuse a read, since `LocalStorageNoteStore.load` throws rather than answering
+`null` on a record it cannot parse. So picking the wrong file, an operation that changed
+nothing, would be what makes the notes unreadable. Fixed the comment to say the measured
+thing, then wrote the one test that can tell the two orders apart: a store readable exactly
+once.
+
+**M10 is the other one, and it invalidated a guard I had just written.** Both `STORE_KEY`
+and the hash domain tag were unpinned — every test imported the constant it was checking, so
+changing either stayed green. The intuitive fix is a pinned output vector, and I added
+those. **They do not catch this**: `BRAND.slug` is `"quadra"` today, so templating the tag
+expands to a byte-identical string and no output moves. The defect is *dormant* — it
+detonates at the rename, long after the commit, and the symptom is every note in existence
+changing identity. A dormant defect can only be caught by its shape, so the real guard is
+textual and lives in `tests/brand.test.ts`. Its first version then failed on `store.ts` and
+`backup.ts` — against my own doc comments, which quote the forbidden form in order to warn
+against it — so it strips comments first, which also strengthens the positive check from
+"the literal is in the file" to "the literal is in the code".
+
+M12 is why the vectors were kept anyway: an endianness flip in the input encoding is caught
+by those three tests and **nothing else**, with the other 727 green. Every property test
+survives it, because a byte-swapped hash is still deterministic, still in field, still
+collision-free, and still distinguishes `H(1, 256)` from `H(256, 1)`.
+
+**`brand.ts`'s header was false, and false in the expensive direction.** It said "nothing
+else hardcodes a brand string", which reads as an invitation to grep for the slug and
+template whatever turns up. Four strings are identifiers in data that already exists and
+must keep their shipped value through a rename: `STORE_KEY`, the hash domain tag,
+`BACKUP_FORMAT`, and the empty-leaf preimage. The distinction is not brand-vs-internal, it
+is **prose vs identifier**. `backupFilename` went the other way — derived from the slug,
+because nothing reads it back.
+
+**Two measured environment facts, both of which rejected a plausible implementation:**
+
+- **jsdom's `Blob` implements exactly `slice`, `size` and `type`.** No `.text()`, no
+  `.arrayBuffer()`, no `.stream()`. So the one-line `await file.text()` is code no test in
+  this repo can execute, and an untested read is not acceptable on the only path by which a
+  user recovers their money.
+- **`await new Response(jsdomFile).text()` resolves to the literal string
+  `"[object File]"`** — a wrong answer with no error, which would have shipped a restore
+  that reliably rejects every real backup.
+
+`FileReader` reads correctly here and has the wider browser baseline of the two, so the
+testable choice is also the more portable one. Its `Reader` constructor is injectable for
+one reason: a real read failure has to arrive as a message rather than a promise that never
+settles, and jsdom cannot be made to fail a read of a valid Blob.
+
+**Three test-harness facts worth knowing:**
+
+- **`vi.useFakeTimers()` hangs `FileReader`** — it resolves on a real task a fake clock
+  never advances, so the tests time out instead of failing. Only `offerDownload` needs the
+  fake clock; the `readTextFile` block gives real timers back.
+- **jsdom has no `URL.createObjectURL`.** It must be assigned and `delete`d by hand —
+  `vi.stubGlobal("URL", …)` would take `new URL()` with it, which jsdom needs internally,
+  and `vi.unstubAllGlobals()` cannot restore a property that never existed.
+- **`userEvent.upload` honours the input's `accept`.** A `.txt` file never reaches a handler
+  behind `accept="application/json,.json"`, so the first wrong-content test passed by never
+  running the code. Both fixtures are now `.json`, which is also the realistic case: a
+  corrupt backup keeps the name it was exported under.
+
+**Open decision, for ShunTr:** encrypt the backup with a passphrase? WebCrypto PBKDF2 +
+AES-GCM, no new dependency. Against: a forgotten passphrase is unrecoverable money, and the
+plaintext label is what currently makes users careful. For: the file is a spendable secret
+and people put files in synced folders. Not started either way.
 
 ### Steps 2 and 3 are NOT done, and step 2 is not a deployment step
 

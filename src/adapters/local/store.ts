@@ -53,7 +53,17 @@ import { FIELD_MODULUS, MAX_NOTE_VALUE } from "@/lib/field";
  */
 export const STORE_VERSION = 1;
 
-/** The localStorage key. Namespaced so it cannot collide with anything else on the origin. */
+/**
+ * The localStorage key. Namespaced so it cannot collide with anything else on the origin.
+ *
+ * 🔴 A frozen literal, NOT `` `${BRAND.slug}.pool.v1` ``. This key is where existing
+ * users' money already is. Derive it from the brand and a rename points the app at a
+ * key nobody has ever written: every pool goes invisible, the app reports no notes,
+ * and the notes are still sitting on disk under the old name with nothing in the UI
+ * that would suggest looking there. `brand.ts` lists the other three strings frozen
+ * for this reason; `tests/adapters.test.ts` pins this one against a literal, because
+ * every other test in that file imports this constant and so cannot see it move.
+ */
 export const STORE_KEY = "quadra.pool.v1";
 
 /**
