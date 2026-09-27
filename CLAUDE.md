@@ -49,8 +49,18 @@ Solidity has its **own** gate, and the two are deliberately separate:
 npm run gate:contracts
 ```
 
-That is `forge build` → `forge test` → `scripts/check-contract-coverage.ts`. 90 tests,
-100% on lines/functions/branches for every file in `contracts/src/`, as of 2026-09-27.
+That is `forge build` → `forge test` → `scripts/check-contract-coverage.ts` →
+`scripts/check-contract-tests.ts`: 100% on lines/functions/branches for every file in
+`contracts/src/`, and the per-suite table in `contracts/README.md` matching what ran.
+
+**No test count is written here.** It is stated once, per suite, in that table, because the
+guard checks the table and can only check one place. Six copies of this number existed
+across four files and all six said 90 after the real figure had reached 104 — a number
+repeated is a number that rots, and the fix is one location plus something that reads it.
+
+⚠️ Run forge from `contracts/`, never the repo root: the root has no `foundry.toml`, so
+forge there compiles nothing, runs nothing and **exits 0**. The npm scripts pin the
+directory, which is the reason to use them over bare `forge`.
 
 🔴 **Do not merge them.** `npm run gate` must stay runnable on a bare clone with nothing
 installed and no network; `gate:contracts` needs Foundry. Folding Solidity into the main
@@ -260,7 +270,9 @@ tests/             23 files, mirrors src/. field.test.ts also reads contracts/sr
 tools/quadra-mcp/  stdio MCP server, read-only
 scripts/           measure-catalog.ts — hand-run, hits the network
                    check-contract-coverage.ts — the forge coverage gate
-contracts/         Foundry. src/ is 3 contracts, test/ is 90 tests.
+                   check-contract-tests.ts — pins the README suite table to the run
+contracts/         Foundry. src/ is 3 contracts; test/ is 3 suites, counted in
+                   contracts/README.md and nowhere else.
                    No forge-std and no lib/ — runs on a bare clone.
                    Read contracts/README.md before editing any of it.
 ```

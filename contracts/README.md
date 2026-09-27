@@ -1,6 +1,7 @@
 # contracts — Quadra's shielded pool
 
-Solidity for Base 8453. Three contracts, 90 tests, 100% coverage on `src/`.
+Solidity for Base 8453. Three contracts, 100% coverage on `src/`, and a suite whose
+per-file counts are in the table at the bottom — and checked against it.
 
 **Nothing here is deployed.** `CONTRACTS.shieldedPool` and `CONTRACTS.verifier` in
 `src/config/chain.ts` are still `null`, and they stay `null` until something is
@@ -15,17 +16,24 @@ Foundry only. No `lib/`, no submodules, no `npm install` for this half.
 
 ```
 forge build          # lints as it compiles; warnings are errors
-forge test           # 90 tests
+forge test           # all three suites
 forge coverage       # expects 100% on src/
 ```
 
-From the repo root, all three plus the coverage gate in one command:
+⚠️ **Run these from `contracts/`, not the repo root.** `foundry.toml` lives here, and the
+root has none — so from up there forge treats the TypeScript `src/` as an empty Solidity
+project, prints "Nothing to compile", runs zero tests and **exits 0**. A wrong-directory
+invocation looks exactly like a passing one. The npm scripts below pin the directory;
+that is the reason to prefer them.
+
+From the repo root, all of it plus both gates in one command:
 
 ```
 npm run gate:contracts
 ```
 
-That is `forge build` → `forge test` → `scripts/check-contract-coverage.ts`.
+That is `forge build` → `forge test` → `scripts/check-contract-coverage.ts` →
+`scripts/check-contract-tests.ts`.
 
 🔴 **`npm run gate` and `npm run gate:contracts` are separate on purpose, and merging
 them would break the first one.** `npm run gate` has to stay runnable on a bare clone
@@ -98,8 +106,23 @@ completed payment.
 
 Join-split, 2-in/2-out, one ERC-20 fixed at construction. `transact` is the only entry
 point: deposit, withdraw and note-to-note are the same operation with a different sign
-on `publicAmount`. Separate `deposit` / `withdraw` functions would make the two
+on `extAmount`. Separate `deposit` / `withdraw` functions would make the two
 distinguishable by selector, which is the exact link the pool exists to break.
+
+🔴 **Two amounts, and conflating them was a real insolvency.** `extAmount` is what
+crosses the boundary on the *user's* behalf and is a field of `ExtData`; `publicAmount`
+is what the *pool's balance* changes by and is derived, not supplied —
+`publicAmountFor(extData)` returns `extAmount - fee`. An earlier version took
+`publicAmount` as calldata and charged the relayer fee against the payout on a
+withdrawal but against the pool on a deposit or an internal transfer, so the
+conservation law it enforced had a case analysis in it while `IVerifier` documented the
+unconditional `sum(inputs) + publicAmount == sum(outputs)`. Against a circuit built to
+the documented spec, a relayed deposit skimmed its fee from other depositors and a
+relayed internal transfer was a repeatable drain — silently, landing on whoever
+withdrew last. The rule now: **whatever leaves the pool is proven as leaving, whether a
+recipient or a relayer receives it.** The regression suite is the
+"what moves must equal what was proven" section of `ShieldedPool.t.sol`, and every test
+in it fails against the old implementation.
 
 ⚠️ **Join-split leaks amounts, and that is an open decision — see `TASKS.md` T7.**
 Fixed denominations (Tornado's design) make every withdrawal look like every other.
@@ -151,7 +174,22 @@ without proving those turns this contract into a faucet and nothing here could t
 |---|---|---|
 | `MerkleTreeWithHistory.t.sol` | 25 | tree mechanics, the 30-root window, capacity, field bounds |
 | `SafeTransfer.t.sol` | 17 | one test per real-world token misbehaviour |
-| `ShieldedPool.t.sol` | 48 | the pool's own rules, with the verifier as a double |
+| `ShieldedPool.t.sol` | 62 | the pool's own rules, with the verifier as a double |
+
+**This table is the only place the repo states these numbers, and
+`scripts/check-contract-tests.ts` holds it to them** — per suite, in both directions, and it
+also fails on a suite that runs but is not listed. It said 90 total for a while after the
+real number was 104, in six places across four files; every other copy now describes the
+property and points here.
+
+🔴 **A count guard is not redundant with the coverage gate, and the difference is the
+reason this one exists.** Coverage measures which lines ran, not how many ways. Delete ten
+of the seventeen `SafeTransfer` tests and the remaining seven still touch every line of
+`SafeTransfer.sol` — coverage stays at 100%, the gate stays green, and the middle row goes
+on claiming "one test per real-world token misbehaviour" while most of those tokens are no
+longer tested. That claim is what makes the file trustworthy and it is precisely what
+coverage cannot see. So if a number here goes **down**, the commit message has to say which
+behaviour stopped being asserted; nothing else will notice.
 
 `test/doubles/TestTokens.sol` is eight token shapes, each a pattern that really shipped
 on Ethereum or Base rather than an invented adversary: no-return (USDT), false-return

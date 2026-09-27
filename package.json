@@ -15,7 +15,8 @@
     "contracts:build": "cd contracts && forge build",
     "contracts:test": "cd contracts && forge test",
     "contracts:cov": "vite-node scripts/check-contract-coverage.ts",
-    "gate:contracts": "npm run contracts:build && npm run contracts:test && npm run contracts:cov",
+    "contracts:count": "vite-node scripts/check-contract-tests.ts",
+    "gate:contracts": "npm run contracts:build && npm run contracts:test && npm run contracts:cov && npm run contracts:count",
     "measure": "vite-node scripts/measure-catalog.ts"
   },
   "dependencies": {

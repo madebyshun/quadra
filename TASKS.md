@@ -10,10 +10,17 @@ succeeds). If it is not green on a fresh checkout, fix that before touching a ta
 are looking at drift, not at your own change.
 
 If you are touching Solidity, `npm run gate:contracts` is the second, separate gate:
-`forge build` → `forge test` (**90 tests**) → 100% coverage on `contracts/src/`. It needs
-Foundry, which is exactly why it is not part of `npm run gate` — that one has to stay
-runnable on a bare clone with no network. Both counts are dated measurements from
-2026-09-27; re-measure them in the same commit that changes them.
+`forge build` → `forge test` → 100% coverage on `contracts/src/` → the suite table in
+`contracts/README.md` matching what actually ran. It needs Foundry, which is exactly why
+it is not part of `npm run gate` — that one has to stay runnable on a bare clone with no
+network.
+
+No Solidity test count is stated here, on purpose. It lives once, per suite, in the table
+at the bottom of `contracts/README.md`, and `scripts/check-contract-tests.ts` fails if that
+table and the run disagree. The count was previously repeated in six places across four
+files and was wrong in all six — they said 90 after the real number had reached 104. The
+TypeScript figure above is still a dated measurement with nothing behind it; re-measure it
+in the same commit that changes it.
 
 **Before you report anything done:** `npm run gate` again, green, all three parts.
 Say which three. "Build is green" has been used to mean "tsc passed" and it was not.
@@ -231,10 +238,11 @@ means here before building a swap into the payment path.
 
 ### Step 1 of 3 is DONE (2026-09-27) — the Solidity exists and is fully tested
 
-`contracts/` holds three contracts, 90 tests and 100% coverage on `src/`, gated by
-`npm run gate:contracts`. Read `contracts/README.md` before touching any of it; it has
-the four traps measured while building it, including two that make a broken config look
-like a working one.
+`contracts/` holds three contracts at 100% coverage on `src/`, gated by
+`npm run gate:contracts`; the per-suite test counts are in the table at the bottom of
+`contracts/README.md`, which that gate checks. Read `contracts/README.md` before touching
+any of it — it has the traps measured while building it, including three that make a broken
+config or a wrong-directory invocation look like a working one.
 
 | file | what |
 |---|---|
