@@ -14,6 +14,8 @@
  * developer must remember not to do — it does not typecheck.
  */
 
+import type { Commitment } from "@/lib/note";
+
 export type TokenRef = {
   address: string;
   symbol: string;
@@ -29,13 +31,29 @@ export type Anchoring =
  * A note is the money. The secret lives in the browser and nowhere else: losing
  * it loses the funds, and leaking it hands them over. Never log a whole note,
  * never put one in a url, never send one to a server.
+ *
+ * ── Why `commitment` is a type and not a string ──────────────────────────────
+ * It used to be `commitment: string`, and the local pool filled it with a random
+ * 32 bytes. That typechecked, it read as correct, and it committed to nothing: no
+ * secret's knowledge was provable from it, so no circuit could ever be written
+ * against those notes. `Commitment` in `lib/note.ts` is a discriminated union
+ * carrying the hash scheme that produced it, so a value hashed with the stand-in
+ * cannot reach the chain boundary without the difference being handled. Same
+ * device as `Anchoring` above, and for the same reason.
  */
 export type Note = {
   id: string;
-  /** public: what goes on chain */
-  commitment: string;
-  /** PRIVATE: never leaves the browser */
-  secret: string;
+  /** public: what goes on chain, derived from `amount` and `secret` */
+  commitment: Commitment;
+  /**
+   * PRIVATE: never leaves the browser.
+   *
+   * A field element rather than a hex string. The scheme's inputs are field
+   * elements, so carrying it in the arithmetic type it is actually used as means
+   * there is no parse step to get wrong and no place for a 33-byte "field element"
+   * to hide.
+   */
+  secret: bigint;
   token: TokenRef;
   /** base units, per token.decimals */
   amount: bigint;

@@ -9,6 +9,9 @@ import { AAPL_BASE } from "@/config/pair";
 import { BLUEAGENT } from "@/config/upstream";
 import { CONTRACTS, USDC } from "@/config/chain";
 import { formatAmount, parseAmount } from "@/lib/amount";
+import { MAX_NOTE_VALUE, isInField } from "@/lib/field";
+import { standInHash } from "@/lib/hash";
+import { deriveCommitment } from "@/lib/note";
 
 const usdc = { address: USDC.address, symbol: USDC.symbol, decimals: USDC.decimals };
 const aaplc = { address: AAPL_BASE.address, symbol: AAPL_BASE.symbol, decimals: AAPL_BASE.decimals };
@@ -65,18 +68,62 @@ describe("LocalShieldedPool.deposit", () => {
     expect(note.spentAt).toBeNull();
   });
 
-  it("gives the note a secret and a commitment that are not the same value", async () => {
+  it("gives the note a secret that is a usable field element", async () => {
     const note = await pool.deposit(usdc, 1n);
-    expect(note.secret).toMatch(/^0x[0-9a-f]{64}$/);
-    expect(note.commitment).toMatch(/^0x[0-9a-f]{64}$/);
-    expect(note.secret).not.toBe(note.commitment);
+    expect(typeof note.secret).toBe("bigint");
+    expect(isInField(note.secret)).toBe(true);
+    expect(note.secret).not.toBe(0n);
+  });
+
+  /**
+   * The test the old one should have been.
+   *
+   * Its predecessor asserted only that the commitment was 32 hex bytes and differed
+   * from the secret — which a `randomHex(32)` passes, and did, for as long as that
+   * was what `deposit` returned. This recomputes the scheme from the note's own
+   * amount and secret and demands the same answer, so a commitment that is not a
+   * commitment fails here instead of passing quietly.
+   */
+  it("derives the commitment from the amount and the secret, recomputably", async () => {
+    const note = await pool.deposit(usdc, 250_000_000n);
+    const again = await deriveCommitment(standInHash, {
+      amount: note.amount,
+      secret: note.secret,
+    });
+    expect(note.commitment).toEqual(again);
+  });
+
+  it("binds the amount: the same secret at a different amount commits differently", async () => {
+    const note = await pool.deposit(usdc, 1n);
+    const other = await deriveCommitment(standInHash, { amount: 2n, secret: note.secret });
+    expect(other.value).not.toBe(note.commitment.value);
+  });
+
+  /**
+   * The whole point of the tagged union. A note minted by this pool must carry the
+   * stand-in tag and the sentence explaining it, because nothing hashed this way
+   * can ever be proven — see lib/hash.ts.
+   */
+  it("tags the commitment as a stand-in and says why", async () => {
+    const note = await pool.deposit(usdc, 1n);
+    expect(note.commitment.scheme).toBe("stand-in");
+    expect(note.commitment).toHaveProperty("why");
+    if (note.commitment.scheme === "stand-in") {
+      expect(note.commitment.why).toContain("not the one any circuit");
+    }
   });
 
   it("never issues the same id, commitment or secret twice", async () => {
     const many = await Promise.all(Array.from({ length: 40 }, () => pool.deposit(usdc, 1n)));
-    for (const key of ["id", "commitment", "secret"] as const) {
-      expect(new Set(many.map((n) => n[key])).size).toBe(many.length);
-    }
+    expect(new Set(many.map((n) => n.id)).size).toBe(many.length);
+    expect(new Set(many.map((n) => n.secret)).size).toBe(many.length);
+    /**
+     * Compared by value, not by object identity: every commitment is a distinct
+     * object, so a `Set` of them would read 40 unique no matter what the hash did.
+     * That is exactly how the previous version of this test would have kept passing
+     * after the switch from a string, which is why the loop over three keys is gone.
+     */
+    expect(new Set(many.map((n) => n.commitment.value)).size).toBe(many.length);
   });
 
   it("stamps a parseable creation time", async () => {
@@ -87,6 +134,17 @@ describe("LocalShieldedPool.deposit", () => {
   it("refuses zero and negative deposits", async () => {
     await expect(pool.deposit(usdc, 0n)).rejects.toThrow("greater than zero");
     await expect(pool.deposit(usdc, -1n)).rejects.toThrow("greater than zero");
+  });
+
+  /**
+   * The same bound `ShieldedPool.sol` reverts `AmountTooLarge` for, refused in the
+   * browser where the user can read it. Checked here and not only in field.test.ts
+   * because the bound is worthless if `deposit` never calls it — that is a wiring
+   * fact about this method, not a fact about the helper.
+   */
+  it("refuses an amount larger than one note can hold", async () => {
+    await expect(pool.deposit(usdc, MAX_NOTE_VALUE + 1n)).rejects.toThrow("2^248");
+    await expect(pool.deposit(usdc, MAX_NOTE_VALUE)).resolves.toHaveProperty("amount");
   });
 
   it("keeps an 8-decimal token and a 6-decimal token apart", async () => {

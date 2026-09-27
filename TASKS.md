@@ -5,7 +5,7 @@ Read `CLAUDE.md` first — it has the constraints and the rules that exist becau
 something broke. This file is only the work.
 
 **Before you start anything:** `npm install`, then `npm run gate`. It must be green
-(tsc clean, **485 tests in 17 files**, 100% on statements/branches/functions/lines, build
+(tsc clean, **551 tests in 20 files**, 100% on statements/branches/functions/lines, build
 succeeds). If it is not green on a fresh checkout, fix that before touching a task — you
 are looking at drift, not at your own change.
 
@@ -248,6 +248,52 @@ executed and an out-of-field hasher would have built a tree whose every root no 
 could reference. Deposits would succeed and no withdrawal would ever be provable, with
 nothing reverting anywhere. `test_everyLegalSizeChecksItsHasher` now asserts the fix at
 every legal size.
+
+### Step 1b also DONE (2026-09-27) — the browser now derives commitments instead of inventing them
+
+Found by reading `src/adapters/local/pool.ts` rather than by a failing test. `deposit` set
+`commitment: randomHex(32)` — a random number with no relationship to the note's amount or
+its secret. It passed the suite, because the only assertion was that it differed from the
+secret and any random value does. **A commitment that commits to nothing is not a
+commitment:** there is no secret whose knowledge it proves, so the on-chain pool could never
+accept one of those notes and no circuit could be written against them. This is precisely
+the "stub you cannot tell from the real thing by looking at the output" the header of
+`src/adapters/types.ts` warns about — except the type system did not catch it, because
+`commitment: string` accepts anything.
+
+| file | what |
+|---|---|
+| `src/lib/field.ts` | BN254 scalar field; `MAX_NOTE_VALUE`; hex codec; rejection-sampled secrets |
+| `src/lib/hash.ts` | the `FieldHash` seam. SHA-256 stand-in, tagged. **No Poseidon — see rule 9** |
+| `src/lib/note.ts` | `commitment = H("note.commitment", [amount, secret])`, nullifier likewise |
+
+Three things about the shape, because each replaces a way this could have gone wrong:
+
+- **`Note.commitment` is a discriminated union, not a string.** `{ scheme: "poseidon" }` or
+  `{ scheme: "stand-in", why }` — so a value hashed with the stand-in cannot reach a chain
+  boundary without the difference being handled. Same device as `Anchoring`, same reason.
+- **`Note.secret` is a `bigint`, not hex.** The scheme's inputs are field elements, so
+  carrying it as one means no parse step to get wrong and nowhere for a 33-byte "field
+  element" to hide.
+- **`tests/field.test.ts` reads `contracts/src/*.sol` and extracts `FIELD_SIZE` and
+  `MAX_NOTE_VALUE`** rather than restating them. The constants exist on both sides of the
+  boundary and a copy drifts silently. Do not replace that with a literal.
+
+Measured while writing those tests, and worth knowing before you write similar ones — both
+are in `CLAUDE.md`: `new URL(x, import.meta.url)` is rewritten by Vite and does not resolve
+against the file, and a spy that delegates to the real `crypto.getRandomValues` re-enters
+itself and cannot count calls (it reported 5 draws for 1).
+
+One number came out of this that is worth having: **`FIELD_MODULUS / MAX_NOTE_VALUE` is 48**,
+so 48 maximum-valued notes can be summed before the field wraps and 49 cannot. Pinned as an
+equality in `tests/field.test.ts`. (The first version of that test asserted 64 fit, which is
+false — 2^248 × 64 is 2^254 and the modulus is just under it. An over-confident inequality in
+a test about overflow is the wrong place to guess.)
+
+**What this does NOT do:** it does not make a note provable. `standInHash` is SHA-256, which
+no circuit computes and none ever will — SHA-256 inside a SNARK costs tens of thousands of
+constraints, which is why Poseidon exists. The gap is now one substitution wide and it is
+tagged in every value, which is the honest version of the same gap rather than a smaller one.
 
 ### Steps 2 and 3 are NOT done, and step 2 is not a deployment step
 

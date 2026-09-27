@@ -1,5 +1,9 @@
 import type { Anchoring, Note, Receipt, ShieldedPool, TokenRef } from "@/adapters/types";
 import { formatAmount } from "@/lib/amount";
+import { assertNoteValue } from "@/lib/field";
+import type { FieldHash } from "@/lib/hash";
+import { standInHash } from "@/lib/hash";
+import { deriveCommitment, newNoteSecret } from "@/lib/note";
 
 /**
  * A shielded pool that keeps its notes in this browser and nothing else.
@@ -13,6 +17,13 @@ import { formatAmount } from "@/lib/amount";
  * The balance arithmetic, the spend rules, the change note, the refusal to
  * overspend: all of that is real and all of it is what the on-chain version
  * will also have to do. Only the proof is missing.
+ *
+ * ── Commitments are derived here, not invented ───────────────────────────────
+ * `deposit` used to set `commitment: randomHex(32)`. A random commitment commits
+ * to nothing, which made the note unprovable by construction rather than merely
+ * unproven — see the header of `lib/note.ts`. It now runs the real scheme over the
+ * real amount and secret. The hash underneath is a stand-in and says so in every
+ * value it produces, which is the honest version of the same gap.
  */
 
 const WHY_LOCAL = "held in this browser only — the pool is not deployed yet";
@@ -38,13 +49,29 @@ export class LocalShieldedPool implements ShieldedPool {
 
   private readonly store: Note[] = [];
 
+  /**
+   * The hash is injected so a test can pin the scheme, and so the day Poseidon
+   * exists this class does not need editing to use it. Defaulted rather than
+   * required because every current caller wants the same one, and a required
+   * argument here would put the choice of hash function in the UI layer.
+   */
+  constructor(private readonly hash: FieldHash = standInHash) {}
+
   async deposit(token: TokenRef, amount: bigint): Promise<Note> {
     if (amount <= 0n) throw new Error("Deposit an amount greater than zero.");
+    /**
+     * The same bound the contract enforces, applied before a note exists rather
+     * than after a revert. The line above already refuses zero with wording aimed
+     * at someone who left the field blank; this catches the other end, where the
+     * number is too large for any note to hold.
+     */
+    assertNoteValue(amount);
 
+    const secret = newNoteSecret();
     const note: Note = {
       id: randomHex(8),
-      commitment: randomHex(32),
-      secret: randomHex(32),
+      commitment: await deriveCommitment(this.hash, { amount, secret }),
+      secret,
       token,
       amount,
       createdAt: new Date().toISOString(),

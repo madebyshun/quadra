@@ -33,7 +33,7 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. **485 tests in 17 files**, 100% on all four
+in one go. Do not report "done" on a subset. **551 tests in 20 files**, 100% on all four
 metrics, measured 2026-09-27.
 
 That count is a dated measurement, not a target — it is here so a fresh clone that comes
@@ -123,6 +123,29 @@ Dev server is `npm run dev` on **port 5273**.
   through a separate non-view `expect()` and returns whether the call matches. Worth noticing
   that the restriction is a feature — a verifier that could record could also return a different
   answer for the same proof depending on what it had seen before.
+- 🔴 **`new URL(relative, import.meta.url)` does NOT resolve against the file. Vite rewrites it.**
+  MEASURED 2026-09-27 while making `tests/field.test.ts` read the Solidity: that exact expression is
+  Vite's static-asset reference pattern, so it was transformed into
+  `http://localhost:3000/contracts/src/ShieldedPool.sol` — resolved against the dev server. The
+  giveaway is an `ENOENT` for `/contracts/src/…` with the project directory missing from the front,
+  which reads as a bad relative path and sends you editing the `../`. `import.meta.url` itself is
+  correct; it is the wrapper that vanishes. Use
+  `resolve(dirname(fileURLToPath(import.meta.url)), "..")` — a plain call is not rewritten.
+- 🔴 **A spy that delegates to the original `crypto.getRandomValues` RE-ENTERS ITSELF, so it cannot
+  count calls.** MEASURED 2026-09-27: `const real = crypto.getRandomValues.bind(crypto)` captured
+  before `vi.spyOn`, then `return real(buf)` from inside `mockImplementation`, counted **5** calls
+  for a single `randomFieldElement()` that drew once. The control — a mock that never delegates —
+  counted exactly 1. The danger is not the wrong number, it is that the number is plausible: a
+  rejection-sampling test asserting "it drew twice" would have been written around whatever the spy
+  happened to report and would have passed while measuring nothing. Script every draw instead; see
+  `withScriptedBytes` in `tests/field.test.ts`.
+- **A test may read a constant out of the Solidity, and one does.** `tests/field.test.ts` extracts
+  `FIELD_SIZE` and `MAX_NOTE_VALUE` from `contracts/src/` rather than restating them, because a
+  copied constant drifts silently and only disagrees where the two halves meet. Consequence worth
+  knowing: `npm run gate` now needs `contracts/src/*.sol` to be present. It does **not** need
+  Foundry — the files are committed and it only reads them — so the offline-bare-clone rule still
+  holds. Do not "simplify" that test into a hard-coded number; the hard-coded number is the bug it
+  exists to catch.
 
 ---
 
@@ -153,6 +176,18 @@ Dev server is `npm run dev` on **port 5273**.
    and no failing test, which is what makes it the single most dangerous file in the repo. Same
    for `TestHasher`: keccak satisfies every property the tree checks, so it passes everything
    and yields a pool whose withdrawals nobody can afford to prove.
+9. **Never write Poseidon constants from memory, a blog post, or another chain.** Its round
+   constants and MDS matrix come from a specified derivation (a Grain LFSR) for one field, width
+   and round count. Recalled constants give a hash that is deterministic, collision-free, in-field
+   and therefore passes every test in `tests/hash.test.ts` — while matching no circuit anybody
+   will generate. Money in, nothing out, no error: the browser half of rule 8's hazard. Poseidon
+   arrives with checked-in test vectors that a generated circuit reproduces, or it does not
+   arrive. Until then `standInHash` is SHA-256 and says so in every value it tags.
+10. **A stand-in value must carry its own reason, and the type must make that unavoidable.**
+   `Commitment` and `Nullifier` are discriminated unions where only the `stand-in` variant has a
+   `why`, so code needing a provable value narrows and cannot ignore a boolean. Same device as
+   `Anchoring`. Do not add a `verified: boolean` anywhere in this codebase — `verified: false` is
+   a field that gets ignored; a missing `quote` is a type error.
 
 ---
 
@@ -166,10 +201,13 @@ src/
   config/          chain.ts (Base 8453, flags), pair.ts (AAPLc), upstream.ts
   features/        registry.ts (the 10 ?do= ids) + panels/
   lib/             amount, hooks, manifest, status, verify
+                   field.ts  — BN254 scalar field, mirrors the contracts' constants
+                   hash.ts   — the FieldHash seam; SHA-256 stand-in, NO Poseidon (rule 9)
+                   note.ts   — commitment + nullifier derivation over that hash
   pages/           /docs /api /verify /404
   ui/              Window, Taskbar, Gel (button), Crt (output box)
   styles/          reset.css + theme.css — the XP/Aqua design system
-tests/             17 files, mirrors src/
+tests/             20 files, mirrors src/. field.test.ts also reads contracts/src/*.sol
 tools/quadra-mcp/  stdio MCP server, read-only
 scripts/           measure-catalog.ts — hand-run, hits the network
                    check-contract-coverage.ts — the forge coverage gate
@@ -229,6 +267,14 @@ re-chasing something that was already fixed, and the list stops being believed.)
   is the larger half and is not Solidity work.)* The two doubles that stand in for them are
   the most dangerous files here — see hard rule 8. `contracts/README.md` lists everything that
   must exist before this holds money.
+  **Narrowed again later the same day, on the browser side:** notes now carry a commitment
+  derived by the real scheme (`src/lib/note.ts`) over a real hash (`src/lib/hash.ts`) instead of
+  the `randomHex(32)` they used to carry, and `Note.commitment` is a discriminated union tagged
+  with the scheme that produced it. So the arithmetic is honest and the gap is one substitution
+  wide. **The missing piece is still Poseidon, and it is missing on purpose** — round constants
+  written from memory produce a hash that passes every property test in `tests/hash.test.ts` and
+  matches no circuit, which is the same failure as `TestHasher` with none of the warning labels.
+  See hard rule 9 and the 🔴 block in `src/lib/hash.ts`.
 - ⚠️ **Join-split leaks amounts, and the shape is still ShunTr's decision.** The pool takes
   arbitrary amounts, so a deposit and a withdrawal of the same size are linkable by anyone
   reading the chain with no cryptography broken. Fixed denominations are strictly stronger and
