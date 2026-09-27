@@ -40,49 +40,48 @@ and fails silently.
 
 ---
 
-## T1 — Stop `/api` describing endpoints that do not exist
+## ~~T1 — Stop `/api` describing endpoints that do not exist~~ — DONE 2026-09-27
 
-**Size:** small. **Blocks:** nothing. **Do this first** — it is the one task where
-the current state is actively untrue.
+Took option (a). `src/pages/ApiPage.tsx` now says outright that this is a single page
+with no server behind it, lists the two endpoints as `not built`, and prints no `curl`
+for either — a copyable command is a promise the thing answers. The only URL shown as
+a command is upstream's catalog, because that one genuinely resolves.
 
-`src/pages/ApiPage.tsx` documents `https://quadra.computer/api/services` as public
-and free to read. There is no such endpoint, no such deployment, and no such domain
-pointed anywhere. It is harmless while the repo is private and a live falsehood the
-day it ships.
+Honesty is structural rather than well-worded: each endpoint carries a `live` flag,
+the badge derives from it, and `tests/api-page.test.tsx` asserts the property — no
+command on the page may name this origin. `apiLede` and `endpointBadge` take their
+input rather than reading `ENDPOINTS`, so the wording that ships the day an endpoint
+goes up is already tested. Same pattern as `installLine` and `assertDeployed`.
 
-Pick one:
-- **(a)** Reword the page to describe what exists — an SPA with no server API — and
-  move the endpoint table under a heading that says it is the intended shape, not a
-  live surface. Cheapest, honest, reversible.
-- **(b)** Build the endpoints. Requires a server, which the static build does not
-  have. See T3; do not start here.
-
-**Done when:** no page in `src/pages/` claims a URL that does not resolve, and the
-tests in `tests/` assert that rather than just rendering it.
+Fixed alongside it: `.notes__row` is a three-column grid sized for SendPanel, so any
+row with two children had its second stretched by the `1fr` column — the MCP panel had
+been rendering its capability chips as full-width bars. `.notes__row > .chip` now has
+`justify-self: start`. 473 green tests never saw it; the chip had the right class and
+the right text the whole time.
 
 ---
 
-## T2 — The document overflows the viewport at 390px
+## ~~T2 — The document overflows the viewport at 390px~~ — WITHDRAWN, there is no such bug
 
-**Size:** small-to-medium, unknown until measured. **Blocks:** nothing.
+**Status:** closed 2026-09-27 as a false finding. Left in place rather than deleted,
+because the next person to shoot a narrow screenshot will see the same thing and
+needs to know it was already chased.
 
-At a 390px viewport the document is wider than the window on both `/` and `/api`,
-so the page scrolls sideways. This predates the recent CSS work — it reproduces on
-the bare card grid.
+The claim was that at 390px the document is wider than the window on `/` and `/api`.
+**It is not.** Measured by loading the app in an iframe of a known width and reading
+`documentElement.scrollWidth` against `clientWidth` — 6 paths × 3 widths
+(390 / 360 / 320), 18 combinations, **zero overflow, zero elements past the right
+edge.** The layout is fine: at 390px the cards collapse to one column, the tagline
+wraps, the chips wrap to a second row and the taskbar fits.
 
-Already ruled out, do not re-check these:
-- `.cards` is `repeat(auto-fill, minmax(168px, 1fr))` and is correctly responsive.
-- `.taskbar` is `position: fixed; inset: auto 0 0 0` and cannot widen the document.
-  Its tray overflows the fixed bar because flex items don't shrink below min-content,
-  which is a separate and smaller problem.
+**The bug was the measuring tool.** `--window-size=390,300` reports `innerWidth=500`
+— headless Chrome clamps its viewport to a minimum and the PNG is a 390px crop of a
+500px render. Everything looks sliced off at the right edge because it literally was,
+by the screenshot rather than by the CSS.
 
-You need real layout measurement, not jsdom — jsdom has no layout and cannot see
-this. Use headless Chrome (recipe in `CLAUDE.md`) or `getBoundingClientRect` through
-a real browser.
-
-**Judgement call inside this task:** making a Windows-XP-desktop metaphor work on a
-phone is a design decision nobody has made. Fixing the overflow is fine. Redesigning
-the desktop for mobile is not — flag it and stop.
+If you need a genuine narrow render, use the iframe method in `CLAUDE.md`. And take
+the general lesson with you: when the tool and the assertion disagree, suspect the
+tool before writing the finding down.
 
 ---
 

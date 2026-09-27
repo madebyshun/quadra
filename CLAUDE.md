@@ -54,6 +54,19 @@ Dev server is `npm run dev` on **port 5273**.
   ```
   Shoot at a small window size — a large one comes back downscaled past the point of reading
   text. Write the PNGs outside the repo.
+- 🔴 **`--window-size` below ~500px does NOT narrow the layout — it crops the PNG.** MEASURED
+  2026-09-27: `--window-size=390,300` reports `innerWidth=500`. Chrome clamps the headless
+  viewport to a minimum and the screenshot is a 390px-wide crop of a 500px-wide render, so
+  every element looks sliced off at the right edge. **This produced an entire fictional bug** —
+  "the document overflows the viewport at 390px on / and /api" was written into this file and
+  into TASKS.md as a measured finding, and it was the measuring tool the whole time.
+  To render narrow for real, put the app in an **iframe of the width you want** and screenshot
+  the parent at a legal size; an iframe gets a true layout viewport equal to its element size.
+  Check `documentElement.scrollWidth` against `clientWidth` inside it rather than eyeballing
+  a PNG — the number is the evidence, the picture is not.
+  **The general lesson is the expensive one: when a tool and an assertion disagree, suspect the
+  tool before writing down the finding.** A wrong measurement recorded as fact costs more than
+  no measurement, because the next reader spends their time chasing it instead of building.
 - **CSS cascade order beats intent at equal specificity.** `.dim` was declared after
   `.shell__hint` and silently won. Check where a rule sits, not just what it says.
 - **A shared class sized for one panel breaks another.** `max-height` belongs on a modifier
