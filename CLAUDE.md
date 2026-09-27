@@ -33,7 +33,7 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. **563 tests in 20 files**, 100% on all four
+in one go. Do not report "done" on a subset. **592 tests in 21 files**, 100% on all four
 metrics, measured 2026-09-27.
 
 That count is a dated measurement, not a target — it is here so a fresh clone that comes
@@ -213,10 +213,12 @@ src/
                    field.ts  — BN254 scalar field, mirrors the contracts' constants
                    hash.ts   — the FieldHash seam; SHA-256 stand-in, NO Poseidon (rule 9)
                    note.ts   — commitment + nullifier derivation over that hash
+                   tree.ts   — the commitment tree, mirroring MerkleTreeWithHistory.sol,
+                               plus the Merkle paths the contract cannot serve
   pages/           /docs /api /verify /404
   ui/              Window, Taskbar, Gel (button), Crt (output box)
   styles/          reset.css + theme.css — the XP/Aqua design system
-tests/             20 files, mirrors src/. field.test.ts also reads contracts/src/*.sol
+tests/             21 files, mirrors src/. field.test.ts also reads contracts/src/*.sol
 tools/quadra-mcp/  stdio MCP server, read-only
 scripts/           measure-catalog.ts — hand-run, hits the network
                    check-contract-coverage.ts — the forge coverage gate

@@ -5,7 +5,7 @@ Read `CLAUDE.md` first — it has the constraints and the rules that exist becau
 something broke. This file is only the work.
 
 **Before you start anything:** `npm install`, then `npm run gate`. It must be green
-(tsc clean, **563 tests in 20 files**, 100% on statements/branches/functions/lines, build
+(tsc clean, **592 tests in 21 files**, 100% on statements/branches/functions/lines, build
 succeeds). If it is not green on a fresh checkout, fix that before touching a task — you
 are looking at drift, not at your own change.
 
@@ -342,6 +342,60 @@ contract's `DuplicateNullifier` guard has no local counterpart — with one inpu
 arise. Whether the browser should join and split the same way is the open question at the
 bottom of this file, and it is a product decision, not a bug. And the nullifiers are still
 stand-in-hashed, so they are the right values in the wrong hash. Same one substitution as 1b.
+
+### Step 1d also DONE (2026-09-28) — the browser has a commitment tree, and can serve paths
+
+`src/lib/tree.ts`. The pool had a `nextIndex` counter and no tree, which meant the
+browser could name a leaf position but could not compute a root or produce a path — the
+two things a withdrawal proof is made of. `IncrementalMerkleTree` mirrors
+`MerkleTreeWithHistory.sol` hash for hash: same insert loop, same empty-subtree
+stand-ins, same 30-root circular history, same refusal of root zero.
+
+It is a **superset**, not a copy. The contract keeps one node per level, because storing
+a million leaves to serve a proof nobody asked for is not what block space is for.
+Somebody still has to produce the path, and here that somebody is the browser, so this
+keeps every leaf and derives paths on demand. `pathFor` is the load-bearing method: a
+path whose siblings do not fold back to the root is a proof that will not verify, and
+nothing about the numbers says so.
+
+**That test was verified by breaking the code, not by watching it pass.** All 29 tests
+went green on the first run, which is a reason for suspicion rather than confidence — so
+two mutations were introduced deliberately: padding the path level with `0n` instead of
+`zeros[i]`, and folding without consulting `isRight`. Each produced exactly one failure,
+the round-trip. A test that only ever passes has not been shown to test anything.
+
+Three decisions worth not undoing:
+
+- **`emptyLeaf` is a required argument with no default.** The contract derives its empty
+  leaf from `keccak256("quadra.shielded-pool.empty-leaf") % FIELD_SIZE`, and **there is
+  no keccak in the browser** — no dependency provides one, and hard-coding a 32-byte
+  constant that nothing local can re-derive is precisely hard rule 9's hazard. So the
+  caller supplies it: from a deployed pool's own `zeros(0)` when there is a deployment,
+  from a declared constant when there is not. A wrong value fails a test; a missing one
+  fails to compile.
+- **Interior nodes are hashed under a domain tag** (`TREE_NODE_DOMAIN = "tree.node"`).
+  `IHasher.hash(left, right)` takes no tag, so **a deployed hasher has to bake this one
+  in** or its roots will not match the browser's. Untagged, a node hash and a two-input
+  note commitment are the same function of the same pair.
+- **Capacity is `2 ** levels`, never `1 << levels`.** `1 << 32` is **1** in JavaScript,
+  so a shift would report a 32-level tree as full at its second leaf. Pinned by an
+  assertion, because the wrong answer is a small plausible number rather than an error.
+
+🔴 **Found while writing it, and NOT yet resolved: the contract is inconsistent with its
+own stated principle, for exactly one value.** `MerkleTreeWithHistory`'s constructor
+comment says empty subtrees are computed from the deployed hasher rather than tabulated,
+because *"a hard-coded table is a copy of the answer for one specific hash function"* —
+and then it takes the empty **leaf** from keccak, which is exactly that. It computes 19
+of 20 zeros from the hasher and imports the 20th from a different hash function
+entirely. The stated reason (so an all-zero calldata blob is not a valid empty leaf) is
+served just as well by a domain-separated call to the hasher it already has.
+
+Leaving the contract alone for now because changing it is a Solidity change with its own
+gate and its own test file, and because the value has to agree with the circuit that
+does not exist yet. **Resolve it as part of step 2, in one of two directions:** derive
+the empty leaf from `IHasher` so both sides can compute it, or keep keccak and accept
+that the browser must be handed the constant from the deployment and can never check it.
+The first is better and the browser is already written for either.
 
 ### Steps 2 and 3 are NOT done, and step 2 is not a deployment step
 
