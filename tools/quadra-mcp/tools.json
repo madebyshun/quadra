@@ -1,0 +1,129 @@
+{
+  "server": {
+    "name": "quadra",
+    "version": "0.0.0",
+    "published": false,
+    "command": "node",
+    "args": ["tools/quadra-mcp/index.mjs"]
+  },
+  "tools": [
+    {
+      "name": "quadra_read_hook",
+      "reach": "offline",
+      "description": "Read what a Uniswap v4 hook is allowed to do, straight out of its address. v4 keeps a hook's permissions in the low 14 bits of the hook's own address and the pool manager obeys those bits, so this is not a claim the hook makes, it is what the pool will actually do. Tells you WHICH callbacks run, never WHAT they do: a hook with one permission can still take every token in your swap.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "The hook's 20-byte address, 0x and 40 hex digits."
+          }
+        },
+        "required": ["address"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "quadra_amount",
+      "reach": "offline",
+      "description": "Convert between a human amount and exact on-chain base units for a token with a stated number of decimals. Always pass the token's own decimals: USDC has 6, a tokenized share has 8, WETH has 18, and getting the exponent wrong misprices by a factor of ten billion, which reads as a price move rather than as a bug. Refuses instead of rounding when an amount has more decimal places than the token can hold.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "description": "A plain decimal like 12.5 when converting to base units, or an integer like 12500000 when converting back. A string either way, because base units overflow a JSON number."
+          },
+          "decimals": {
+            "type": "integer",
+            "description": "The token's decimals. Read it from the token, do not assume 18.",
+            "minimum": 0,
+            "maximum": 36
+          },
+          "to": {
+            "type": "string",
+            "enum": ["base", "human"],
+            "description": "base turns 12.5 into base units; human turns base units back into 12.5."
+          }
+        },
+        "required": ["value", "decimals", "to"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "quadra_status",
+      "reach": "offline",
+      "description": "What this build can and cannot do right now: which chain it targets, which of its own contracts are deployed, and what is still missing. Ask this before assuming a capability exists. The shielded pool is not deployed, so nothing that needs it can run yet, and this server holds no key and cannot sign or send anything at all.",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+    },
+    {
+      "name": "quadra_list_tools",
+      "reach": "public-read",
+      "description": "List the paid tools available upstream on BlueAgent, each with its price and its inputs. Reads the free public catalog. This lists them only: it cannot run one and it spends nothing.",
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+    },
+    {
+      "name": "quadra_quote_tool",
+      "reach": "public-read",
+      "description": "Ask what one upstream tool costs, without paying it. Reads the live 402 the server answers with, so the price is the real one rather than a number copied into this repo. Some ids answer without asking for payment; those come back as free, not as a price of zero.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toolId": {
+            "type": "string",
+            "description": "A tool id from quadra_list_tools, for example honeypot."
+          }
+        },
+        "required": ["toolId"],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "build": {
+    "chain": { "id": 8453, "name": "Base" },
+    "contracts": {
+      "shieldedPool": null,
+      "verifier": null,
+      "treasury": null,
+      "token": null
+    },
+    "limits": [
+      "This server holds no key. It cannot sign, send, swap, or pay.",
+      "The shielded pool is not deployed, so no proof is made on chain and no transfer is shielded.",
+      "Upstream tools can be listed and quoted, never run: running one costs USDC and needs a wallet this server does not have.",
+      "Nothing here is published. The tool names may still change."
+    ]
+  },
+  "hookPermissions": [
+    { "bit": 13, "name": "beforeInitialize", "means": "runs once, before the pool exists" },
+    { "bit": 12, "name": "afterInitialize", "means": "runs once, just after the pool is created" },
+    { "bit": 11, "name": "beforeAddLiquidity", "means": "runs before anyone adds liquidity" },
+    { "bit": 10, "name": "afterAddLiquidity", "means": "runs after liquidity is added" },
+    { "bit": 9, "name": "beforeRemoveLiquidity", "means": "runs before anyone takes liquidity out" },
+    { "bit": 8, "name": "afterRemoveLiquidity", "means": "runs after liquidity is taken out" },
+    { "bit": 7, "name": "beforeSwap", "means": "runs before your swap, and can change its price" },
+    { "bit": 6, "name": "afterSwap", "means": "runs after your swap" },
+    { "bit": 5, "name": "beforeDonate", "means": "runs before a donation to the pool" },
+    { "bit": 4, "name": "afterDonate", "means": "runs after a donation to the pool" },
+    {
+      "bit": 3,
+      "name": "beforeSwapReturnsDelta",
+      "means": "can take or add tokens before your swap is priced"
+    },
+    {
+      "bit": 2,
+      "name": "afterSwapReturnsDelta",
+      "means": "can take or add tokens after your swap"
+    },
+    {
+      "bit": 1,
+      "name": "afterAddLiquidityReturnsDelta",
+      "means": "can take or add tokens when liquidity arrives"
+    },
+    {
+      "bit": 0,
+      "name": "afterRemoveLiquidityReturnsDelta",
+      "means": "can take or add tokens when liquidity leaves"
+    }
+  ]
+}

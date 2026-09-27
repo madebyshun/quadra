@@ -1,0 +1,762 @@
+/*
+ * Quadra's look is three eras fused on purpose — the name is a 1991 Macintosh,
+ * so the Apple half carries it:
+ *   window chrome  → Windows XP "Luna"   (blue title bars, #ece9d8 bodies, Trebuchet titles)
+ *   controls       → Mac OS X "Aqua"     (gel lozenges, pinstripes, traffic lights)
+ *   proof panels   → CRT phosphor        (green glow, scanlines)
+ *
+ * Every value here is a token. Components never hardcode a colour.
+ */
+
+:root {
+  /* ---- XP Luna ---- */
+  --xp-title-a: #0058e6;
+  --xp-title-b: #3f8cf3;
+  --xp-title-c: #0054e3;
+  --xp-title-edge: #0831d9;
+  --xp-frame: #0054e3;
+  --xp-face: #ece9d8;
+  --xp-face-lit: #fffffe;
+  --xp-face-dim: #d4d0c8;
+  --xp-sunken: #ffffff;
+  --xp-border-dark: #716f64;
+  --xp-border-mid: #aca899;
+  --xp-btn-edge: #003c74;
+  --xp-hot: #ff9c00;
+  --xp-start-a: #379937;
+  --xp-start-b: #3faf3f;
+  --xp-ink: #000000;
+  --xp-ink-soft: #3a3a3a;
+  --xp-ink-dim: #6d6a5f;
+
+  /* ---- Aqua ---- */
+  --aqua-blue-a: #a8d0f7;
+  --aqua-blue-b: #4e8fe0;
+  --aqua-blue-c: #2f6cbe;
+  --aqua-graphite-a: #f4f4f4;
+  --aqua-graphite-b: #cfcfcf;
+  --aqua-graphite-c: #a9a9a9;
+  --aqua-gloss: rgba(255, 255, 255, 0.85);
+  --aqua-red: #ff5f57;
+  --aqua-yellow: #ffbd2e;
+  --aqua-green: #28c840;
+  --aqua-stripe: rgba(255, 255, 255, 0.55);
+
+  /* ---- CRT phosphor ---- */
+  --crt-bg: #06120b;
+  --crt-ink: #7fff9a;
+  --crt-ink-dim: #3f8f56;
+  --crt-glow: rgba(127, 255, 154, 0.35);
+  --crt-scan: rgba(0, 0, 0, 0.22);
+  --crt-amber: #ffb642;
+
+  /* ---- semantic ---- */
+  --ok: #1d7a2e;
+  --warn: #9a6300;
+  --bad: #b3261e;
+
+  /* ---- type ---- */
+  --font-title: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif;
+  --font-ui: Tahoma, Verdana, "Segoe UI", sans-serif;
+  --font-mac: "Lucida Grande", Geneva, Verdana, sans-serif;
+  --font-mono: "Andale Mono", Monaco, Consolas, "Courier New", monospace;
+
+  /* ---- metrics ---- */
+  --radius-window: 8px;
+  --radius-control: 3px;
+  --radius-gel: 999px;
+  --shadow-window: 0 6px 22px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  --taskbar-h: 30px;
+}
+
+/* ===================================================================
+   The desktop
+   =================================================================== */
+
+.desktop {
+  min-height: 100vh;
+  padding: 22px 18px calc(var(--taskbar-h) + 28px);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--xp-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Aqua's pinstripe wash, laid over the XP sky. Two eras, one surface. */
+.desktop::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    var(--aqua-stripe) 0px,
+    var(--aqua-stripe) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  opacity: 0.16;
+  z-index: 0;
+}
+
+.desktop > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ===================================================================
+   XP window
+   =================================================================== */
+
+.win {
+  background: var(--xp-frame);
+  border-radius: var(--radius-window) var(--radius-window) 0 0;
+  padding: 0 3px 3px;
+  box-shadow: var(--shadow-window);
+}
+
+.win__bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 27px;
+  padding: 0 4px 0 6px;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(
+    180deg,
+    var(--xp-title-b) 0%,
+    var(--xp-title-a) 8%,
+    var(--xp-title-c) 42%,
+    var(--xp-title-edge) 90%,
+    var(--xp-title-a) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.win__title {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-title);
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Aqua traffic lights, sitting in an XP title bar. Deliberate. */
+.win__lights {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.light {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.32);
+  border-radius: 50%;
+  cursor: pointer;
+  background-repeat: no-repeat;
+}
+
+.light--close {
+  background:
+    radial-gradient(circle at 50% 22%, var(--aqua-gloss) 0 22%, transparent 55%),
+    var(--aqua-red);
+}
+.light--min {
+  background:
+    radial-gradient(circle at 50% 22%, var(--aqua-gloss) 0 22%, transparent 55%),
+    var(--aqua-yellow);
+}
+.light--max {
+  background:
+    radial-gradient(circle at 50% 22%, var(--aqua-gloss) 0 22%, transparent 55%),
+    var(--aqua-green);
+}
+
+.light:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+
+.win__body {
+  background: var(--xp-face);
+  border: 1px solid var(--xp-border-mid);
+  border-top: none;
+  padding: 14px;
+}
+
+/* ===================================================================
+   Aqua gel button
+   =================================================================== */
+
+.gel {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 4px 16px;
+  border: 1px solid var(--aqua-blue-c);
+  border-radius: var(--radius-gel);
+  font-family: var(--font-mac);
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  background: linear-gradient(
+    180deg,
+    var(--aqua-blue-a) 0%,
+    var(--aqua-blue-b) 48%,
+    var(--aqua-blue-c) 52%,
+    var(--aqua-blue-b) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+/* the gloss highlight that makes Aqua look wet */
+.gel::after {
+  content: "";
+  position: absolute;
+  inset: 1px 3px auto;
+  height: 45%;
+  border-radius: var(--radius-gel);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+.gel:hover {
+  filter: brightness(1.08);
+}
+.gel:active {
+  filter: brightness(0.92);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+.gel:disabled {
+  cursor: not-allowed;
+  filter: grayscale(1) brightness(1.15);
+  color: var(--xp-ink-dim);
+  text-shadow: none;
+}
+.gel:focus-visible {
+  outline: 2px solid var(--xp-hot);
+  outline-offset: 2px;
+}
+
+.gel--quiet {
+  border-color: var(--aqua-graphite-c);
+  color: var(--xp-ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+  background: linear-gradient(
+    180deg,
+    #fff 0%,
+    var(--aqua-graphite-a) 48%,
+    var(--aqua-graphite-b) 52%,
+    var(--aqua-graphite-a) 100%
+  );
+}
+
+/* ===================================================================
+   XP push button, sunken field, group box
+   =================================================================== */
+
+.btn {
+  min-height: 23px;
+  padding: 3px 12px;
+  border: 1px solid var(--xp-btn-edge);
+  border-radius: var(--radius-control);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--xp-ink);
+  cursor: pointer;
+  background: linear-gradient(
+    180deg,
+    var(--xp-face-lit) 0%,
+    var(--xp-face) 48%,
+    var(--xp-face-dim) 100%
+  );
+}
+
+.btn:hover {
+  border-color: var(--xp-hot);
+}
+.btn:active {
+  background: linear-gradient(180deg, var(--xp-face-dim) 0%, var(--xp-face) 100%);
+}
+.btn:disabled {
+  color: var(--xp-ink-dim);
+  border-color: var(--xp-border-mid);
+  cursor: not-allowed;
+}
+
+.field {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  border: 1px solid var(--xp-border-dark);
+  border-radius: 0;
+  background: var(--xp-sunken);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--xp-ink);
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.18);
+}
+
+.field:focus {
+  outline: 1px solid var(--xp-title-a);
+  outline-offset: -2px;
+}
+
+.field::placeholder {
+  color: var(--xp-ink-dim);
+}
+
+.group {
+  border: 1px solid var(--xp-border-mid);
+  padding: 12px 12px 14px;
+  margin: 0;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.group > legend {
+  padding: 0 5px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--xp-title-c);
+}
+
+.label {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 11px;
+  color: var(--xp-ink-soft);
+}
+
+/* ===================================================================
+   CRT phosphor panel — proofs, receipts, calldata
+   =================================================================== */
+
+.crt {
+  position: relative;
+  overflow: hidden;
+  padding: 10px 12px;
+  border: 1px solid #000;
+  background: var(--crt-bg);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--crt-ink);
+  text-shadow: 0 0 6px var(--crt-glow);
+  white-space: pre-wrap;
+  /*
+    `anywhere`, not `break-all`. Both keep a 66-character address or a base64 proof
+    inside the box, which is what this panel is for; the difference is what they do
+    to the sentences alongside them. `break-all` breaks at whatever column the line
+    ends on, and it was rendering the not-built notice as "nothing here will mo / ve
+    money" — which reads as a rendering fault and undermines a sentence whose whole
+    job is to be believed. `anywhere` breaks a token only when it cannot fit on a
+    line of its own, so prose wraps at spaces and a long hash still wraps.
+  */
+  overflow-wrap: anywhere;
+}
+
+.crt::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0px,
+    transparent 2px,
+    var(--crt-scan) 2px,
+    var(--crt-scan) 3px
+  );
+}
+
+.crt__dim {
+  color: var(--crt-ink-dim);
+  text-shadow: none;
+}
+
+.crt__amber {
+  color: var(--crt-amber);
+  text-shadow: 0 0 6px rgba(255, 182, 66, 0.35);
+}
+
+.crt__ok {
+  color: var(--crt-ink);
+}
+
+/* The CRT already wraps; this keeps a model's own line breaks as it wrote them. */
+.crt__pre {
+  display: block;
+  white-space: pre-wrap;
+}
+
+.crt > * + * {
+  display: block;
+  margin-top: 8px;
+}
+
+.crt a {
+  color: var(--crt-ink);
+  text-underline-offset: 2px;
+}
+
+/* ===================================================================
+   Panel furniture: labelled rows, unit suffixes, the note list
+   =================================================================== */
+
+.group__row {
+  display: grid;
+  grid-template-columns: 74px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--xp-ink-soft);
+}
+
+.group__unit {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--xp-ink-dim);
+}
+
+.field--area {
+  resize: vertical;
+  min-height: 62px;
+  line-height: 1.5;
+}
+
+.notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--xp-border-mid);
+  background: var(--xp-sunken);
+}
+
+/*
+  The height cap belongs to the lists that can grow, not to every list that wants
+  a sunken box. It lived on `.notes` itself until the panels were looked at in a
+  browser: 168px is about four of SendPanel's one-line rows, and about two and a
+  half of the MCP panel's, which each carry a paragraph — so that list rendered as
+  a box with its third entry sliced through the middle of the glyphs. Nothing in
+  jsdom has a layout, so no test could have seen it.
+
+  Applied only to SendPanel's note list, which is the one a user can make
+  arbitrarily long. The other three are fixed-length reads — five MCP tools, the
+  build's limits, fourteen v4 permission bits — and are better shown whole.
+*/
+.notes--scroll {
+  max-height: 168px;
+  overflow-y: auto;
+}
+
+.notes > li + li {
+  border-top: 1px solid var(--xp-border-mid);
+}
+
+/*
+  Lines up with `.notes__row`'s own 8px, so a row and the sentence explaining it
+  share a left edge. It was an unpadded inline `span`, which put the description
+  8px left of the name it belongs to.
+*/
+.notes__why {
+  display: block;
+  padding: 0 8px 6px;
+  color: var(--xp-ink-dim);
+}
+
+.notes__row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.notes__row:hover {
+  background: rgba(49, 106, 197, 0.1);
+}
+
+.notes__amount {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--xp-ink);
+}
+
+.notes__id {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+/* ===================================================================
+   The desktop's own furniture: brand, cards
+   =================================================================== */
+
+.home {
+  max-width: 900px;
+  margin: 0 auto;
+  gap: 18px;
+}
+
+.home__head {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 10px 2px 0;
+}
+
+.home__brand {
+  font-family: var(--font-title);
+  font-size: clamp(38px, 8vw, 66px);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  color: #fff;
+  text-shadow:
+    0 0 24px var(--crt-glow),
+    2px 2px 2px rgba(0, 0, 0, 0.45);
+}
+
+.home__tagline {
+  max-width: 54ch;
+  font-family: var(--font-mac);
+  font-size: 13px;
+  line-height: 1.55;
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 10px;
+}
+
+.cards--docs {
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  opacity: 0.95;
+}
+
+.card {
+  display: grid;
+  gap: 3px;
+  align-content: start;
+  height: 100%;
+  padding: 11px 12px 12px;
+  border: 1px solid var(--xp-border-mid);
+  border-radius: 5px;
+  background: linear-gradient(180deg, #fff 0%, var(--xp-face) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 2px 5px rgba(0, 0, 0, 0.22);
+  color: var(--xp-ink);
+  text-decoration: none;
+}
+
+.card:hover {
+  border-color: var(--xp-hot);
+  text-decoration: none;
+  filter: brightness(1.03);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--xp-hot);
+  outline-offset: 2px;
+}
+
+.card__title {
+  font-family: var(--font-title);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--xp-title-c);
+}
+
+.card__blurb {
+  font-family: var(--font-mac);
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--xp-ink-soft);
+}
+
+.card--off {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.card--off .card__title {
+  color: var(--xp-ink-dim);
+}
+
+.card--doc .card__title {
+  color: var(--xp-ink-soft);
+}
+
+/* ===================================================================
+   Taskbar
+   =================================================================== */
+
+.taskbar {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--taskbar-h);
+  padding: 0 8px 0 0;
+  background: linear-gradient(180deg, #245edb 0%, #1941a5 9%, #2f6ee8 18%, #245edb 92%, #1941a5 100%);
+  box-shadow: 0 -1px 0 #0831d9 inset;
+  font-family: var(--font-ui);
+  color: #fff;
+}
+
+.taskbar__start {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  padding: 0 18px 0 10px;
+  border: none;
+  border-radius: 0 9px 9px 0;
+  font-family: var(--font-title);
+  font-size: 14px;
+  font-style: italic;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  background: linear-gradient(180deg, var(--xp-start-b) 0%, var(--xp-start-a) 55%, #2b7a2b 100%);
+}
+
+.taskbar__start:hover {
+  filter: brightness(1.12);
+}
+
+.taskbar__tray {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 100%;
+  padding: 0 10px;
+  font-size: 11px;
+  background: linear-gradient(180deg, #1290e9 0%, #0d73c8 50%, #1290e9 100%);
+  box-shadow: inset 1px 0 0 #0e5cad;
+}
+
+/* ===================================================================
+   One-window shell
+   =================================================================== */
+
+.shell {
+  max-width: 720px;
+  margin: 0 auto;
+  display: grid;
+  gap: 8px;
+}
+
+.shell__hint {
+  padding-left: 4px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.shell__hint a {
+  color: #fff;
+}
+
+.panel__lede {
+  max-width: 62ch;
+  font-family: var(--font-mac);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--xp-ink-soft);
+}
+
+/* ===================================================================
+   Small parts
+   =================================================================== */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--xp-border-mid);
+  border-radius: var(--radius-gel);
+  background: linear-gradient(180deg, #fff, var(--aqua-graphite-a));
+  font-size: 10.5px;
+  color: var(--xp-ink-soft);
+}
+
+.chip--ok {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.chip--warn {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+.chip--bad {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.dim {
+  color: var(--xp-ink-dim);
+}
+
+.stack {
+  display: grid;
+  gap: 10px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

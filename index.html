@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover"
+    />
+    <title>Quadra</title>
+    <meta
+      name="description"
+      content="Quadra trades, pays and routes on Base without leaving a trail. Private swaps, private payments, a payment router for agents, and all of it as MCP tools."
+    />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Quadra" />
+    <meta
+      property="og:description"
+      content="Private swaps, private payments and a payment router for agents, on Base."
+    />
+    <meta property="og:site_name" content="Quadra" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" type="image/svg+xml" href="/brand/icon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a3c8c" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Quadra" />
+
+    <!-- The desktop, before any script has loaded. Without this the page opens
+         white and jumps to blue once the bundle arrives. -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #0a3c8c;
+      }
+      body {
+        min-height: 100vh;
+        background:
+          linear-gradient(
+            180deg,
+            #1a5fc4 0%,
+            #3c87dc 38%,
+            #6fb0e8 52%,
+            #79a83c 62%,
+            #4f7c28 100%
+          )
+          fixed;
+      }
+    </style>
+    <script type="module" src="/src/main.tsx"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
