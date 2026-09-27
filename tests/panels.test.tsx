@@ -8,6 +8,8 @@ import { LOCAL_TOOLS, LocalCatalog } from "@/adapters/local/catalog";
 import { NO_WALLET } from "@/adapters/http/catalog";
 import { BLUEAGENT } from "@/config/upstream";
 import type { Adapters, Model, Quote, Tool } from "@/adapters/types";
+import { notBuiltNotice, UNBUILT, WAITING_ON } from "@/features/FeaturePanel";
+import type { Feature } from "@/features/registry";
 import { Anchor, Attested, Settled } from "@/features/panels/Anchor";
 import { SendPanel } from "@/features/panels/SendPanel";
 import { InferencePanel } from "@/features/panels/InferencePanel";
@@ -1062,5 +1064,74 @@ describe("the whole app, through a window", () => {
   it("still says a switched-off feature is off, not unbuilt", () => {
     renderAt("/?do=bridge");
     expect(screen.getByText(/Bridge is not switched on/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * An amber box used to say the same eleven words for Swap, Router and Audit. All
+ * three were accurate and none was actionable: they are waiting on three different
+ * things, and a reader cannot tell "nobody has built this" from "this needs a
+ * contract that does not exist" without being told which.
+ *
+ * The assertions below are therefore about the property — every window that renders
+ * the notice names its blocker — rather than about the wording, for the same reason
+ * the API page's tests are about `live` and not about its lede.
+ */
+describe("why an unbuilt window is unbuilt", () => {
+  it("names what it is waiting on for every switched-on window with nothing behind it", () => {
+    expect(UNBUILT.map((f) => f.id)).toEqual(["swap", "router", "audit"]);
+    for (const feature of UNBUILT) {
+      expect(WAITING_ON[feature.id], feature.id).toBeTruthy();
+    }
+  });
+
+  /**
+   * The inverse, and the one that would actually rot: a reason left behind for a
+   * window that now works reads as an excuse for a panel a user is looking at.
+   */
+  it("keeps no excuse for a window that is finished or switched off", () => {
+    const unbuilt = new Set(UNBUILT.map((f) => f.id));
+    for (const id of Object.keys(WAITING_ON)) {
+      expect(unbuilt.has(id as Feature["id"]), id).toBe(true);
+    }
+  });
+
+  it("appends the reason to the notice, and stands alone without one", () => {
+    expect(notBuiltNotice("Swap", "a deployed pool.")).toBe(
+      "Swap is switched on but not built yet. There is nothing here to click, and nothing here will move money. It is waiting on a deployed pool.",
+    );
+    expect(notBuiltNotice("Swap", undefined)).toBe(
+      "Swap is switched on but not built yet. There is nothing here to click, and nothing here will move money.",
+    );
+  });
+
+  /**
+   * Audit and Router are blocked on the same missing piece, and saying so is the
+   * point — two windows waiting on one thing is a different priority from two
+   * windows waiting on two.
+   */
+  it("sends both payment windows to the same missing piece, and Swap to a contract", () => {
+    expect(WAITING_ON.router).toMatch(/wallet signing/);
+    expect(WAITING_ON.audit).toMatch(/wallet signing/);
+    expect(WAITING_ON.swap).toMatch(/CONTRACTS\.shieldedPool/);
+  });
+
+  /**
+   * `audit` would call a paid tool, and the price is the one thing this must not
+   * write down: a number frozen in a source file goes stale silently and the
+   * failure mode is agreeing to the wrong amount. It points at the live quote.
+   */
+  it("quotes no price for the paid tool audit would call", () => {
+    const audit = WAITING_ON.audit ?? "";
+    expect(audit).toContain("repo-health");
+    expect(audit).toMatch(/x402 window/);
+    expect(audit).not.toMatch(/\$\d|\d+ USDC|\d{4,}/);
+  });
+
+  it("renders the reason in the window, not just in the map", () => {
+    renderAt("/?do=audit");
+    expect(screen.getByLabelText("Audit is not built yet")).toHaveTextContent(
+      /waiting on wallet signing.*repo-health/,
+    );
   });
 });

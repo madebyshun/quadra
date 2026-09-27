@@ -128,9 +128,14 @@ anything network-facing lives in a hand-run script instead of the suite.
 
 **Built and working:** `send`, `inference`, `x402`, `hooks`, `mcp`.
 
-**Flag on, not built:** `swap`, `router`, `audit`. These render an honest amber notice
-saying so. Each is gated on signing code or a deployed contract that does not exist yet.
-Do not make them look finished.
+**Flag on, not built:** `swap`, `router`, `audit`. These render an amber notice that names
+what each one is waiting on — `swap` a deployed pool, `router` and `audit` the same missing
+signing code. `WAITING_ON` in `features/FeaturePanel.tsx`, with `UNBUILT` derived from
+`FLAGS` and `BUILT` so a hand-kept list cannot go stale in the flattering direction, and a
+test asserting the two agree both ways. Measured 2026-09-27: `repo-health`, the tool `audit`
+would call, quotes 402 — it is not one of the six free ids, so that panel is genuinely
+blocked and not merely unwritten. **Do not make them look finished, and do not write a price
+into that map** — the live quote is the only price this repo displays.
 
 **Flag off:** `bridge`, `launch`. Rendered dimmed.
 

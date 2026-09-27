@@ -23,15 +23,21 @@ Say which three. "Build is green" has been used to mean "tsc passed" and it was 
 | `x402` | on | built, **free runs work end to end against the live catalog; paid runs cannot** |
 | `hooks` | on | built, read-only |
 | `mcp` | on | built, read-only |
-| `swap` | on | **not built** — renders an honest amber notice |
-| `router` | on | **not built** — same |
-| `audit` | on | **not built** — same |
+| `swap` | on | **not built** — amber notice, waiting on a deployed pool (T7) |
+| `router` | on | **not built** — amber notice, waiting on wallet signing (T4) |
+| `audit` | on | **not built** — amber notice, waiting on wallet signing (T4) |
 | `bridge` | off | rendered dimmed |
 | `launch` | off | rendered dimmed |
 
 Flags live in `src/config/chain.ts` → `FLAGS`. The "built" set is `BUILT` in
 `src/features/FeaturePanel.tsx`. A panel is honest today; the failure mode to avoid
 is making one *look* finished before it is.
+
+Each amber notice names its own blocker — `WAITING_ON` in the same file, with `UNBUILT`
+derived from `FLAGS` and `BUILT` rather than typed out, and a test asserting the two
+agree in both directions. That matters for this handoff specifically: **two of the three
+are waiting on the same piece**, which the old shared wording hid, and which changes
+what to build first.
 
 Every contract address in `src/config/chain.ts` → `CONTRACTS` is `null`. That is
 deliberate and load-bearing. `requireContract()` throws naming the unset constant.
@@ -168,13 +174,30 @@ throwing something the user cannot read.
 
 ## T5 — Build `audit`
 
-**Size:** small-to-medium. **Blocked by T4** if the underlying tool is paid; check the
-live quote first — it may be one of the six free ids.
+**Size:** small-to-medium. **Blocked by T4 — measured 2026-09-27, no longer a guess.**
 
-`audit` — "score any GitHub repo" — is not new compute. BlueAgent's catalog already
-has repo-health tooling, so this panel is an x402 call with a purpose-built form and a
-readable result, not a new backend. Look at `X402Panel.tsx` for the quote → input →
-run → receipt shape and build the narrow version of it.
+This task used to say "check the live quote first — it may be one of the six free ids."
+It was checked. It is not:
+
+| id | live quote | what it is |
+|---|---|---|
+| `repo-health` | **402**, 200000 base units, eip155:8453 | the repo scorer this panel would call |
+| `blue-audit` | **402**, 1000000 base units | the heavier audit, same answer |
+| `blue-doctor` | 200, free | a diagnostic, not a repo scorer |
+
+The six free ids are `blue-doctor`, `hood-live`, `hood-track-record`, `picks-check`,
+`rh-rwa-verify` and `rh-token-scan`. **Not one of them scores a repo.** So nothing in
+this panel can run until something here can answer a 402, which is T4.
+
+Do not build it early. A purpose-built form with a live quote and a permanently disabled
+button adds nothing the x402 window does not already do, and it would fail this task's
+own done-condition on the day it shipped.
+
+When T4 lands: `audit` is not new compute. It is an x402 call with a narrow form and a
+readable result. Look at `X402Panel.tsx` for the quote → input → run → receipt shape and
+build the one-tool version of it. Re-quote `repo-health` then rather than trusting the
+table above — the amount is a dated measurement, and the panel must show the live price
+regardless.
 
 **Done when:** it scores a real repo from a real source, and it does not invent a
 number when the source has nothing to say. "Cannot assess" is the correct answer to
