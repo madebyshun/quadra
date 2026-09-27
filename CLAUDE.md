@@ -33,7 +33,7 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. **551 tests in 20 files**, 100% on all four
+in one go. Do not report "done" on a subset. **563 tests in 20 files**, 100% on all four
 metrics, measured 2026-09-27.
 
 That count is a dated measurement, not a target — it is here so a fresh clone that comes
@@ -188,6 +188,15 @@ Dev server is `npm run dev` on **port 5273**.
    `why`, so code needing a provable value narrows and cannot ignore a boolean. Same device as
    `Anchoring`. Do not add a `verified: boolean` anywhere in this codebase — `verified: false` is
    a field that gets ignored; a missing `quote` is a type error.
+11. **Where the contract and the browser enforce the same rule, the browser enforces it the
+   contract's way — even when a local shortcut is correct.** A spend was refused by
+   `note.spentAt !== null`; on chain it is refused by `mapping(bytes32 => bool) isSpent`. The
+   timestamp was not wrong, it was **unverifiable and locally mutable** — `notes()` copies the
+   array but not the notes, so a caller already held a reference that could clear it and re-arm a
+   spent note. The tell is that the shortcut reads state nobody outside this tab can check. When
+   you find one, keep the convenience for display and move the authority; then write the test
+   that forces the two apart (wipe the timestamp, the spend must still be refused), because a
+   test where they agree passes under both rules and proves nothing.
 
 ---
 

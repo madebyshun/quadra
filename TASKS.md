@@ -5,7 +5,7 @@ Read `CLAUDE.md` first — it has the constraints and the rules that exist becau
 something broke. This file is only the work.
 
 **Before you start anything:** `npm install`, then `npm run gate`. It must be green
-(tsc clean, **551 tests in 20 files**, 100% on statements/branches/functions/lines, build
+(tsc clean, **563 tests in 20 files**, 100% on statements/branches/functions/lines, build
 succeeds). If it is not green on a fresh checkout, fix that before touching a task — you
 are looking at drift, not at your own change.
 
@@ -294,6 +294,54 @@ a test about overflow is the wrong place to guess.)
 no circuit computes and none ever will — SHA-256 inside a SNARK costs tens of thousands of
 constraints, which is why Poseidon exists. The gap is now one substitution wide and it is
 tagged in every value, which is the honest version of the same gap rather than a smaller one.
+
+### Step 1c also DONE (2026-09-28) — the double-spend rule is now the one the chain enforces
+
+Same method as 1b: found by reading the code against the Solidity, not by a failing test. The
+local pool refused a second spend with `if (note.spentAt !== null)`. The contract refuses one
+with `mapping(bytes32 => bool) public isSpent`. Both work, and **only one of them is checkable
+by anyone other than this browser** — a timestamp is a fact this tab wrote about its own
+mutable object, and `notes()` copies the array but not the notes, so a caller already holds a
+reference that can clear it. Under the old rule, clearing it re-armed a spent note.
+
+So the rule is now: derive `nullifier = H("note.nullifier", [secret, leafIndex])`, refuse it if
+the set already holds it, and record it. `spentAt` stays, demoted to what it always really was —
+something to render. The type says so in as many words, and two tests force the two apart on
+purpose rather than trusting that they agree:
+
+- wipe `spentAt` on a spent note → the pool still refuses it
+- stamp `spentAt` on an unspent note → the pool still spends it
+
+Neither of those passes under the old rule, and the first one is the one that loses money.
+
+| file | what changed |
+|---|---|
+| `src/adapters/types.ts` | `Note.leafIndex: number`; `nullifiers()` on the interface; `spentAt` re-documented as display |
+| `src/adapters/local/pool.ts` | `spent: Set<string>`; monotonic `nextIndex`; `consume` writes both, in one place |
+
+Three decisions in there worth not undoing:
+
+- **`leafIndex` is stored on the note, not derived from its position.** The nullifier's
+  preimage includes it, so two notes sharing a secret at different positions must nullify
+  differently. It is also assigned the way `MerkleTreeWithHistory._insert` assigns it —
+  monotonic, **never reused, including across spends**, because the tree is append-only and a
+  spent leaf keeps its slot forever. Hand index 0 back out and the new note can derive a
+  nullifier already in the set: unspendable from birth, with no error text that explains why.
+- **`nextIndex` increments after the note literal, not before.** `deriveCommitment` throws on
+  a bad amount, and an index consumed by a deposit that never happened is a permanent hole —
+  harmless alone, and exactly the off-by-one that makes a later tree reconstruction disagree
+  with the chain for no visible reason. Pinned by a test that refuses two deposits and then
+  expects index 0.
+- **The nullifier is derived once, in `spendable`, and handed to `consume`.** Deriving it
+  again there would be two chances to disagree, and the derivation that decides "already
+  spent" has to be the one that gets stored.
+
+**What this does NOT do.** It mirrors the *rule*, not the *arity*: `transact` takes
+`bytes32[2] inputNullifiers` and retires two notes per transaction, this spends one, so the
+contract's `DuplicateNullifier` guard has no local counterpart — with one input the case cannot
+arise. Whether the browser should join and split the same way is the open question at the
+bottom of this file, and it is a product decision, not a bug. And the nullifiers are still
+stand-in-hashed, so they are the right values in the wrong hash. Same one substitution as 1b.
 
 ### Steps 2 and 3 are NOT done, and step 2 is not a deployment step
 

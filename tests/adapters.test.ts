@@ -11,7 +11,12 @@ import { CONTRACTS, USDC } from "@/config/chain";
 import { formatAmount, parseAmount } from "@/lib/amount";
 import { MAX_NOTE_VALUE, isInField } from "@/lib/field";
 import { standInHash } from "@/lib/hash";
-import { deriveCommitment } from "@/lib/note";
+import { commitmentHex, deriveCommitment, deriveNullifier } from "@/lib/note";
+
+/** The nullifier the pool must have recorded for a note it spent. */
+async function nullifierOf(note: Note): Promise<string> {
+  return commitmentHex(await deriveNullifier(standInHash, { secret: note.secret }, note.leafIndex));
+}
 
 const usdc = { address: USDC.address, symbol: USDC.symbol, decimals: USDC.decimals };
 const aaplc = { address: AAPL_BASE.address, symbol: AAPL_BASE.symbol, decimals: AAPL_BASE.decimals };
@@ -129,6 +134,42 @@ describe("LocalShieldedPool.deposit", () => {
   it("stamps a parseable creation time", async () => {
     const note = await pool.deposit(usdc, 1n);
     expect(Number.isNaN(Date.parse(note.createdAt))).toBe(false);
+  });
+
+  it("assigns leaf indices from zero, in the order the notes arrived", async () => {
+    const first = await pool.deposit(usdc, 1n);
+    const second = await pool.deposit(usdc, 1n);
+    const third = await pool.deposit(aaplc, 1n);
+    expect([first.leafIndex, second.leafIndex, third.leafIndex]).toEqual([0, 1, 2]);
+  });
+
+  /**
+   * The tree is append-only — `MerkleTreeWithHistory._insert` only ever increments —
+   * so a spent leaf keeps its position forever. If this pool handed index 0 back out
+   * after the note at index 0 was spent, the new note could derive a nullifier
+   * already in the set and be unspendable from birth, with no error text that could
+   * explain why. Asserted across a spend rather than in a straight line, because a
+   * straight line is what a naive `store.length` also passes.
+   */
+  it("never reuses a leaf index, not even one whose note is already spent", async () => {
+    const first = await pool.deposit(usdc, 1n);
+    await pool.withdraw(first.id, "0x1111111111111111111111111111111111111111");
+    const second = await pool.deposit(usdc, 1n);
+
+    expect(first.leafIndex).toBe(0);
+    expect(second.leafIndex).toBe(1);
+    expect(await pool.notes()).toHaveLength(1);
+  });
+
+  /**
+   * `deriveCommitment` throws on an out-of-range amount, and it throws before the
+   * index is consumed. A hole in the tree would be harmless on its own and is exactly
+   * the off-by-one that makes a later reconstruction disagree with the chain.
+   */
+  it("consumes no leaf index for a deposit that was refused", async () => {
+    await expect(pool.deposit(usdc, MAX_NOTE_VALUE + 1n)).rejects.toThrow();
+    await expect(pool.deposit(usdc, 0n)).rejects.toThrow();
+    expect((await pool.deposit(usdc, 1n)).leafIndex).toBe(0);
   });
 
   it("refuses zero and negative deposits", async () => {
@@ -285,6 +326,128 @@ describe("LocalShieldedPool.withdraw", () => {
     const note = await pool.deposit(usdc, 1n);
     await pool.withdraw(note.id, to);
     await expect(pool.withdraw(note.id, to)).rejects.toThrow("A note spends once.");
+  });
+});
+
+/**
+ * The spend rule, tested as the rule the chain enforces rather than the one this
+ * browser finds convenient.
+ *
+ * `spentAt` used to be the authority. It passed every test above, and it would have
+ * gone on passing right up to the day the on-chain adapter landed and the two
+ * disagreed — because a timestamp is a fact about a mutable local object and
+ * `mapping(bytes32 => bool) isSpent` is a fact about a chain. The tests that matter
+ * here are the two that force them apart on purpose.
+ */
+describe("LocalShieldedPool: the nullifier set is the spend authority", () => {
+  const to = "0x4444444444444444444444444444444444444444";
+
+  it("has seen no nullifiers in a fresh browser", async () => {
+    expect(await pool.nullifiers()).toEqual([]);
+  });
+
+  it("records nothing for a deposit — depositing is not spending", async () => {
+    await pool.deposit(usdc, 1n);
+    await pool.deposit(usdc, 2n);
+    expect(await pool.nullifiers()).toEqual([]);
+  });
+
+  it("records the nullifier derived from the spent note's own secret and leaf index", async () => {
+    const note = await pool.deposit(usdc, 1_000_000n);
+    await pool.withdraw(note.id, to);
+    expect(await pool.nullifiers()).toEqual([await nullifierOf(note)]);
+  });
+
+  it("records one nullifier per spend, including the spend that made change", async () => {
+    const a = await pool.deposit(usdc, parseAmount("10", 6));
+    await pool.send(a.id, to, parseAmount("3", 6));
+    const change = (await pool.notes())[0] as Note;
+    await pool.withdraw(change.id, to);
+
+    expect(await pool.nullifiers()).toEqual([await nullifierOf(a), await nullifierOf(change)]);
+  });
+
+  /**
+   * The demotion, in the direction that could lose money.
+   *
+   * `notes()` copies the array but not the notes, so `all[0]` is the pool's own
+   * object — a caller (or a bug) can clear the timestamp. Under the old rule that
+   * re-armed a spent note and the same funds spent twice. Under this one the set has
+   * already seen the nullifier and nothing can talk it out of that.
+   */
+  it("still refuses a spent note after its spentAt is wiped", async () => {
+    const note = await pool.deposit(usdc, parseAmount("5", 6));
+    await pool.send(note.id, to, parseAmount("1", 6));
+
+    const stored = (await pool.notes({ includeSpent: true })).find((n) => n.id === note.id) as Note;
+    expect(stored.spentAt).not.toBeNull();
+    stored.spentAt = null;
+
+    await expect(pool.send(note.id, to, parseAmount("1", 6))).rejects.toThrow(
+      "A note spends once.",
+    );
+  });
+
+  /**
+   * And the other direction, which is the same demotion seen from the front: a
+   * timestamp on a note nobody spent is a display bug, not a lost note. The set has
+   * never seen this nullifier, so the chain would accept the spend, so this pool does.
+   */
+  it("spends a note whose spentAt was stamped without a nullifier behind it", async () => {
+    const note = await pool.deposit(usdc, parseAmount("5", 6));
+    const stored = (await pool.notes())[0] as Note;
+    stored.spentAt = "2026-01-01T00:00:00.000Z";
+
+    const receipt = await pool.withdraw(note.id, to);
+    expect(receipt.summary).toContain("You withdrew 5 USDC");
+    expect(await pool.nullifiers()).toEqual([await nullifierOf(note)]);
+  });
+
+  /**
+   * The invariant `adapters/types.ts` promises — both writes happen in `consume` and
+   * nowhere else. Asserted over a mixed history rather than a single spend, since one
+   * spend cannot tell "written together" from "written in two places that agree once".
+   */
+  it("keeps spentAt and the set agreeing across a mixed history", async () => {
+    const spentWhole = await pool.deposit(usdc, parseAmount("1", 6));
+    const spentPartly = await pool.deposit(usdc, parseAmount("10", 6));
+    await pool.deposit(aaplc, parseAmount("2", 8));
+    await pool.withdraw(spentWhole.id, to);
+    await pool.send(spentPartly.id, to, parseAmount("4", 6));
+
+    const set = new Set(await pool.nullifiers());
+    const all = await pool.notes({ includeSpent: true });
+    expect(all).toHaveLength(4);
+    for (const note of all) {
+      expect(set.has(await nullifierOf(note))).toBe(note.spentAt !== null);
+    }
+    expect(set.size).toBe(all.filter((n) => n.spentAt !== null).length);
+  });
+
+  /**
+   * A nullifier is published; a secret and a commitment are not. If the nullifier
+   * leaked either, publishing the spend would deanonymise the note it spent, which is
+   * the one thing the scheme exists to prevent. Both guarantees come from the domain
+   * tag in `lib/hash.ts`; this asserts the pool actually gets them.
+   */
+  it("publishes a nullifier that reveals neither the secret nor the commitment", async () => {
+    const note = await pool.deposit(usdc, 1_000_000n);
+    await pool.withdraw(note.id, to);
+    const [nullifier] = await pool.nullifiers();
+
+    expect(nullifier).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(nullifier).not.toContain(note.secret.toString(16));
+    expect(nullifier).not.toBe(commitmentHex(note.commitment));
+  });
+
+  it("hands back a copy, so a caller cannot forge or forget a spend", async () => {
+    const note = await pool.deposit(usdc, 1n);
+    await pool.withdraw(note.id, to);
+
+    const listed = await pool.nullifiers();
+    listed.length = 0;
+    listed.push("0xdeadbeef");
+    expect(await pool.nullifiers()).toEqual([await nullifierOf(note)]);
   });
 });
 

@@ -46,6 +46,17 @@ export type Note = {
   /** public: what goes on chain, derived from `amount` and `secret` */
   commitment: Commitment;
   /**
+   * Which leaf of the commitment tree this note is, counted from zero.
+   *
+   * Part of the note rather than derivable from it, because the tree assigns it:
+   * `MerkleTreeWithHistory._insert` returns `nextIndex` and increments. It is here
+   * because the nullifier's preimage includes it — without it the same secret at two
+   * positions would produce one nullifier, and spending either would mark both.
+   *
+   * Public. It identifies a position in a tree everyone can read, not an owner.
+   */
+  leafIndex: number;
+  /**
    * PRIVATE: never leaves the browser.
    *
    * A field element rather than a hex string. The scheme's inputs are field
@@ -58,6 +69,15 @@ export type Note = {
   /** base units, per token.decimals */
   amount: bigint;
   createdAt: string;
+  /**
+   * When this note was spent, for display. **Not the authority on whether it was.**
+   *
+   * The pool refuses a double-spend from its nullifier set, the way the contract
+   * does (`ShieldedPool.isSpent`), because that is the rule that will still be true
+   * on chain — a timestamp is a local convenience that no verifier can check. The
+   * two are written in one place so they cannot disagree; `tests/adapters.test.ts`
+   * asserts the invariant rather than trusting it.
+   */
   spentAt: string | null;
   anchoring: Anchoring;
 };
@@ -77,6 +97,16 @@ export interface ShieldedPool {
   send(noteId: string, to: string, amount: bigint): Promise<Receipt>;
   /** Take money back out to an address you control. */
   withdraw(noteId: string, to: string): Promise<Receipt>;
+  /**
+   * The nullifiers this pool has seen, as hex. Mirrors `ShieldedPool.isSpent`.
+   *
+   * Part of the interface because it is public on chain — anyone can read that
+   * mapping, so hiding it here would make the local pool look more private than the
+   * real one rather than less, which is the wrong direction for every seam in this
+   * file. It leaks nothing: a nullifier is unlinkable to its commitment without the
+   * secret, which is the entire reason the scheme uses one.
+   */
+  nullifiers(): Promise<string[]>;
   /** True when this is backed by a deployed pool rather than local state. */
   readonly isLive: boolean;
 }
