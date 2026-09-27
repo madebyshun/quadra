@@ -155,13 +155,16 @@ list; the displayed price is always the live quote.
 
 ## Known open items
 
-- **The document overflows the viewport horizontally at 390px** on `/` and `/api`. Predates
-  the CSS work above — reproduced on the card grid. `.cards` and `.taskbar` are both ruled
-  out. Not fixed, because making a Windows-XP-desktop metaphor work on a phone is a design
-  decision nobody has made yet.
-- **`/api` documents `https://quadra.computer/api/services` as public and free to read.**
-  Those endpoints do not exist. Harmless while the site is unpublished; a live falsehood the
-  day it ships. Fix before launch.
+*(Two entries lived here until 2026-09-27 and are gone because they were resolved, not
+because they were tidied away: the 390px overflow was **withdrawn as a false finding** — see
+the `--window-size` rule above, the measuring tool produced it — and `/api` no longer claims
+endpoints this origin does not serve. Both are written up in `TASKS.md` as T2 and T1. **Close
+an item here in the same edit that closes the work.** A resolved entry left in a
+known-open-items list is worse than a missing one: the next reader spends their session
+re-chasing something that was already fixed, and the list stops being believed.)*
+
 - **No contracts yet.** Foundry scaffold + anvil tests for the shielded pool are unwritten.
+  This is the largest unblocked piece of work in the repo — T3–T6 all wait on a decision or
+  on each other, T7 waits on nothing.
 - **`$QUADRA` does not exist.** It is intended to pair against AAPLc on Base. No address may
   be guessed for it — `LAUNCH_TOKEN` stays `null` until something is deployed and verified.
