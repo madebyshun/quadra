@@ -19,6 +19,7 @@ import {
   commitmentHex,
   deriveCommitment,
   deriveNullifier,
+  derivePaddingCommitment,
   newNoteSecret,
 } from "@/lib/note";
 
@@ -102,6 +103,63 @@ describe("deriveCommitment", () => {
     await expect(deriveCommitment(standInHash, { amount: 1n, secret: 0n })).rejects.toThrow(
       "uninitialised variable",
     );
+  });
+});
+
+/**
+ * The second door, and what it does NOT relax.
+ *
+ * `derivePaddingCommitment` exists only so a 2-in/2-out transaction can fill an unused
+ * output slot with a real commitment to a note worth zero — see the header on that
+ * function. The risk of a second entry point is that it quietly becomes the lenient
+ * one everybody uses, so these tests pin what stays strict: the ceiling, the field
+ * bound on the secret, and the refusal of a zero secret. Only the "more than zero"
+ * floor is dropped, and only on the amount.
+ */
+describe("derivePaddingCommitment", () => {
+  it("commits to a zero amount, which deriveCommitment refuses", async () => {
+    const padding = await derivePaddingCommitment(standInHash, { amount: 0n, secret: SECRET });
+    expect(isInField(padding.value)).toBe(true);
+
+    await expect(deriveCommitment(standInHash, { amount: 0n, secret: SECRET })).rejects.toThrow(
+      "more than zero",
+    );
+  });
+
+  /**
+   * A zero-value commitment is not a magic constant — it still binds the secret, which
+   * is the whole reason the padding note needs a fresh one. If this returned the same
+   * number for every padding note, its nullifier would be fixed too, and the first
+   * spend would burn it on chain for everybody. See `newPaddingNote`.
+   */
+  it("still binds the secret, so two padding notes differ", async () => {
+    const one = await derivePaddingCommitment(standInHash, { amount: 0n, secret: SECRET });
+    const two = await derivePaddingCommitment(standInHash, { amount: 0n, secret: SECRET + 1n });
+    expect(one.value).not.toBe(two.value);
+  });
+
+  it("agrees with deriveCommitment wherever both are allowed", async () => {
+    const strict = await deriveCommitment(standInHash, { amount: 7n, secret: SECRET });
+    const lenient = await derivePaddingCommitment(standInHash, { amount: 7n, secret: SECRET });
+    expect(lenient).toEqual(strict);
+  });
+
+  it("keeps the ceiling and both secret checks", async () => {
+    await expect(
+      derivePaddingCommitment(standInHash, { amount: (1n << 248n) + 1n, secret: SECRET }),
+    ).rejects.toThrow("2^248");
+    await expect(
+      derivePaddingCommitment(standInHash, { amount: 0n, secret: FIELD_MODULUS }),
+    ).rejects.toThrow("must be a field element");
+    await expect(
+      derivePaddingCommitment(standInHash, { amount: 0n, secret: 0n }),
+    ).rejects.toThrow("uninitialised variable");
+  });
+
+  it("refuses a negative amount, which is a bug rather than padding", async () => {
+    await expect(
+      derivePaddingCommitment(standInHash, { amount: -1n, secret: SECRET }),
+    ).rejects.toThrow("cannot hold a negative amount");
   });
 });
 

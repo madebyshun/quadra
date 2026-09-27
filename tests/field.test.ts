@@ -28,6 +28,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   FIELD_MODULUS,
   MAX_NOTE_VALUE,
+  assertNoteCapacity,
   assertNoteValue,
   fromFieldHex,
   intoField,
@@ -252,6 +253,32 @@ describe("assertNoteValue", () => {
     const over = MAX_NOTE_VALUE + 1n;
     expect(isInField(over)).toBe(true);
     expect(() => assertNoteValue(over)).toThrow();
+  });
+});
+
+/**
+ * The same ceiling without the floor, and the pair is the point.
+ *
+ * `assertNoteCapacity` exists because `ShieldedPool.transact` is 2-in/2-out and the
+ * shape is not optional, so a withdrawal leaving no change still has to commit to
+ * something and the honest something is a note worth zero. What makes that safe rather
+ * than a hole is that the two functions are separately named: a zero amount reaching
+ * `assertNoteValue` is still a loud failure, and the only caller of the permissive one
+ * is the padding path in `lib/transaction.ts`.
+ */
+describe("assertNoteCapacity", () => {
+  it("allows the zero that assertNoteValue refuses", () => {
+    expect(() => assertNoteCapacity(0n)).not.toThrow();
+    expect(() => assertNoteValue(0n)).toThrow("more than zero");
+  });
+
+  it("still refuses a negative, which no encoding could carry", () => {
+    expect(() => assertNoteCapacity(-1n)).toThrow("cannot hold a negative amount, got -1");
+  });
+
+  it("keeps the same ceiling as assertNoteValue, to the base unit", () => {
+    expect(() => assertNoteCapacity(MAX_NOTE_VALUE)).not.toThrow();
+    expect(() => assertNoteCapacity(MAX_NOTE_VALUE + 1n)).toThrow("2^248");
   });
 });
 

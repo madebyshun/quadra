@@ -33,7 +33,7 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. **730 tests in 23 files**, 100% on all four
+in one go. Do not report "done" on a subset. **779 tests in 24 files**, 100% on all four
 metrics, measured 2026-09-28.
 
 That count is a dated measurement, not a target — it is here so a fresh clone that comes
@@ -254,6 +254,16 @@ src/
                    note.ts   — commitment + nullifier derivation over that hash
                    tree.ts   — the commitment tree, mirroring MerkleTreeWithHistory.sol,
                                plus the Merkle paths the contract cannot serve
+                   transaction.ts — the (Proof, ExtData) pair `transact` takes. Mirrors
+                               four contract functions by name and says so at each. Two
+                               things to know before editing: it has NO keccak, so
+                               `extDataHash` returns a union whose `unavailable` arm is
+                               the honest state of this build and not an error path
+                               (substituting SHA-256 would be rule 9 one layer up); and
+                               a negative amount is encoded TWO different ways on
+                               purpose — field negation for the public input, two's
+                               complement for `abi.encode` — so conflating them yields
+                               a proof that verifies for the wrong transaction
                    backup.ts — the backup file format. localStorage is not a backup;
                                this is. Plaintext secrets by necessity and labelled as
                                such, never half-encrypted. Validates an import through
@@ -266,7 +276,11 @@ src/
   pages/           /docs /api /verify /404
   ui/              Window, Taskbar, Gel (button), Crt (output box)
   styles/          reset.css + theme.css — the XP/Aqua design system
-tests/             23 files, mirrors src/. field.test.ts also reads contracts/src/*.sol
+tests/             24 files, mirrors src/. TWO of them read Solidity rather than
+                   restating its numbers: field.test.ts extracts FIELD_SIZE and
+                   MAX_NOTE_VALUE from contracts/src/*.sol, and transaction.test.ts
+                   extracts the pinned abi.encode vector from contracts/test/
+                   ShieldedPool.t.sol. Both fail by naming the file that moved
 tools/quadra-mcp/  stdio MCP server, read-only
 scripts/           measure-catalog.ts — hand-run, hits the network
                    check-contract-coverage.ts — the forge coverage gate

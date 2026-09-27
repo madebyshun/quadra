@@ -5,9 +5,10 @@ Read `CLAUDE.md` first — it has the constraints and the rules that exist becau
 something broke. This file is only the work.
 
 **Before you start anything:** `npm install`, then `npm run gate`. It must be green
-(tsc clean, **730 tests in 23 files**, 100% on statements/branches/functions/lines, build
-succeeds). If it is not green on a fresh checkout, fix that before touching a task — you
-are looking at drift, not at your own change.
+(tsc clean, **779 tests in 24 files** as measured 2026-09-28, 100% on
+statements/branches/functions/lines, build succeeds). If it is not green on a fresh
+checkout, fix that before touching a task — you are looking at drift, not at your own
+change.
 
 If you are touching Solidity, `npm run gate:contracts` is the second, separate gate:
 `forge build` → `forge test` → 100% coverage on `contracts/src/` → the suite table in

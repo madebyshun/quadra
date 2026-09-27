@@ -31,7 +31,13 @@
  * specification and this is the client that has to agree with it.
  */
 
-import { assertNoteValue, isInField, randomFieldElement, toFieldHex } from "@/lib/field";
+import {
+  assertNoteCapacity,
+  assertNoteValue,
+  isInField,
+  randomFieldElement,
+  toFieldHex,
+} from "@/lib/field";
 import type { FieldHash, HashScheme } from "@/lib/hash";
 
 /**
@@ -133,8 +139,34 @@ export async function deriveCommitment(
    * see the warning on `intoField` in `lib/field.ts`.
    */
   assertNoteValue(note.amount);
-  assertSecret(note.secret);
+  return commitmentOf(hash, note);
+}
 
+/**
+ * The same commitment, for a note that is allowed to be worth zero.
+ *
+ * ── Why this is a second function and not a flag ─────────────────────────────
+ * `deriveCommitment` refuses a zero amount and should keep refusing it: a note a
+ * user holds worth nothing means an amount went missing upstream, and that is worth
+ * a loud failure. But `ShieldedPool` is 2-in/2-out with no way to say "I only need
+ * one output", so a withdrawal leaving no change still has to commit to something,
+ * and the honest something is a real note worth zero.
+ *
+ * A boolean parameter on `deriveCommitment` would collapse the two, and the default
+ * would be wrong at whichever call site forgot to think about it. Two names cost
+ * nothing and make the padding case searchable — `lib/transaction.ts` is the only
+ * caller, which is the property to preserve.
+ */
+export async function derivePaddingCommitment(
+  hash: FieldHash,
+  note: NoteSecrets,
+): Promise<Commitment> {
+  assertNoteCapacity(note.amount);
+  return commitmentOf(hash, note);
+}
+
+async function commitmentOf(hash: FieldHash, note: NoteSecrets): Promise<Commitment> {
+  assertSecret(note.secret);
   const value = await hash.hash(COMMITMENT_DOMAIN, [note.amount, note.secret]);
   return tagged(hash.scheme, hash.whyNotCircuitReady, value);
 }

@@ -821,6 +821,86 @@ contract ShieldedPoolTest is Harness {
         assertTrue(inward != outward, "a deposit and a withdrawal are different proofs");
     }
 
+    /* ── one pinned vector, for the browser to check itself against ──────────── */
+
+    /**
+     * 🔴 The browser has to reproduce `abi.encode(extData)` byte for byte, and it
+     * cannot ask the compiler.
+     *
+     * `src/lib/transaction.ts` writes the encoding out by hand — it has to, because a
+     * zero-dependency frontend has no ABI coder — and an encoding that is wrong in any
+     * byte produces a different `extDataHash`, which is `input[2]`, which is the slot
+     * that binds *who gets paid*. A proof built against a wrong `input[2]` is a proof
+     * about a different recipient. Nothing reverts; the transaction simply never
+     * verifies, or verifies for someone else.
+     *
+     * So the vector below is extracted from the **compiler** here and read back out of
+     * this file by `tests/transaction.test.ts`, the same way `tests/field.test.ts`
+     * reads `FIELD_SIZE` out of `MerkleTreeWithHistory.sol`. One vector, asserted from
+     * both sides. Restating these literals in TypeScript instead would be two copies
+     * again, agreeing with whichever side they were typed against.
+     *
+     * ── Why these particular numbers ─────────────────────────────────────────────
+     * Not arbitrary. The case is a **relayed withdrawal**, which is the only shape
+     * that exercises every interesting part of the encoding at once:
+     *   - `recipient` and `relayer` differ, so a swapped-word bug is visible;
+     *   - `extAmount` is **negative**, so the `int256` word is two's complement and a
+     *     browser that used field negation there (which is correct for `input[1]` and
+     *     wrong here) gets a different digest;
+     *   - `fee` is non-zero, so the fourth word is not a zero that any bug agrees with;
+     *   - and the resulting keccak digest is **above FIELD_SIZE**, asserted below, so
+     *     the `% FIELD_SIZE` fold genuinely reduces. A digest that happened to land
+     *     under the modulus would make the fold a no-op and let a broken fold pass.
+     */
+    int256 internal constant PINNED_EXT_AMOUNT = -75e8;
+    uint256 internal constant PINNED_EXT_FEE = 25e8;
+
+    /** `abi.encode(ExtData(ALICE, RELAYER, PINNED_EXT_AMOUNT, PINNED_EXT_FEE))`. */
+    bytes internal constant PINNED_ENCODING =
+        hex"00000000000000000000000000000000000000000000000000000000000a11ce"
+        hex"00000000000000000000000000000000000000000000000000000000003e14e3"
+        hex"fffffffffffffffffffffffffffffffffffffffffffffffffffffffe40f71500"
+        hex"000000000000000000000000000000000000000000000000000000009502f900";
+
+    /** `keccak256(PINNED_ENCODING)`. The one value the browser cannot compute. */
+    bytes32 internal constant PINNED_DIGEST =
+        0xad526f2d2afa98224a43dda9d78d3fbd5167ea6401fc2ca8de5d2ecf49c8a56f;
+
+    /** `uint256(PINNED_DIGEST) % FIELD_SIZE` — what `hashExtData` returns. */
+    uint256 internal constant PINNED_FIELD =
+        12731042960267385565968027458327713665880296818808042993315985931762240365932;
+
+    /**
+     * Four static 32-byte words, and nothing else.
+     *
+     * The length assertion is the load-bearing half. Every member of `ExtData` is a
+     * static type, so the encoding is the four head words concatenated — no offset
+     * word, no length prefix, no tail. That is *why* the browser can write it out in
+     * twenty lines, and if a future member were dynamic (a `bytes memo`, say) this
+     * assertion would fail first and point at the file that has to change.
+     */
+    function test_encodesExtDataAsFourStaticWords() public pure {
+        bytes memory encoded = abi.encode(_ext(ALICE, PINNED_EXT_AMOUNT, PINNED_EXT_FEE));
+
+        assertEq(encoded.length, 128, "four static words, no offsets and no tail");
+        assertEq(keccak256(encoded), keccak256(PINNED_ENCODING), "the pinned encoding drifted");
+    }
+
+    /**
+     * The pinned digest is the compiler's, and the fold is not a no-op.
+     *
+     * Both halves matter separately: the first says the digest literal in this file is
+     * the real keccak of the real encoding, and the second says the reduction that
+     * `src/lib/transaction.ts` performs on that digest is actually reducing something.
+     */
+    function test_pinsTheExtDataDigestAndItsFold() public view {
+        ShieldedPool.ExtData memory ext = _ext(ALICE, PINNED_EXT_AMOUNT, PINNED_EXT_FEE);
+
+        assertEq(keccak256(abi.encode(ext)), PINNED_DIGEST, "the pinned digest drifted");
+        assertTrue(uint256(PINNED_DIGEST) >= FIELD_SIZE, "the fold has to reduce something");
+        assertEq(pool.hashExtData(ext), PINNED_FIELD, "the pinned field element drifted");
+    }
+
     /* ── the vector handed to the verifier ──────────────────────────────────── */
 
     /**

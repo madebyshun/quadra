@@ -108,10 +108,43 @@ export function fromFieldHex(hex: string): bigint {
  * The contract reverts `AmountTooLarge` for the same bound. Checking in the
  * browser as well is not redundant: a revert costs gas and arrives as a hex error
  * selector, whereas this arrives as a sentence before anything is signed.
+ *
+ * This is the bound for a note somebody **holds**. For the padding note that fills
+ * an unused slot in a 2-in/2-out transaction, use `assertNoteCapacity` — see below
+ * for why the two cannot be the same function.
  */
 export function assertNoteValue(amount: bigint): void {
   if (amount <= 0n) {
     throw new Error(`A note must hold more than zero, got ${amount}.`);
+  }
+  assertNoteCapacity(amount);
+}
+
+/**
+ * The same ceiling, without the "more than zero" floor.
+ *
+ * ── Why zero has to be allowed somewhere ─────────────────────────────────────
+ * `ShieldedPool.transact` is 2-in/2-out and the shape is not optional: there are
+ * always two output commitments and two input nullifiers, because a transaction
+ * that revealed how many notes it really used would leak exactly what the pool
+ * exists to hide. A withdrawal that leaves no change still has to fill the second
+ * output slot, and what fills it is a real commitment to a note worth zero.
+ *
+ * `assertNoteValue` refuses that, correctly — a note a *user* holds worth zero is a
+ * bug, and it is worth refusing loudly because it means an amount went missing
+ * somewhere upstream. So the floor cannot simply be dropped to accommodate padding;
+ * it has to be a second function, used only where a zero is meaningful.
+ *
+ * ⚠️ **The padding note still needs a fresh random secret, and that is not this
+ * function's job.** A zero-value note with a *fixed* secret has a fixed nullifier,
+ * so the first transaction that spends one burns that nullifier on chain for
+ * everybody — every later transaction needing a padding input would revert
+ * `AlreadySpent`, and the pool would appear to break for reasons nobody could see.
+ * See `newPaddingNote` in `lib/transaction.ts`.
+ */
+export function assertNoteCapacity(amount: bigint): void {
+  if (amount < 0n) {
+    throw new Error(`A note cannot hold a negative amount, got ${amount}.`);
   }
   if (amount > MAX_NOTE_VALUE) {
     throw new Error(

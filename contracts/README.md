@@ -174,13 +174,24 @@ without proving those turns this contract into a faucet and nothing here could t
 |---|---|---|
 | `MerkleTreeWithHistory.t.sol` | 25 | tree mechanics, the 30-root window, capacity, field bounds |
 | `SafeTransfer.t.sol` | 17 | one test per real-world token misbehaviour |
-| `ShieldedPool.t.sol` | 62 | the pool's own rules, with the verifier as a double |
+| `ShieldedPool.t.sol` | 64 | the pool's own rules, with the verifier as a double |
 
 **This table is the only place the repo states these numbers, and
 `scripts/check-contract-tests.ts` holds it to them** — per suite, in both directions, and it
 also fails on a suite that runs but is not listed. It said 90 total for a while after the
 real number was 104, in six places across four files; every other copy now describes the
 property and points here.
+
+⚠️ **Two of those 64 are load-bearing for the frontend, and nothing in this directory
+says so.** `test_encodesExtDataAsFourStaticWords` and `test_pinsTheExtDataDigestAndItsFold`
+exist to write down one `abi.encode(ExtData)` output, its keccak digest, and the folded
+field element, as literals the compiler asserts. `tests/transaction.test.ts` in the repo
+root then **reads those literals out of the `.sol` file** and checks the hand-written
+encoder in `src/lib/transaction.ts` against them, because a zero-dependency browser has no
+ABI coder and no keccak. So deleting or renaming that pinned-vector block breaks a
+TypeScript suite two directories away — and it breaks it with a "no longer parses" error
+naming this file, which is the one thing a reader needs to know. Same arrangement, opposite
+direction, as `tests/field.test.ts` reading `FIELD_SIZE` out of `src/`.
 
 🔴 **A count guard is not redundant with the coverage gate, and the difference is the
 reason this one exists.** Coverage measures which lines ran, not how many ways. Delete ten
