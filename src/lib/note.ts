@@ -35,20 +35,31 @@ import { assertNoteValue, isInField, randomFieldElement, toFieldHex } from "@/li
 import type { FieldHash, HashScheme } from "@/lib/hash";
 
 /**
- * A commitment, tagged with the hash that produced it.
+ * A field element, tagged with the hash that produced it.
  *
  * Same asymmetry as `Anchoring` in `adapters/types.ts`, for the same reason: the
  * variant that cannot be proven carries a `why` and the one that can does not, so
- * code that needs a real commitment must narrow the union and cannot simply ignore
+ * code that needs a provable value must narrow the union and cannot simply ignore
  * a boolean. `why` exists to be shown to a user, not to be checked and discarded.
  */
-export type Commitment =
+export type TaggedField =
   | { scheme: "poseidon"; value: bigint }
   | { scheme: "stand-in"; value: bigint; why: string };
 
-export type Nullifier =
-  | { scheme: "poseidon"; value: bigint }
-  | { scheme: "stand-in"; value: bigint; why: string };
+/**
+ * Three names for one shape, and **TypeScript does not keep them apart** — these are
+ * structurally identical, so a `Nullifier` is assignable wherever a `Commitment` is
+ * wanted. The names are for whoever reads a signature, and they earn their keep there:
+ * `deriveCommitment` returning `Commitment` says what it computed.
+ *
+ * Written as aliases rather than three copies of the union so that nobody can mistake
+ * them for a type-level guarantee. What actually stops a nullifier being passed off as
+ * a commitment is the **domain tag** in `lib/hash.ts`, which makes the two numbers
+ * unrelated for the same inputs. The aliases document; the tag enforces.
+ */
+export type Commitment = TaggedField;
+export type Nullifier = TaggedField;
+export type TreeRoot = TaggedField;
 
 /** The private half of a note. Never logged, never in a URL, never sent anywhere. */
 export type NoteSecrets = {
@@ -70,17 +81,26 @@ export function newNoteSecret(): bigint {
 }
 
 /**
- * Tag a derived value with its hash scheme, in one place.
+ * Tag a value with the scheme of the hash that produced it, in one place.
  *
  * Written as a single helper so the `why` sentence on a stand-in value comes from
  * the hash itself rather than being retyped at each call site. Two hand-written
  * copies of that sentence is how one of them ends up saying something reassuring.
+ *
+ * Exported because the commitment tree's root needs the same treatment and is not
+ * derived in this file — a root computed from stand-in hashes matches no deployed pool,
+ * and that has to travel with the number rather than be remembered about it. Takes the
+ * whole `FieldHash` so a caller cannot pair one hash's scheme with another's reason.
  */
+export function tagWithScheme(hash: FieldHash, value: bigint): TaggedField {
+  return tagged(hash.scheme, hash.whyNotCircuitReady, value);
+}
+
 function tagged(
   scheme: HashScheme,
   whyNotCircuitReady: string | null,
   value: bigint,
-): { scheme: "poseidon"; value: bigint } | { scheme: "stand-in"; value: bigint; why: string } {
+): TaggedField {
   if (scheme === "poseidon") {
     /**
      * A `poseidon` tag with a `whyNotCircuitReady` reason is a contradiction: it

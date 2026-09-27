@@ -4,7 +4,7 @@ import { LocalShieldedPool } from "@/adapters/local/pool";
 import { LOCAL_MODELS, LocalEnclave } from "@/adapters/local/enclave";
 import { LocalCatalog } from "@/adapters/local/catalog";
 import { HttpCatalog } from "@/adapters/http/catalog";
-import type { Note } from "@/adapters/types";
+import type { Note, NoteWitness } from "@/adapters/types";
 import { AAPL_BASE } from "@/config/pair";
 import { BLUEAGENT } from "@/config/upstream";
 import { CONTRACTS, USDC } from "@/config/chain";
@@ -12,6 +12,7 @@ import { formatAmount, parseAmount } from "@/lib/amount";
 import { MAX_NOTE_VALUE, isInField } from "@/lib/field";
 import { standInHash } from "@/lib/hash";
 import { commitmentHex, deriveCommitment, deriveNullifier } from "@/lib/note";
+import { IncrementalMerkleTree, TREE_NODE_DOMAIN } from "@/lib/tree";
 
 /** The nullifier the pool must have recorded for a note it spent. */
 async function nullifierOf(note: Note): Promise<string> {
@@ -448,6 +449,211 @@ describe("LocalShieldedPool: the nullifier set is the spend authority", () => {
     listed.length = 0;
     listed.push("0xdeadbeef");
     expect(await pool.nullifiers()).toEqual([await nullifierOf(note)]);
+  });
+});
+
+/**
+ * The tree the pool hands out leaf indices from, tested through the pool.
+ *
+ * `tests/tree.test.ts` already proves the tree is a tree. What is unproven until here
+ * is that the POOL's notes are in it — that `leafIndex` names the position where this
+ * note's own commitment actually sits, rather than being a number that happens to
+ * count up. The fold below is the check, because it fails for any mismatch between
+ * the note and the leaf.
+ */
+describe("LocalShieldedPool: the notes are in a real tree", () => {
+  const to = "0x5555555555555555555555555555555555555555";
+
+  /**
+   * Fold a witness the way a verifier would, with no help from the pool.
+   *
+   * Deliberately a second implementation rather than a call into `lib/tree.ts`: a test
+   * that folds with the same code that built the path proves the code agrees with
+   * itself. This one only knows the scheme.
+   */
+  async function foldWitness(w: NoteWitness): Promise<bigint> {
+    let node = w.leaf.value;
+    for (const [i, sibling] of w.siblings.entries()) {
+      node =
+        w.isRight[i] === true
+          ? await standInHash.hash(TREE_NODE_DOMAIN, [sibling, node])
+          : await standInHash.hash(TREE_NODE_DOMAIN, [node, sibling]);
+    }
+    return node;
+  }
+
+  it("has a root before anything is deposited, because an empty tree has one", async () => {
+    const root = await pool.root();
+    expect(root.value).toBeGreaterThan(0n);
+    expect(isInField(root.value)).toBe(true);
+  });
+
+  it("tags the root as a stand-in and says why, so it cannot pass for a deployed root", async () => {
+    const root = await pool.root();
+    expect(root.scheme).toBe("stand-in");
+    if (root.scheme !== "stand-in") throw new Error("unreachable: asserted above");
+    /**
+     * Asserted against the hash's own sentence rather than a quoted phrase: the point
+     * of `tagWithScheme` is that the reason travels from the hash instead of being
+     * retyped at each call site, and a hardcoded substring here would pass even if the
+     * pool grew its own reassuring copy of it.
+     */
+    expect(root.why).toBe(standInHash.whyNotCircuitReady);
+  });
+
+  it("moves the root on every deposit", async () => {
+    const seen = new Set<bigint>([(await pool.root()).value]);
+    for (let i = 0; i < 4; i++) {
+      await pool.deposit(usdc, BigInt(i + 1));
+      seen.add((await pool.root()).value);
+    }
+    expect(seen.size).toBe(5);
+  });
+
+  it("serves a witness that folds back to the pool's own root", async () => {
+    await pool.deposit(usdc, 1n);
+    const note = await pool.deposit(usdc, 2n);
+    await pool.deposit(usdc, 3n);
+
+    const w = await pool.witness(note.id);
+    expect(w.leafIndex).toBe(note.leafIndex);
+    expect(w.leaf).toEqual(note.commitment);
+    expect(await foldWitness(w)).toBe((await pool.root()).value);
+    expect(w.root.value).toBe((await pool.root()).value);
+  });
+
+  it("serves a witness for every note it holds, at every size of tree", async () => {
+    const notes: Note[] = [];
+    for (let n = 1; n <= 6; n++) {
+      notes.push(await pool.deposit(usdc, BigInt(n)));
+      const root = (await pool.root()).value;
+      for (const note of notes) {
+        expect(await foldWitness(await pool.witness(note.id))).toBe(root);
+      }
+    }
+  });
+
+  it("gives each note a witness distinct from its neighbour's", async () => {
+    const a = await pool.deposit(usdc, 1n);
+    const b = await pool.deposit(usdc, 1n);
+
+    const wa = await pool.witness(a.id);
+    const wb = await pool.witness(b.id);
+    /** Same amount, so only the secret differs — and the leaf must differ with it. */
+    expect(wa.leaf.value).not.toBe(wb.leaf.value);
+    expect(wa.isRight[0]).toBe(false);
+    expect(wb.isRight[0]).toBe(true);
+    /** Siblings at level 0 are each other's leaves. */
+    expect(wa.siblings[0]).toBe(wb.leaf.value);
+    expect(wb.siblings[0]).toBe(wa.leaf.value);
+  });
+
+  it("gives the witness one sibling per level of the deployed depth", async () => {
+    const note = await pool.deposit(usdc, 1n);
+    const w = await pool.witness(note.id);
+    expect(w.siblings).toHaveLength(20);
+    expect(w.isRight).toHaveLength(20);
+  });
+
+  it("still serves a witness for a note that has been spent", async () => {
+    const note = await pool.deposit(usdc, parseAmount("5", 6));
+    await pool.withdraw(note.id, to);
+
+    const w = await pool.witness(note.id);
+    expect(await foldWitness(w)).toBe((await pool.root()).value);
+  });
+
+  it("refuses a witness for an id this browser does not hold", async () => {
+    await expect(pool.witness("0xnope")).rejects.toThrow("No note with id 0xnope");
+  });
+
+  /**
+   * The bug this test exists for, and it is not a hypothetical.
+   *
+   * `IncrementalMerkleTree.insert` awaits `levels` hashes. Two deposits in flight at
+   * once interleave inside it, both write `filledSubtrees`, and the tree ends up with a
+   * root belonging to neither — **without throwing**. Every note comes back looking
+   * correct and every proof fails later, on chain. `Promise.all` over deposits is an
+   * ordinary thing to write, so the pool serializes rather than documenting a rule
+   * about how it must be called.
+   */
+  it("survives concurrent deposits: distinct indices, and a tree that agrees", async () => {
+    const parallel = await Promise.all(
+      Array.from({ length: 8 }, (_, i) => pool.deposit(usdc, BigInt(i + 1))),
+    );
+    expect([...parallel].map((n) => n.leafIndex).sort((a, b) => a - b)).toEqual([
+      0, 1, 2, 3, 4, 5, 6, 7,
+    ]);
+
+    const root = (await pool.root()).value;
+    for (const note of parallel) {
+      expect(await foldWitness(await pool.witness(note.id))).toBe(root);
+    }
+  });
+
+  it("reaches the same root concurrently as serially, for the same leaves in order", async () => {
+    /**
+     * Two pools fed identical commitments, one eight-at-a-time and one one-at-a-time.
+     * The deposits cannot be reused — each mints a fresh secret — so the leaves come
+     * from the concurrent pool's notes, replayed into a bare tree in index order.
+     */
+    const parallel = await Promise.all(
+      Array.from({ length: 8 }, (_, i) => pool.deposit(usdc, BigInt(i + 1))),
+    );
+    const inOrder = [...parallel].sort((a, b) => a.leafIndex - b.leafIndex);
+
+    const replay = await IncrementalMerkleTree.create({
+      levels: 20,
+      hash: standInHash,
+      emptyLeaf: await standInHash.hash("tree.empty-leaf", [0n]),
+    });
+    for (const note of inOrder) await replay.insert(note.commitment.value);
+
+    expect(replay.root()).toBe((await pool.root()).value);
+  });
+
+  it("keeps a refused deposit out of the tree entirely", async () => {
+    const before = (await pool.root()).value;
+    await expect(pool.deposit(usdc, 0n)).rejects.toThrow("greater than zero");
+    expect((await pool.root()).value).toBe(before);
+
+    /** And the next real deposit still takes leaf zero. */
+    const note = await pool.deposit(usdc, 1n);
+    expect(note.leafIndex).toBe(0);
+  });
+
+  /**
+   * A rejection must not take the queue down with it.
+   *
+   * `serialize` chains on the previous entry, so a naive `this.queue.then(body)` would
+   * propagate one caller's rejection into every caller after it — the pool would stop
+   * working for good the first time a user typed a bad amount.
+   */
+  it("keeps working after a refusal, even one queued behind other work", async () => {
+    const results = await Promise.allSettled([
+      pool.deposit(usdc, 1n),
+      pool.deposit(usdc, 0n),
+      pool.deposit(usdc, 2n),
+      pool.send("0xnope", to, 1n),
+      pool.deposit(usdc, 3n),
+    ]);
+    expect(results.map((r) => r.status)).toEqual([
+      "fulfilled",
+      "rejected",
+      "fulfilled",
+      "rejected",
+      "fulfilled",
+    ]);
+    expect((await pool.notes()).map((n) => n.leafIndex).sort((a, b) => a - b)).toEqual([0, 1, 2]);
+  });
+
+  it("makes the change note a leaf too, so it can be spent later", async () => {
+    const note = await pool.deposit(usdc, parseAmount("5", 6));
+    await pool.send(note.id, to, parseAmount("2", 6));
+
+    const change = (await pool.notes())[0] as Note;
+    expect(change.leafIndex).toBe(1);
+    expect(await foldWitness(await pool.witness(change.id))).toBe((await pool.root()).value);
   });
 });
 

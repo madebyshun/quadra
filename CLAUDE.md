@@ -33,7 +33,7 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. **592 tests in 21 files**, 100% on all four
+in one go. Do not report "done" on a subset. **606 tests in 21 files**, 100% on all four
 metrics, measured 2026-09-27.
 
 That count is a dated measurement, not a target — it is here so a fresh clone that comes
@@ -205,7 +205,9 @@ Dev server is `npm run dev` on **port 5273**.
 ```
 src/
   adapters/        ShieldedPool + Enclave + Catalog behind one interface
-    local/         in-browser implementations used today
+    local/         in-browser implementations used today. pool.ts owns the tree and
+                   serializes its writes — read the note on `serialize` before touching
+                   it, concurrent inserts corrupt the root WITHOUT throwing
     http/          the live BlueAgent x402 catalog client
   config/          chain.ts (Base 8453, flags), pair.ts (AAPLc), upstream.ts
   features/        registry.ts (the 10 ?do= ids) + panels/

@@ -14,7 +14,7 @@
  * developer must remember not to do — it does not typecheck.
  */
 
-import type { Commitment } from "@/lib/note";
+import type { Commitment, TreeRoot } from "@/lib/note";
 
 export type TokenRef = {
   address: string;
@@ -88,6 +88,36 @@ export type Receipt = {
   anchoring: Anchoring;
 };
 
+/**
+ * Everything a proof needs about one note's place in the tree.
+ *
+ * This is the input a circuit consumes: it proves "I know the secret behind a leaf
+ * that is in the tree with this root" without saying which leaf. So the shape is
+ * `lib/tree.ts`'s `MerklePath`, with the two ends **tagged** — see `TaggedField` in
+ * `lib/note.ts`.
+ *
+ * ── Why the ends are tagged and the middle is not ────────────────────────────
+ * `root` and `leaf` are the two values that leave this browser: the root is what a
+ * contract checks against `isKnownRoot`, the leaf is what was inserted. A root
+ * computed from the stand-in hash matches no deployed pool, so shipping it as a bare
+ * bigint would let an unprovable number reach a chain boundary looking exactly like a
+ * provable one — the hazard the header of this file is about.
+ *
+ * The `siblings` stay bare bigints on purpose. They are interior nodes, meaningless
+ * except under a root that is already tagged, and tagging each of twenty of them
+ * would be twenty copies of one fact about the whole witness. Tag the boundary, not
+ * every node behind it.
+ */
+export type NoteWitness = {
+  readonly root: TreeRoot;
+  readonly leaf: Commitment;
+  readonly leafIndex: number;
+  /** Sibling at each level, leaf upward. `siblings.length === levels`. */
+  readonly siblings: readonly bigint[];
+  /** True where the path node is the RIGHT child, so the sibling hashes first. */
+  readonly isRight: readonly boolean[];
+};
+
 export interface ShieldedPool {
   /** Put money in. Returns the note you must keep. */
   deposit(token: TokenRef, amount: bigint): Promise<Note>;
@@ -107,6 +137,30 @@ export interface ShieldedPool {
    * secret, which is the entire reason the scheme uses one.
    */
   nullifiers(): Promise<string[]>;
+  /**
+   * The current commitment-tree root.
+   *
+   * On the interface rather than only on the local pool, because a pool that cannot
+   * say what its root is cannot be proven against — every proof is a statement about
+   * one root, and `MerkleTreeWithHistory.isKnownRoot` is what the contract checks it
+   * with. The on-chain adapter reads `ShieldedPool.getLastRoot()`; the local one
+   * computes it. Neither can forget to have one.
+   *
+   * Tagged, so a root the stand-in hash produced cannot be mistaken for a root a
+   * deployed pool would recognise.
+   */
+  root(): Promise<TreeRoot>;
+  /**
+   * The Merkle witness for a note this browser holds.
+   *
+   * Here for the same reason as `root()`: it is the other half of what a proof needs,
+   * and the local pool can serve it today. **Not** on the contract — the chain stores
+   * only `filledSubtrees` and cannot reconstruct a path for an arbitrary leaf, which
+   * is why a client keeps its own copy of the tree. So the on-chain adapter will build
+   * this from its own tree too, and the interface is what makes that obligation
+   * visible instead of a surprise on deployment day.
+   */
+  witness(noteId: string): Promise<NoteWitness>;
   /** True when this is backed by a deployed pool rather than local state. */
   readonly isLive: boolean;
 }

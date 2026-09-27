@@ -5,7 +5,7 @@ Read `CLAUDE.md` first — it has the constraints and the rules that exist becau
 something broke. This file is only the work.
 
 **Before you start anything:** `npm install`, then `npm run gate`. It must be green
-(tsc clean, **592 tests in 21 files**, 100% on statements/branches/functions/lines, build
+(tsc clean, **606 tests in 21 files**, 100% on statements/branches/functions/lines, build
 succeeds). If it is not green on a fresh checkout, fix that before touching a task — you
 are looking at drift, not at your own change.
 
@@ -396,6 +396,64 @@ does not exist yet. **Resolve it as part of step 2, in one of two directions:** 
 the empty leaf from `IHasher` so both sides can compute it, or keep keccak and accept
 that the browser must be handed the constant from the deployment and can never check it.
 The first is better and the browser is already written for either.
+
+### Step 1e also DONE (2026-09-28) — the tree is load-bearing, and the pool can serve a witness
+
+`lib/tree.ts` existed but nothing imported it, so `leafIndex` still came from a bare
+`nextIndex` counter on the pool. A counter is monotonic for the right reason and is still
+only a *promise* that some tree somewhere agrees with it. Now `LocalShieldedPool` owns an
+`IncrementalMerkleTree` and every index it hands out is the return value of an actual
+`insert`, so the index and the tree cannot disagree — there is only one of them.
+
+Two methods went onto the `ShieldedPool` **interface**, not just the local class, because
+a pool that cannot state its root cannot be proven against and the on-chain adapter must
+not be free to forget them:
+
+- `root(): Promise<TreeRoot>` — tagged, so a root the stand-in hash produced cannot be
+  mistaken for one a deployed pool would recognise.
+- `witness(noteId): Promise<NoteWitness>` — the Merkle path a circuit consumes. Note this
+  is the half the **contract cannot serve**: the chain stores only `filledSubtrees` and
+  cannot reconstruct a path for an arbitrary leaf. That is why a client keeps its own copy
+  of the tree, and putting it on the interface makes that obligation visible now instead
+  of on deployment day.
+
+`NoteWitness` tags its two ends (`root`, `leaf`) and leaves `siblings` as bare bigints:
+those are interior nodes, meaningless except under a root that is already tagged, and
+tagging twenty of them would be twenty copies of one fact about the whole witness. Tag
+the boundary, not every node behind it.
+
+**The bug this increment was really about is one nothing would have thrown for.**
+`insert` awaits `levels` hashes. Two deposits in flight at once interleave inside it,
+both write `filledSubtrees`, and the tree ends up with a root belonging to neither —
+silently. Every note comes back looking correct and every proof fails later, on chain.
+`Promise.all` over deposits is an ordinary thing for a caller to write, and
+`tests/adapters.test.ts` already did it. So the pool serializes its writes rather than
+documenting a rule about how it must be called. Measured, with the queue removed: eight
+concurrent deposits all returned `leafIndex: 0`, and the pre-existing 40-deposit
+uniqueness test **still passed** — it checks ids, commitments and secrets, all of which
+stay distinct while the tree is being corrupted.
+
+The public methods are thin wrappers over private `depositNow`/`sendNow`/`withdrawNow`.
+That is not style: `send` mints its change note by calling `depositNow`, and if the inner
+call went through the queue it would wait on a queue its own caller holds — a deadlock
+with no error message, just a promise that never settles.
+
+**A correction found by mutation, worth recording because the code read as careful.**
+`serialize` was written as `this.queue.then(body, body)` *plus* advancing the queue with a
+rejection-swallowed copy, and the comment called both load-bearing. They are
+**alternatives, not layers**: removing either one alone broke no test, and only removing
+both turned four red. Two mechanisms for one job is worse than one, because each makes the
+other look necessary and so neither gets read carefully. Kept the swallowed advance, which
+states its intent — `this.queue` is a sequencing token, never a result channel — and
+dropped the clever arm. This is the same lesson as hard rule 10 in a different costume:
+defensive code that cannot be reached is indistinguishable from defensive code that works.
+
+**Verified by breaking it, not by watching it pass.** Four mutations, and the interesting
+result is that two of them were *green*: dropping the deposit queue (3 tests red, the
+silent-corruption case), dropping `then(body, body)` (**green — dead code**), dropping the
+swallowed advance (**green — the other half of the same redundancy**), and dropping both
+(4 tests red). A test suite that only ever passes has not been shown to test anything, and
+a mutation that changes nothing is telling you about the code, not about the test.
 
 ### Steps 2 and 3 are NOT done, and step 2 is not a deployment step
 
