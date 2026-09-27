@@ -33,8 +33,29 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. 473 tests, 16 files, 100% on all four metrics
-as of 2026-09-27.
+in one go. Do not report "done" on a subset. **485 tests in 17 files**, 100% on all four
+metrics, measured 2026-09-27.
+
+That count is a dated measurement, not a target — it is here so a fresh clone that comes
+back with *fewer* tests tells you something is wrong with the checkout rather than with
+your change. It had drifted to 473/16 in this file and in `TASKS.md` before being
+re-measured, which is the ordinary way a written-down number goes stale: the suite grew
+and nobody re-ran the count. **If you add tests, re-measure both files in the same
+commit.**
+
+Solidity has its **own** gate, and the two are deliberately separate:
+
+```
+npm run gate:contracts
+```
+
+That is `forge build` → `forge test` → `scripts/check-contract-coverage.ts`. 90 tests,
+100% on lines/functions/branches for every file in `contracts/src/`, as of 2026-09-27.
+
+🔴 **Do not merge them.** `npm run gate` must stay runnable on a bare clone with nothing
+installed and no network; `gate:contracts` needs Foundry. Folding Solidity into the main
+gate would break the one property that makes the main gate always-runnable. Both are
+required before anything is deployed. Details in `contracts/README.md`.
 
 Dev server is `npm run dev` on **port 5273**.
 
@@ -75,6 +96,33 @@ Dev server is `npm run dev` on **port 5273**.
 - **A JSX ternary branch in parentheses cannot hold a comment block plus an element.** Eight
   confusing `TS2657`/`TS1005`/`TS1382` errors come from exactly that. Put the note in the CSS
   or above the ternary.
+- 🔴 **Foundry's `deny = "warnings"` belongs in `[profile.default]`. Put it under `[lint]` and
+  it silently turns itself OFF.** MEASURED 2026-09-27: forge accepts the key there, prints one
+  line about an unknown config key, and resolves `deny` back to `"never"`. The build then goes
+  green *because the strictness is gone* — which is the same observable result as a clean
+  build, and reads as success. **Verify with `forge config | grep deny`, never by whether the
+  build passed.** (`[lint]` is where it looks like it belongs, which is why this happened; the
+  deprecated spelling `deny_warnings = true` works but warns on every invocation, training the
+  reader to skim warnings in the one project that has decided warnings are errors.)
+- 🔴 **A glob that matches nothing is indistinguishable from one that works.** `[lint] ignore =
+  ["test/**"]` in `foundry.toml` matches **no files at all** — `test/*` covers the top level
+  only and `test/**/*` is what reaches `test/doubles/`, so both entries are required. Measured
+  by appending a deliberately bad cast to a file in `test/doubles/` and counting warnings under
+  each pattern: `test/*` alone left 3 lines, the pair left 0. **Whenever you narrow or widen an
+  ignore list, plant a violation you expect it to swallow and confirm the count goes to zero.**
+  Do not infer coverage of an exemption from a clean build — that is the same mistake as the
+  `deny` one above, and both times the wrong answer looked exactly like the right one.
+- **`vm.expectRevert` binds to the next *external call*, not the next statement.** Any view call
+  made while building arguments consumes the expectation, and the failure message — "next call
+  did not revert as expected" — points at the wrong call entirely. This produced 12 simultaneous
+  failures in one run from a single cause: the `_args()` test helper calls `pool.getLastRoot()`.
+  Hoist all argument construction above the `expectRevert`.
+- **A `view` interface cannot be instrumented, and that is usually correct.** `IVerifier.verifyProof`
+  is `view`, so no implementation can record what it was called with — a recording double is
+  impossible to write. The fix is to invert it: `ExpectingVerifier` takes the expected vector
+  through a separate non-view `expect()` and returns whether the call matches. Worth noticing
+  that the restriction is a feature — a verifier that could record could also return a different
+  answer for the same proof depending on what it had seen before.
 
 ---
 
@@ -98,6 +146,13 @@ Dev server is `npm run dev` on **port 5273**.
    actually answers; a fabricated input turns a measurement into a guess.
 7. **Amounts go through `parseAmount`.** Either an exact base-unit bigint or a thrown error
    the user reads. No path where a typo becomes a silently rounded number.
+8. **The accepting verifier lives under `contracts/test/` and nowhere else.**
+   `AcceptingVerifier` in `contracts/test/doubles/TestVerifier.sol` returns `true` for every
+   proof. Nothing under `contracts/src/` may import it. It compiles, the suite goes green, the
+   pool "works", and the only symptom is that anybody can drain it — there is no error message
+   and no failing test, which is what makes it the single most dangerous file in the repo. Same
+   for `TestHasher`: keccak satisfies every property the tree checks, so it passes everything
+   and yields a pool whose withdrawals nobody can afford to prove.
 
 ---
 
@@ -114,9 +169,13 @@ src/
   pages/           /docs /api /verify /404
   ui/              Window, Taskbar, Gel (button), Crt (output box)
   styles/          reset.css + theme.css — the XP/Aqua design system
-tests/             16 files, mirrors src/
+tests/             17 files, mirrors src/
 tools/quadra-mcp/  stdio MCP server, read-only
 scripts/           measure-catalog.ts — hand-run, hits the network
+                   check-contract-coverage.ts — the forge coverage gate
+contracts/         Foundry. src/ is 3 contracts, test/ is 90 tests.
+                   No forge-std and no lib/ — runs on a bare clone.
+                   Read contracts/README.md before editing any of it.
 ```
 
 `@/` → `src/`. Tests never touch the network: `tests/setup.ts` makes `fetch` throw, so
@@ -163,8 +222,17 @@ an item here in the same edit that closes the work.** A resolved entry left in a
 known-open-items list is worse than a missing one: the next reader spends their session
 re-chasing something that was already fixed, and the list stops being believed.)*
 
-- **No contracts yet.** Foundry scaffold + anvil tests for the shielded pool are unwritten.
-  This is the largest unblocked piece of work in the repo — T3–T6 all wait on a decision or
-  on each other, T7 waits on nothing.
+- **No verifier and no Poseidon**, so nothing is deployed and `CONTRACTS.shieldedPool` stays
+  `null`. *(This entry replaced "No contracts yet" on 2026-09-27 — the Solidity is written and
+  fully tested, so leaving the old wording would have been the exact rot the note above warns
+  about. But it is narrowed, not closed: what remains is a circuit and a hash function, which
+  is the larger half and is not Solidity work.)* The two doubles that stand in for them are
+  the most dangerous files here — see hard rule 8. `contracts/README.md` lists everything that
+  must exist before this holds money.
+- ⚠️ **Join-split leaks amounts, and the shape is still ShunTr's decision.** The pool takes
+  arbitrary amounts, so a deposit and a withdrawal of the same size are linkable by anyone
+  reading the chain with no cryptography broken. Fixed denominations are strictly stronger and
+  would break the `send` interface. **The UI must not claim a guarantee this shape does not
+  give** — three options and their costs are in `TASKS.md` T7.
 - **`$QUADRA` does not exist.** It is intended to pair against AAPLc on Base. No address may
   be guessed for it — `LAUNCH_TOKEN` stays `null` until something is deployed and verified.

@@ -5,9 +5,15 @@ Read `CLAUDE.md` first — it has the constraints and the rules that exist becau
 something broke. This file is only the work.
 
 **Before you start anything:** `npm install`, then `npm run gate`. It must be green
-(tsc clean, 473 tests, 100% on statements/branches/functions/lines, build succeeds).
-If it is not green on a fresh checkout, fix that before touching a task — you are
-looking at drift, not at your own change.
+(tsc clean, **485 tests in 17 files**, 100% on statements/branches/functions/lines, build
+succeeds). If it is not green on a fresh checkout, fix that before touching a task — you
+are looking at drift, not at your own change.
+
+If you are touching Solidity, `npm run gate:contracts` is the second, separate gate:
+`forge build` → `forge test` (**90 tests**) → 100% coverage on `contracts/src/`. It needs
+Foundry, which is exactly why it is not part of `npm run gate` — that one has to stay
+runnable on a bare clone with no network. Both counts are dated measurements from
+2026-09-27; re-measure them in the same commit that changes them.
 
 **Before you report anything done:** `npm run gate` again, green, all three parts.
 Say which three. "Build is green" has been used to mean "tsc passed" and it was not.
@@ -223,14 +229,95 @@ means here before building a swap into the payment path.
 
 **Size:** large. **Blocks T8.** Independent of T3–T6 — can be done in parallel.
 
-There are no contracts yet. `src/adapters/local/pool.ts` is a browser-local
-implementation behind the `ShieldedPool` interface in `src/adapters/types.ts`. That
-interface is the seam: an on-chain implementation drops in without the UI changing.
+### Step 1 of 3 is DONE (2026-09-27) — the Solidity exists and is fully tested
 
-1. Foundry project, anvil for local tests.
-2. Shielded pool + verifier. `CONTRACTS.shieldedPool` and `CONTRACTS.verifier` stay
-   `null` until each is deployed **and verified on Basescan**.
-3. An `OnchainPool implements ShieldedPool` alongside the local one.
+`contracts/` holds three contracts, 90 tests and 100% coverage on `src/`, gated by
+`npm run gate:contracts`. Read `contracts/README.md` before touching any of it; it has
+the four traps measured while building it, including two that make a broken config look
+like a working one.
+
+| file | what |
+|---|---|
+| `src/MerkleTreeWithHistory.sol` | append-only commitment tree + 30-root window |
+| `src/SafeTransfer.sol` | ERC-20 moves that fail loudly, incl. non-standard tokens |
+| `src/ShieldedPool.sol` | join-split pool, 2-in/2-out, one asset |
+
+One real bug was found and fixed rather than documented: at `levels == 1` the
+constructor's `zeros` loop never runs, so the field check on the hasher's output never
+executed and an out-of-field hasher would have built a tree whose every root no circuit
+could reference. Deposits would succeed and no withdrawal would ever be provable, with
+nothing reverting anywhere. `test_everyLegalSizeChecksItsHasher` now asserts the fix at
+every legal size.
+
+### Steps 2 and 3 are NOT done, and step 2 is not a deployment step
+
+**There is no verifier and there is no Poseidon.** `IVerifier` has no implementation
+under `src/`. What exists is `test/doubles/TestVerifier.sol` and
+`test/doubles/TestHasher.sol`, and neither is a step toward the real thing:
+
+🔴 **`AcceptingVerifier` returns `true` for everything.** It compiles, the suite goes
+green, the pool "works", and the only symptom is that anybody can drain it. **Nothing
+under `src/` may import it, ever.** It exists so the pool's own logic can be tested.
+
+🔴 **`TestHasher` is keccak**, and it satisfies every property the tree needs —
+deterministic, in-field, collision-resistant — which is exactly what makes it
+dangerous. A 20-level keccak Merkle path is a proof a browser cannot produce. Shipped,
+it gives a pool whose deposits work, whose tree is valid, and whose withdrawals nobody
+can afford to prove.
+
+So what is actually left:
+
+1. **A circuit**, and a Groth16 verifier generated from it. This is the large piece and
+   it is not Solidity work.
+2. **Poseidon deployed**, with the same parameters the circuit uses.
+3. **A trusted setup whose provenance is written down.**
+4. **An external audit.** 100% coverage says every branch has been executed, not that
+   the design is sound. Those are different claims and only the first is measured.
+5. **An `OnchainPool implements ShieldedPool`** alongside `src/adapters/local/pool.ts`.
+   That interface in `src/adapters/types.ts` is the seam — an on-chain implementation
+   drops in without the UI changing.
+6. `CONTRACTS.shieldedPool` / `CONTRACTS.verifier` filled in from a **Basescan-verified**
+   deployment, never from a deploy log. Until then they stay `null`.
+
+### ⚠️ DECISION FOR SHUNTR — join-split leaks amounts, and the UI must not claim otherwise
+
+This one is written down here rather than settled in the contract, and **it is the one
+item in T7 a session must not decide alone.**
+
+The pool is **join-split**: two notes in, two notes out, arbitrary signed net amount. A
+note can be spent for part of its value with the rest coming back as change. It was
+built that way because the UI already promises it — `ShieldedPool.send(noteId, to,
+amount)` in `src/adapters/types.ts` takes an arbitrary amount and `LocalShieldedPool`
+already makes change.
+
+**Fixed denominations (Tornado's design) give a strictly stronger guarantee.** Every
+withdrawal looks exactly like every other, so the anonymity set is everyone in the pool.
+Join-split does not: deposit 137.42 and withdraw 137.42 and the link is visible to
+anybody reading the chain, with **no cryptography broken**. Join-split makes that
+*possible* to avoid rather than automatic — the user has to not do it.
+
+Three options, none of them free:
+
+- **(a) Keep join-split, and make the UI honest about it.** The product copy cannot say
+  "nothing tying it to you" without qualification. Needs the note-merge move surfaced
+  (see below) and probably a warning when an amount is round or matches a deposit.
+- **(b) Switch to fixed denominations.** Stronger privacy, and it breaks the `send`
+  interface and the change-making the local pool already does. A large UI change, not a
+  contract tweak.
+- **(c) Both** — denominated pools for the privacy claim, join-split for convenience,
+  with the difference stated. Most work, and two things to audit.
+
+Note what already exists in support of (a): `publicAmount == 0` with no fee is
+deliberately **not** rejected. That is two notes in, two notes out, nothing crossing the
+boundary — a merge or a re-split. It is how a wallet consolidates dust and the one move
+a user has for repairing the amount correlation this shape leaks. An early version
+refused it as "nothing to do"; the test `test_allowsANoteMergeThatMovesNoMoney` exists
+to stop that coming back.
+
+**Do not build T8 against a privacy claim this shape does not give.** That is the same
+question T8 asks about the venue, arriving from the other side.
+
+### Standing, for this task
 
 **The rule that shapes this, from `types.ts`:** a stub that emits a plausible-looking
 proof is worse than no stub, because you cannot tell it from the real thing by looking
@@ -252,6 +339,11 @@ the heaviest thing left. It needs the deployed shielded pool (T7) plus a venue o
 Base to actually trade against. Until both exist the panel must keep saying it is not
 built; a swap screen that looks operational and cannot swap is the single worst thing
 this repo could ship.
+
+**The pool contract existing does not unblock this.** As of 2026-09-27 `contracts/` is
+written and fully tested, but there is no verifier and no Poseidon, so nothing is
+deployed and `CONTRACTS.shieldedPool` is still `null`. `requireContract()` will throw
+naming the unset constant, which is the correct behaviour and not a bug to route around.
 
 **Open question for ShunTr before building:** which venue, and whether the privacy
 claim survives it. Routing a shielded balance through a public pool can undo exactly
@@ -299,6 +391,12 @@ Stop and ask rather than picking:
    not, and the MCP server in `tools/quadra-mcp/` holds no keys at all. Changing that
    is a custody decision, not a refactor.
 3. **T6** — what "any token" means in the router.
-4. **T8** — which venue `swap` trades against, and whether the privacy claim survives it.
-5. **`bridge` and `launch`** — both flags are off. Whether they get built at all.
-6. **T9** — the launch itself, and anything that moves real money.
+4. **T7** — **join-split vs fixed denominations.** The pool as built takes arbitrary
+   amounts, which is a genuinely weaker privacy guarantee than Tornado-style fixed
+   denominations — amounts correlate deposits to withdrawals with no cryptography
+   broken. The contract is written and tested; the shape is still a product decision,
+   and the UI copy depends on the answer. Three options and their costs are in T7.
+5. **T8** — which venue `swap` trades against, and whether the privacy claim survives it.
+   Note this is the same question as item 4 arriving from the other side.
+6. **`bridge` and `launch`** — both flags are off. Whether they get built at all.
+7. **T9** — the launch itself, and anything that moves real money.
