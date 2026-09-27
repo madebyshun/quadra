@@ -12,6 +12,8 @@ import {
   tagWithScheme,
 } from "@/lib/note";
 import { IncrementalMerkleTree } from "@/lib/tree";
+import type { NoteStore } from "@/adapters/local/store";
+import { MemoryNoteStore, STORE_VERSION, decodePool, encodeNote } from "@/adapters/local/store";
 
 /**
  * A shielded pool that keeps its notes in this browser and nothing else.
@@ -138,8 +140,16 @@ export class LocalShieldedPool implements ShieldedPool {
    * exists this class does not need editing to use it. Defaulted rather than
    * required because every current caller wants the same one, and a required
    * argument here would put the choice of hash function in the UI layer.
+   *
+   * `disk` defaults to memory, so this class has no idea what a browser is and an
+   * ephemeral pool is something you get by asking for nothing. `adapters/index.ts`
+   * passes the durable one — and `tests/adapters.test.ts` asserts that it does, because
+   * "remember to wire persistence" is not a mechanism.
    */
-  constructor(private readonly hash: FieldHash = standInHash) {}
+  constructor(
+    private readonly hash: FieldHash = standInHash,
+    private readonly disk: NoteStore = new MemoryNoteStore(),
+  ) {}
 
   /**
    * Run `body` after everything already queued, whatever happened to it.
@@ -168,13 +178,94 @@ export class LocalShieldedPool implements ShieldedPool {
     return run;
   }
 
-  private async getTree(): Promise<IncrementalMerkleTree> {
-    this.tree ??= await IncrementalMerkleTree.create({
+  /**
+   * Build the tree and restore what was saved, once, before anything reads or writes.
+   *
+   * ⚠️ `this.tree` is assigned **only after hydration succeeds**, and that ordering is
+   * the whole safety property. Assigning it first — the obvious shape, and what a
+   * `??=` would do — means a load that throws leaves a built, empty tree behind, and
+   * the next call skips hydration and presents a pool with no notes in it. The user's
+   * money would be on disk and invisible, with no error the second time. Failing every
+   * time is correct: a caller that cannot read its notes must keep being told so.
+   */
+  private async ready(): Promise<IncrementalMerkleTree> {
+    if (this.tree !== null) return this.tree;
+
+    const tree = await IncrementalMerkleTree.create({
       levels: TREE_LEVELS,
       hash: this.hash,
       emptyLeaf: await this.hash.hash(EMPTY_LEAF_DOMAIN, [0n]),
     });
-    return this.tree;
+
+    const saved = decodePool(await this.disk.load());
+    if (saved !== null) {
+      for (const n of saved.nullifiers) this.spent.add(n);
+
+      /**
+       * Inserted in leaf-index order, which `decodePool` has already sorted and proven
+       * to be exactly `0..n-1`. So `insert` returns each note's own `leafIndex` without
+       * this loop having to check — the guarantee lives in the decoder, where it can be
+       * stated once and tested directly, rather than as an assertion here that no input
+       * could ever reach.
+       *
+       * The order on disk is deliberately not trusted for this. Display order is
+       * re-derived below from the index, so a shuffled file loads correctly instead of
+       * building a tree whose root belongs to no one.
+       */
+      for (const n of saved.notes) {
+        const commitment = await deriveCommitment(this.hash, {
+          amount: n.amount,
+          secret: n.secret,
+        });
+        await tree.insert(commitment.value);
+
+        const note: Note = {
+          id: n.id,
+          commitment,
+          leafIndex: n.leafIndex,
+          secret: n.secret,
+          token: n.token,
+          amount: n.amount,
+          createdAt: n.createdAt,
+          spentAt: n.spentAt,
+          anchoring: n.anchoring,
+        };
+        /** Ascending index in, newest-first out. */
+        this.store.unshift(note);
+
+        /** The safe half of the union — see `SAFE_REPAIR` in `store.ts`. */
+        if (note.spentAt !== null) {
+          this.spent.add(
+            commitmentHex(await deriveNullifier(this.hash, { secret: n.secret }, n.leafIndex)),
+          );
+        }
+      }
+    }
+
+    this.tree = tree;
+    return tree;
+  }
+
+  /**
+   * Write the whole pool out.
+   *
+   * Called immediately after every state change rather than once per operation, because
+   * the gap between "this note is spent in memory" and "this note is spent on disk" is a
+   * window in which a reload un-spends it. Rewriting everything is wasteful and is the
+   * only shape that cannot leave the two disagreeing.
+   *
+   * A failed write throws, and the note it belongs to is already in the tree — which
+   * cannot be rolled back, because the tree is append-only and `filledSubtrees` has
+   * moved. So memory ends up one leaf ahead of disk. That is deliberate and it is loud:
+   * on the next load `decodePool` sees a gap in the leaf indices and refuses, rather than
+   * quietly rebuilding a shorter tree whose every witness would be rejected on chain.
+   */
+  private async persist(): Promise<void> {
+    await this.disk.save({
+      version: STORE_VERSION,
+      notes: this.store.map(encodeNote),
+      nullifiers: [...this.spent],
+    });
   }
 
   /**
@@ -210,7 +301,7 @@ export class LocalShieldedPool implements ShieldedPool {
      * out-of-field commitment, a full tree — no index was consumed and no note exists,
      * which is the same ordering the counter needed a comment to explain.
      */
-    const tree = await this.getTree();
+    const tree = await this.ready();
     const leafIndex = await tree.insert(commitment.value);
 
     const note: Note = {
@@ -225,16 +316,54 @@ export class LocalShieldedPool implements ShieldedPool {
       anchoring: local(),
     };
     this.store.unshift(note);
+    await this.persist();
     return note;
   }
 
+  /**
+   * ── Why a read is serialized and hydrated too ────────────────────────────────
+   * This used to be two synchronous lines over an in-memory array. On a freshly loaded
+   * page that returns `[]` — the notes are on disk and nothing has read them yet — so
+   * the UI would render an empty pool to someone who owns money, and the bug would only
+   * appear after a refresh, which is the one moment a user is most likely to believe it.
+   * Serialized as well as hydrated, so a read cannot land midway through an insert.
+   */
   async notes(opts?: { includeSpent?: boolean }): Promise<Note[]> {
-    const all = [...this.store];
-    return opts?.includeSpent ? all : all.filter((n) => n.spentAt === null);
+    return this.serialize(async () => {
+      await this.ready();
+      const all = [...this.store];
+      return opts?.includeSpent ? all : all.filter((n) => n.spentAt === null);
+    });
   }
 
   async nullifiers(): Promise<string[]> {
-    return [...this.spent];
+    return this.serialize(async () => {
+      await this.ready();
+      return [...this.spent];
+    });
+  }
+
+  /**
+   * The only way to look a note up. Both callers went through `this.store.find` directly
+   * until this existed, and both were wrong in the same way.
+   *
+   * 🔴 The bug was not that the lookup failed — it is that of all the things it could
+   * have said, it said the note **does not exist**. On a freshly loaded page `this.store`
+   * is empty until `ready()` has run, so the first spend or witness request after any
+   * refresh answered `No note with id … in this browser` about a note sitting on disk
+   * three lines away. A user reading that has been told their money is gone, by the
+   * product whose whole claim is that the note never left their browser. It survived a
+   * round of review because `notes()` and `nullifiers()` had already been given their
+   * `await this.ready()` and the two lookups read as though they were covered by it.
+   *
+   * So the fix is a single choke point rather than two more `await`s: a third lookup path
+   * cannot reintroduce this by forgetting, because there is nowhere else to look a note up.
+   */
+  private async locate(noteId: string): Promise<Note> {
+    await this.ready();
+    const note = this.store.find((n) => n.id === noteId);
+    if (!note) throw new Error(`No note with id ${noteId} in this browser.`);
+    return note;
   }
 
   /**
@@ -244,7 +373,7 @@ export class LocalShieldedPool implements ShieldedPool {
    * root cannot observe a tree halfway through an insert.
    */
   async root(): Promise<TreeRoot> {
-    return this.serialize(async () => tagWithScheme(this.hash, (await this.getTree()).root()));
+    return this.serialize(async () => tagWithScheme(this.hash, (await this.ready()).root()));
   }
 
   /**
@@ -257,10 +386,8 @@ export class LocalShieldedPool implements ShieldedPool {
    */
   async witness(noteId: string): Promise<NoteWitness> {
     return this.serialize(async () => {
-      const note = this.store.find((n) => n.id === noteId);
-      if (!note) throw new Error(`No note with id ${noteId} in this browser.`);
-
-      const path = await (await this.getTree()).pathFor(note.leafIndex);
+      const note = await this.locate(noteId);
+      const path = await (await this.ready()).pathFor(note.leafIndex);
       return {
         root: tagWithScheme(this.hash, path.root),
         leaf: note.commitment,
@@ -284,7 +411,7 @@ export class LocalShieldedPool implements ShieldedPool {
       );
     }
 
-    this.consume(note, nullifier);
+    await this.consume(note, nullifier);
     const change = note.amount - amount;
     if (change > 0n) await this.depositNow(note.token, change);
 
@@ -304,7 +431,7 @@ export class LocalShieldedPool implements ShieldedPool {
 
   private async withdrawNow(noteId: string, to: string): Promise<Receipt> {
     const { note, nullifier } = await this.spendable(noteId);
-    this.consume(note, nullifier);
+    await this.consume(note, nullifier);
 
     const amount = `${formatAmount(note.amount, note.token.decimals)} ${note.token.symbol}`;
     return {
@@ -323,9 +450,7 @@ export class LocalShieldedPool implements ShieldedPool {
    * gets stored — otherwise the set could refuse a note whose nullifier it never held.
    */
   private async spendable(noteId: string): Promise<{ note: Note; nullifier: string }> {
-    const note = this.store.find((n) => n.id === noteId);
-    if (!note) throw new Error(`No note with id ${noteId} in this browser.`);
-
+    const note = await this.locate(noteId);
     const nullifier = commitmentHex(
       await deriveNullifier(this.hash, { secret: note.secret }, note.leafIndex),
     );
@@ -344,12 +469,18 @@ export class LocalShieldedPool implements ShieldedPool {
   }
 
   /**
-   * The single place a note is retired. Both writes live here so the nullifier set
-   * and `spentAt` cannot disagree about whether a note was spent — the invariant
-   * `adapters/types.ts` promises and `tests/adapters.test.ts` asserts.
+   * The single place a note is retired. All three writes live here so the nullifier set,
+   * `spentAt` and the saved copy cannot disagree about whether a note was spent — the
+   * invariant `adapters/types.ts` promises and `tests/adapters.test.ts` asserts.
+   *
+   * The save is inside this method and not in the callers for the same reason the other
+   * two are: `sendNow` retires a note and then mints change, and a save that only ran at
+   * the end of the operation would leave a window where a reload resurrects the spent
+   * note. A spend reaches disk before anything else happens.
    */
-  private consume(note: Note, nullifier: string): void {
+  private async consume(note: Note, nullifier: string): Promise<void> {
     this.spent.add(nullifier);
     note.spentAt = new Date().toISOString();
+    await this.persist();
   }
 }

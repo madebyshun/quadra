@@ -2,6 +2,7 @@ import type { Adapters } from "@/adapters/types";
 import { HttpCatalog } from "@/adapters/http/catalog";
 import { LocalEnclave } from "@/adapters/local/enclave";
 import { LocalShieldedPool } from "@/adapters/local/pool";
+import { LocalStorageNoteStore } from "@/adapters/local/store";
 import { CONTRACTS } from "@/config/chain";
 
 /**
@@ -42,7 +43,17 @@ export function resolvePool(ready: boolean): LocalShieldedPool {
       "The pool is deployed, but no on-chain ShieldedPool is implemented yet. Implement it in src/adapters/onchain/ before setting CONTRACTS.shieldedPool.",
     );
   }
-  return new LocalShieldedPool();
+  /**
+   * The one place that knows this app runs in a browser.
+   *
+   * `LocalShieldedPool` defaults to an in-memory store, which is the right default for a
+   * class that should not depend on `localStorage` existing — but it is the WRONG
+   * behaviour for the product, because a pool that forgets on refresh loses real money.
+   * Passing it here rather than defaulting to it keeps the dependency at the edge, and
+   * `tests/adapters.test.ts` asserts that this call is durable so the wiring is a checked
+   * fact rather than something to remember.
+   */
+  return new LocalShieldedPool(undefined, new LocalStorageNoteStore());
 }
 
 /**

@@ -33,7 +33,7 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. **606 tests in 21 files**, 100% on all four
+in one go. Do not report "done" on a subset. **653 tests in 21 files**, 100% on all four
 metrics, measured 2026-09-27.
 
 That count is a dated measurement, not a target — it is here so a fresh clone that comes
@@ -207,7 +207,12 @@ src/
   adapters/        ShieldedPool + Enclave + Catalog behind one interface
     local/         in-browser implementations used today. pool.ts owns the tree and
                    serializes its writes — read the note on `serialize` before touching
-                   it, concurrent inserts corrupt the root WITHOUT throwing
+                   it, concurrent inserts corrupt the root WITHOUT throwing.
+                   store.ts persists the notes; it re-derives each commitment on load
+                   rather than storing one, because a `scheme` tag read off disk is a
+                   claim and not a derivation (rule 10). Look a note up through
+                   `locate()` only — a bare `this.store.find` skips hydration and tells
+                   the user their note does not exist
     http/          the live BlueAgent x402 catalog client
   config/          chain.ts (Base 8453, flags), pair.ts (AAPLc), upstream.ts
   features/        registry.ts (the 10 ?do= ids) + panels/

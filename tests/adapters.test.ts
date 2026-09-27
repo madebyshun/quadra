@@ -5,11 +5,13 @@ import { LOCAL_MODELS, LocalEnclave } from "@/adapters/local/enclave";
 import { LocalCatalog } from "@/adapters/local/catalog";
 import { HttpCatalog } from "@/adapters/http/catalog";
 import type { Note, NoteWitness } from "@/adapters/types";
+import type { NoteStore, StoredNote, StoredPool } from "@/adapters/local/store";
+import { LocalStorageNoteStore, MemoryNoteStore, STORE_KEY, STORE_VERSION } from "@/adapters/local/store";
 import { AAPL_BASE } from "@/config/pair";
 import { BLUEAGENT } from "@/config/upstream";
 import { CONTRACTS, USDC } from "@/config/chain";
 import { formatAmount, parseAmount } from "@/lib/amount";
-import { MAX_NOTE_VALUE, isInField } from "@/lib/field";
+import { FIELD_MODULUS, MAX_NOTE_VALUE, isInField } from "@/lib/field";
 import { standInHash } from "@/lib/hash";
 import { commitmentHex, deriveCommitment, deriveNullifier } from "@/lib/note";
 import { IncrementalMerkleTree, TREE_NODE_DOMAIN } from "@/lib/tree";
@@ -17,6 +19,28 @@ import { IncrementalMerkleTree, TREE_NODE_DOMAIN } from "@/lib/tree";
 /** The nullifier the pool must have recorded for a note it spent. */
 async function nullifierOf(note: Note): Promise<string> {
   return commitmentHex(await deriveNullifier(standInHash, { secret: note.secret }, note.leafIndex));
+}
+
+/**
+ * Fold a witness the way a verifier would, with no help from the pool.
+ *
+ * Deliberately a second implementation rather than a call into `lib/tree.ts`: a test that
+ * folds with the same code that built the path proves the code agrees with itself. This
+ * one only knows the scheme.
+ *
+ * At module scope because two blocks need it — the tree tests and the reload tests. A
+ * witness that folds to the same root after a reload is the strongest single statement
+ * this suite makes, since it is the one thing a proof will actually consume.
+ */
+async function foldWitness(w: NoteWitness): Promise<bigint> {
+  let node = w.leaf.value;
+  for (const [i, sibling] of w.siblings.entries()) {
+    node =
+      w.isRight[i] === true
+        ? await standInHash.hash(TREE_NODE_DOMAIN, [sibling, node])
+        : await standInHash.hash(TREE_NODE_DOMAIN, [node, sibling]);
+  }
+  return node;
 }
 
 const usdc = { address: USDC.address, symbol: USDC.symbol, decimals: USDC.decimals };
@@ -464,24 +488,6 @@ describe("LocalShieldedPool: the nullifier set is the spend authority", () => {
 describe("LocalShieldedPool: the notes are in a real tree", () => {
   const to = "0x5555555555555555555555555555555555555555";
 
-  /**
-   * Fold a witness the way a verifier would, with no help from the pool.
-   *
-   * Deliberately a second implementation rather than a call into `lib/tree.ts`: a test
-   * that folds with the same code that built the path proves the code agrees with
-   * itself. This one only knows the scheme.
-   */
-  async function foldWitness(w: NoteWitness): Promise<bigint> {
-    let node = w.leaf.value;
-    for (const [i, sibling] of w.siblings.entries()) {
-      node =
-        w.isRight[i] === true
-          ? await standInHash.hash(TREE_NODE_DOMAIN, [sibling, node])
-          : await standInHash.hash(TREE_NODE_DOMAIN, [node, sibling]);
-    }
-    return node;
-  }
-
   it("has a root before anything is deposited, because an empty tree has one", async () => {
     const root = await pool.root();
     expect(root.value).toBeGreaterThan(0n);
@@ -657,6 +663,545 @@ describe("LocalShieldedPool: the notes are in a real tree", () => {
   });
 });
 
+/**
+ * Reloading the page is the test. Everything else in this file runs against one pool
+ * object; a user runs against a new one every time they refresh, and until this block
+ * existed nothing checked that the second one could find the money.
+ *
+ * `reopen` is the whole device: same store, new pool, exactly what a refresh does.
+ */
+describe("LocalShieldedPool: the money survives a reload", () => {
+  const to = "0x6666666666666666666666666666666666666666";
+  let disk: MemoryNoteStore;
+
+  beforeEach(() => {
+    disk = new MemoryNoteStore();
+    pool = new LocalShieldedPool(standInHash, disk);
+  });
+
+  /** A fresh pool over the same store — a page reload, with nothing carried in memory. */
+  function reopen(): LocalShieldedPool {
+    return new LocalShieldedPool(standInHash, disk);
+  }
+
+  it("writes nothing until there is something to write", async () => {
+    expect(await disk.load()).toBeNull();
+    /** A read must not create a record — an empty pool that saves has invented a fact. */
+    expect(await pool.notes()).toEqual([]);
+    expect(await disk.load()).toBeNull();
+  });
+
+  it("brings back the notes, with their amounts intact", async () => {
+    await pool.deposit(usdc, parseAmount("2.5", 6));
+    await pool.deposit(aaplc, parseAmount("1.25", 8));
+
+    const after = await reopen().notes();
+    expect(after.map((n) => [n.token.symbol, n.amount])).toEqual([
+      ["AAPLc", parseAmount("1.25", 8)],
+      ["USDC", parseAmount("2.5", 6)],
+    ]);
+  });
+
+  it("brings back amounts too large for a double, exactly", async () => {
+    /**
+     * The trap this pins: `JSON.stringify` throws on a bigint rather than coercing it,
+     * so the encoding has to be explicit — and the obvious explicit choice, a number,
+     * is lossy. `Number(2n ** 200n)` round-trips to a different integer with no error.
+     */
+    const huge = 2n ** 200n + 12345n;
+    await pool.deposit(usdc, huge);
+    expect(((await reopen().notes())[0] as Note).amount).toBe(huge);
+  });
+
+  it("brings back the secret exactly, because the money is the secret", async () => {
+    const note = await pool.deposit(usdc, 7n);
+    expect(((await reopen().notes())[0] as Note).secret).toBe(note.secret);
+  });
+
+  it("re-derives the commitment rather than trusting a stored one", async () => {
+    const note = await pool.deposit(usdc, 7n);
+    const back = (await reopen().notes())[0] as Note;
+
+    expect(back.commitment).toEqual(note.commitment);
+    expect(back.commitment).toEqual(await deriveCommitment(standInHash, { amount: 7n, secret: note.secret }));
+    /** Nothing on disk claims a scheme, so nothing on disk can claim the wrong one. */
+    expect(JSON.stringify(await disk.load())).not.toContain("poseidon");
+    expect(JSON.stringify(await disk.load())).not.toContain("scheme");
+  });
+
+  it("rebuilds the same tree: same root, and witnesses that still fold", async () => {
+    for (let i = 1; i <= 5; i++) await pool.deposit(usdc, BigInt(i));
+    const before = await pool.root();
+    const notes = await pool.notes();
+
+    const back = reopen();
+    expect((await back.root()).value).toBe(before.value);
+    for (const note of notes) {
+      const w = await back.witness(note.id);
+      expect(w.leafIndex).toBe(note.leafIndex);
+      expect(w.root.value).toBe(before.value);
+    }
+  });
+
+  /**
+   * ⚠️ The test above looks like it covers this and does not, which is why both exist.
+   *
+   * It reaches `witness` through `back.root()` and a `notes()` call that already ran, so
+   * the pool was hydrated before the witness was ever asked for. Mutation-checked: with
+   * hydration removed from the lookup, that test still passed and only the three *spend*
+   * tests went red — the witness path was being carried by its neighbours' side effects.
+   *
+   * A witness is the first thing a proof needs, so it is exactly the call a real client
+   * makes first on a fresh page. Asked here with nothing run before it.
+   */
+  it("serves a witness as the very first call on a reopened pool", async () => {
+    const note = await pool.deposit(usdc, parseAmount("3", 6));
+    const expected = (await pool.root()).value;
+
+    const w = await reopen().witness(note.id);
+    expect(w.leafIndex).toBe(note.leafIndex);
+    expect(w.leaf.value).toBe(note.commitment.value);
+    expect(await foldWitness(w)).toBe(expected);
+  });
+
+  it("rebuilds the tree from leaf order, not the order the file happens to list", async () => {
+    for (let i = 1; i <= 4; i++) await pool.deposit(usdc, BigInt(i));
+    const expected = (await pool.root()).value;
+
+    /**
+     * The file is written newest-first, so a rebuild that trusted array order would
+     * insert leaf 3 at position 0 and produce a root belonging to no one — silently,
+     * since every note would still look correct. Shuffling proves the order on disk is
+     * not load-bearing.
+     */
+    const saved = (await disk.load()) as StoredPool;
+    await disk.save({ ...saved, notes: [...saved.notes].reverse() });
+    expect((await reopen().root()).value).toBe(expected);
+  });
+
+  it("still refuses a note that was spent before the reload", async () => {
+    const note = await pool.deposit(usdc, parseAmount("5", 6));
+    await pool.send(note.id, to, parseAmount("2", 6));
+
+    const back = reopen();
+    await expect(back.send(note.id, to, parseAmount("1", 6))).rejects.toThrow("A note spends once.");
+    expect(await back.nullifiers()).toEqual([await nullifierOf(note)]);
+  });
+
+  it("brings the change note back spendable", async () => {
+    const note = await pool.deposit(usdc, parseAmount("5", 6));
+    await pool.send(note.id, to, parseAmount("2", 6));
+
+    const back = reopen();
+    const change = (await back.notes())[0] as Note;
+    expect(change.amount).toBe(parseAmount("3", 6));
+    const receipt = await back.withdraw(change.id, to);
+    expect(receipt.summary).toContain("You withdrew 3 USDC");
+  });
+
+  /**
+   * The security case, and the reason the nullifier set is stored rather than rebuilt
+   * from `spentAt`. `tests/adapters.test.ts` already pins that a wiped `spentAt` does not
+   * un-spend a note **in memory**; this pins that the guarantee survives a refresh,
+   * which it would not if the set were derived from the timestamps on load.
+   */
+  it("keeps refusing a spent note whose spentAt was wiped on disk", async () => {
+    const note = await pool.deposit(usdc, parseAmount("5", 6));
+    await pool.withdraw(note.id, to);
+
+    const saved = (await disk.load()) as StoredPool;
+    await disk.save({
+      ...saved,
+      notes: saved.notes.map((n) => ({ ...n, spentAt: null })),
+    });
+
+    const back = reopen();
+    await expect(back.withdraw(note.id, to)).rejects.toThrow("A note spends once.");
+  });
+
+  /**
+   * The mirror image, and it resolves the other way on purpose — see `SAFE_REPAIR`.
+   * Believing the stripped set would allow a second spend of a note that is already
+   * gone: locally it succeeds, on chain it is rejected, and the user has been shown
+   * money that does not exist. So the union wins and the spend stays refused.
+   */
+  it("refuses a note stamped spent even when its nullifier was stripped from the set", async () => {
+    const note = await pool.deposit(usdc, parseAmount("5", 6));
+    await pool.withdraw(note.id, to);
+
+    const saved = (await disk.load()) as StoredPool;
+    await disk.save({ ...saved, nullifiers: [] });
+
+    const back = reopen();
+    await expect(back.withdraw(note.id, to)).rejects.toThrow("A note spends once.");
+    /** And the derived nullifier is back in the set, so the next reload needs no repair. */
+    expect(await back.nullifiers()).toEqual([await nullifierOf(note)]);
+  });
+
+  it("keeps spending across several reloads without drifting", async () => {
+    for (let i = 0; i < 3; i++) {
+      const p = reopen();
+      const note = await p.deposit(usdc, parseAmount("1", 6));
+      await p.withdraw(note.id, to);
+    }
+
+    const back = reopen();
+    expect(await back.notes()).toEqual([]);
+    expect(await back.notes({ includeSpent: true })).toHaveLength(3);
+    expect(await back.nullifiers()).toHaveLength(3);
+    expect((await back.notes({ includeSpent: true })).map((n) => n.leafIndex)).toEqual([2, 1, 0]);
+  });
+
+  it("surfaces a failed write instead of pretending the deposit happened", async () => {
+    const failing: NoteStore = {
+      load: async () => null,
+      save: async () => {
+        throw new Error("QuotaExceededError");
+      },
+    };
+    const p = new LocalShieldedPool(standInHash, failing);
+    await expect(p.deposit(usdc, 1n)).rejects.toThrow("QuotaExceededError");
+  });
+});
+
+/**
+ * Every way a saved record can be wrong, and the refusal it earns.
+ *
+ * These matter more than they look. The alternative to refusing is skipping the bad
+ * entry, which reads as robustness and is how a pool comes back holding less money than
+ * it did yesterday with nothing in the UI to say so.
+ */
+describe("the saved pool refuses to be misread", () => {
+  let disk: MemoryNoteStore;
+
+  /** One good note on disk, to mutate one field of at a time. */
+  async function saved(): Promise<StoredPool> {
+    const seed = new MemoryNoteStore();
+    const p = new LocalShieldedPool(standInHash, seed);
+    await p.deposit(usdc, parseAmount("4", 6));
+    return (await seed.load()) as StoredPool;
+  }
+
+  /**
+   * ⚠️ Deliberately NOT an `async function`, and the tests here are worthless if anyone
+   * makes it one. An async function flattens a promise it returns, so
+   * `async () => pool.notes()` awaits the load itself — the rejection lands on
+   * `loading(...)` and every `rejects.toThrow` below sees an already-settled value
+   * instead. That was the first shape of this helper: **21 of these tests passed on a
+   * pool that threw, and passed just as happily on one that did not.** Chaining off
+   * `save` keeps the seeding asynchronous while handing back one unsettled promise.
+   */
+  function loading(record: unknown): Promise<unknown> {
+    disk = new MemoryNoteStore();
+    const loaded = new LocalShieldedPool(standInHash, disk);
+    return disk.save(record as StoredPool).then(() => loaded.notes());
+  }
+
+  it("reads a record it wrote itself", async () => {
+    await expect(loading(await saved())).resolves.toHaveLength(1);
+  });
+
+  it("refuses a version it does not know", async () => {
+    await expect(loading({ ...(await saved()), version: 2 })).rejects.toThrow(
+      "version 2 and this build reads version 1",
+    );
+  });
+
+  it("refuses a record with no notes array", async () => {
+    await expect(loading({ version: STORE_VERSION, nullifiers: [] })).rejects.toThrow(
+      "missing its notes",
+    );
+  });
+
+  it("refuses a record with no nullifier array", async () => {
+    await expect(loading({ version: STORE_VERSION, notes: [] })).rejects.toThrow(
+      "missing its notes or its nullifier list",
+    );
+  });
+
+  it("refuses something that is not a note", async () => {
+    const rec = await saved();
+    await expect(loading({ ...rec, notes: [null] })).rejects.toThrow("is not a note");
+  });
+
+  it("refuses an amount that is not a decimal string", async () => {
+    for (const amount of ["0x10", " 4 ", "", "4.0", "-4", "1e6"]) {
+      const rec = await saved();
+      await expect(
+        loading({ ...rec, notes: rec.notes.map((n) => ({ ...n, amount })) }),
+      ).rejects.toThrow("is not a decimal number");
+    }
+  });
+
+  it("refuses a zero amount, which is what an empty field decodes to elsewhere", async () => {
+    const rec = await saved();
+    await expect(
+      loading({ ...rec, notes: rec.notes.map((n) => ({ ...n, amount: "0" })) }),
+    ).rejects.toThrow("which no note can hold");
+  });
+
+  it("refuses an amount at or above the note ceiling", async () => {
+    const rec = await saved();
+    await expect(
+      loading({
+        ...rec,
+        notes: rec.notes.map((n) => ({ ...n, amount: MAX_NOTE_VALUE.toString(10) })),
+      }),
+    ).rejects.toThrow("which no note can hold");
+  });
+
+  it("refuses a zero secret, which is what an uninitialised one looks like", async () => {
+    const rec = await saved();
+    await expect(
+      loading({ ...rec, notes: rec.notes.map((n) => ({ ...n, secret: "0" })) }),
+    ).rejects.toThrow("not a usable field element");
+  });
+
+  it("refuses a secret outside the field", async () => {
+    const rec = await saved();
+    await expect(
+      loading({
+        ...rec,
+        notes: rec.notes.map((n) => ({ ...n, secret: FIELD_MODULUS.toString(10) })),
+      }),
+    ).rejects.toThrow("not a usable field element");
+  });
+
+  it("refuses a secret that is not a decimal string", async () => {
+    const rec = await saved();
+    await expect(
+      loading({ ...rec, notes: rec.notes.map((n) => ({ ...n, secret: "0xdead" })) }),
+    ).rejects.toThrow("is not a decimal number");
+  });
+
+  it("refuses a leaf index that is not a tree position", async () => {
+    for (const leafIndex of [-1, 1.5, Number.NaN, "0"]) {
+      const rec = await saved();
+      await expect(
+        loading({ ...rec, notes: rec.notes.map((n) => ({ ...n, leafIndex })) }),
+      ).rejects.toThrow("not a position in a tree");
+    }
+  });
+
+  it("refuses a gap in the leaf indices, because it shifts every note after it", async () => {
+    const rec = await saved();
+    await expect(
+      loading({ ...rec, notes: rec.notes.map((n) => ({ ...n, leafIndex: 1 })) }),
+    ).rejects.toThrow("jumps from leaf none to leaf 1");
+  });
+
+  it("names the leaf it jumped from when the gap is not at the start", async () => {
+    const seed = new MemoryNoteStore();
+    const p = new LocalShieldedPool(standInHash, seed);
+    await p.deposit(usdc, 1n);
+    await p.deposit(usdc, 2n);
+    const rec = (await seed.load()) as StoredPool;
+
+    /**
+     * Notes are newest-first, so index 0 of the file is leaf 1. Push it to leaf 2.
+     *
+     * The assertion is `from leaf 0`, not `from leaf none` — which is the only reason
+     * this test earns its place next to the one above. Both cases are a gap; only the
+     * message tells them apart, and a gap in the middle has a real predecessor to name.
+     */
+    const notes = rec.notes.map((n) => (n.leafIndex === 1 ? { ...n, leafIndex: 2 } : n));
+    await expect(loading({ ...rec, notes })).rejects.toThrow("jumps from leaf 0 to leaf 2");
+  });
+
+  it("refuses a missing id, creation time or anchoring reason", async () => {
+    const cases: [string, Partial<StoredNote>][] = [
+      ["its id", { id: "" }],
+      ["a creation time", { createdAt: "" }],
+      ["its anchoring reason", { anchoring: { kind: "local", why: "" } }],
+      ["a spend time", { spentAt: "" }],
+    ];
+    for (const [what, patch] of cases) {
+      const rec = await saved();
+      await expect(
+        loading({ ...rec, notes: rec.notes.map((n) => ({ ...n, ...patch })) }),
+      ).rejects.toThrow(what);
+    }
+  });
+
+  it("refuses an anchoring that claims to be on chain", async () => {
+    const rec = await saved();
+    await expect(
+      loading({
+        ...rec,
+        notes: rec.notes.map((n) => ({
+          ...n,
+          anchoring: { kind: "onchain", txHash: "0xabc", block: 1 },
+        })),
+      }),
+    ).rejects.toThrow("cannot vouch for anything on chain");
+  });
+
+  it("refuses a missing anchoring outright", async () => {
+    const rec = await saved();
+    await expect(
+      loading({ ...rec, notes: rec.notes.map((n) => ({ ...n, anchoring: null })) }),
+    ).rejects.toThrow("missing its anchoring");
+  });
+
+  it("refuses a missing token, or one with no address or symbol", async () => {
+    const cases: [string, unknown][] = [
+      ["missing its token", null],
+      ["its token address", { address: "", symbol: "USDC", decimals: 6 }],
+      ["its token symbol", { address: "0x1", symbol: "", decimals: 6 }],
+    ];
+    for (const [what, token] of cases) {
+      const rec = await saved();
+      await expect(
+        loading({ ...rec, notes: rec.notes.map((n) => ({ ...n, token })) }),
+      ).rejects.toThrow(what);
+    }
+  });
+
+  it("refuses a token whose decimals would rescale the money", async () => {
+    for (const decimals of [-1, 1.5, 37, "6", undefined]) {
+      const rec = await saved();
+      await expect(
+        loading({
+          ...rec,
+          notes: rec.notes.map((n) => ({ ...n, token: { ...n.token, decimals } })),
+        }),
+      ).rejects.toThrow("decimals");
+    }
+  });
+
+  it("refuses a nullifier that is not 32 bytes of lowercase hex", async () => {
+    for (const bad of ["0xABC", "deadbeef", `0x${"f".repeat(63)}`, 1, null]) {
+      const rec = await saved();
+      await expect(loading({ ...rec, nullifiers: [bad] })).rejects.toThrow(
+        "not a 32-byte hex value",
+      );
+    }
+  });
+
+  it("keeps failing on every retry instead of settling into an empty pool", async () => {
+    const p = new LocalShieldedPool(standInHash, {
+      load: async () => ({ version: 99, notes: [], nullifiers: [] }),
+      save: async () => undefined,
+    });
+    await expect(p.notes()).rejects.toThrow("version 99");
+    /**
+     * The failure mode this guards: assigning the tree before hydrating means the second
+     * call finds a built tree, skips the load, and reports an empty pool. The money would
+     * be on disk and invisible, with no error the second time.
+     */
+    await expect(p.notes()).rejects.toThrow("version 99");
+    await expect(p.root()).rejects.toThrow("version 99");
+  });
+});
+
+describe("LocalStorageNoteStore", () => {
+  it("round-trips a record through localStorage", async () => {
+    const store = new LocalStorageNoteStore();
+    const record: StoredPool = { version: STORE_VERSION, notes: [], nullifiers: [] };
+    await store.save(record);
+    expect(await store.load()).toEqual(record);
+  });
+
+  it("answers null for a browser that has never saved anything", async () => {
+    expect(await new LocalStorageNoteStore().load()).toBeNull();
+  });
+
+  it("uses a key that can be pointed somewhere else, so two pools can coexist in tests", async () => {
+    const a = new LocalStorageNoteStore("quadra.test.a");
+    await a.save({ version: STORE_VERSION, notes: [], nullifiers: [] });
+    expect(await new LocalStorageNoteStore("quadra.test.b").load()).toBeNull();
+  });
+
+  /**
+   * A truncated write must not read as "no notes yet". Answering null there shows an
+   * empty pool to someone who owns money, who would then reasonably deposit over it.
+   */
+  it("refuses unreadable JSON rather than reporting an empty pool", async () => {
+    localStorage.setItem(STORE_KEY, "{not json");
+    await expect(new LocalStorageNoteStore().load()).rejects.toThrow("not valid JSON");
+  });
+
+  /**
+   * ⚠️ Patched on `Storage.prototype`, NOT on `localStorage` — and the difference is not
+   * style. `Storage` has a named-property setter, so `localStorage.setItem = fn` is
+   * **reinterpreted as storing data**: jsdom writes a real entry under the key
+   * `"setItem"` whose value is the function's source text, leaves the method untouched,
+   * and throws nothing. Measured: after that assignment `hasOwnProperty("setItem")` is
+   * still `false` and `getItem("setItem")` returns `"() => { throw ... }"`.
+   *
+   * That is how the first version of these two tests failed — `save` quietly succeeded
+   * and `rejects` was handed a fulfilled promise. It is also the more dangerous half: the
+   * `finally` that "restored" the method wrote the same junk key a second time, so a
+   * patch that never applied still left state behind for whatever ran next.
+   */
+  function failingSetItem(thrown: unknown): () => void {
+    const proto = Object.getPrototypeOf(localStorage) as Storage;
+    const real = proto.setItem;
+    proto.setItem = () => {
+      throw thrown;
+    };
+    return () => {
+      proto.setItem = real;
+    };
+  }
+
+  it("reports a refused write, naming what the browser said", async () => {
+    const store = new LocalStorageNoteStore();
+    const restore = failingSetItem(new Error("QuotaExceededError"));
+    try {
+      await expect(store.save({ version: STORE_VERSION, notes: [], nullifiers: [] })).rejects.toThrow(
+        "refused to save the pool: QuotaExceededError",
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  /** A browser that throws a bare string still has to produce a sentence a user can read. */
+  it("reports a non-Error thrown by the browser too", async () => {
+    const store = new LocalStorageNoteStore();
+    const restore = failingSetItem("out of space");
+    try {
+      await expect(store.save({ version: STORE_VERSION, notes: [], nullifiers: [] })).rejects.toThrow(
+        "out of space",
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  /** The patch above must leave nothing behind — see the note on why it could. */
+  it("leaves no stray key behind when a write is refused", async () => {
+    failingSetItem(new Error("QuotaExceededError"))();
+    expect(Object.keys(localStorage)).toEqual([]);
+    await new LocalStorageNoteStore().save({ version: STORE_VERSION, notes: [], nullifiers: [] });
+    expect(Object.keys(localStorage)).toEqual([STORE_KEY]);
+  });
+});
+
+describe("MemoryNoteStore", () => {
+  it("holds nothing until something is saved", async () => {
+    expect(await new MemoryNoteStore().load()).toBeNull();
+  });
+
+  it("hands back a copy, so a caller editing what it read cannot edit the store", async () => {
+    const store = new MemoryNoteStore();
+    await store.save({ version: STORE_VERSION, notes: [], nullifiers: ["0x" + "1".repeat(64)] });
+
+    const first = (await store.load()) as StoredPool;
+    first.nullifiers.length = 0;
+    expect(((await store.load()) as StoredPool).nullifiers).toHaveLength(1);
+  });
+
+  it("takes a copy on the way in, so a caller mutating its own record cannot edit the store", async () => {
+    const store = new MemoryNoteStore();
+    const record: StoredPool = { version: STORE_VERSION, notes: [], nullifiers: [] };
+    await store.save(record);
+    record.version = 99;
+    expect(((await store.load()) as StoredPool).version).toBe(STORE_VERSION);
+  });
+});
+
 describe("LocalEnclave", () => {
   const enclave = new LocalEnclave();
 
@@ -800,9 +1345,32 @@ describe("resolver", () => {
     ).not.toBeNull();
   });
 
-  it("gives each call its own pool, so one page cannot read another's notes", async () => {
-    const a = adapters();
-    await a.pool.deposit(usdc, 1n);
-    expect(await adapters().pool.notes()).toEqual([]);
+  /**
+   * ⚠️ This replaced a test asserting the OPPOSITE — that a second `adapters()` call
+   * sees no notes, "so one page cannot read another's notes". That was ephemerality
+   * written down as if it were a guarantee, and it was wrong twice over: there is no
+   * boundary between pages of one origin to defend (same browser, same user, same
+   * `localStorage`), and a user who deposits, navigates, and finds an empty pool has
+   * lost their money as far as they can tell. The old test would have blocked
+   * persistence while reading like a privacy property.
+   */
+  it("wires a durable pool, so notes survive the next call and the next page load", async () => {
+    const note = await adapters().pool.deposit(usdc, parseAmount("3", 6));
+
+    const reloaded = await adapters().pool.notes();
+    expect(reloaded).toHaveLength(1);
+    expect((reloaded[0] as Note).id).toBe(note.id);
+    expect((reloaded[0] as Note).amount).toBe(parseAmount("3", 6));
+  });
+
+  it("hands out a distinct pool object each call, so neither holds the other's memory", async () => {
+    expect(adapters().pool).not.toBe(adapters().pool);
+  });
+
+  it("persists under the namespaced key and nowhere else", async () => {
+    expect(localStorage.getItem(STORE_KEY)).toBeNull();
+    await adapters().pool.deposit(usdc, 1n);
+    expect(localStorage.getItem(STORE_KEY)).not.toBeNull();
+    expect(Object.keys(localStorage)).toEqual([STORE_KEY]);
   });
 });

@@ -5,7 +5,7 @@ Read `CLAUDE.md` first — it has the constraints and the rules that exist becau
 something broke. This file is only the work.
 
 **Before you start anything:** `npm install`, then `npm run gate`. It must be green
-(tsc clean, **606 tests in 21 files**, 100% on statements/branches/functions/lines, build
+(tsc clean, **653 tests in 21 files**, 100% on statements/branches/functions/lines, build
 succeeds). If it is not green on a fresh checkout, fix that before touching a task — you
 are looking at drift, not at your own change.
 
@@ -454,6 +454,90 @@ silent-corruption case), dropping `then(body, body)` (**green — dead code**), 
 swallowed advance (**green — the other half of the same redundancy**), and dropping both
 (4 tests red). A test suite that only ever passes has not been shown to test anything, and
 a mutation that changes nothing is telling you about the code, not about the test.
+
+### Step 1f also DONE (2026-09-28) — the notes survive a reload, which the premise required
+
+Before this, `LocalShieldedPool` kept its notes in an array and a refresh destroyed every
+one of them. The only `localStorage` reference in the whole repo was in `tests/setup.ts`.
+For a product whose entire claim is *the secret lives in this browser and nowhere else*,
+that is not a missing feature — it is the claim not being true yet.
+
+`src/adapters/local/store.ts` is the new storage seam: a `NoteStore` interface with a
+`MemoryNoteStore` (the default, so the class does not depend on `localStorage` existing)
+and a `LocalStorageNoteStore`, which `resolvePool` injects — the one place that knows this
+app runs in a browser.
+
+**Three decisions worth defending:**
+
+1. **The commitment is NOT stored. It is re-derived on load.** Storing it means storing its
+   `scheme` tag, and a tag read back from disk is a *claim* — someone could write
+   `scheme: "poseidon"` next to a stand-in value and the UI would believe it. Re-deriving
+   means the tag always comes from the hash that actually ran. This is hard rule 10, and
+   `note.ts`'s "derived, not invented", applied to the disk.
+2. **The nullifier set IS stored, even though every entry is derivable from a note.** The
+   redundancy is the point: without it, the guarantee "a note whose `spentAt` was wiped is
+   still refused" would hold in memory and silently stop holding after a refresh. It is
+   also the shape that migrates — the on-chain adapter fills the same set from chain events.
+3. **Every inconsistency is refused, never quietly repaired.** Skipping a bad note reads as
+   robustness and is how a user ends up with a pool that holds less money than it did
+   yesterday, with nothing in the UI to say so. `SAFE_REPAIR` names the one repair that is
+   safe, and it is asymmetric on purpose: the union of stored nullifiers *plus* one derived
+   per note stamped spent. Erring toward refusing a spend cannot lose money; erring the
+   other way can.
+
+The set-level check matters as much as the per-field ones: `decodePool` sorts by
+`leafIndex` and asserts the result is exactly `0..n-1`. A gap shifts every note after it,
+so the witnesses would be rejected on chain — the worst possible place to find out.
+
+🔴 **Found a real bug doing this, and its error message was the bad part.** `spendable` and
+`witness` both read `this.store` directly, before hydration. On a freshly loaded page that
+array is empty, so the first spend or witness request after *any* refresh answered
+`No note with id … in this browser` — about a note sitting on disk three lines away. Of all
+the things it could have said, it said the note does not exist. It survived review because
+`notes()` and `nullifiers()` had already been given their `await this.ready()` and the two
+lookups read as if covered by it. Fixed with a single `locate()` choke point rather than two
+more `await`s, so a third lookup path cannot reintroduce it by forgetting.
+
+**Verified by breaking it. Six mutations, six caught — and the fourth exposed a gap:**
+
+| Mutation | Result |
+|---|---|
+| `ready()` assigns `this.tree` before hydrating | 1 red — "keeps failing on every retry instead of settling into an empty pool" |
+| `decodePool` trusts file order (no sort) | 6 red |
+| drop the `SAFE_REPAIR` derived union | 1 red — the stripped-nullifier test |
+| `locate()` without hydrating | 3 red — **all three spend paths, and none for `witness`** |
+| drop the leaf-contiguity check | 2 red — both gap-message tests |
+| store the commitment and its `scheme` on disk | 1 red — the re-derivation test |
+
+The fourth row is the finding. Three tests caught it, but the witness path was being
+carried by its neighbours' side effects: those tests call `notes()` first, which hydrates,
+so `witness` was never asked cold. A witness is the first thing a proof consumes and the
+first call a real client makes on a fresh page. Added "serves a witness as the very first
+call on a reopened pool", re-ran the mutation, and it now goes red on its own. **Coverage
+was 100% under every one of these mutations** — line coverage cannot see call ordering.
+
+**Two test-harness bugs worth knowing about, because both faked a pass:**
+
+- **An `async` function flattens a promise it returns.** The `loading()` helper was
+  `async` and returned `pool.notes()`, so the rejection landed on `loading(...)` itself and
+  every `rejects.toThrow` below it was handed an already-settled value. **21 tests passed
+  against a pool that threw, and would have passed just as happily against one that did
+  not.** It is now deliberately not `async`, with a comment saying so.
+- **`localStorage.setItem = fn` does not patch the method.** `Storage` has a named-property
+  setter, so jsdom reinterprets the assignment as *storing data*: it writes a real entry
+  under the key `"setItem"` whose value is the function's source text and leaves the method
+  untouched. Measured — after the assignment `hasOwnProperty("setItem")` is still `false`
+  and `getItem("setItem")` returns `"() => { throw ... }"`. Two tests silently asserted
+  nothing, and the `finally` that "restored" the method wrote the junk key a second time.
+  Patch `Object.getPrototypeOf(localStorage)` instead; there is now a test asserting the
+  patch leaves no key behind.
+
+**Follow-up, product not code: `localStorage` is not a backup, and the UI does not say so.**
+Clearing site data, a private window closing, or a browser evicting storage under pressure
+destroys every note, and the notes ARE the money — there is no server-side copy, by design.
+The pool now refuses loudly when the file is *damaged*, but nothing warns a user before the
+file is *gone*. That needs an export/restore path and a plain-language warning in the
+deposit flow before this is shown to anyone holding real funds. Not started.
 
 ### Steps 2 and 3 are NOT done, and step 2 is not a deployment step
 
