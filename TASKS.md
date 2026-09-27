@@ -5,7 +5,7 @@ Read `CLAUDE.md` first — it has the constraints and the rules that exist becau
 something broke. This file is only the work.
 
 **Before you start anything:** `npm install`, then `npm run gate`. It must be green
-(tsc clean, **799 tests in 25 files** as measured 2026-09-28, 100% on
+(tsc clean, **871 tests in 26 files** as measured 2026-09-28, 100% on
 statements/branches/functions/lines, build succeeds). If it is not green on a fresh
 checkout, fix that before touching a task — you are looking at drift, not at your own
 change.
@@ -771,12 +771,116 @@ because its only importer is `transaction.ts` and nothing under `src/` imports *
 so the pair tree-shakes out together. Do not read the unchanged number as "the rewiring
 did not take"; re-grep `from "@/lib/transaction"` instead.
 
-**Still to come, and now the whole of the next increment:** `src/lib/address.ts`, folding
-the four live copies of `/^0x[0-9a-fA-F]{40}$/` (`SendPanel.tsx`, `lib/verify.ts`,
-`lib/transaction.ts`, `lib/hooks.ts`) into one door that also checks the **EIP-55
-checksum** — which is keccak over the lowercased address, so it was impossible before
-today and is merely undone now. Until it lands, a mistyped recipient is an irreversible
-payment to nobody and no file in this repo can tell you which.
+⚠️ **…and that stopped being true one increment later — 224.51 kB.** Left above as the
+dated measurement it was, rather than overwritten, because the *reasoning* is what to
+keep: an unchanged bundle size was evidence about the import graph, not about whether the
+code worked. `address.ts` imports keccak and three panels import `address.ts`, so the
+permutation now ships. **Confirmed by grepping `dist/` rather than by inferring it from
+the size:** the RATE expression `(1600-2*Cs*8)/8` and the LFSR fold `(s&256)&&(s^=369)`
+are both in the minified output verbatim — esbuild declined to constant-fold either, which
+is lucky, so they make usable needles. First time this code runs outside a test.
+
+**Step 1i is what keccak was for.** See below.
+
+### Step 1i also DONE (2026-09-28) — a mistyped recipient is now caught before the money moves
+
+`src/lib/address.ts`. Four live copies of `/^0x[0-9a-fA-F]{40}$/` (`SendPanel.tsx`,
+`lib/verify.ts`, `lib/transaction.ts`, `lib/hooks.ts`) folded into one door that also
+verifies the **EIP-55 checksum** — keccak over the ASCII of the lowercased 40 hex
+characters, which is why this could not be built before step 1h.
+
+**Shape checking was never the problem; it was that shape is all a regex can check.** All
+four copies agreed on the answer and all four answers were nearly worthless: a typo in a
+recipient address is still 40 hex characters, so every one of them said yes. On a real
+chain that is an irreversible payment to an account nobody controls, and nothing in this
+repo could have told you which of the two addresses you meant.
+
+🔴 **`checkAddress` returns a four-valued union and must never be collapsed to a boolean.**
+This is the load-bearing decision of the increment, and it follows from a fact about EIP-55
+rather than from taste: **the checksum only exists when the address has mixed case.** An
+all-lowercase address, an all-uppercase one, and one with no letters at all carry *zero*
+checksum information. So a boolean has to pick a lie:
+
+| collapse | what breaks |
+|---|---|
+| `unchecked → true` | a typo bypasses the check entirely by lowercasing it first — and lowercase is the form explorers hand out, so this is the common path, not the exotic one |
+| `unchecked → false` | most legitimately-copied addresses are refused, the check gets ripped out within a day, and rightly so |
+
+The union names all four (`malformed` / `unchecked` / `mismatch` / `checksummed`), so a
+caller is forced to say what it does about each. This is rule 10 in a different costume: a
+stand-in must carry its own reason, and `unchecked` is a stand-in for a verdict that does
+not exist. **Pinned by EIP-55's own vectors** — `0xde709f…fb77` is *correctly checksummed
+per the spec* and must still classify as `unchecked`, because agreement carries no
+information when every address has a passing lowercase spelling.
+
+🔴 **A mismatch is never offered a correction.** `toChecksumAddress` only changes case — it
+cannot change a hex digit — so on a mismatch the recomputed "correct" spelling **is the
+typo, capitalised to look verified**. Offering it as "did you mean…?" would take the one
+signal that caught the error and use it to launder the error. A mismatch has two
+indistinguishable causes (a wrong digit, or mangled case on a right address) and it has to
+assume the expensive one, so the message says *copy it again from the source* and
+explicitly says not to fix the capitalisation. `tests/address.test.ts` asserts the refusal
+structurally: `Object.keys(checked).sort()` is exactly `["kind", "why"]`, so there is no
+field a future panel could render as a suggestion.
+
+🔴 **`assertChecksummedAddress` verifies BEFORE it lowercases, and reversing those two
+lines would be invisible.** Lowercasing first destroys the evidence: a mistyped mixed-case
+recipient becomes a *well-formed lowercase* one, `abiEncodeExtData` encodes it canonically,
+`extDataHash` binds it, the proof verifies, and the money is gone. Every downstream check
+passes. This is the same shape as the `extData: A` / `extDataHash(B)` hole step 1h closed —
+a well-formed, fully-typed, internally-consistent artefact about the wrong transaction.
+
+**Ten `cast to-check-sum-address` vectors, plus one raw digest.** All eight canonical EIP-55
+vectors re-derived on this machine, plus the no-letters and zero addresses, plus
+`cast keccak $(cast from-utf8 5aaeb6053f3e94c9b9a09f33669435e7ef1beaed)` to pin the digest
+itself. Commands are in the test header. 🔴 **Same tautology warning as keccak: never
+regenerate a doubted vector by running our code.**
+
+🔴 **The suite's own mixed-case fixture was an address that cannot exist.**
+`tests/transaction.test.ts` used `0xAbCdEf0123456789aBcDeF0123456789AbCdEf01` as its
+example of a legitimate address. `cast` says the real spelling is
+`0xabCDeF0123456789AbcdEf0123456789aBCDEF01`. The old one was hand-typed alternating case —
+right length, right alphabet, plausible capitalisation, **wrong account**: precisely the
+artefact a typo produces, sitting in the test suite as the example of correctness. It
+survived because the code only ever checked shape. Fixed, and a test now asserts the old
+fixture is refused. **Worth more than the fix: it is the measurement that says checking
+shape alone lets a wrong address through, taken from this repo rather than from a
+hypothetical.**
+
+**The verdict is on screen BEFORE the button, not in the error path.** `SendPanel` renders
+the line live under the To field (`.dim` for a match, `.caution` for anything else). After
+`Send` on a real chain there is nothing left to warn about, so a warning that only appears
+on failure is a warning about money that is already gone. Tests assert the timing, not just
+the wording — a suite that only pressed Send and read the output would pass against a build
+that says nothing until it is too late to matter.
+
+⚠️ **The read-only Hooks panel checks it too, and that is not over-engineering.** Mistype a
+hook address and the panel reads a *different* address's permission bits and reports them
+with total confidence — most likely as `inert`, "the pool will not call it at any point".
+"You are safe" about an address that is not the hook is worse than an error, because the
+user acts on it and nothing on screen looks wrong. `tests/hooks.test.ts` asserts the
+would-have-been reading, so the claim cannot rot. It also keeps two distinct messages: the
+EIP-55 sentence for a mistyped address, `NOT_AN_ADDRESS` for a pasted word — telling
+someone who mistyped a real address to "paste a 20-byte 0x… hook address" points them at
+the one thing already correct, and they paste the same typo back.
+
+⚠️ **`recognize` in `lib/verify.ts` still classifies on shape, deliberately.** A
+bad-checksum string still *is* an address, and that page exists to name what you pasted;
+calling it `unrecognized` would hide the one mistake somebody opens it to find. The verdict
+rides along in a `checksum` field instead, so the page says both things at once.
+
+**One wording bug found by writing the test rather than the code.** The `unchecked` line
+read "Lowercase address: …", which is false for an all-uppercase address (one of EIP-55's
+own vectors) and meaningless for a digits-only one — both land in `unchecked`. Now "This
+address has no mixed case, …". A sentence that misdescribes what the user is looking at
+gets skipped, and this is the one line in the send flow whose entire job is to be read.
+
+**Audited every address in `src/config/` with `cast` while the oracle was open.** `0xb200…`
+(AAPLc), `0xB20f…` (B20 factory) and `0x8335…` (USDC) are mixed-case and all checksum
+correctly; `0xa3b1…` and `0x0295…` are all-lowercase so carry no checksum, digits verified
+by eye; `0x4200…0006` has no letters. **No config bug** — recorded because a mismatch there
+would have meant a shipped address that is possibly wrong, and "I checked and found
+nothing" is a result.
 
 ### Steps 2 and 3 are NOT done, and step 2 is not a deployment step
 

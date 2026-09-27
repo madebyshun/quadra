@@ -265,12 +265,28 @@ describe("abiEncodeExtData", () => {
   });
 });
 
+/**
+ * `assertAddress` delegates to `assertChecksummedAddress`; EIP-55 itself is pinned against
+ * `cast` in `tests/address.test.ts`. What is asserted here is the contract-facing half:
+ * that the encoder sees one canonical spelling, and that a contradicted checksum never
+ * reaches it.
+ *
+ * ⚠️ **This block found a real defect in its own fixture, which is why it reads the way it
+ * does.** The mixed-case address here used to be `0xAbCdEf0123456789aBcDeF0123456789AbCdEf01`
+ * — hand-typed in an alternating pattern that *looks* checksummed and is not. No account
+ * has that spelling. It sat in the suite as an example of a legitimate mixed-case address
+ * for as long as the code only checked shape, and it is exactly the artefact a typo
+ * produces: right length, right alphabet, plausible capitalisation, wrong account. The
+ * correct spelling below came from `cast to-check-sum-address`.
+ */
 describe("assertAddress", () => {
+  /** `cast to-check-sum-address 0xabcdef0123456789abcdef0123456789abcdef01` */
+  const MIXED = "0xabCDeF0123456789AbcdEf0123456789aBCDEF01";
+
   it("lowercases so one address cannot produce two encodings", () => {
-    const mixed = "0xAbCdEf0123456789aBcDeF0123456789AbCdEf01";
-    expect(assertAddress(mixed, "recipient")).toBe(mixed.toLowerCase());
-    expect(hex(abiEncodeExtData({ ...PINNED, recipient: mixed }))).toBe(
-      hex(abiEncodeExtData({ ...PINNED, recipient: mixed.toLowerCase() })),
+    expect(assertAddress(MIXED, "recipient")).toBe(MIXED.toLowerCase());
+    expect(hex(abiEncodeExtData({ ...PINNED, recipient: MIXED }))).toBe(
+      hex(abiEncodeExtData({ ...PINNED, recipient: MIXED.toLowerCase() })),
     );
   });
 
@@ -279,6 +295,26 @@ describe("assertAddress", () => {
       expect(() => assertAddress(bad, "recipient"), bad).toThrow("not a 20-byte hex address");
     }
     expect(() => assertAddress("AAPLc", "recipient")).toThrow("ticker never does");
+  });
+
+  /**
+   * 🔴 The assertion that makes the finding above permanent. The old fixture is now a
+   * refusal, and it has to be: it is 42 characters of valid hex whose capitalisation says
+   * it is a different account than the one it spells.
+   */
+  it("refuses the plausible-looking alternating case this suite used to trust", () => {
+    expect(() =>
+      assertAddress("0xAbCdEf0123456789aBcDeF0123456789AbCdEf01", "recipient"),
+    ).toThrow("checksum");
+  });
+
+  /**
+   * ⚠️ And the reason the refusal above cannot simply be applied to every address: a
+   * lowercase address has no checksum to contradict, and it is what an explorer's copy
+   * button hands out. Refusing these would be refusing the common case.
+   */
+  it("accepts a lowercase address, which carries no checksum at all", () => {
+    expect(assertAddress(MIXED.toLowerCase(), "recipient")).toBe(MIXED.toLowerCase());
   });
 
   it("accepts the zero address, because the pool's rule is about direction", () => {

@@ -37,12 +37,25 @@
  * deletes the entire class. Do not reintroduce the parameter for testability — pass a
  * different `extData` instead.
  *
- * ⚠️ **Still open, and now merely undone rather than impossible: EIP-55.** The checksum
- * is keccak over the lowercased address, so `assertAddress` below *could* verify it
- * today and does not — it still checks shape and length only. That is the next
- * increment (`src/lib/address.ts`, which also folds the four live copies of this
- * regex into one door). Until then a mistyped recipient is an irreversible payment to
- * nobody, and this file cannot tell you which.
+ * ── EIP-55 is enforced here now, and the check happens BEFORE the lowercasing ────
+ * `assertAddress` used to check shape and length only, then lowercase. It now delegates
+ * to `assertChecksummedAddress` in `lib/address.ts`, which refuses a mixed-case address
+ * whose EIP-55 checksum is contradicted.
+ *
+ * 🔴 **The order is the point, and reversing it would be invisible.** Lowercasing first
+ * destroys the evidence: a mistyped mixed-case recipient becomes a well-formed lowercase
+ * one, `abiEncodeExtData` encodes it canonically, `extDataHash` binds it, the proof
+ * verifies, and the money is gone to an account nobody chose. Every check downstream of
+ * the lowercasing passes, because by then there is nothing wrong with the string. This is
+ * the same shape as the `extData: A` / `extDataHash(B)` hole above — a well-formed
+ * statement about the wrong transaction — which is why both are fixed in the type rather
+ * than in a comment asking call sites to be careful.
+ *
+ * ⚠️ An all-lowercase address still passes, and must: explorers hand those out, and
+ * refusing them would make the app unusable. A lowercase address carries no checksum at
+ * all, so `checkAddress` reports `unchecked` and a panel is expected to say so out loud
+ * rather than imply it verified something. See `lib/address.ts`'s header for why that
+ * distinction lives in the type and not in a boolean.
  *
  * ── Status: NOTHING IMPORTS THIS YET ─────────────────────────────────────────
  * ⚠️ Re-measured 2026-09-28 after the keccak rewiring: no file under `src/` outside this
@@ -62,6 +75,7 @@
  * shape of a real spend rather than about a number.
  */
 
+import { ZERO_ADDRESS, assertChecksummedAddress } from "@/lib/address";
 import { FIELD_MODULUS, MAX_NOTE_VALUE, intoField, isInField } from "@/lib/field";
 import type { FieldHash } from "@/lib/hash";
 import { keccak256Uint } from "@/lib/keccak";
@@ -127,24 +141,18 @@ export type PublicInputs =
   | { readonly kind: "complete"; readonly input: PublicInputVector }
   | { readonly kind: "incomplete"; readonly why: readonly string[] };
 
-const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-
 /**
- * Shape and length only, and the "only" is the point — see the ⚠️ in the header.
+ * Shape, EIP-55, and the canonical lowercase spelling, in that order.
  *
- * Lowercases on the way out so that two spellings of one address cannot produce two
- * different ABI encodings and therefore two different `extDataHash` values for what
- * is meant to be the same transaction.
+ * A thin pass-through to `assertChecksummedAddress` rather than a re-implementation, and
+ * kept as a named export because three call sites below read better with `assertAddress`
+ * in them. The lowercasing on the way out is what stops two spellings of one address
+ * producing two different ABI encodings and therefore two different `extDataHash` values
+ * for what is meant to be the same transaction — and it happens *after* the checksum
+ * check, which is the ordering argument in the header.
  */
 export function assertAddress(value: string, label: string): string {
-  if (!ADDRESS.test(value)) {
-    throw new Error(
-      `${label} is not a 20-byte hex address: "${value}". ` +
-        "Chain plus address identifies a token or an account; a name or a ticker never does.",
-    );
-  }
-  return value.toLowerCase();
+  return assertChecksummedAddress(value, label);
 }
 
 /**

@@ -33,7 +33,7 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. **799 tests in 25 files**, 100% on all four
+in one go. Do not report "done" on a subset. **871 tests in 26 files**, 100% on all four
 metrics, measured 2026-09-28.
 
 That count is a dated measurement, not a target — it is here so a fresh clone that comes
@@ -249,6 +249,19 @@ src/
   config/          chain.ts (Base 8453, flags), pair.ts (AAPLc), upstream.ts
   features/        registry.ts (the 10 ?do= ids) + panels/
   lib/             amount, hooks, manifest, status, verify
+                   address.ts — the ONE door every address goes through. Folded four
+                               copies of `/^0x[0-9a-fA-F]{40}$/` into it, one of which sat
+                               on the money path. 🔴 `checkAddress` returns a FOUR-valued
+                               union (malformed / unchecked / mismatch / checksummed) and
+                               must never be collapsed to a boolean: EIP-55 is only
+                               checkable when the address has mixed case, so `unchecked →
+                               true` lets a typo bypass the check by lowercasing and
+                               `unchecked → false` rejects most addresses explorers hand
+                               out. 🔴 Never offer the recomputed checksum as "did you
+                               mean" — `toChecksumAddress` only changes case, so on a
+                               mismatch the suggestion IS the typo, correctly capitalised.
+                               And `assertChecksummedAddress` checks BEFORE it lowercases,
+                               because lowercasing first destroys the evidence
                    field.ts  — BN254 scalar field, mirrors the contracts' constants
                    hash.ts   — the FieldHash seam; SHA-256 stand-in, NO Poseidon (rule 9)
                    note.ts   — commitment + nullifier derivation over that hash
@@ -263,9 +276,16 @@ src/
                                vector, which is the exact opposite of a recalled Poseidon
                                constant. It must NEVER become the pool's hash (rule 9
                                still binds: `contracts/test/TestHasher` being keccak-based
-                               is a test fixture, not a precedent). Its ONE importer is
-                               transaction.ts, and since nothing imports THAT, both still
-                               tree-shake out: the bundle is byte-identical at 221.42 kB
+                               is a test fixture, not a precedent). It SHIPS to the browser
+                               as of the EIP-55 increment — address.ts imports it and three
+                               panels import that, so the whole permutation is in the
+                               bundle (VERIFIED by grepping dist/ for the RATE expression
+                               `(1600-2*Cs*8)/8` and the LFSR fold `(s&256)&&(s^=369)`,
+                               both present verbatim). It was tree-shaken out while
+                               transaction.ts was its only importer and nothing imported
+                               THAT; the bundle went 221.42 → 224.51 kB when that stopped
+                               being true, which is the first time this code has run
+                               anywhere but a test
                    transaction.ts — the (Proof, ExtData) pair `transact` takes. Mirrors
                                four contract functions by name and says so at each. Two
                                things to know before editing: `extDataHash` is REAL as of
@@ -294,7 +314,7 @@ src/
   pages/           /docs /api /verify /404
   ui/              Window, Taskbar, Gel (button), Crt (output box)
   styles/          reset.css + theme.css — the XP/Aqua design system
-tests/             25 files, mirrors src/. TWO of them read Solidity rather than
+tests/             26 files, mirrors src/. TWO of them read Solidity rather than
                    restating its numbers: field.test.ts extracts FIELD_SIZE and
                    MAX_NOTE_VALUE from contracts/src/*.sol, and transaction.test.ts
                    extracts the pinned abi.encode vector from contracts/test/

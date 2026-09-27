@@ -220,6 +220,12 @@ describe("SendPanel: paying out", () => {
     );
   });
 
+  /**
+   * `vitalik.eth` rather than arbitrary junk, because a name is the failure this
+   * particular sentence exists for: an ENS name IS a real thing that resolves
+   * somewhere, so the message has to say why this field will not take one instead of
+   * only calling it invalid.
+   */
   it("rejects something that is not an address before touching the note", async () => {
     await withNote();
     await userEvent.type(amount("Address to pay"), "vitalik.eth");
@@ -227,8 +233,13 @@ describe("SendPanel: paying out", () => {
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
     await waitFor(() =>
-      expect(within(out("Send output")).getByText(/not an address/)).toBeInTheDocument(),
+      expect(
+        within(out("Send output")).getByText(/not a 20-byte hex address/),
+      ).toBeInTheDocument(),
     );
+    expect(
+      within(out("Send output")).getByText(/a name or a ticker never does/),
+    ).toBeInTheDocument();
     expect(screen.getByText("10 USDC")).toBeInTheDocument();
   });
 
@@ -262,7 +273,9 @@ describe("SendPanel: paying out", () => {
     await userEvent.type(amount("Address to pay"), "0x123");
     await userEvent.click(screen.getByRole("button", { name: "Withdraw all of it" }));
     await waitFor(() =>
-      expect(within(out("Send output")).getByText(/not an address/)).toBeInTheDocument(),
+      expect(
+        within(out("Send output")).getByText(/not a 20-byte hex address/),
+      ).toBeInTheDocument(),
     );
   });
 
@@ -330,7 +343,9 @@ describe("SendPanel: paying out", () => {
     await userEvent.type(amount("Amount to send"), "1");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() =>
-      expect(within(out("Send output")).getByText(/not an address/)).toBeInTheDocument(),
+      expect(
+        within(out("Send output")).getByText(/not a 20-byte hex address/),
+      ).toBeInTheDocument(),
     );
 
     await userEvent.clear(amount("Address to pay"));
@@ -339,7 +354,9 @@ describe("SendPanel: paying out", () => {
     await waitFor(() =>
       expect(within(out("Send output")).getByText(/You paid 1 USDC/)).toBeInTheDocument(),
     );
-    expect(within(out("Send output")).queryByText(/not an address/)).not.toBeInTheDocument();
+    expect(
+      within(out("Send output")).queryByText(/not a 20-byte hex address/),
+    ).not.toBeInTheDocument();
   });
 
   it("never shows an on-chain claim while the pool is local", async () => {
@@ -352,6 +369,158 @@ describe("SendPanel: paying out", () => {
     await waitFor(() => expect(within(panel).getByText(/Not on chain/)).toBeInTheDocument());
     expect(panel.textContent).not.toMatch(/basescan/i);
     expect(within(panel).queryByRole("link")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * The EIP-55 verdict under the To field.
+ *
+ * Its own arithmetic is `tests/address.test.ts`, verified against
+ * `cast to-check-sum-address`. What only a panel can show is the part that makes it
+ * worth anything: that the verdict is on screen BEFORE the button is pressed, that a
+ * contradicted checksum stops the payment, and that a lowercase address is not silently
+ * passed off as verified.
+ *
+ * ⚠️ Why the timing is the subject of every test here rather than the wording. On a real
+ * chain a send is final the moment it lands, so a warning in the error path is a warning
+ * about money that is already gone. A test that only pressed Send and read the output
+ * would pass against a build that shows nothing at all until it is too late to matter.
+ */
+describe("SendPanel: the checksum verdict, before the button", () => {
+  /** `cast to-check-sum-address 0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed` */
+  const CHECKSUMMED = "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed";
+  /** The same 40 hex digits with the second character's case flipped: one wrong bit. */
+  const CONTRADICTED = "0x5AAeb6053F3E94C9b9A09f33669435E7Ef1BeAed";
+
+  async function withNote(value = "10") {
+    const mounted = await mount(<SendPanel />);
+    await userEvent.clear(amount("Amount to deposit"));
+    await userEvent.type(amount("Amount to deposit"), value);
+    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
+    await waitFor(() => expect(screen.getByRole("radio")).toBeChecked());
+    return mounted;
+  }
+
+  it("says nothing at all while the field is empty", async () => {
+    await mount(<SendPanel />);
+    expect(screen.queryByText(/EIP-55/)).not.toBeInTheDocument();
+  });
+
+  it("confirms a matching checksum as soon as it is typed, with no click", async () => {
+    await mount(<SendPanel />);
+    await userEvent.type(amount("Address to pay"), CHECKSUMMED);
+    expect(screen.getByText("EIP-55 checksum matches.")).toBeInTheDocument();
+    expect(within(out("Send output")).getByText("// nothing run yet")).toBeInTheDocument();
+  });
+
+  /**
+   * 🔴 The one that matters. The warning is on screen while the money is still in the
+   * note — not after a send, where there would be nothing left to warn about.
+   *
+   * The output is asserted to hold no payment rather than to hold the placeholder: the
+   * deposit that created the note already printed its receipt there, and "nothing run
+   * yet" would be asserting the wrong thing. What has to be true is that nothing has
+   * been *spent* while this warning is being read.
+   */
+  it("warns about a contradicted checksum before anything is spent", async () => {
+    await withNote();
+    await userEvent.type(amount("Address to pay"), CONTRADICTED);
+
+    expect(screen.getByText(/does not match/)).toBeInTheDocument();
+    expect(screen.getByText("10 USDC")).toBeInTheDocument();
+    expect(within(out("Send output")).queryByText(/You paid/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * 🔴 And the refusal, so the warning is not merely advisory. A panel that warned and
+   * then paid anyway would be strictly worse than one that said nothing, because the
+   * user would have read a warning and watched it be ignored.
+   */
+  it("refuses to send to a contradicted checksum, leaving the note intact", async () => {
+    await withNote();
+    await userEvent.type(amount("Address to pay"), CONTRADICTED);
+    await userEvent.type(amount("Amount to send"), "1");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() =>
+      expect(within(out("Send output")).getByText(/does not match/)).toBeInTheDocument(),
+    );
+    expect(screen.getByText("10 USDC")).toBeInTheDocument();
+  });
+
+  it("refuses to withdraw to a contradicted checksum too", async () => {
+    await withNote();
+    await userEvent.type(amount("Address to pay"), CONTRADICTED);
+    await userEvent.click(screen.getByRole("button", { name: "Withdraw all of it" }));
+
+    await waitFor(() =>
+      expect(within(out("Send output")).getByText(/does not match/)).toBeInTheDocument(),
+    );
+    expect(screen.getByText("10 USDC")).toBeInTheDocument();
+  });
+
+  /**
+   * 🔴 Never offers the recomputed spelling. `toChecksumAddress` only changes case, so
+   * on a mismatch the "corrected" address is the typo wearing valid capitalisation — a
+   * suggestion here would launder a wrong account into a plausible-looking one.
+   */
+  it("does not offer a corrected spelling of the address it just refused", async () => {
+    await mount(<SendPanel />);
+    await userEvent.type(amount("Address to pay"), CONTRADICTED);
+
+    const line = screen.getByText(/does not match/);
+    expect(line.textContent).not.toContain(CHECKSUMMED);
+    expect(line.textContent).toMatch(/Copy it again/);
+  });
+
+  /**
+   * ⚠️ A lowercase address must still be spendable — explorers and wallets hand those
+   * out and refusing them would make the app unusable — but it must not be reported as
+   * if it had been checked. This is the "silence reads as approval" case.
+   */
+  it("passes a lowercase address through while saying it was never checked", async () => {
+    await withNote();
+    await userEvent.type(amount("Address to pay"), CHECKSUMMED.toLowerCase());
+    expect(screen.getByText(/no EIP-55 checksum to verify/)).toBeInTheDocument();
+
+    await userEvent.type(amount("Amount to send"), "1");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() =>
+      expect(within(out("Send output")).getByText(/You paid 1 USDC/)).toBeInTheDocument(),
+    );
+  });
+
+  /**
+   * The unchecked and mismatch cases are both warnings and a match is not, so they must
+   * not share a style: a verified address styled like a caution trains the user to
+   * ignore the caution. `.dim` is the footnote voice, `.caution` the amber one — the
+   * class is asserted because nothing else in the suite can see the difference, and
+   * because a typo'd class name renders as unstyled text that no assertion would catch.
+   */
+  it("styles a match as a footnote and everything else as a caution", async () => {
+    await mount(<SendPanel />);
+
+    await userEvent.type(amount("Address to pay"), CHECKSUMMED);
+    expect(screen.getByText("EIP-55 checksum matches.")).toHaveClass("dim");
+
+    await userEvent.clear(amount("Address to pay"));
+    await userEvent.type(amount("Address to pay"), CHECKSUMMED.toLowerCase());
+    expect(screen.getByText(/no EIP-55 checksum to verify/)).toHaveClass("caution");
+
+    await userEvent.clear(amount("Address to pay"));
+    await userEvent.type(amount("Address to pay"), CONTRADICTED);
+    expect(screen.getByText(/does not match/)).toHaveClass("caution");
+  });
+
+  /**
+   * A half-typed address is malformed, and saying so is correct rather than rude: the
+   * field is where you find out, and the alternative is a blank space that looks like
+   * approval until the moment you press Send.
+   */
+  it("classifies a half-typed address rather than waiting for the full length", async () => {
+    await mount(<SendPanel />);
+    await userEvent.type(amount("Address to pay"), "0x5aAeb605");
+    expect(screen.getByText(/not a 20-byte hex address/)).toHaveClass("caution");
   });
 });
 
@@ -1288,6 +1457,37 @@ describe("HooksPanel", () => {
     await paste("not-an-address");
     expect(within(out("Hooks output")).getByText(/not an address/)).toBeInTheDocument();
     expect(screen.queryByLabelText("Hook permissions")).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⚠️ The two ways to fail need different sentences, and this is the test that keeps
+   * them apart. A mistyped real address and a pasted word are both "not usable", but
+   * telling the first user to "paste a 20-byte 0x… hook address" points them at the one
+   * thing already correct — so they paste the same typo back and get the same answer.
+   */
+  it("distinguishes a mistyped address from a pasted word", async () => {
+    await paste("0xA1b2C3d4e5F6a7B8C9d0e1f2a3b4C5d6E7f80080");
+    const panel = within(out("Hooks output"));
+    expect(panel.getByText(/EIP-55 checksum/)).toBeInTheDocument();
+    expect(panel.queryByText(/Paste a 20-byte/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Hook permissions")).not.toBeInTheDocument();
+  });
+
+  /**
+   * The checksum line sits with the caveats, not with the verdict. An `inert` reading of
+   * an unchecked address is two separate uncertainties — which address, and what is in
+   * it — and printing only the second would hide the weaker one.
+   */
+  it("says which address was read, alongside what was found in it", async () => {
+    await paste(BEFORE_SWAP);
+    const panel = within(out("Hooks output"));
+    expect(panel.getByText(/call this hook at 1 of 14 points/)).toBeInTheDocument();
+    expect(panel.getByText(/no EIP-55 checksum to verify/)).toBeInTheDocument();
+  });
+
+  it("confirms the checksum when the pasted address carries one", async () => {
+    await paste("0xA1B2C3d4e5F6a7B8C9d0e1f2a3b4C5d6E7f80080");
+    expect(within(out("Hooks output")).getByText(/EIP-55 checksum matches/)).toBeInTheDocument();
   });
 
   it("goes back to asking when the field is cleared", async () => {

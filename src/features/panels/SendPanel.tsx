@@ -1,6 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAdapters } from "@/adapters/AdaptersProvider";
 import type { Note, Receipt } from "@/adapters/types";
+import {
+  type AddressCheck,
+  assertChecksummedAddress,
+  checkAddress,
+  describeChecksum,
+} from "@/lib/address";
 import { formatAmount, parseAmount } from "@/lib/amount";
 import { offerDownload, readTextFile } from "@/lib/download";
 import { USDC } from "@/config/chain";
@@ -26,8 +32,6 @@ import { Anchor } from "@/features/panels/Anchor";
 
 const TOKEN = { address: USDC.address, symbol: USDC.symbol, decimals: USDC.decimals };
 
-const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
-
 /**
  * What the CRT is showing.
  *
@@ -52,6 +56,19 @@ export function SendPanel() {
   const [selected, setSelected] = useState<string | null>(null);
   const [output, setOutput] = useState<Output | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * The EIP-55 verdict for whatever is in the To field, or `null` while it is empty.
+   *
+   * `null` rather than a `malformed` verdict for the empty case: an untouched field has
+   * not made a mistake, and telling somebody their blank input is not an address is
+   * scolding them for not having typed yet. Anything non-empty gets classified, including
+   * half-typed addresses — that is correct, because a half-typed address IS malformed and
+   * the field is the right place to learn it.
+   */
+  const toChecksum = useMemo((): AddressCheck | null => {
+    return to.trim() === "" ? null : checkAddress(to);
+  }, [to]);
 
   const refresh = useCallback(async () => {
     setNotes(await pool.notes());
@@ -100,19 +117,15 @@ export function SendPanel() {
   const send = () =>
     runReceipt(async () => {
       if (!selected) throw new Error("Pick a note to spend.");
-      if (!ADDRESS.test(to.trim())) {
-        throw new Error("That is not an address. Paste a 20-byte 0x… address.");
-      }
-      return pool.send(selected, to.trim(), parseAmount(sendText, TOKEN.decimals));
+      const recipient = assertChecksummedAddress(to, "Recipient");
+      return pool.send(selected, recipient, parseAmount(sendText, TOKEN.decimals));
     });
 
   const withdraw = () =>
     runReceipt(async () => {
       if (!selected) throw new Error("Pick a note to withdraw.");
-      if (!ADDRESS.test(to.trim())) {
-        throw new Error("That is not an address. Paste a 20-byte 0x… address.");
-      }
-      return pool.withdraw(selected, to.trim());
+      const recipient = assertChecksummedAddress(to, "Recipient");
+      return pool.withdraw(selected, recipient);
     });
 
   /**
@@ -248,6 +261,20 @@ export function SendPanel() {
             spellCheck={false}
           />
         </label>
+        {/*
+          The checksum verdict, live, BEFORE the button is pressed.
+
+          ⚠️ This is the whole product value of the increment and it has to be here rather
+          than in the error path: after `Send` there is nothing to warn about, because on
+          a real chain the payment has already happened. A lowercase address says so out
+          loud instead of staying silent, since silence next to a field reads as approval
+          and "cannot be checked" is materially weaker than "checked".
+        */}
+        {toChecksum !== null && (
+          <p className={toChecksum.kind === "checksummed" ? "dim" : "caution"}>
+            {describeChecksum(toChecksum)}
+          </p>
+        )}
         <label className="group__row">
           <span>Amount</span>
           <input

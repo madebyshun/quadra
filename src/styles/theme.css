@@ -747,6 +747,21 @@
   color: var(--xp-ink-dim);
 }
 
+/*
+ * Caution text: darker and heavier than `.dim`, and deliberately not red.
+ *
+ * Added with the EIP-55 checksum line in SendPanel, which needed a third weight. `.dim`
+ * was wrong because a warning that looks like a footnote is a footnote. An error colour
+ * was also wrong, because "this address carries no checksum" is the ordinary case for a
+ * lowercase address and must not read as a failure — see `describeChecksum` in
+ * `lib/address.ts`. `--warn` already existed for `.chip--warn`; this is the same ink at
+ * running-text size.
+ */
+.caution {
+  color: var(--warn);
+  font-weight: 600;
+}
+
 .stack {
   display: grid;
   gap: 10px;

@@ -20,7 +20,32 @@ suite("recognize", () => {
   });
 
   it("recognizes a 20-byte address, and does not call it a transaction", () => {
-    expect(recognize(USDC.address)).toEqual({ kind: "address", value: USDC.address });
+    expect(recognize(USDC.address)).toEqual({
+      kind: "address",
+      value: USDC.address,
+      checksum: { kind: "checksummed", address: USDC.address.toLowerCase() },
+    });
+  });
+
+  /**
+   * ⚠️ **The reason `recognize` classifies on shape and not on the checksum.** A
+   * bad-checksum string still IS an address, and this box exists to name what you pasted.
+   * Calling it `unrecognized` would hide the one mistake somebody opens this page to find,
+   * and would also be false. The verdict rides along instead, so the page can say both
+   * things: this is an address, and something is wrong with it.
+   */
+  it("still calls a bad-checksum string an address, and reports the mismatch", () => {
+    const typo = USDC.address.replace("0x833589", "0x833589").replace("913", "914");
+    const found = recognize(typo);
+    expect(found.kind).toBe("address");
+    if (found.kind !== "address") throw new Error("unreachable");
+    expect(found.checksum.kind).toBe("mismatch");
+  });
+
+  it("reports a lowercase address as unchecked rather than as verified", () => {
+    const found = recognize(USDC.address.toLowerCase());
+    if (found.kind !== "address") throw new Error("unreachable");
+    expect(found.checksum.kind).toBe("unchecked");
   });
 
   it("does not confuse the two lengths", () => {
@@ -65,13 +90,37 @@ suite("recognize", () => {
 
 suite("describe", () => {
   it("has a line for every kind", () => {
-    const kinds = ["empty", "txHash", "address", "note", "unrecognized"] as const;
-    for (const kind of kinds) {
-      const line = explain(
-        kind === "empty" ? { kind } : ({ kind, value: "x" } as ReturnType<typeof recognize>),
-      );
-      expect(line.length, kind).toBeGreaterThan(0);
+    /**
+     * The `address` arm is built through `recognize` rather than by hand, because it now
+     * carries a `checksum` whose value has to be real — a fabricated one would let this
+     * test pass against a `describe` that reads a field nothing ever sets.
+     */
+    const cases: ReturnType<typeof recognize>[] = [
+      { kind: "empty" },
+      { kind: "txHash", value: "x" },
+      recognize(USDC.address),
+      { kind: "note", value: "x" },
+      { kind: "unrecognized", value: "x" },
+    ];
+    for (const found of cases) {
+      expect(explain(found).length, found.kind).toBeGreaterThan(0);
     }
+    expect(new Set(cases.map((c) => c.kind)).size).toBe(5);
+  });
+
+  /**
+   * ⚠️ The checksum verdict is appended to the address line rather than replacing it,
+   * because the two facts answer different questions and a user pasting an address into a
+   * transaction box needs both: "this is not the transaction" and "this may be mistyped".
+   */
+  it("appends the checksum verdict to the address line", () => {
+    const verified = explain(recognize(USDC.address));
+    const unchecked = explain(recognize(USDC.address.toLowerCase()));
+    expect(verified).toContain("That is an address, not a transaction.");
+    expect(unchecked).toContain("That is an address, not a transaction.");
+    expect(verified).toContain("EIP-55 checksum matches.");
+    expect(unchecked).toContain("no EIP-55 checksum to verify");
+    expect(verified).not.toBe(unchecked);
   });
 
   it("tells you an address is not a transaction, rather than just naming it", () => {
