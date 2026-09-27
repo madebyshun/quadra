@@ -125,12 +125,21 @@ export class IncrementalMerkleTree {
    * not know which one it was handed.
    *
    * `emptyLeaf` has no default ON PURPOSE. The contract derives it from
-   * `keccak256("quadra.shielded-pool.empty-leaf")`, which is a value this browser
-   * cannot recompute — there is no keccak here, and hard-coding a 32-byte constant
-   * nobody can re-derive locally is the hazard hard rule 9 exists about. So the caller
-   * supplies it: from the deployed pool's own `zeros(0)` when there is a deployment,
-   * and from a declared local constant when there is not. A wrong value then surfaces
-   * as a wrong root in a test, while a missing one will not compile — neither can hide.
+   * `keccak256("quadra.shielded-pool.empty-leaf")`, so the caller supplies it: from the
+   * deployed pool's own `zeros(0)` when there is a deployment, and from a declared local
+   * constant when there is not. A wrong value then surfaces as a wrong root in a test,
+   * while a missing one will not compile — neither can hide.
+   *
+   * ⚠️ **This comment used to justify that with "there is no keccak here", and that
+   * stopped being true on 2026-09-28** — `lib/keccak.ts` exists and
+   * `tests/keccak.test.ts` pins the contract's own empty-leaf preimage. The argument was
+   * replaced rather than the parameter, because the parameter is still right for a
+   * different reason: this class does not know which hash it was handed, and a leaf from
+   * keccak sitting above 19 empty subtrees from some other hash is two hash functions in
+   * one root. **Do not now pass the contract's keccak leaf here** — interior nodes still
+   * go through the stand-in hash, so it would move every local root without making one
+   * of them provable, and invalidate every backup already written. It changes when
+   * Poseidon lands, in one change. See TASKS.md step 1d.
    */
   static async create(opts: {
     levels: number;

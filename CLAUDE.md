@@ -33,7 +33,7 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. **779 tests in 24 files**, 100% on all four
+in one go. Do not report "done" on a subset. **799 tests in 25 files**, 100% on all four
 metrics, measured 2026-09-28.
 
 That count is a dated measurement, not a target — it is here so a fresh clone that comes
@@ -254,13 +254,31 @@ src/
                    note.ts   — commitment + nullifier derivation over that hash
                    tree.ts   — the commitment tree, mirroring MerkleTreeWithHistory.sol,
                                plus the Merkle paths the contract cannot serve
+                   keccak.ts — Keccak-256, hand-written, ZERO tabulated constants: the ρ
+                               offsets, the π permutation and all 24 round constants are
+                               derived at module load, so a transcription typo is
+                               impossible rather than merely tested for. NOT a rule-9
+                               violation and its header explains why at length — `cast
+                               keccak` is a local oracle, so a wrong bit fails the first
+                               vector, which is the exact opposite of a recalled Poseidon
+                               constant. It must NEVER become the pool's hash (rule 9
+                               still binds: `contracts/test/TestHasher` being keccak-based
+                               is a test fixture, not a precedent). Its ONE importer is
+                               transaction.ts, and since nothing imports THAT, both still
+                               tree-shake out: the bundle is byte-identical at 221.42 kB
                    transaction.ts — the (Proof, ExtData) pair `transact` takes. Mirrors
                                four contract functions by name and says so at each. Two
-                               things to know before editing: it has NO keccak, so
-                               `extDataHash` returns a union whose `unavailable` arm is
-                               the honest state of this build and not an error path
-                               (substituting SHA-256 would be rule 9 one layer up); and
-                               a negative amount is encoded TWO different ways on
+                               things to know before editing: `extDataHash` is REAL as of
+                               2026-09-28 and returns a plain bigint — it calls keccak.ts
+                               and folds with `%`, matching `hashExtData` exactly. The
+                               `ExtDataHash` union that used to describe keccak's absence,
+                               the injected `Keccak256` type and the `WHY_NO_KECCAK` string
+                               are all DELETED, not kept "for flexibility"; do not
+                               reintroduce the hash as a parameter to `buildPublicInputs`
+                               either — as a parameter it let a caller pair `extData: A`
+                               with `extDataHash(B)` and get a well-formed, in-field,
+                               fully-typed vector about a transaction nobody is sending.
+                               And a negative amount is encoded TWO different ways on
                                purpose — field negation for the public input, two's
                                complement for `abi.encode` — so conflating them yields
                                a proof that verifies for the wrong transaction
@@ -276,11 +294,15 @@ src/
   pages/           /docs /api /verify /404
   ui/              Window, Taskbar, Gel (button), Crt (output box)
   styles/          reset.css + theme.css — the XP/Aqua design system
-tests/             24 files, mirrors src/. TWO of them read Solidity rather than
+tests/             25 files, mirrors src/. TWO of them read Solidity rather than
                    restating its numbers: field.test.ts extracts FIELD_SIZE and
                    MAX_NOTE_VALUE from contracts/src/*.sol, and transaction.test.ts
                    extracts the pinned abi.encode vector from contracts/test/
-                   ShieldedPool.t.sol. Both fail by naming the file that moved
+                   ShieldedPool.t.sol. Both fail by naming the file that moved.
+                   keccak.test.ts is the third kind: its nine digests come from an
+                   EXTERNAL oracle (`cast keccak`, commands in its header). Regenerate a
+                   doubted vector with cast — never by running our code and pasting the
+                   answer back, which converts the test into a tautology
 tools/quadra-mcp/  stdio MCP server, read-only
 scripts/           measure-catalog.ts — hand-run, hits the network
                    check-contract-coverage.ts — the forge coverage gate

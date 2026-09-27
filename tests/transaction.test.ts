@@ -12,13 +12,32 @@
  * Typing the same literals in here as well would be two copies that agree with
  * whichever side they were written against, which is the bug rather than the check.
  *
- * ── What this file honestly cannot check ─────────────────────────────────────
- * 🔴 **There is no keccak-256 in this build**, so nothing here recomputes the digest.
- * The digest arrives as a pinned vector and the test asserts the *fold* of it. That
- * is the same discipline `lib/hash.ts` demands of Poseidon — a hash you cannot
- * compute is supplied as checked-in vectors, never approximated with a different
- * function that happens to be available. Substituting SHA-256 to make this file look
- * more complete would produce a green suite and an unprovable pool.
+ * ── The loop this file used to leave open, now closed ────────────────────────
+ * This header said "there is no keccak-256 in this build, so nothing here recomputes the
+ * digest" — the digest arrived as a pinned vector and only its *fold* was asserted. That
+ * was the right discipline for the state of the build and it was also the weaker of the
+ * two available checks: reading a number out of the Solidity proves the two files agree
+ * about a literal, not that the browser can produce it.
+ *
+ * `src/lib/keccak.ts` closed it on 2026-09-28. The digest is now **recomputed here from
+ * the bytes this repo encoded** and compared against `PINNED_DIGEST`, so the chain runs
+ * end to end with no step taken on faith:
+ *
+ *     our abi.encode  ==  the compiler's abi.encode        (PINNED_ENCODING)
+ *     our keccak of it ==  the compiler's keccak of it      (PINNED_DIGEST)
+ *     our fold of that ==  the compiler's fold             (PINNED_FIELD)
+ *
+ * Note where the authority sits at each step, because it is not the same place. The
+ * encoding and the fold are pinned by **Solidity**, which is the thing that has to agree.
+ * The keccak is pinned by **`cast`**, in `tests/keccak.test.ts` — this file's digest
+ * assertion is a cross-check between two independently-anchored implementations, which is
+ * why it is worth making even though the Solidity already asserts it.
+ *
+ * 🔴 **What has not changed: no SHA substitute, ever.** Ethereum's keccak-256 is not
+ * SHA-3-256 (different padding) and neither is available from `crypto.subtle`. If
+ * `lib/keccak.ts` is ever swapped for something convenient, this file goes green against
+ * a hash the pool disagrees with. The same discipline `lib/hash.ts` demands of Poseidon
+ * applies here and is now *satisfied* rather than deferred.
  */
 
 import { readFileSync } from "node:fs";
@@ -27,10 +46,10 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { FIELD_MODULUS, MAX_NOTE_VALUE } from "@/lib/field";
 import { standInHash } from "@/lib/hash";
+import { keccak256, toHex } from "@/lib/keccak";
 import type { Commitment, Nullifier, TaggedField } from "@/lib/note";
 import {
   type ExtData,
-  type ExtDataHash,
   PUBLIC_INPUT_COUNT,
   abiEncodeExtData,
   assertAddress,
@@ -146,12 +165,6 @@ function word2(extData: ExtData): string {
   return word;
 }
 
-/** The pinned digest as the 32 bytes a real keccak would have returned. */
-function pinnedKeccak(): Uint8Array {
-  const body = PINNED_DIGEST.slice(2);
-  return Uint8Array.from({ length: 32 }, (_, i) => Number.parseInt(body.slice(i * 2, i * 2 + 2), 16));
-}
-
 function field(value: bigint): TaggedField {
   return { scheme: "poseidon", value };
 }
@@ -160,21 +173,25 @@ function standIn(value: bigint): TaggedField {
   return { scheme: "stand-in", value, why: "produced by a stand-in hash" };
 }
 
-const KECCAK_OK: ExtDataHash = { kind: "keccak256", value: PINNED_FIELD };
-
+/**
+ * ⚠️ **There is no `hash` override here on purpose, and adding one back would reopen a
+ * real hole.** `buildPublicInputs` used to take the `extDataHash` as a parameter, which
+ * meant a caller could pass one `extData` beside the hash of a *different* one and get a
+ * vector that is well-formed, in-field and about the wrong transaction. It derives the
+ * hash itself now. To test a bad hash, pass a bad `extData` — the only way to get a
+ * different `input[2]` is to be describing a different payment, which is the property.
+ */
 function vector(overrides: {
   readonly root?: TaggedField;
   readonly nullifiers?: readonly [Nullifier, Nullifier];
   readonly commitments?: readonly [Commitment, Commitment];
   readonly extData?: ExtData;
-  readonly hash?: ExtDataHash;
 }) {
   return buildPublicInputs({
     root: overrides.root ?? field(11n),
     inputNullifiers: overrides.nullifiers ?? [field(22n), field(33n)],
     outputCommitments: overrides.commitments ?? [field(44n), field(55n)],
     extData: overrides.extData ?? PINNED,
-    extDataHash: overrides.hash ?? KECCAK_OK,
   });
 }
 
@@ -330,44 +347,56 @@ describe("fieldEncodeAmount", () => {
 
 describe("extDataHash", () => {
   /**
-   * The honest state of this build. `unavailable` is not a transient error and the
-   * message has to say why no substitute would do, because "just use SHA-256" is the
-   * obvious next thought and it produces a pool no proof can satisfy.
+   * 🔴 The assertion this whole file was built to reach, and the one that used to be
+   * missing: **our keccak of our encoding equals the compiler's digest.** Until
+   * `lib/keccak.ts` existed, `PINNED_DIGEST` was read out of the Solidity and then only
+   * folded — so a wrong encoder could still have produced the right field element,
+   * because the digest it was folding came from the other side of the check rather than
+   * from these bytes.
+   *
+   * Asserted on the raw digest rather than on the fold, deliberately: `% FIELD_SIZE`
+   * discards information, so two different digests can fold to one field element. The
+   * fold is checked separately below. Check the injective step before the lossy one.
    */
-  it("reports the missing keccak rather than inventing a number", () => {
-    const result = extDataHash(PINNED, null);
-    expect(result.kind).toBe("unavailable");
-    if (result.kind !== "unavailable") throw new Error("unreachable");
-    expect(result.why).toContain("keccak-256");
-    expect(result.why).toContain("SHA-3-256");
-  });
-
-  it("folds the pinned digest into the field element the contract returns", () => {
-    const result = extDataHash(PINNED, pinnedKeccak);
-    expect(result).toEqual({ kind: "keccak256", value: PINNED_FIELD });
+  it("recomputes the compiler's digest from the bytes it encoded", () => {
+    expect(toHex(keccak256(abiEncodeExtData(PINNED)))).toBe(PINNED_DIGEST);
   });
 
   /**
-   * The injected keccak is handed the bytes this module built, not the struct — so a
-   * test can assert the message as well as the result, which is the only way to catch
-   * an encoder that is right about length and wrong about content.
+   * And that those bytes are the pinned 128, so the test above cannot pass by hashing
+   * something else that happens to collide with the right answer — which is not a real
+   * risk for keccak, but the assertion costs one line and removes the argument.
    */
-  it("hashes exactly the 128 bytes it encoded", () => {
-    let seen: Uint8Array | null = null;
-    extDataHash(PINNED, (message) => {
-      seen = message;
-      return pinnedKeccak();
-    });
-    expect(seen).not.toBeNull();
-    expect(hex(seen ?? new Uint8Array())).toBe(PINNED_ENCODING);
+  it("hashes exactly the 128 bytes the compiler encoded", () => {
+    expect(hex(abiEncodeExtData(PINNED))).toBe(PINNED_ENCODING);
   });
 
-  it("refuses a digest that is not 32 bytes rather than folding it", () => {
-    expect(() => extDataHash(PINNED, () => new Uint8Array(20))).toThrow("must be 32 bytes");
+  it("folds that digest into the field element the contract returns", () => {
+    expect(extDataHash(PINNED)).toBe(PINNED_FIELD);
+  });
+
+  /**
+   * The fold is load-bearing for this vector specifically, which is why the vector was
+   * chosen this way: the digest is **above** the modulus, so `%` actually reduces. A
+   * digest below it makes the fold a no-op and a broken fold would pass.
+   */
+  it("reduces rather than passing the digest through", () => {
+    expect(BigInt(PINNED_DIGEST)).toBeGreaterThan(FIELD_MODULUS);
+    expect(extDataHash(PINNED)).toBeLessThan(FIELD_MODULUS);
+    expect(extDataHash(PINNED)).not.toBe(BigInt(PINNED_DIGEST));
   });
 
   it("propagates an encoding failure instead of hashing a broken struct", () => {
-    expect(() => extDataHash({ ...PINNED, relayer: "nope" }, pinnedKeccak)).toThrow("relayer");
+    expect(() => extDataHash({ ...PINNED, relayer: "nope" })).toThrow("relayer");
+  });
+
+  /**
+   * Binding, stated as the property rather than as a number: change who gets paid and
+   * `input[2]` changes. This is what `extDataHash` is *for* — a hash that did not move
+   * here would let a proof be replayed against a different recipient.
+   */
+  it("changes when the recipient does", () => {
+    expect(extDataHash({ ...PINNED, recipient: SOMEWHERE })).not.toBe(extDataHash(PINNED));
   });
 });
 
@@ -437,15 +466,33 @@ describe("buildPublicInputs", () => {
     expect(built.input.slice(3)).toEqual([1n, 2n, 3n, 4n]);
   });
 
-  it("refuses a vector with an unavailable extDataHash", () => {
-    const built = vector({ hash: { kind: "unavailable", why: "no keccak in this build" } });
-    expect(built).toEqual({ kind: "incomplete", why: ["extDataHash: no keccak in this build"] });
+  /**
+   * ⚠️ **These next two are a matched pair and each one covers a guard operand the other
+   * cannot.** `buildPublicInputs` derives the hash and the amount inside one `try`, in
+   * that order, and the comment there explains why the order is load-bearing. These are
+   * the two tests that make it so — delete either and the corresponding `=== null` in
+   * the guard is covered only by a condition nobody can exercise.
+   *
+   * This one: a malformed address throws inside `extDataHash`, so **neither** value is
+   * assigned and `hashValue === null` is what decides.
+   */
+  it("refuses a vector whose extData cannot even be encoded", () => {
+    const built = vector({ extData: { ...PINNED, relayer: "not-an-address" } });
+    expect(built.kind).toBe("incomplete");
+    if (built.kind !== "incomplete") throw new Error("unreachable");
+    expect(built.why).toHaveLength(1);
+    expect(built.why[0]).toContain("extData:");
+    expect(built.why[0]).toContain("relayer");
   });
 
   /**
-   * A keccak and every field in place, and the amount alone is the blocker — which is
-   * what makes the `encodedAmount === null` guard something a test can decide rather
-   * than a line that only exists for the type checker.
+   * And this one: `extAmount` and `fee` are **each** inside 2^248, so the encoding and
+   * therefore the hash both succeed, and only `fieldEncodeAmount` throws. So
+   * `encodedAmount === null` decides on its own — the case that disappears if the two
+   * assignments are ever reordered.
+   *
+   * Reported once, not twice: `abiEncodeExtData` also bounds its inputs, so two separate
+   * catches would name a single mistake under two labels.
    */
   it("refuses a vector whose derived amount is out of range", () => {
     const built = vector({
@@ -454,7 +501,7 @@ describe("buildPublicInputs", () => {
     expect(built.kind).toBe("incomplete");
     if (built.kind !== "incomplete") throw new Error("unreachable");
     expect(built.why).toHaveLength(1);
-    expect(built.why[0]).toContain("publicAmount:");
+    expect(built.why[0]).toContain("extData:");
     expect(built.why[0]).toContain("2^248");
   });
 
@@ -466,26 +513,32 @@ describe("buildPublicInputs", () => {
   });
 
   /**
-   * One unusable element makes the whole vector unusable, and every blocker is
-   * reported at once. A panel that showed them one at a time would make a user fix
-   * them one round-trip each, and in this build the keccak one is always present.
+   * One unusable element makes the whole vector unusable, and every blocker is reported
+   * at once. A panel that showed them one at a time would make a user fix them one
+   * round-trip each.
+   *
+   * The `extData` blocker is in here too, so the assertion covers the ordering of a
+   * tagged-field blocker against a derived one — the tagged ones are pushed by the loop
+   * above the `try`, so they come first, and a panel's list order is a thing users notice
+   * when it changes.
    */
   it("names every blocker, not the first", () => {
     const built = vector({
       root: standIn(11n),
       nullifiers: [standIn(22n), field(FIELD_MODULUS)],
       commitments: [field(44n), standIn(55n)],
-      hash: { kind: "unavailable", why: "no keccak" },
+      extData: { ...PINNED, extAmount: -MAX_NOTE_VALUE, fee: MAX_NOTE_VALUE },
     });
     if (built.kind !== "incomplete") throw new Error("unreachable");
-    expect(built.why).toEqual([
+    expect(built.why).toHaveLength(5);
+    expect(built.why.slice(0, 4)).toEqual([
       "root: produced by a stand-in hash",
       "inputNullifier[0]: produced by a stand-in hash",
       "inputNullifier[1] is not a field element " +
         `(${FIELD_MODULUS}) and no circuit can reference it`,
       "outputCommitment[1]: produced by a stand-in hash",
-      "extDataHash: no keccak",
     ]);
+    expect(built.why[4]).toContain("extData:");
   });
 
   it("rejects an out-of-field value from a hash that claims to be real", () => {

@@ -5,7 +5,7 @@ Read `CLAUDE.md` first — it has the constraints and the rules that exist becau
 something broke. This file is only the work.
 
 **Before you start anything:** `npm install`, then `npm run gate`. It must be green
-(tsc clean, **779 tests in 24 files** as measured 2026-09-28, 100% on
+(tsc clean, **799 tests in 25 files** as measured 2026-09-28, 100% on
 statements/branches/functions/lines, build succeeds). If it is not green on a fresh
 checkout, fix that before touching a task — you are looking at drift, not at your own
 change.
@@ -376,12 +376,22 @@ the round-trip. A test that only ever passes has not been shown to test anything
 Three decisions worth not undoing:
 
 - **`emptyLeaf` is a required argument with no default.** The contract derives its empty
-  leaf from `keccak256("quadra.shielded-pool.empty-leaf") % FIELD_SIZE`, and **there is
-  no keccak in the browser** — no dependency provides one, and hard-coding a 32-byte
-  constant that nothing local can re-derive is precisely hard rule 9's hazard. So the
-  caller supplies it: from a deployed pool's own `zeros(0)` when there is a deployment,
-  from a declared constant when there is not. A wrong value fails a test; a missing one
-  fails to compile.
+  leaf from `keccak256("quadra.shielded-pool.empty-leaf") % FIELD_SIZE`, and when this was
+  written **there was no keccak in the browser** — no dependency provided one, and
+  hard-coding a 32-byte constant that nothing local can re-derive is precisely hard rule
+  9's hazard. So the caller supplies it: from a deployed pool's own `zeros(0)` when there
+  is a deployment, from a declared constant when there is not. A wrong value fails a test;
+  a missing one fails to compile.
+
+  ⚠️ **The premise changed on 2026-09-28 and the decision did not.** `src/lib/keccak.ts`
+  exists, and `tests/keccak.test.ts` pins `keccak256("quadra.shielded-pool.empty-leaf")` to
+  the contract's own preimage, so the browser *can* now re-derive that constant — the rule-9
+  hazard named above is gone. `emptyLeaf` stays a required argument anyway, and the pool
+  keeps passing its own `"tree.empty-leaf"` stand-in. Reason: matching the empty leaf alone
+  moves **every** local root without making a single one provable, because interior nodes
+  still go through the stand-in hash — and it would invalidate every backup file already
+  written, for no gain. The leaf becomes the contract's when Poseidon does, in one change.
+  Do not take the half of this that is now possible.
 - **Interior nodes are hashed under a domain tag** (`TREE_NODE_DOMAIN = "tree.node"`).
   `IHasher.hash(left, right)` takes no tag, so **a deployed hasher has to bake this one
   in** or its roots will not match the browser's. Untagged, a node hash and a two-input
@@ -405,6 +415,17 @@ does not exist yet. **Resolve it as part of step 2, in one of two directions:** 
 the empty leaf from `IHasher` so both sides can compute it, or keep keccak and accept
 that the browser must be handed the constant from the deployment and can never check it.
 The first is better and the browser is already written for either.
+
+⚠️ **One argument for the second direction got weaker on 2026-09-28, and it is the argument
+that would have decided it wrongly.** "The browser can never check the keccak constant" was
+half the case against keeping keccak, and `src/lib/keccak.ts` removes it — the browser
+checks that value in `tests/keccak.test.ts` today. What survives untouched is the *whole*
+of the case **for** deriving from `IHasher`: the contract's own comment gives the reason
+(a tabulated value is a copy of the answer for one specific hash function), and one tree
+whose leaf comes from keccak while its 19 other zeros come from Poseidon is two hash
+functions in one root for no stated benefit. **Decide it on that, not on what the browser
+can compute** — "we can now verify the inconsistent value" is not a reason to keep the
+inconsistency, and it is the reason a future session is most likely to reach for.
 
 ### Step 1e also DONE (2026-09-28) — the tree is load-bearing, and the pool can serve a witness
 
@@ -676,6 +697,86 @@ settles, and jsdom cannot be made to fail a read of a valid Blob.
 AES-GCM, no new dependency. Against: a forgotten passphrase is unrecoverable money, and the
 plaintext label is what currently makes users careful. For: the file is a spendable secret
 and people put files in synced folders. Not started either way.
+
+### Step 1h also DONE (2026-09-28) — there is a keccak-256 now, and it has no tables
+
+`src/lib/keccak.ts`. Four separate things in this repo were blocked on the same missing
+primitive: `extDataHash` (so `buildPublicInputs` could only ever return `incomplete`), EIP-55
+checksum verification of a recipient address, the empty-leaf preimage in step 1d above, and
+any future check of a deployed pool's `zeros(0)`. One 200-line file unblocks all four.
+
+**Read `src/lib/keccak.ts`'s header before deciding this was a rule-9 violation** — it is the
+reverse of one, and the distinction is the whole reason the file is allowed to exist. Rule 9
+forbids the constant nothing local can check: a Poseidon constant recalled from a blog post
+gives a hash that is deterministic, collision-free, in-field, passes every test in
+`tests/hash.test.ts`, and matches no circuit — the failure is invisible until deployment day.
+Keccak is the opposite: `cast keccak` is an oracle on this machine, so a single wrong bit
+fails the first vector immediately. **The rule is about verifiability, not about whether
+cryptography may be hand-written.**
+
+**There are no tabulated constants at all, and that is the design.** The 24 round constants
+come from the LFSR that defines them; the ρ offsets and the π permutation both fall out of the
+single walk `(x, y) -> (y, 2x + 3y mod 5)`. A transcription typo is therefore *impossible*
+rather than merely tested for — which matters because the usual failure here is one wrong
+nibble in a 24-entry table, and that is exactly what a reader's eye slides over.
+
+**Nine digests, from `cast keccak`, at the lengths where padding breaks.** The commands are in
+the test header; regenerate a doubted vector with them. 🔴 **Never "fix" a vector by running
+this code and pasting its answer back** — that converts the test into a tautology and it will
+look greener than before. Lengths 0, 1, 135 (both pad bits in one byte, must be `0x81`), 136
+(needs a whole extra block), 137, 272, 273 (the absorb loop runs more than twice).
+
+**One of my assertions was wrong, and the way it was resolved is the point.** The test first
+asserted all 24 round constants are distinct. It failed at **22** — while all nine `cast`
+vectors passed in the same run. The vectors are the authority, so the *test* was wrong, not the
+code: Keccak's constants genuinely collide twice, `RC[5] == RC[22]` and `RC[6] == RC[20]`. It is
+now pinned by collision **position** rather than by count, which is independent of the table's
+values and moves if the register mis-steps. "The round constants are distinct" is an assumption
+the next person writing this test will also make.
+
+**Four mutations, each reverted and `diff`-confirmed byte-identical:**
+
+| mutation | red | what it proves |
+|---|---|---|
+| `PAD_FIRST` `0x01` → `0x06` (SHA-3's) | 10 | one pad bit is caught; keccak ≠ SHA-3-256 |
+| `let register = 1` moved inside the round loop | 12 | the LFSR runs continuously across rounds |
+| `2x + 3y` → `2x + 2y` in the walk | 9 | only the vectors pin *which* permutation |
+| `nextX = y` → `nextX = x` | 12 | the permutation property itself bites |
+
+⚠️ **Row 3 is the one worth reading.** `2x + 2y` also happens to permute the 24 non-centre
+lanes, so the test named "makes π a permutation" stays **green** through it and only the `cast`
+vectors catch it. Row 2 has the same shape from the other side: `rc(0) = 1` stays green through
+a restarted LFSR, because round 0 is the one round a restart cannot corrupt — a suite holding
+only that assertion would have reported healthy. Both are recorded at the assertions
+themselves, because a test whose name promises more than it delivers is worse than no test.
+
+**Its first consumer landed in the SAME commit, and not for tidiness.** `transaction.ts`
+carried a user-facing string, `WHY_NO_KECCAK`, whose text asserted that this build has no
+keccak-256. The moment keccak.ts existed that string was **false on screen**, so the choice
+was a bigger commit or a self-contradicting one. `extDataHash` therefore returns a plain
+bigint now, and the `ExtDataHash` union, the injected `Keccak256` type and `WHY_NO_KECCAK`
+are **deleted** rather than kept "for flexibility" — they existed only to describe an
+absence that has ended. The same staleness was fixed in `src/lib/tree.ts` (a doc comment
+justifying its injected hash with "there is no keccak here") and in step 1d above.
+
+⚠️ **That closed the loop the pinned vector left open.** `tests/transaction.test.ts` now
+recomputes `keccak256(abiEncodeExtData(PINNED))` and compares it to `PINNED_DIGEST`, which
+came out of Solidity. So our encoder agrees with `solc`'s `abi.encode`, our hasher agrees
+with `solc`'s `keccak256`, and our fold agrees with the contract's `%` — with the middle
+step independently anchored to `cast` rather than to `solc`. Two implementations, two
+authorities, one answer.
+
+⚠️ **The bundle is STILL byte-identical at 221.42 kB.** Not because keccak is unused, but
+because its only importer is `transaction.ts` and nothing under `src/` imports *that* yet,
+so the pair tree-shakes out together. Do not read the unchanged number as "the rewiring
+did not take"; re-grep `from "@/lib/transaction"` instead.
+
+**Still to come, and now the whole of the next increment:** `src/lib/address.ts`, folding
+the four live copies of `/^0x[0-9a-fA-F]{40}$/` (`SendPanel.tsx`, `lib/verify.ts`,
+`lib/transaction.ts`, `lib/hooks.ts`) into one door that also checks the **EIP-55
+checksum** — which is keccak over the lowercased address, so it was impossible before
+today and is merely undone now. Until it lands, a mistyped recipient is an irreversible
+payment to nobody and no file in this repo can tell you which.
 
 ### Steps 2 and 3 are NOT done, and step 2 is not a deployment step
 

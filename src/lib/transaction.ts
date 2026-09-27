@@ -15,41 +15,44 @@
  * contract's way** — see the header of `lib/field.ts` for why a local shortcut that
  * happens to be correct is still the wrong choice here.
  *
- * ── The one thing this file cannot do, and does not pretend to ───────────────
- * 🔴 **`extDataHash` needs keccak-256, and a zero-dependency browser does not have
- * one.** `crypto.subtle` offers SHA-1, SHA-256, SHA-384 and SHA-512 — keccak is not
- * among them, and Ethereum's keccak-256 is not the same function as SHA-3-256
- * either (different padding), so there is no standards-track substitute. The pool
- * computes `uint256(keccak256(abi.encode(extData))) % FIELD_SIZE`, and nothing in
- * this repo can reproduce that number.
+ * ── `extDataHash` is real now, and the union that described its absence is gone ──
+ * This file shipped on 2026-09-28 with an `ExtDataHash` union whose `unavailable` arm
+ * carried a sentence explaining that the browser had no keccak-256, and an injected
+ * `Keccak256` parameter for the day one arrived. `src/lib/keccak.ts` is that day, so
+ * both are **deleted** rather than kept: a union with one inhabitable variant is a
+ * `bigint` wearing a costume, and the sentence was a user-facing claim that the build
+ * could no longer honour. An absence that has ended stops being a type.
  *
- * Which is why `extDataHash` returns a **union** and not a bigint. The tempting
- * alternatives are all worse:
+ * Kept from that design, because it was right about something else: the hash is folded
+ * with `% FIELD_SIZE` and never truncated, and a digest of the wrong length throws
+ * rather than being padded. `input[2]` is the slot where a wrong value means "this
+ * proof is about a different recipient than the one being paid", so nothing may produce
+ * a plausible number there.
  *
- *   - hash it with SHA-256 instead → a number that is deterministic, in-field and
- *     collision-resistant, that every test would accept, and that the contract
- *     disagrees with. Exactly the `TestHasher` failure one layer up.
- *   - return `0n` when unavailable → a valid-looking field element, and the
- *     `input[2]` slot is precisely where a wrong value means "this proof is about a
- *     different recipient than the one being paid".
- *   - throw → the panel could not then show a user what is missing and why, and the
- *     rest of the vector is genuinely computable and worth showing.
+ * 🔴 **`buildPublicInputs` no longer accepts the hash — it derives it from the same
+ * `extData` it is given.** That is not tidying. While it was a parameter, a caller
+ * could pass `extData: A` alongside `extDataHash(B)`, and the result would be
+ * well-formed, in-field, fully typed, and a statement about a transaction that is not
+ * the one being sent. The only defence was that every call site remembered. Deriving it
+ * deletes the entire class. Do not reintroduce the parameter for testability — pass a
+ * different `extData` instead.
  *
- * The union is the same device as `Anchoring` in `adapters/types.ts` and
- * `TaggedField` in `lib/note.ts`: the variant that cannot be proven carries a `why`
- * meant to be read by a person, and the type makes ignoring it impossible.
- *
- * ⚠️ A second, quieter cost of the same gap: **EIP-55 checksums cannot be verified
- * here.** The checksum is defined in terms of keccak over the lowercased address, so
- * `assertAddress` below can only check shape and length, not that a typo'd address
- * is a typo. When a keccak arrives, checking it becomes possible and should be done
- * — a mistyped recipient is an irreversible payment to nobody.
+ * ⚠️ **Still open, and now merely undone rather than impossible: EIP-55.** The checksum
+ * is keccak over the lowercased address, so `assertAddress` below *could* verify it
+ * today and does not — it still checks shape and length only. That is the next
+ * increment (`src/lib/address.ts`, which also folds the four live copies of this
+ * regex into one door). Until then a mistyped recipient is an irreversible payment to
+ * nobody, and this file cannot tell you which.
  *
  * ── Status: NOTHING IMPORTS THIS YET ─────────────────────────────────────────
- * ⚠️ Measured 2026-09-28: no file under `src/` outside this one imports this module, so
- * it is absent from the production bundle and no panel calls it. Written down because
- * the usual signals say the opposite — it is at 100% coverage with 41 tests and a
- * vector the Solidity suite asserts, which is what a wired-up module looks like.
+ * ⚠️ Re-measured 2026-09-28 after the keccak rewiring: no file under `src/` outside this
+ * one imports this module, so it is absent from the production bundle and no panel calls
+ * it. Written down because the usual signals say the opposite — it is at 100% coverage
+ * with a vector the Solidity suite asserts, which is what a wired-up module looks like.
+ *
+ * Note this module now *has* an import of its own (`lib/keccak`), which is the direction
+ * that does not count: depending on something is not being depended upon. Re-grep for
+ * `from "@/lib/transaction"` rather than trusting this paragraph.
  *
  * That is deliberate rather than abandoned: it is the piece T5/T6/T8 and the proof path
  * all need, and building it against the compiler now is cheaper than discovering the
@@ -61,6 +64,7 @@
 
 import { FIELD_MODULUS, MAX_NOTE_VALUE, intoField, isInField } from "@/lib/field";
 import type { FieldHash } from "@/lib/hash";
+import { keccak256Uint } from "@/lib/keccak";
 import {
   type Commitment,
   type NoteSecrets,
@@ -97,25 +101,6 @@ export type ExtData = {
   readonly fee: bigint;
 };
 
-/**
- * `keccak256(abi.encode(extData)) % FIELD_SIZE`, or the reason it is missing.
- *
- * See the header. The `unavailable` variant is the honest state of this build, not
- * a transient error.
- */
-export type ExtDataHash =
-  | { readonly kind: "keccak256"; readonly value: bigint }
-  | { readonly kind: "unavailable"; readonly why: string };
-
-/**
- * A keccak-256 implementation: 32 bytes in, 32 bytes out.
- *
- * Injected rather than imported so that this module stays dependency-free and so the
- * day a real keccak arrives — a wasm module, a wallet RPC, or a vetted package —
- * nothing here changes shape. Same reasoning as `FieldHash` in `lib/hash.ts`.
- */
-export type Keccak256 = (message: Uint8Array) => Uint8Array;
-
 /** How many public inputs a proof is checked against. Mirrors `uint256[7]`. */
 export const PUBLIC_INPUT_COUNT = 7;
 
@@ -133,8 +118,10 @@ export type PublicInputVector = readonly [
 /**
  * A complete vector, or the list of reasons it could not be built.
  *
- * Plural `why` because a panel showing one blocker at a time makes a user fix them
- * one round-trip each, and in this build there is always at least the keccak one.
+ * Plural `why` because a panel showing one blocker at a time makes a user fix them one
+ * round-trip each. Until keccak landed there was always at least one blocker — the
+ * missing hash — so `complete` was unreachable in practice; it is reachable now, which
+ * is the whole point of the increment.
  */
 export type PublicInputs =
   | { readonly kind: "complete"; readonly input: PublicInputVector }
@@ -142,11 +129,6 @@ export type PublicInputs =
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-
-const WHY_NO_KECCAK =
-  "this build has no keccak-256 — crypto.subtle offers only the SHA families, and " +
-  "Ethereum's keccak-256 differs from SHA-3-256 in its padding, so extDataHash " +
-  "cannot be computed here and no substitute would match the pool";
 
 /**
  * Shape and length only, and the "only" is the point — see the ⚠️ in the header.
@@ -258,32 +240,23 @@ export function abiEncodeExtData(extData: ExtData): Uint8Array {
 }
 
 /**
- * The binding hash, when something can compute it.
+ * The binding hash. Mirrors `ShieldedPool.hashExtData`:
+ * `uint256(keccak256(abi.encode(extData))) % FIELD_SIZE`.
  *
- * `keccak` is nullable rather than optional so that a caller has to state that it
- * has none. An optional parameter would default to "no keccak" at exactly the call
- * site that forgot to pass one, and the failure would be a wrong `input[2]` rather
- * than a missing one.
+ * `keccak256Uint` reads the digest **big-endian**, which is what `uint256(bytes32)`
+ * means in Solidity and the opposite of how Keccak's own lanes are ordered. Both
+ * directions are correct in their own place and conflating them yields a byte-reversed
+ * field element that is in range, deterministic, and about nothing — see the
+ * endianness tests in `tests/keccak.test.ts`.
+ *
+ * Folded with `%`, never truncated, so the high bits still affect the result — see
+ * `intoField` in `lib/field.ts`. The 32-byte length check that used to guard an injected
+ * implementation is gone with the injection: `keccak256` returns `DIGEST_BYTES` by
+ * construction and `tests/keccak.test.ts` asserts it, so a check here would be an
+ * unreachable branch against the 100% gate forever.
  */
-export function extDataHash(extData: ExtData, keccak: Keccak256 | null): ExtDataHash {
-  const message = abiEncodeExtData(extData);
-  if (keccak === null) return { kind: "unavailable", why: WHY_NO_KECCAK };
-
-  const digest = keccak(message);
-  if (digest.length !== 32) {
-    throw new Error(
-      `A keccak-256 digest must be 32 bytes, got ${digest.length}. ` +
-        "A short digest folded into the field would be a valid-looking wrong answer.",
-    );
-  }
-
-  let value = 0n;
-  for (const byte of digest) value = (value << 8n) | BigInt(byte);
-  /**
-   * Folded, matching the contract's `% FIELD_SIZE`. Folding rather than truncating
-   * so the top bits still affect the result — see `intoField` in `lib/field.ts`.
-   */
-  return { kind: "keccak256", value: intoField(value) };
+export function extDataHash(extData: ExtData): bigint {
+  return intoField(keccak256Uint(abiEncodeExtData(extData)));
 }
 
 /**
@@ -339,7 +312,6 @@ export function buildPublicInputs(args: {
   readonly inputNullifiers: readonly [Nullifier, Nullifier];
   readonly outputCommitments: readonly [Commitment, Commitment];
   readonly extData: ExtData;
-  readonly extDataHash: ExtDataHash;
 }): PublicInputs {
   const why: string[] = [];
 
@@ -358,35 +330,38 @@ export function buildPublicInputs(args: {
   }
 
   /**
-   * Narrowed into a local rather than re-tested at the bottom.
+   * Both derived here rather than accepted, for the same reason the contract derives
+   * them: a value handed in is a value that can disagree with the `extData` beside it.
+   * A thrown bound or shape error becomes a blocker rather than propagating, so a panel
+   * can show it next to the others instead of losing the whole render to one bad field.
    *
-   * ⚠️ Not a style preference — it is what makes the guard below **reachable in both
-   * directions on every operand.** Written as one combined
-   * `why.length > 0 || hash.kind !== "keccak256"` at the end, the second half can
-   * never be the deciding factor, because an unavailable hash has already pushed a
-   * blocker: the operand exists only to convince the type checker, no test can make
-   * it decide anything, and the 100% branch gate would be met by a condition nobody
-   * can exercise. Capturing the value here means each `=== null` below is the sole
-   * reason for some real input, which is the only honest way to hold that gate.
+   * ⚠️ **One `try` for both, and `extDataHash` first. Both halves of that are
+   * load-bearing and neither is style.**
+   *
+   * One `try`: `abiEncodeExtData` calls `publicAmountFor` for its bounds, so two
+   * separate catches would report an out-of-range amount **twice**, once under each
+   * label, for a single mistake.
+   *
+   * This order: it is what keeps each `=== null` below independently able to decide the
+   * guard, which is the only honest way to hold a 100% branch gate.
+   *
+   *   - a malformed address throws inside `extDataHash` → both stay null → the first
+   *     operand decides.
+   *   - an `extAmount` and `fee` that are **each** within 2^248 while their difference
+   *     is not → `extDataHash` succeeds, `fieldEncodeAmount` throws → the second operand
+   *     decides on its own.
+   *
+   * Swap the two assignments and that second case vanishes: `fieldEncodeAmount` would
+   * throw before the hash was computed, so `encodedAmount === null` could never be the
+   * sole reason and the branch would be covered by a condition nobody can exercise.
    */
   let hashValue: bigint | null = null;
-  if (args.extDataHash.kind === "keccak256") {
-    hashValue = args.extDataHash.value;
-  } else {
-    why.push(`extDataHash: ${args.extDataHash.why}`);
-  }
-
-  /**
-   * The amount is derived here rather than accepted, for the same reason the
-   * contract derives it. A thrown bound error is reported as a blocker rather than
-   * propagated, so a panel can show it beside the others instead of losing the
-   * whole render to one bad field.
-   */
   let encodedAmount: bigint | null = null;
   try {
+    hashValue = extDataHash(args.extData);
     encodedAmount = fieldEncodeAmount(publicAmountFor(args.extData));
   } catch (error) {
-    why.push(`publicAmount: ${messageOf(error)}`);
+    why.push(`extData: ${messageOf(error)}`);
   }
 
   if (hashValue === null || encodedAmount === null || why.length > 0) {
