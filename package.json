@@ -12,6 +12,10 @@
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "gate": "npm run typecheck && npm run test:cov && npm run build",
+    "contracts:build": "cd contracts && forge build",
+    "contracts:test": "cd contracts && forge test",
+    "contracts:cov": "vite-node scripts/check-contract-coverage.ts",
+    "gate:contracts": "npm run contracts:build && npm run contracts:test && npm run contracts:cov",
     "measure": "vite-node scripts/measure-catalog.ts"
   },
   "dependencies": {
