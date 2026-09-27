@@ -494,6 +494,25 @@
   background: rgba(49, 106, 197, 0.1);
 }
 
+/*
+  The row is a three-column grid because SendPanel's rows hold three things —
+  radio, amount, id — and the middle one taking `1fr` is what pushes the id out
+  to the right edge. The MCP panel and the API page put only two things in a
+  row, so their second child lands in that `1fr` column and gets stretched: a
+  "not built" pill rendered as a 600px bar with the words at one end.
+
+  `justify-self: start` fixes it where it is wrong rather than reshaping the
+  grid, because the grid is not wrong — it is right for the row it was written
+  for. A chip is a label on the thing to its left, and should be the width of
+  its own text wherever it appears.
+
+  jsdom could not see this one either. The chip had the right class and the
+  right text, so the MCP panel's tests passed the whole time it was a bar.
+*/
+.notes__row > .chip {
+  justify-self: start;
+}
+
 .notes__amount {
   font-family: var(--font-mono);
   font-size: 12px;
