@@ -5,7 +5,7 @@ Read `CLAUDE.md` first — it has the constraints and the rules that exist becau
 something broke. This file is only the work.
 
 **Before you start anything:** `npm install`, then `npm run gate`. It must be green
-(tsc clean, **871 tests in 26 files** as measured 2026-09-28, 100% on
+(tsc clean, **940 tests in 28 files** as measured 2026-09-28, 100% on
 statements/branches/functions/lines, build succeeds). If it is not green on a fresh
 checkout, fix that before touching a task — you are looking at drift, not at your own
 change.
@@ -152,14 +152,26 @@ code. 109 of the 115 catalog tools are paid. Making them run means:
 1. **Connect a wallet.** EIP-1193 injected provider. Guard the chain — Base is 8453,
    `BASE.idHex` is `0x2105` in `src/config/chain.ts`. A signature produced on the
    wrong chain is a silent failure, so refuse rather than prompt-and-hope.
-2. **Read the payment requirements off the live 402.** They are already parsed —
-   `Price` in `src/adapters/types.ts` carries `payTo`, `amountBaseUnits`, `asset`,
-   `network`. **Never assemble a price locally.** `BLUEAGENT.knownPayTo` exists only
-   to assert against, never to send to; if the live `payTo` ever differs from it,
-   that is a signal, not a default.
-3. **Sign an EIP-3009 `TransferWithAuthorization`.** USDC on Base, EIP-712 domain
-   `{ name: "USD Coin", version: "2" }`, verifying contract `USDC.address`, 6 decimals.
-   All in `src/config/chain.ts`.
+2. **Read the payment requirements off the live 402 — and CHECK them.** They are already
+   parsed: `Price` in `src/adapters/types.ts` carries `payTo`, `amountBaseUnits`, `asset`,
+   `network`. Parsed is not checked, and this step is where the risk in the whole path
+   lives: a changed or hostile upstream that names a different token, a different chain or
+   a different payee gets a valid signature for exactly what it named. So assert `asset`
+   and the EIP-712 `extra.{name,version}` against `USDC_DOMAIN`, assert `network` against
+   `BASE.id`, and assert `payTo` against `BLUEAGENT.knownPayTo`. **Never assemble a price
+   locally**, and `knownPayTo` is only ever an assertion, never a destination — a constant
+   used as the destination keeps paying the old payee after upstream moves. A live `payTo`
+   that differs from it is a signal, not a default. ⬅️ **This is the next increment**; the
+   digest it feeds already exists.
+3. **Sign an EIP-3009 `TransferWithAuthorization`.** ✅ **The digest half is DONE** —
+   `src/lib/eip712.ts`, built 2026-09-28 out of order because it needed no wallet and no
+   decision. `authorizationDigest(USDC_DOMAIN, auth)` is the 32 bytes to sign, and its
+   domain separator is verified equal to the deployed contract's own
+   `DOMAIN_SEPARATOR()` on Base. See **Step 1j** under T7 for the full argument. What is
+   left here is `eth_signTypedData_v4` and the `{v,r,s}` split — and note the module holds
+   no key by design (rule 5), so if signing ever moves inside it, that is a custody change
+   and ShunTr's call. Use `validityWindow` for the window; do not hand-roll `validBefore`,
+   and read why before raising its cap.
 4. **Base64 the authorization into an `X-PAYMENT` header** and re-POST the tool.
 5. **Read the settlement back.** `Settlement` in `types.ts` has three variants and only
    `kind: "settled"` carries a `txHash` — by design, so an unsettled run cannot render
@@ -780,6 +792,20 @@ the size:** the RATE expression `(1600-2*Cs*8)/8` and the LFSR fold `(s&256)&&(s
 are both in the minified output verbatim — esbuild declined to constant-fold either, which
 is lucky, so they make usable needles. First time this code runs outside a test.
 
+🔴 **Two of those three sentences are wrong, and the way they are wrong is the lesson.**
+Caught 2026-09-28 while checking whether `abi.ts` shipped. (a) `(s&256)&&(s^=369)` is not
+what is in the bundle; the real text is `(s&256)!==0&&(s^=369)`, so anyone pasting the
+quoted form gets 0 hits and concludes the module was tree-shaken. (b) **A needle containing
+a minified identifier is not reusable.** `Cs` and `s` are esbuild's names for *this* build
+and are not promised to the next, so both needles are dated, not durable — `(1600-2*Cs*8)/8`
+happened to survive and `s^=369` would not have. (c) Separately, `grep` without `-F`
+reported **0** for `s^=369` on a bundle that contains it. Two attempts at this check have
+now gone wrong in opposite directions, each time producing a confident answer about whether
+code reaches users. The durable form: **`grep -cF` with a needle made only of operators and
+literals.** For keccak those are `(1600-2*`, `^=369`, `&256)!==0` and `(1n<<64n)-1n`, all
+four re-verified 2026-09-28. Where a module has a distinctive error string, prefer that.
+And never a bare number: `369` also occurs inside the BN254 modulus.
+
 **Step 1i is what keccak was for.** See below.
 
 ### Step 1i also DONE (2026-09-28) — a mistyped recipient is now caught before the money moves
@@ -881,6 +907,115 @@ correctly; `0xa3b1…` and `0x0295…` are all-lowercase so carry no checksum, d
 by eye; `0x4200…0006` has no letters. **No config bug** — recorded because a mismatch there
 would have meant a shipped address that is possibly wrong, and "I checked and found
 nothing" is a result.
+
+### Step 1j also DONE (2026-09-28) — the digest a wallet will be asked to sign
+
+`src/lib/eip712.ts` and `src/lib/abi.ts`. This is **step 3 of T4**, taken out of order on
+purpose: steps 1 and 2 are a wallet connection, and a digest is pure keccak arithmetic over
+values the caller already holds. No key, no wallet, no socket, no signature — so rule 5
+stays intact, and the whole thing is checkable offline against `cast` with nothing deployed
+and nobody's money at stake. T3/T5/T6/T8 are all waiting on somebody's decision; this was
+the piece that was not.
+
+🔴 **The strongest assertion in the increment is a closed loop against a contract nobody
+here controls.** `USDC_DOMAIN` is assembled from `src/config/chain.ts`, and the separator
+derived from it equals what the deployed USDC contract on Base reports:
+
+```
+cast call 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 \
+  'DOMAIN_SEPARATOR()(bytes32)' --rpc-url https://mainnet.base.org
+→ 0x02fa7265e7c5d81118673727957699e4d68f74cd74b7db77da710fe8a2c7834f
+domainSeparator(USDC_DOMAIN)
+→ 0x02fa7265e7c5d81118673727957699e4d68f74cd74b7db77da710fe8a2c7834f
+```
+
+One equality, and it verifies the domain struct's shape, the fact that the two strings are
+*hashed* rather than inlined, `name: "USD Coin"`, `version: "2"`, chainId 8453 and the token
+address — **all at once, and all of them config values rather than test fixtures.** Five
+claims became measurements. Edit any one of those config fields and this fails, which is the
+behaviour wanted: every one of those edits changes what a signature authorizes.
+
+⚠️ **`cast` cannot hash typed data in one shot** — `cast --help` matches "typed" only inside
+`decode-transaction` — so the digest is pinned compositionally, one anchored step at a time:
+both typehashes, `keccak("USD Coin")`, `keccak("2")`, the 160-byte domain encoding, the
+224-byte struct encoding, the 66-byte `0x1901`-prefixed preimage, and the digest itself
+(`0x770c97d3…18ea`). Same discipline `abiEncodeExtData`/`extDataHash` are pinned with. There
+is **not one typehash hex literal in the source** — both are derived from their type strings
+at module load, so the test's literals are an independent second opinion rather than the same
+number written twice.
+
+🔴 **An EIP-3009 authorization is a BEARER INSTRUMENT, and the validity window is the whole
+of its safety.** Signing one does not move money; it mints a slip anybody holding it can
+redeem, once, until `validBefore`. So `validBefore = 0` is fail-safe (never valid, useless,
+harmless) and `2^256 - 1` is the dangerous one — not "a payment with no expiry" but **a
+standing permission to withdraw `value`**, alive in every log and clipboard it ever touches.
+`validityWindow` defaults to 10 minutes and refuses anything past `MAX_AUTHORIZATION_SECONDS`
+(3600). Do not raise that cap to fix a settlement timeout; a facilitator needs a block or
+two, and a timeout is a different bug.
+
+⚠️ **`validAfter` is 0 deliberately, and "tightening" it would be a regression.** EIP-3009
+checks `block.timestamp > validAfter`, so a lower bound only matters for *scheduling* a
+future payment. Setting it from the browser's own clock buys nothing — `validBefore` already
+closes the window from the side that matters — and costs a real failure: a clock a few
+seconds fast produces an authorization the chain rejects as being from the future. Zero
+cannot be early. Pinned by a test so it does not get "improved".
+
+⚠️ **`validityWindow` also refuses a millisecond timestamp**, because `BigInt(Date.now())` is
+the obvious thing to write and would sign a window roughly fifty thousand years wide — the
+exact standing-permission failure the cap exists to prevent, arrived at through a unit
+mistake rather than a policy one. The bound is the year 10000, so the check is about the
+*unit* and never expires the way "not more than a year out" would.
+
+🔴 **The nonce is drawn from a SET, not a sequence.** EIP-3009 nonces are arbitrary `bytes32`
+with one used/unused bit each: no counter, no order, no "next". Two tidier-looking wrong
+answers, both rejected:
+
+| Tempting | What it actually does |
+|---|---|
+| A counter | Nothing on chain says where you are in it; two tabs disagree immediately; every collision is an authorization that silently never settles |
+| `keccak(from‖to‖value)` | Makes paying the same amount to the same payee **twice impossible** — the second reuses a spent nonce — and publishes the payment's contents, since an observer who guesses the fields confirms the guess by recomputing the nonce |
+
+`randomNonce` is `crypto.getRandomValues` over 32 bytes and nothing else. Unlike
+`randomFieldElement` there is no rejection loop, because every 32-byte string is a legal
+nonce: no field to land in, so no sampling bias to avoid.
+
+**The type is the argument for the nonce.** `Authorization.nonce` is `Uint8Array`, not
+`bigint`, because a number invites `nonce + 1n` and there is no next nonce. `wordFromBytes32`
+refuses any length but 32 — a 31-byte nonce left-padded is a *different* nonce that encodes
+without complaint, so the authorization would commit to a label the caller never generated.
+
+**`src/lib/abi.ts` exists because `writeWord` was about to be written twice.** It was private
+in `transaction.ts` and `eip712.ts` needed the identical loop. Two copies of a byte layout is
+the four-copies-of-a-regex smell from step 1i, and worse in one respect: both copies feed a
+hash that a signature or a proof commits to, so two layouts that agree today and diverge
+later produce no error — they produce a valid signature over a different transaction. The
+128-byte Solidity-pinned vector did not move, which is what made the extraction safe to do.
+
+🔴 **`encodeWords` throws on an out-of-range word where the old `writeWord` masked.** Masking
+is what falls out of writing the loop the obvious way — take 32 bytes, stop caring. Nothing
+in the repo can reach it and it must still throw, because of what silence means *here*:
+`2^256` masks to **zero**, and a zero `value` word is a *free* authorization that reads like
+a deliberate one. The user sees one number on screen and signs another. Refusing is the only
+behaviour that keeps the bytes and the screen describing the same thing.
+
+⚠️ **Neither new module is in the production bundle, and that is measured, not assumed.**
+`grep -cF 'TransferWithAuthorization' dist/assets/*.js` → 0, `grep -cF 'does not fit a
+256-bit' …` → 0, bundle unchanged at 224.51 kB. The reason is one level deeper than
+"eip712 has no consumer yet": **`transaction.ts` has exactly one importer in the entire
+repo, `tests/transaction.test.ts`.** So the whole ext-data/public-input encoder is
+test-only, `abi.ts` inherits that, and the unchanged byte count has a fully understood
+cause rather than a worrying one. Both files carry a status block saying so; re-grep rather
+than trusting either.
+
+**What this is waiting for, and it is the next increment rather than a later nicety.** A 402
+response carries `payTo`, `maxAmountRequired`, `asset`, `network` and `extra.{name,version}`.
+Signing an authorization built from those *without checking them* is the entire risk in this
+path: a changed or hostile upstream names a different payee, a different token, or a
+different chain, and the signature is valid for whatever it named. So the consumer to build
+is the requirements check — assert `asset` and `extra` against `USDC_DOMAIN`, assert `payTo`
+against `BLUEAGENT.knownPayTo`, then build the digest. `knownPayTo` exists **only to assert
+against**; a constant used as the destination is a constant that keeps paying the old payee
+after upstream moves.
 
 ### Steps 2 and 3 are NOT done, and step 2 is not a deployment step
 

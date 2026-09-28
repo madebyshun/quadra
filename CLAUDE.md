@@ -33,7 +33,7 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. **871 tests in 26 files**, 100% on all four
+in one go. Do not report "done" on a subset. **940 tests in 28 files**, 100% on all four
 metrics, measured 2026-09-28.
 
 That count is a dated measurement, not a target — it is here so a fresh clone that comes
@@ -279,13 +279,23 @@ src/
                                is a test fixture, not a precedent). It SHIPS to the browser
                                as of the EIP-55 increment — address.ts imports it and three
                                panels import that, so the whole permutation is in the
-                               bundle (VERIFIED by grepping dist/ for the RATE expression
-                               `(1600-2*Cs*8)/8` and the LFSR fold `(s&256)&&(s^=369)`,
-                               both present verbatim). It was tree-shaken out while
-                               transaction.ts was its only importer and nothing imported
-                               THAT; the bundle went 221.42 → 224.51 kB when that stopped
-                               being true, which is the first time this code has run
-                               anywhere but a test
+                               bundle. It was tree-shaken out while transaction.ts was its
+                               only importer and nothing imported THAT; the bundle went
+                               221.42 → 224.51 kB when that stopped being true, which is
+                               the first time this code has run anywhere but a test
+                   🔴 HOW TO CHECK WHETHER SOMETHING IS IN THE BUNDLE, because two
+                               attempts got this wrong in opposite directions and both
+                               looked convincing. (1) Use `grep -cF`, never plain `grep`:
+                               `grep -c 's^=369'` reports 0 on a bundle that contains
+                               `(s^=369)` verbatim, and a 0 reads as "tree-shaken". (2) The
+                               needle must contain NO identifier. esbuild renames every
+                               local, so `(1600-2*Cs*8)/8` matched one build and `Cs` is
+                               not promised to the next. The stable needles for keccak are
+                               `(1600-2*`, `^=369`, `&256)!==0` and `(1n<<64n)-1n` —
+                               operators and literals only, all four verified 2026-09-28.
+                               (3) A bare numeric literal is useless: `369` also occurs
+                               inside the BN254 modulus. Prefer a distinctive error string
+                               where the module has one
                    transaction.ts — the (Proof, ExtData) pair `transact` takes. Mirrors
                                four contract functions by name and says so at each. Two
                                things to know before editing: `extDataHash` is REAL as of
@@ -302,6 +312,33 @@ src/
                                purpose — field negation for the public input, two's
                                complement for `abi.encode` — so conflating them yields
                                a proof that verifies for the wrong transaction
+                   abi.ts    — the 32-byte word layout, extracted from transaction.ts's
+                               private `writeWord` when eip712.ts needed the same loop. Two
+                               copies of a byte layout whose output gets hashed and signed
+                               is the address-regex smell with worse consequences. 🔴 An
+                               out-of-range word THROWS; the version it replaced masked,
+                               and a masked `value` word is a signature over a number
+                               nobody chose. `wordFromBytes32` refuses any length but 32
+                               for the same reason — a 31-byte nonce left-padded is a
+                               different nonce that encodes cleanly
+                   eip712.ts — the EIP-3009 `TransferWithAuthorization` digest. Holds no
+                               key and produces no signature (rule 5) — that is why it
+                               could be built while the rest of T4 waits on a decision.
+                               🔴 Its strongest test is a closed loop: the domain separator
+                               derived from config/chain.ts equals the deployed USDC
+                               contract's own `DOMAIN_SEPARATOR()` on Base,
+                               `0x02fa7265…7834f`, so one equality turns the struct shape,
+                               the string hashing, name, version, chainId and token address
+                               into measurements. 🔴 An authorization is a BEARER
+                               INSTRUMENT: `validBefore` far in the future is a standing
+                               withdrawal permission, not a payment, hence the
+                               one-hour cap. 🔴 The nonce comes from a SET not a sequence —
+                               `crypto.getRandomValues`, never a counter and never derived
+                               from the payment fields, which would make paying the same
+                               amount twice impossible and publish the payment's contents.
+                               Typehashes are derived from the type strings at load, never
+                               tabulated (rule 9); the strings are whitespace-sensitive and
+                               pinned as text as well as by hash
                    backup.ts — the backup file format. localStorage is not a backup;
                                this is. Plaintext secrets by necessity and labelled as
                                such, never half-encrypted. Validates an import through
@@ -314,7 +351,7 @@ src/
   pages/           /docs /api /verify /404
   ui/              Window, Taskbar, Gel (button), Crt (output box)
   styles/          reset.css + theme.css — the XP/Aqua design system
-tests/             26 files, mirrors src/. TWO of them read Solidity rather than
+tests/             28 files, mirrors src/. TWO of them read Solidity rather than
                    restating its numbers: field.test.ts extracts FIELD_SIZE and
                    MAX_NOTE_VALUE from contracts/src/*.sol, and transaction.test.ts
                    extracts the pinned abi.encode vector from contracts/test/

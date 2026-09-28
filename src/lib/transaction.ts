@@ -75,6 +75,7 @@
  * shape of a real spend rather than about a number.
  */
 
+import { encodeWords } from "@/lib/abi";
 import { ZERO_ADDRESS, assertChecksummedAddress } from "@/lib/address";
 import { FIELD_MODULUS, MAX_NOTE_VALUE, intoField, isInField } from "@/lib/field";
 import type { FieldHash } from "@/lib/hash";
@@ -230,6 +231,10 @@ export function fieldEncodeAmount(amount: bigint): bigint {
  * place a negative amount is encoded that way; `fieldEncodeAmount` above uses field
  * negation instead, and conflating the two encodings is the kind of mistake that
  * yields a verifying proof for the wrong transaction.
+ *
+ * The word layout moved to `lib/abi.ts` when `lib/eip712.ts` needed the same loop.
+ * The 128-byte vector did not move, so it still pins this encoding from both sides —
+ * which is what makes the extraction safe to have done at all.
  */
 export function abiEncodeExtData(extData: ExtData): Uint8Array {
   const recipient = assertAddress(extData.recipient, "recipient");
@@ -239,12 +244,12 @@ export function abiEncodeExtData(extData: ExtData): Uint8Array {
   // silently wrapping into a valid-looking word.
   publicAmountFor(extData);
 
-  const out = new Uint8Array(4 * 32);
-  writeWord(out, 0, BigInt(recipient));
-  writeWord(out, 1, BigInt(relayer));
-  writeWord(out, 2, twosComplement256(extData.extAmount));
-  writeWord(out, 3, extData.fee);
-  return out;
+  return encodeWords([
+    BigInt(recipient),
+    BigInt(relayer),
+    twosComplement256(extData.extAmount),
+    extData.fee,
+  ]);
 }
 
 /**
@@ -456,10 +461,3 @@ function twosComplement256(amount: bigint): bigint {
   return ((amount % modulus) + modulus) % modulus;
 }
 
-function writeWord(out: Uint8Array, index: number, value: bigint): void {
-  let remaining = value;
-  for (let byte = 31; byte >= 0; byte--) {
-    out[index * 32 + byte] = Number(remaining & 0xffn);
-    remaining >>= 8n;
-  }
-}
