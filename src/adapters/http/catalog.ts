@@ -1,6 +1,6 @@
-import type { Catalog, Price, Quote, TokenRef, Tool, ToolField, ToolRun } from "@/adapters/types";
-import { USDC } from "@/config/chain";
+import type { Catalog, Price, Quote, Tool, ToolField, ToolRun } from "@/adapters/types";
 import { BLUEAGENT, FORWARD } from "@/config/upstream";
+import { checkRequirements, whyNotSign } from "@/lib/requirements";
 
 /**
  * The real upstream catalog, read over the network.
@@ -43,32 +43,6 @@ import { BLUEAGENT, FORWARD } from "@/config/upstream";
  * that says why is honest; four fabricated tools that look like a catalog are not.
  */
 
-/**
- * Assets whose decimals this repo has verified on Basescan.
- *
- * A 402 names its asset by address and carries no `decimals` — measured the same
- * day, and the MCP server's quote output says so out loud for the same reason. The
- * number that turns `amount: "10000"` into `0.01` therefore cannot come from
- * upstream, and assuming 6 because the symbol looks familiar is how a price ends
- * up wrong by a factor of 10^12.
- *
- * One entry, because upstream prices everything in USDC. Refusing an address that
- * is not on this list is the point of having a list: an unknown asset means there
- * is nothing verified to divide by, and "cannot price this" is a correct answer
- * where a guess would not be.
- */
-const KNOWN_ASSETS: readonly TokenRef[] = [USDC];
-
-export function assetOf(address: string): TokenRef {
-  const found = KNOWN_ASSETS.find((t) => t.address.toLowerCase() === address.toLowerCase());
-  if (!found) {
-    throw new Error(
-      `The payee asked to be paid in ${address}, which is not an asset this build has verified. Nothing here knows how many decimals it has, so the price cannot be shown and must not be signed.`,
-    );
-  }
-  return found;
-}
-
 /* ── reading upstream's json without trusting its shape ───────────────────────── */
 
 type Json = Record<string, unknown>;
@@ -85,17 +59,6 @@ function str(value: unknown, what: string): string {
     throw new Error(`Upstream sent no ${what}.`);
   }
   return value;
-}
-
-/** Digits only. `BigInt("1e4")` throws, and `BigInt(" 1")` does not — neither is a price. */
-const WHOLE = /^\d+$/;
-
-function baseUnits(value: unknown): bigint {
-  const text = str(value, "amount");
-  if (!WHOLE.test(text)) {
-    throw new Error(`Upstream asked for "${text}", which is not a whole number of base units.`);
-  }
-  return BigInt(text);
 }
 
 /**
@@ -185,6 +148,16 @@ export function parseTools(body: unknown): Tool[] {
  * which the catalog itself contradicts. So the ids reaching here are the ones NOT in
  * the list: a stale name from an older catalog, a cached MCP manifest, or a hard-coded
  * string. Trusting that hint would report a phantom tool as merely unavailable.
+ *
+ * ── The paid branch is one call, and that is the point ───────────────────────────
+ * It used to read four fields out of `accepts[0]` by hand and drop the other three.
+ * `checkRequirements` reads all seven and refuses the ones that cannot be signed
+ * safely, so the paid branch here is now a delegation rather than a parser. Nothing
+ * in this file decides what an acceptable asset, chain, scheme or window is any
+ * more — there was a `KNOWN_ASSETS` list and an `assetOf` here doing half of it,
+ * which is the same two-copies-of-one-rule hazard `lib/abi.ts` was extracted to
+ * end, and worse in the same way: both copies sat on the path whose output gets
+ * signed.
  */
 export function parsePrice(toolId: string, status: number, body: unknown): Price {
   const b = obj(body, "a quote");
@@ -203,21 +176,7 @@ export function parsePrice(toolId: string, status: number, body: unknown): Price
     };
   }
 
-  const first = Array.isArray(b.accepts) ? (b.accepts[0] as unknown) : undefined;
-  if (first === undefined) {
-    throw new Error(
-      `${toolId} answered ${status} but named no price, so there is nothing here to agree to.`,
-    );
-  }
-
-  const accept = obj(first, "a payment requirement");
-  return {
-    kind: "paid",
-    payTo: str(accept.payTo, "payee"),
-    amountBaseUnits: baseUnits(accept.amount),
-    asset: assetOf(str(accept.asset, "asset address")),
-    network: str(accept.network, "network"),
-  };
+  return { kind: "paid", requirements: checkRequirements(toolId, b) };
 }
 
 /* ── the adapter ─────────────────────────────────────────────────────────────── */
@@ -300,8 +259,20 @@ export class HttpCatalog implements Catalog {
    */
   readonly isLive = false;
 
+  /**
+   * ⚠️ Two independent reasons, and the order outlives the current one.
+   *
+   * `NO_WALLET` is why nothing runs today and it goes first. An unrecognised payee is
+   * reported after it because it is the reason that will **still** be true once a
+   * wallet lands — so both get said rather than the temporary one hiding the
+   * permanent one. Suppressing the payee note while there is no wallet would mean the
+   * day signing is wired up is the day the warning first appears, which is the worst
+   * possible day to learn that upstream's payee moved.
+   */
   whyNot(price: Price): string | null {
-    return price.kind === "free" ? null : NO_WALLET;
+    if (price.kind === "free") return null;
+    const payee = whyNotSign(price.requirements);
+    return payee === null ? NO_WALLET : `${NO_WALLET} There is also a second problem: ${payee}`;
   }
 
   async tools(): Promise<Tool[]> {

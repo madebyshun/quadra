@@ -15,6 +15,7 @@
  */
 
 import type { Commitment, TreeRoot } from "@/lib/note";
+import type { PaymentRequirements } from "@/lib/requirements";
 
 export type TokenRef = {
   address: string;
@@ -245,9 +246,23 @@ export type Tool = {
  * `free` is a real case, not an absence: some ids answer 200 with no payment at
  * all, and a `price: 0n` would have let the router build an authorization for
  * zero and charge gas to prove nothing.
+ *
+ * ── 🔴 Why `paid` carries a checked struct and not four loose fields ──────────
+ * It was `{ payTo, amountBaseUnits, asset, network }` — the four fields the panel
+ * happens to render. The 402 it came from carries three more: `scheme`,
+ * `extra.{name,version}` and `maxTimeoutSeconds`, which are precisely the ones a
+ * signature's safety rests on. Dropping them at parse time did not defer the check,
+ * it **destroyed the evidence for it**: no later stage could verify a domain or a
+ * settlement scheme that no longer existed in any value.
+ *
+ * So the paid variant carries `PaymentRequirements`, which only exists once
+ * `checkRequirements` has agreed to it. There is now no way to construct a displayed
+ * price that was not checked — not because a developer must remember to check, but
+ * because the type of a price is the output of the checker. Same device as
+ * `Attestation` and `Anchoring` above: the shape enforces the discipline.
  */
 export type Price =
-  | { kind: "paid"; payTo: string; amountBaseUnits: bigint; asset: TokenRef; network: string }
+  | { kind: "paid"; requirements: PaymentRequirements }
   | { kind: "free"; why: string };
 
 export type Quote = {

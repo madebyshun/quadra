@@ -5,7 +5,7 @@ Read `CLAUDE.md` first — it has the constraints and the rules that exist becau
 something broke. This file is only the work.
 
 **Before you start anything:** `npm install`, then `npm run gate`. It must be green
-(tsc clean, **940 tests in 28 files** as measured 2026-09-28, 100% on
+(tsc clean, **1019 tests in 29 files** as measured 2026-09-28, 100% on
 statements/branches/functions/lines, build succeeds). If it is not green on a fresh
 checkout, fix that before touching a task — you are looking at drift, not at your own
 change.
@@ -34,7 +34,7 @@ Say which three. "Build is green" has been used to mean "tsc passed" and it was 
 |---|---|---|
 | `send` | on | built, works against the local pool |
 | `inference` | on | built, works against the local enclave |
-| `x402` | on | built, **free runs work end to end against the live catalog; paid runs cannot** |
+| `x402` | on | built, **free runs work end to end against the live catalog; paid runs are quoted, priced and CHECKED but cannot be signed** (T4 step 2 done 2026-09-28) |
 | `hooks` | on | built, read-only |
 | `mcp` | on | built, read-only |
 | `swap` | on | **not built** — amber notice, waiting on a deployed pool (T7) |
@@ -152,17 +152,17 @@ code. 109 of the 115 catalog tools are paid. Making them run means:
 1. **Connect a wallet.** EIP-1193 injected provider. Guard the chain — Base is 8453,
    `BASE.idHex` is `0x2105` in `src/config/chain.ts`. A signature produced on the
    wrong chain is a silent failure, so refuse rather than prompt-and-hope.
-2. **Read the payment requirements off the live 402 — and CHECK them.** They are already
-   parsed: `Price` in `src/adapters/types.ts` carries `payTo`, `amountBaseUnits`, `asset`,
-   `network`. Parsed is not checked, and this step is where the risk in the whole path
-   lives: a changed or hostile upstream that names a different token, a different chain or
-   a different payee gets a valid signature for exactly what it named. So assert `asset`
-   and the EIP-712 `extra.{name,version}` against `USDC_DOMAIN`, assert `network` against
-   `BASE.id`, and assert `payTo` against `BLUEAGENT.knownPayTo`. **Never assemble a price
-   locally**, and `knownPayTo` is only ever an assertion, never a destination — a constant
-   used as the destination keeps paying the old payee after upstream moves. A live `payTo`
-   that differs from it is a signal, not a default. ⬅️ **This is the next increment**; the
-   digest it feeds already exists.
+2. **Read the payment requirements off the live 402 — and CHECK them.** ✅ **DONE
+   2026-09-28** — `src/lib/requirements.ts`. It did not end up being an assertion pass over
+   `Price`, because measuring the live 402 proved that impossible: `Price` kept four of the
+   seven fields and dropped `scheme`, `extra` and `maxTimeoutSeconds`, which are the three
+   that matter. So the check *became* the parse, and `Price`'s `paid` variant now carries a
+   `PaymentRequirements` and nothing else — there is no way to hold a displayable price that
+   was not checked. Two things the plan above got wrong and the measurement fixed: `network`
+   is CAIP-2 `"eip155:8453"` (asserting against `BASE.id` directly would have refused every
+   real 402), and upstream asks for `maxTimeoutSeconds: 120` where this build's fallback said
+   600. See **Step 1k** under T7 for the measured table, the per-field authority asymmetry,
+   and why an unrecognised payee is a value rather than a throw.
 3. **Sign an EIP-3009 `TransferWithAuthorization`.** ✅ **The digest half is DONE** —
    `src/lib/eip712.ts`, built 2026-09-28 out of order because it needed no wallet and no
    decision. `authorizationDigest(USDC_DOMAIN, auth)` is the 32 bytes to sign, and its
@@ -178,7 +178,13 @@ code. 109 of the 115 catalog tools are paid. Making them run means:
    as paid. Keep that property. Do not add a `paid: boolean`.
 6. **Relax `whyNot`** so a paid price is refused only when there is genuinely no wallet
    or no chain — not unconditionally. Read the long comment on `Catalog.whyNot` before
-   you change it; it explains why this is per-price and not per-adapter.
+   you change it; it explains why this is per-price and not per-adapter. ⚠️ **Partly done
+   already, and note what it now has to keep doing:** `HttpCatalog.whyNot` composes two
+   independent reasons — the missing wallet *and* an unrecognised payee — with the wallet
+   first because it is the one that disappears when this step lands. When you delete
+   `NO_WALLET` from that string, the payee refusal must survive on its own. It is not
+   decoration: `authorizationFor` throws on it too, so removing the wrong half here means
+   the button enables and the signature still refuses.
 
 **Hard constraints:**
 - The panel must keep re-quoting on every tool change. A stale price is how someone
@@ -1007,15 +1013,140 @@ test-only, `abi.ts` inherits that, and the unchanged byte count has a fully unde
 cause rather than a worrying one. Both files carry a status block saying so; re-grep rather
 than trusting either.
 
-**What this is waiting for, and it is the next increment rather than a later nicety.** A 402
-response carries `payTo`, `maxAmountRequired`, `asset`, `network` and `extra.{name,version}`.
-Signing an authorization built from those *without checking them* is the entire risk in this
-path: a changed or hostile upstream names a different payee, a different token, or a
-different chain, and the signature is valid for whatever it named. So the consumer to build
-is the requirements check — assert `asset` and `extra` against `USDC_DOMAIN`, assert `payTo`
-against `BLUEAGENT.knownPayTo`, then build the digest. `knownPayTo` exists **only to assert
-against**; a constant used as the destination is a constant that keeps paying the old payee
-after upstream moves.
+> **Half of that is SUPERSEDED by step 1k, same day.** Re-measured after the requirements
+> check shipped: `TransferWithAuthorization` → **1**, `EIP712Domain(` → **1**, bundle
+> **229.46 kB**. `eip712.ts` is in production now, because `requirements.ts` reads
+> `USDC_DOMAIN`, `MAX_AUTHORIZATION_SECONDS` and `validityWindow` on the live price path.
+> The `abi.ts` half is still 0 and for a precise reason worth keeping: `authorizationFor`
+> is exported but has no caller, so rollup drops it and with it `authorizationDigest` →
+> `encodeAuthorization` → `encodeWords`. The **digest** path still does not ship; the
+> **domain** path does. Left as a correction rather than an edit — the original numbers are
+> the evidence for a decision already taken, and overwriting them makes it unauditable.
+
+### Step 1k also DONE (2026-09-28) — the 402 is checked before anything can display it
+
+`src/lib/requirements.ts`, and a rewrite of `Price`. This is **step 2 of T4**, and it turned
+out to be a bigger change than "assert some fields" because of what measuring the live 402
+revealed.
+
+🔴 **The brief was impossible as written, and the measurement is what showed it.** The plan
+above says: take a live-parsed `Price` and assert its fields. But `parsePrice` kept only
+**four** of the seven requirement fields and threw away `scheme`, `extra.{name,version}` and
+`maxTimeoutSeconds` — which are exactly the three a signature's safety rests on. A checker
+placed downstream of `Price` is therefore not merely inconvenient, it is **structurally
+unable** to check the things worth checking, because the evidence is already gone. So the
+check had to *become* the parse, and `Price`'s paid variant had to become the checker's
+output type:
+
+```ts
+export type Price =
+  | { kind: "paid"; requirements: PaymentRequirements }   // ← was four loose fields
+  | { kind: "free"; why: string };
+```
+
+There is now no way to construct a displayed price that was not checked — not because a
+developer must remember to check, but because the type of a price is the output of the
+checker. Same device as `Attestation` and `Anchoring`.
+
+**MEASURED 2026-09-28** — `GET https://blueagent.dev/api/x402/<id>` for `token-price`,
+`wallet-risk` and `blue-audit`: three different prices, byte-identical shapes.
+
+| field | value | note |
+|---|---|---|
+| `x402Version` | `2` | |
+| `accepts` | **exactly 1** entry, on every id | |
+| `scheme` | `"exact"` | was being dropped |
+| `network` | `"eip155:8453"` | 🔴 **CAIP-2, not the bare number** |
+| `asset` | `0x833589fC…02913` | checksummed USDC |
+| `payTo` | `0x02950ad3…809205` | all-lowercase, matches `BLUEAGENT.knownPayTo` |
+| `maxTimeoutSeconds` | `120` | was being dropped |
+| `extra` | `{ name: "USD Coin", version: "2" }` | was being dropped |
+| `amount` | `"10000"` / `"50000"` / `"1000000"` | |
+| `decimals` | **absent entirely** | |
+
+Also measured: `hood-live` answers `free: true`, and `hub-risk-gate` answers **501**
+`TOOL_UNAVAILABLE` — confirming the phantom-id branch in `parsePrice` is real.
+
+🔴 **`network` is CAIP-2 and this was nearly a shipped bug.** An assertion written against
+`BASE.id` without measuring — `accept.network !== BASE.id` — would have refused *every real
+402*. The parser now pins the form with `/^eip155:(\d+)$/` and then the id, refusing
+`"8453"`, `"base"` and `"solana:8453"` alike. Lenient parsing is not available on this
+field: the chain id is the thing that stops a signature being replayed on another chain.
+
+🔴 **`maxTimeoutSeconds: 120` supersedes a guess.** `DEFAULT_AUTHORIZATION_SECONDS = 600n`
+in `eip712.ts` was chosen before this field was ever read. Signing a ten-minute window for a
+two-minute settlement is **5× the bearer-instrument exposure for nothing**. The live path
+now reads upstream's number and caps it; the 600 stays only as the fallback for callers with
+no requirements to read. The local stub carries its own `SETTLEMENT_SECONDS = 120` rather
+than importing the fallback, because a stub using 600 would be quietly claiming upstream
+asks for ten minutes.
+
+🔴 **Authority differs PER FIELD, and the two directions are not interchangeable.** This is
+the part to read before editing anything in that file:
+
+| field | authoritative side | why the other direction is wrong |
+|---|---|---|
+| `payTo` | **upstream** | `BLUEAGENT.knownPayTo` is only ever an assertion. A constant used as the *destination* keeps paying the old payee after upstream rotates — a silent misroute, not an error |
+| EIP-712 domain | **config** | Upstream's `extra.{name,version}` is only ever compared. A domain built from upstream's strings would let the payee choose the domain its own signature is verified under, and `domainSeparator` would dutifully produce a valid separator for it |
+
+`assertDomain` returns `USDC_DOMAIN` **by identity**, and a test asserts `toBe` rather than
+`toEqual` to pin exactly that.
+
+⚠️ **An unrecognised payee is a VALUE, not a throw.** A rotated payee leaves the 402
+perfectly readable, so throwing would make the price un-renderable over a problem the user
+can actually be told about. `Payee` is a union (`known | unrecognised`) and not a
+`recognised: boolean` — rule 10 — so the refusal has to be rendered rather than ignored.
+`whyNotSign` refuses the `unrecognised` variant, and `authorizationFor` refuses it **again**,
+so a panel that forgets to ask still cannot sign. `HttpCatalog.whyNot` reports it *after*
+`NO_WALLET`, deliberately: the missing wallet is the reason that goes away, the payee is the
+one that outlives it.
+
+**The panel shows it today, while nothing can sign.** Suppressing the note until signing
+exists would mean it first appears on the day signing lands — the worst possible day to
+learn upstream moved its payee. A warning that stays silent for exactly the period when
+reading it is free has spent its whole cheap life saying nothing. `.caution`, not the error
+path: the price is real and the tool runs the moment a wallet exists.
+
+**Every bound REFUSES. None of them clamp.** Amount over `MAX_TOOL_PRICE_BASE_UNITS`
+(5 USDC, anchored to the live catalog's own maximum of $1.00), window over
+`MAX_AUTHORIZATION_SECONDS`, more than one `accepts` entry — all throw. Clamping would show
+a user one number and sign another, which is the `encodeWords` masking argument from step 1j
+in a different costume. `accepts.length > 1` is refused rather than defaulting to
+`accepts[0]`: which one to prefer is a decision nobody has made, and array order is the one
+way of making it that cannot be reviewed.
+
+**A duplicated payment rule was deleted, not left alongside.** `KNOWN_ASSETS` and `assetOf`
+in `http/catalog.ts` were a second, independent opinion about which assets are acceptable,
+sitting on the path whose output gets signed — the same two-copies hazard `lib/abi.ts` was
+extracted to end. `assertAsset` is now the only one. Note it deliberately does **not** run
+EIP-55: there *is* another copy of that address, and comparing against it is strictly
+stronger than checking a checksum.
+
+⚠️ **`payTo` is the one address on this path where EIP-55 cannot help.** Both upstream's
+`payTo` and `BLUEAGENT.knownPayTo` are all-lowercase, so `checkAddress` returns `unchecked`
+for both and there is no checksum to verify. The constant comparison is not a
+belt-and-braces extra — it is the only check this field has.
+
+**The local stub is now provably a shape production could produce.** `priceOf` assembles
+upstream's envelope and hands it to `checkRequirements` instead of building a
+`PaymentRequirements` literal. A literal would have been shorter and is exactly the drift
+that file's own header forbids — *"a stub is a claim about upstream; copy it, do not compose
+it"* — and it would pass a `toEqual` while proving nothing. Now if `PAY_TO`, `NETWORK` or the
+domain ever drift out of agreement with `config/`, the test suite throws rather than a user
+seeing it.
+
+⚠️ **A doc comment that names the grep to run will match that grep.** The first version of
+this module's status block said "to re-check, grep `src/` for an import of this module" — and
+`grep -rln 'from "@/lib/requirements"' src/` returned `requirements.ts` itself, because the
+sentence describing the grep matched it. Read the hits, never count them; the bundle needle
+is the reliable answer. Now measured the other way round:
+`grep -cF 'not the CAIP-2 form' dist/assets/*.js` → **1**.
+
+**What is left of T4, in order:** step 1 (EIP-1193 connect, guard the chain to `0x2105`),
+then `eth_signTypedData_v4` over the digest `authorizationFor` already returns plus the
+`{v,r,s}` split, then step 4 (base64 `X-PAYMENT`), then step 5 (settlement — keep
+`kind: "settled"` as the only variant carrying `txHash`; do **not** add `paid: boolean`).
+Step 6 is partly done already: `whyNot` is per-price, not per-adapter.
 
 ### Steps 2 and 3 are NOT done, and step 2 is not a deployment step
 

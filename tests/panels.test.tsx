@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { AdaptersProvider, useAdapters } from "@/adapters/AdaptersProvider";
 import { LocalShieldedPool } from "@/adapters/local/pool";
 import { LocalEnclave } from "@/adapters/local/enclave";
-import { LOCAL_TOOLS, LocalCatalog } from "@/adapters/local/catalog";
+import { LOCAL_TOOLS, LocalCatalog, priceOf } from "@/adapters/local/catalog";
 import { NO_WALLET } from "@/adapters/http/catalog";
 import { BLUEAGENT } from "@/config/upstream";
 import type { Adapters, Model, Quote, Tool } from "@/adapters/types";
@@ -18,10 +18,14 @@ import { HooksPanel } from "@/features/panels/HooksPanel";
 import { installLine, McpPanel } from "@/features/panels/McpPanel";
 import { HOOK_PERMISSIONS } from "@/lib/hooks";
 import { MCP_BUILD, MCP_TOOLS, mcpConfigSnippet } from "@/lib/manifest";
+import { checkRequirements } from "@/lib/requirements";
 import { USDC } from "@/config/chain";
 import { renderAt, settle } from "./helpers";
 
 const PAYEE = "0x1111111111111111111111111111111111111111";
+
+/** The stub's own record for an id, so a test can price it the way the stub does. */
+const byId = (id: string) => LOCAL_TOOLS.find((t) => t.id === id)!;
 
 function stub(): Adapters {
   return {
@@ -1091,17 +1095,87 @@ describe("X402Panel", () => {
     );
   });
 
-  it("names the payee and the network before anything is signed", async () => {
+  /**
+   * ⚠️ "on Base", not "on eip155:8453", and the change is the point rather than
+   * cosmetic. The panel now renders a price that `checkRequirements` returned, and that
+   * check refuses any network but `eip155:8453` and then keeps no string — so the name
+   * on screen is a restatement of an assertion that passed. Printing the raw field was
+   * the weaker rendering: it looked precise while proving only that a string had been
+   * copied from the wire to the screen.
+   */
+  it("names the payee and the chain before anything is signed", async () => {
     await mount(<X402Panel />);
     await userEvent.selectOptions(amount("Tool"), "token-price");
-    await waitFor(() => expect(screen.getByText(/0\.01 USDC on eip155:8453/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/0\.01 USDC on Base/)).toBeInTheDocument());
     expect(screen.getByText(BLUEAGENT.knownPayTo)).toBeInTheDocument();
+  });
+
+  /**
+   * The window is on screen next to the price, because the amount alone understates
+   * what is being agreed to: an EIP-3009 authorization is a bearer slip, so the risk is
+   * the amount for as long as the slip stays live. Upstream asks for 120 seconds, which
+   * this build read off the live 402 rather than using its own 600-second fallback.
+   */
+  it("says how long the authorization it asks for stays spendable", async () => {
+    await mount(<X402Panel />);
+    await userEvent.selectOptions(amount("Tool"), "token-price");
+    await waitFor(() =>
+      expect(screen.getByText(/stays spendable for 120 seconds/)).toBeInTheDocument(),
+    );
   });
 
   it("says a free tool touches no wallet at all", async () => {
     await mount(<X402Panel />);
     expect(screen.getByText(/Free\. No payment is sent/)).toBeInTheDocument();
     expect(screen.queryByText(BLUEAGENT.knownPayTo)).not.toBeInTheDocument();
+    expect(screen.queryByText(/stays spendable/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⚠️ A rotated payee is shown TODAY, while this build still cannot sign anything.
+   *
+   * The tempting shortcut is to suppress the note until signing exists, on the grounds
+   * that nothing can go wrong before then. It is the wrong call for a reason that has
+   * nothing to do with today: the note would first appear on the day signing lands,
+   * which is the single worst day to discover that upstream moved its payee. A warning
+   * that stays silent for exactly the period when reading it is free has spent its
+   * whole cheap life saying nothing.
+   *
+   * Note what the price does NOT do here: it still renders. The amount is real, the
+   * asset is real, and the tool runs the moment a wallet exists — so this goes through
+   * `.caution` and not the error path, and the run button's own refusal stays the
+   * catalog's business rather than this component's.
+   *
+   * The requirements come from `checkRequirements` over a 402-shaped body rather than
+   * from a hand-built struct, so the sentence asserted below is the checker's own. A
+   * literal here could drift from what upstream's rotation actually produces and the
+   * test would still pass, since it would be asserting against itself.
+   */
+  it("warns about a payee it does not recognise, without calling the price an error", async () => {
+    const stranger = "0x1111111111111111111111111111111111111112";
+    const rotated = checkRequirements("token-price", {
+      x402Version: 2,
+      accepts: [
+        {
+          scheme: "exact",
+          network: "eip155:8453",
+          asset: USDC.address,
+          amount: "10000",
+          payTo: stranger,
+          maxTimeoutSeconds: 120,
+          extra: USDC.eip712,
+        },
+      ],
+    });
+    const value = stub();
+    value.catalog = patch(value.catalog, {
+      quote: () => Promise.resolve({ toolId: "token-price", price: { kind: "paid", requirements: rotated } }),
+    });
+    await mount(<X402Panel />, value);
+    await waitFor(() => expect(screen.getByText(/0\.01 USDC on Base/)).toBeInTheDocument());
+    expect(screen.getByText(new RegExp(`wants to be paid to ${stranger}`))).toBeInTheDocument();
+    expect(screen.getByText(/Confirm the new address before signing/)).toBeInTheDocument();
+    expect(screen.getByText(stranger)).toBeInTheDocument();
   });
 
   it("shows a field for each input the tool declares, and none otherwise", async () => {
@@ -1282,25 +1356,20 @@ describe("X402Panel", () => {
     await mount(<X402Panel />, value);
     await userEvent.selectOptions(amount("Tool"), "competitor-scan");
     await userEvent.selectOptions(amount("Tool"), "token-price");
-    await waitFor(() => expect(screen.getByText(/0\.01 USDC on eip155:8453/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/0\.01 USDC on Base/)).toBeInTheDocument());
     const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
+      /**
+       * The late price is the stub's own, not a literal: `Price`'s paid variant carries a
+       * `PaymentRequirements`, and the only way to hold one is to have run the checker.
+       * `competitor-scan` is 0.2 USDC, which is what makes this test able to tell a
+       * dropped quote from an applied one.
+       */
       await act(async () =>
-        release([
-          {
-            toolId: "competitor-scan",
-            price: {
-              kind: "paid",
-              payTo: PAYEE,
-              amountBaseUnits: 999_000n,
-              asset: USDC,
-              network: "eip155:8453",
-            },
-          },
-        ]),
+        release([{ toolId: "competitor-scan", price: priceOf(byId("competitor-scan")) }]),
       );
-      expect(screen.queryByText(/0\.999 USDC/)).not.toBeInTheDocument();
-      expect(screen.getByText(/0\.01 USDC on eip155:8453/)).toBeInTheDocument();
+      expect(screen.queryByText(/0\.2 USDC/)).not.toBeInTheDocument();
+      expect(screen.getByText(/0\.01 USDC on Base/)).toBeInTheDocument();
       expect(quiet).not.toHaveBeenCalled();
     } finally {
       quiet.mockRestore();

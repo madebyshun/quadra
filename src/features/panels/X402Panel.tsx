@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAdapters } from "@/adapters/AdaptersProvider";
 import type { Quote, Tool, ToolRun } from "@/adapters/types";
+import { BASE } from "@/config/chain";
 import { formatAmount } from "@/lib/amount";
+import { whyNotSign, type PaymentRequirements } from "@/lib/requirements";
 import { Crt } from "@/ui/Crt";
 import { Gel } from "@/ui/Gel";
 import { Settled } from "@/features/panels/Anchor";
@@ -105,9 +107,9 @@ export function X402Panel() {
   const label = () => {
     if (busy) return "Running…";
     if (!quote) return "Run";
-    return quote.price.kind === "free"
-      ? "Run — free"
-      : `Run for ${formatAmount(quote.price.amountBaseUnits, quote.price.asset.decimals)} ${quote.price.asset.symbol}`;
+    if (quote.price.kind === "free") return "Run — free";
+    const { value, asset } = quote.price.requirements;
+    return `Run for ${formatAmount(value, asset.decimals)} ${asset.symbol}`;
   };
 
   return (
@@ -134,11 +136,7 @@ export function X402Panel() {
         ) : quote.price.kind === "free" ? (
           <p className="dim">Free. No payment is sent and no wallet is touched.</p>
         ) : (
-          <p className="dim">
-            {formatAmount(quote.price.amountBaseUnits, quote.price.asset.decimals)}{" "}
-            {quote.price.asset.symbol} on {quote.price.network}, to{" "}
-            <code>{quote.price.payTo}</code>. Charged only if the tool answers.
-          </p>
+          <Requirements requirements={quote.price.requirements} />
         )}
       </fieldset>
 
@@ -187,5 +185,54 @@ export function X402Panel() {
         )}
       </Crt>
     </div>
+  );
+}
+
+/**
+ * What a paid run will cost, who receives it, and how long the signature stays
+ * spendable.
+ *
+ * Every field here survived `checkRequirements`, which is why this component can
+ * render them flatly with no hedging: the amount is exact base units, the asset's
+ * decimals came from this repo's verified table rather than from the 402, and the
+ * chain was refused unless it was `eip155:8453`. That last one is why the chain
+ * prints as `BASE.name` and not as a string off the wire — the name is a
+ * restatement of an assertion that passed, not config quietly overriding upstream.
+ *
+ * ── The window is on screen because it is the exposure ───────────────────────────
+ * An EIP-3009 authorization is a bearer instrument: once signed, whoever holds it
+ * can redeem it once, at any moment until `validBefore`. So the honest unit of
+ * risk is not the amount alone, it is the amount multiplied by how long the slip
+ * stays live. Upstream asks for 120 seconds. This panel printed neither number
+ * until the requirements check existed to read them, and hiding the window while
+ * showing the price would describe the smaller half of what is being agreed to.
+ *
+ * ── An unrecognised payee is shown, not swallowed ────────────────────────────────
+ * ⚠️ `whyNotSign` is asked here even though this build cannot sign anything yet,
+ * and its sentence is rendered in `.caution` rather than as an error. Two reasons,
+ * and the second is the load-bearing one:
+ *
+ *   - It is not an error. The quote parsed, the price is real, and the tool is
+ *     still perfectly runnable the moment a wallet exists — nothing failed.
+ *   - Suppressing it until signing is wired up would mean the day signing lands is
+ *     the day the warning first appears, which is the worst possible day to
+ *     discover that upstream's payee moved. A warning that only shows up once it
+ *     has teeth has been silent for exactly the period when it was free to read.
+ */
+function Requirements({ requirements }: { requirements: PaymentRequirements }) {
+  const { payee, value, asset, lifetimeSeconds } = requirements;
+  const refusal = whyNotSign(requirements);
+  return (
+    <>
+      <p className="dim">
+        {formatAmount(value, asset.decimals)} {asset.symbol} on {BASE.name}, to{" "}
+        <code>{payee.address}</code>. Charged only if the tool answers.
+      </p>
+      <p className="dim">
+        {"The authorization it asks you to sign stays spendable for "}
+        {`${lifetimeSeconds}`} seconds, then expires on its own.
+      </p>
+      {refusal ? <p className="caution">{refusal}</p> : null}
+    </>
   );
 }

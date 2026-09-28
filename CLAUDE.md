@@ -33,7 +33,7 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. **940 tests in 28 files**, 100% on all four
+in one go. Do not report "done" on a subset. **1019 tests in 29 files**, 100% on all four
 metrics, measured 2026-09-28.
 
 That count is a dated measurement, not a target — it is here so a fresh clone that comes
@@ -339,6 +339,30 @@ src/
                                Typehashes are derived from the type strings at load, never
                                tabulated (rule 9); the strings are whitespace-sensitive and
                                pinned as text as well as by hash
+                   requirements.ts — reads a live 402 into the ONLY struct `Price`'s
+                               `paid` variant can hold, so a displayed price is by
+                               construction a checked one. It became the parse rather
+                               than a second pass over `Price`, because `Price` used to
+                               drop `scheme`, `extra` and `maxTimeoutSeconds` — exactly
+                               the three a signature's safety rests on — so a checker
+                               downstream of it was structurally unable to check them.
+                               🔴 Authority differs PER FIELD and the directions are not
+                               interchangeable: `payTo` comes from upstream and the
+                               config constant is only ever an assertion (a constant used
+                               as the destination keeps paying the old payee after a
+                               rotation — a silent misroute, not an error), while the
+                               EIP-712 domain comes from config and upstream's
+                               `extra.{name,version}` is only ever compared (adopting it
+                               would let the payee choose the domain its own signature is
+                               verified under). 🔴 MEASURED 2026-09-28: `network` is CAIP-2
+                               `"eip155:8453"`, NOT the bare number — an assertion written
+                               against `BASE.id` without measuring would refuse every real
+                               402. Same measurement: `maxTimeoutSeconds: 120`, which
+                               supersedes eip712.ts's 600-second fallback, and a 402
+                               carries no `decimals` at all. Every bound REFUSES and none
+                               clamp; an unrecognised payee is a VALUE (`Payee` is a union,
+                               rule 10) because a rotated payee leaves the 402 perfectly
+                               readable and throwing would make the price un-renderable
                    backup.ts — the backup file format. localStorage is not a backup;
                                this is. Plaintext secrets by necessity and labelled as
                                such, never half-encrypted. Validates an import through
@@ -351,7 +375,7 @@ src/
   pages/           /docs /api /verify /404
   ui/              Window, Taskbar, Gel (button), Crt (output box)
   styles/          reset.css + theme.css — the XP/Aqua design system
-tests/             28 files, mirrors src/. TWO of them read Solidity rather than
+tests/             29 files, mirrors src/. TWO of them read Solidity rather than
                    restating its numbers: field.test.ts extracts FIELD_SIZE and
                    MAX_NOTE_VALUE from contracts/src/*.sol, and transaction.test.ts
                    extracts the pinned abi.encode vector from contracts/test/

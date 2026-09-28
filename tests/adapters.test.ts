@@ -2,14 +2,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { adapters, bothDeployed, onchainReady, resolvePool } from "@/adapters";
 import { LocalShieldedPool } from "@/adapters/local/pool";
 import { LOCAL_MODELS, LocalEnclave } from "@/adapters/local/enclave";
-import { LocalCatalog } from "@/adapters/local/catalog";
+import { LOCAL_TOOLS, LocalCatalog, priceOf } from "@/adapters/local/catalog";
 import { HttpCatalog } from "@/adapters/http/catalog";
 import type { Note, NoteWitness } from "@/adapters/types";
 import type { NoteStore, StoredNote, StoredPool } from "@/adapters/local/store";
 import { LocalStorageNoteStore, MemoryNoteStore, STORE_KEY, STORE_VERSION } from "@/adapters/local/store";
 import { BACKUP_FORMAT } from "@/lib/backup";
 import { AAPL_BASE } from "@/config/pair";
-import { BLUEAGENT } from "@/config/upstream";
 import { CONTRACTS, USDC } from "@/config/chain";
 import { formatAmount, parseAmount } from "@/lib/amount";
 import { FIELD_MODULUS, MAX_NOTE_VALUE, isInField } from "@/lib/field";
@@ -1606,19 +1605,22 @@ describe("resolver", () => {
    * A free run reaching upstream for real does not change that — it returns an answer
    * nobody paid for, which is the opposite of a settlement.
    */
+  /**
+   * The paid price comes from `priceOf`, not from a literal written here.
+   *
+   * `Price`'s paid variant now holds a `PaymentRequirements`, and the only way to get
+   * one is through `checkRequirements` — which is the point of the type. Writing a
+   * fixture for it in this file would mean writing a second opinion about upstream's
+   * envelope into a test about adapter WIRING, so this borrows the stub's price
+   * instead. It is a real checked price, and this test only needs it to be paid.
+   */
   it("does not let a live read make the catalog claim it settled anything", () => {
     const { catalog } = adapters();
     expect(catalog.isLive).toBe(false);
     expect(catalog.whyNot({ kind: "free", why: "no payment" })).toBeNull();
-    expect(
-      catalog.whyNot({
-        kind: "paid",
-        payTo: BLUEAGENT.knownPayTo,
-        amountBaseUnits: 10_000n,
-        asset: usdc,
-        network: "eip155:8453",
-      }),
-    ).not.toBeNull();
+    const paid = priceOf(LOCAL_TOOLS.find((t) => t.priceBaseUnits > 0n)!);
+    expect(paid.kind).toBe("paid");
+    expect(catalog.whyNot(paid)).not.toBeNull();
   });
 
   /**

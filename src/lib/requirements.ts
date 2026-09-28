@@ -85,19 +85,20 @@
  * out-of-range ABI word (see `lib/abi.ts`). Refusing is the only behaviour that
  * keeps the bytes and the screen describing the same thing.
  *
- * ── Status: NOTHING IMPORTS THIS YET ────────────────────────────────────────
- * ⚠️ Measured 2026-09-28: no file under `src/` imports this module, so it is
- * tree-shaken out. Written down because this repo has twice now had a module at
- * 100% coverage that looked wired up and was not. The consumer is one commit away
- * and named: `Price`'s `paid` variant should carry a `PaymentRequirements` instead
- * of its four loose fields, which is what closes the gap this file's header opens.
+ * ── Status: this is the only way to hold a price ────────────────────────────────
+ * Measured 2026-09-28: `grep -cF 'not the CAIP-2 form' dist/assets/*.js` → 1, so this
+ * module is in the shipped bundle and not tree-shaken out. Worth confirming in the
+ * bundle rather than by grepping `src/`, for two reasons: this repo has twice had a
+ * module at 100% coverage that looked wired up and was not, and the obvious source
+ * grep matches **this very sentence** (see `lib/keccak.ts` for why the needle must be
+ * `-F` and must carry no identifier).
  *
- * To re-check, grep `src/` for an import of this module — and note that the obvious
- * grep matches **this sentence**, so read the hits rather than counting them. The
- * bundle answer is the reliable one: `grep -cF 'not the CAIP-2 form' dist/assets/*.js`
- * → 0 today, with `grep -cF '(1600-2*' dist/assets/*.js` → 1 as the control proving
- * the needle technique works on the same file. See `lib/keccak.ts` for why `-F` and
- * why the needle carries no identifier.
+ * It is reachable because `Price`'s `paid` variant now holds a `PaymentRequirements`
+ * and nothing else — so `checkRequirements` is not a check a caller may remember to
+ * run, it is the only constructor of a displayable price. `adapters/http/catalog.ts`
+ * delegates to it for every live 402, and `adapters/local/catalog.ts` runs its stub
+ * envelope through it too, which is what makes the stub provably a shape production
+ * could produce.
  */
 
 import { sameAddress } from "@/lib/address";

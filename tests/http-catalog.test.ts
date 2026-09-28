@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  assetOf,
   HttpCatalog,
   NO_FORWARDER,
   NO_WALLET,
@@ -12,6 +11,7 @@ import {
 import type { Catalog } from "@/adapters/types";
 import { BLUEAGENT } from "@/config/upstream";
 import { USDC, WETH } from "@/config/chain";
+import { USDC_DOMAIN } from "@/lib/eip712";
 
 /**
  * The real catalog, against the bodies production actually sends.
@@ -302,27 +302,44 @@ describe("quoting against a live 402", () => {
     expect(seen.urls[0]).toBe("https://blueagent.dev/api/x402/token-price");
   });
 
-  it("reads the price, the payee and the network off the response", async () => {
+  it("reads the price and the payee off the response", async () => {
     answering({ status: 402, body: PAID });
     const quote = await new HttpCatalog().quote("token-price");
     if (quote.price.kind !== "paid") throw new Error("expected a paid quote");
-    expect(quote.price.amountBaseUnits).toBe(10_000n);
-    expect(quote.price.payTo).toBe(BLUEAGENT.knownPayTo);
-    expect(quote.price.network).toBe("eip155:8453");
+    expect(quote.price.requirements.value).toBe(10_000n);
+    expect(quote.price.requirements.payee.address).toBe(BLUEAGENT.knownPayTo);
+    expect(quote.price.requirements.payee.kind).toBe("known");
+  });
+
+  /**
+   * The three fields this parser used to throw away, now on the struct it returns.
+   *
+   * Worth its own test because the old shape made them unreachable rather than wrong:
+   * `scheme`, `extra` and `maxTimeoutSeconds` were read off the wire and dropped, so no
+   * downstream check could have looked at them however careful it was. `lifetimeSeconds`
+   * is the one with a number attached — 120 from upstream, where this build's own
+   * fallback said 600.
+   */
+  it("keeps the settlement window and the domain upstream named, instead of dropping them", async () => {
+    answering({ status: 402, body: PAID });
+    const quote = await new HttpCatalog().quote("token-price");
+    if (quote.price.kind !== "paid") throw new Error("expected a paid quote");
+    expect(quote.price.requirements.lifetimeSeconds).toBe(120n);
+    expect(quote.price.requirements.domain).toBe(USDC_DOMAIN);
   });
 
   it("keeps the amount in base units, never a float", async () => {
     answering({ status: 402, body: PAID });
     const quote = await new HttpCatalog().quote("token-price");
     if (quote.price.kind !== "paid") throw new Error("expected a paid quote");
-    expect(typeof quote.price.amountBaseUnits).toBe("bigint");
+    expect(typeof quote.price.requirements.value).toBe("bigint");
   });
 
   it("calls a free tool free rather than pricing it at zero", async () => {
     answering({ body: FREE });
     const quote = await new HttpCatalog().quote("hood-live");
     expect(quote.price.kind).toBe("free");
-    expect(quote.price).not.toHaveProperty("amountBaseUnits");
+    expect(quote.price).not.toHaveProperty("requirements");
     if (quote.price.kind !== "free") throw new Error("expected a free quote");
     expect(quote.price.why).toMatch(/no payment, no wallet/);
   });
@@ -364,65 +381,65 @@ describe("quoting against a live 402", () => {
     );
   });
 
-  it("refuses a 402 that names no price", () => {
-    expect(() => parsePrice("token-price", 402, { error: "Payment Required" })).toThrow(
-      /named no price/,
+  it("refuses a 402 that names no way to pay", () => {
+    expect(() => parsePrice("token-price", 402, { x402Version: 2 })).toThrow(/named no way to pay/);
+    expect(() => parsePrice("token-price", 402, { x402Version: 2, accepts: [] })).toThrow(
+      /named no way to pay/,
     );
-    expect(() => parsePrice("token-price", 402, { accepts: [] })).toThrow(/named no price/);
   });
 
-  it("refuses a payment requirement that is missing a field", () => {
-    const one = (extra: Record<string, unknown>) => ({
-      accepts: [{ network: "eip155:8453", asset: USDC.address, amount: "10000", ...extra }],
-    });
-    expect(() => parsePrice("t", 402, one({}))).toThrow("no payee");
-    expect(() => parsePrice("t", 402, { accepts: ["nope"] })).toThrow("not a JSON object");
-  });
-
-  it("refuses an amount that is not a whole number of base units", () => {
-    const amount = (value: unknown) => ({
-      accepts: [{ payTo: BLUEAGENT.knownPayTo, asset: USDC.address, network: "base", amount: value }],
-    });
-    expect(() => parsePrice("t", 402, amount("0.01"))).toThrow(/not a whole number/);
-    expect(() => parsePrice("t", 402, amount("1e4"))).toThrow(/not a whole number/);
-    expect(() => parsePrice("t", 402, amount(10000))).toThrow("no amount");
-  });
-
+  /**
+   * `parsePrice`'s own refusal, before delegation: the body itself is not an object, so
+   * there is no `code`, no `free` and no `accepts` to branch on.
+   */
   it("refuses a body that is not an object", () => {
     expect(() => parsePrice("t", 402, "Payment Required")).toThrow("not a JSON object");
   });
 });
 
-describe("the asset a 402 asks to be paid in", () => {
-  it("resolves USDC to the decimals this repo verified on Basescan", () => {
-    expect(assetOf(USDC.address)).toBe(USDC);
+/**
+ * ⚠️ This block used to be sixty lines of field-by-field refusals — a missing payee, a
+ * fractional amount, an unverified asset — and every one of them has moved to
+ * `tests/requirements.test.ts`, which checks all seven fields instead of the four this
+ * file's parser used to read.
+ *
+ * They are not merely relocated: they were **weaker here**. A refusal asserted through
+ * `parsePrice` passes whether the check lives in this module or three modules down, so
+ * the old tests could not distinguish "this file checks the asset" from "something
+ * eventually does" — which is exactly how a second copy of the rule survived in
+ * `KNOWN_ASSETS` next to the real one. What is left below is the one statement only
+ * this file can make: that it delegates at all, and that upstream's refusal reaches a
+ * caller intact rather than being caught and turned into a price.
+ */
+describe("what a paid quote delegates", () => {
+  const withAccept = (patch: Record<string, unknown>) => ({
+    ...PAID,
+    accepts: [{ ...PAID.accepts[0], ...patch }],
   });
 
-  it("does not care about checksum casing", () => {
-    expect(assetOf(USDC.address.toLowerCase())).toBe(USDC);
+  it("hands the body to the requirements checker instead of reading fields itself", () => {
+    expect(() => parsePrice("token-price", 402, withAccept({ asset: WETH.address }))).toThrow(
+      /verified the decimals of exactly one asset/,
+    );
   });
 
   /**
-   * The load-bearing refusal. A 402 carries no `decimals`, so the only way to turn
-   * `amount: "10000"` into a number a human agrees to is a decimals value from
-   * somewhere trusted. Guessing 6 for an 18-decimal asset misprices by 10^12, and
-   * the mistake is invisible on screen — it just reads as a smaller number.
+   * The refusal reaches the caller through `quote`, not only through `parsePrice`.
+   * A checker whose throw were swallowed by the fetch path would be a checker that
+   * runs and has no effect.
    */
-  it("refuses an asset whose decimals it has not verified, rather than guessing", () => {
-    expect(() => assetOf(WETH.address)).toThrow(/not an asset this build has verified/);
-    expect(() => assetOf(WETH.address)).toThrow(/must not be signed/);
+  it("lets the refusal out through quote, so a bad 402 cannot become a price", async () => {
+    answering({ status: 402, body: withAccept({ network: "eip155:1" }) });
+    await expect(new HttpCatalog().quote("token-price")).rejects.toThrow(
+      /signs only for Base \(8453\)/,
+    );
   });
 
-  it("refuses through quote as well, not only when called directly", async () => {
-    answering({
-      status: 402,
-      body: {
-        accepts: [
-          { payTo: BLUEAGENT.knownPayTo, asset: WETH.address, amount: "1", network: "base" },
-        ],
-      },
-    });
-    await expect(new HttpCatalog().quote("token-price")).rejects.toThrow(/has not|not an asset/);
+  /** Names the tool, because the error surfaces in a window that shows several. */
+  it("names the tool in the refusal", () => {
+    expect(() => parsePrice("blue-audit", 402, withAccept({ scheme: "upto" }))).toThrow(
+      /^blue-audit wants to be paid under/,
+    );
   });
 });
 
@@ -583,15 +600,29 @@ describe("running a tool", () => {
   it("blocks the button for a paid price and allows it for a free one", () => {
     const catalog = new HttpCatalog();
     expect(catalog.whyNot({ kind: "free", why: "no payment" })).toBeNull();
-    expect(
-      catalog.whyNot({
-        kind: "paid",
-        payTo: BLUEAGENT.knownPayTo,
-        amountBaseUnits: 10_000n,
-        asset: USDC,
-        network: "eip155:8453",
-      }),
-    ).toBe(NO_WALLET);
+    expect(catalog.whyNot(parsePrice("token-price", 402, PAID))).toBe(NO_WALLET);
+  });
+
+  /**
+   * ⚠️ Two independent reasons, and the missing wallet is named first because it is the
+   * one that goes away.
+   *
+   * Signing lands and `NO_WALLET` disappears; a payee upstream rotated does not. If the
+   * payee note were first it would read as the headline today and as a leftover
+   * afterwards, so this asserts the ORDER and not merely that both strings appear. Both
+   * do have to appear: reporting only the wallet would hide the durable problem behind
+   * the temporary one, and reporting only the payee would tell a user to fix upstream
+   * when this window cannot pay anybody yet.
+   */
+  it("reports an unrecognised payee as well as the missing wallet, in that order", () => {
+    const rotated = parsePrice("token-price", 402, {
+      ...PAID,
+      accepts: [{ ...PAID.accepts[0], payTo: WETH.address }],
+    });
+    const why = new HttpCatalog().whyNot(rotated);
+    expect(why).toContain(NO_WALLET);
+    expect(why).toMatch(/second problem/);
+    expect(why?.indexOf(NO_WALLET)).toBe(0);
   });
 
   /**
