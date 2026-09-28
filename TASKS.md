@@ -5,7 +5,7 @@ Read `CLAUDE.md` first — it has the constraints and the rules that exist becau
 something broke. This file is only the work.
 
 **Before you start anything:** `npm install`, then `npm run gate`. It must be green
-(tsc clean, **1019 tests in 29 files** as measured 2026-09-28, 100% on
+(tsc clean, **1084 tests in 30 files** as measured 2026-09-28, 100% on
 statements/branches/functions/lines, build succeeds). If it is not green on a fresh
 checkout, fix that before touching a task — you are looking at drift, not at your own
 change.
@@ -149,9 +149,18 @@ absent.
 Today `catalog.whyNot(price)` refuses every paid price because there is no signing
 code. 109 of the 115 catalog tools are paid. Making them run means:
 
-1. **Connect a wallet.** EIP-1193 injected provider. Guard the chain — Base is 8453,
-   `BASE.idHex` is `0x2105` in `src/config/chain.ts`. A signature produced on the
-   wrong chain is a silent failure, so refuse rather than prompt-and-hope.
+1. **Connect a wallet.** ✅ **DONE 2026-09-28** — `src/lib/wallet.ts`, 65 tests, taken
+   ahead of T3 for the same reason as steps 2 and 3: connecting a wallet needs no
+   forwarder and no owner decision. `readWallet` / `connectWallet` / `requestBaseChain`
+   all end by re-measuring, because EIP-3326 has `wallet_switchEthereumChain` resolve
+   `null` both when it switched and when it decided not to — so its return value carries
+   no information and prompt-and-hope is not even available. An error from the request
+   can only *relabel* that measurement, never replace it. See **Step 1l** under T7 for
+   the near-bug this avoided (a hex string comparison against `BASE.idHex` that passes
+   for Base and silently breaks for any chain id containing `a`–`f`), and for why this
+   build refuses to call `wallet_addEthereumChain`. ⚠️ **Not wired into any panel yet** —
+   measured in the bundle, not inferred: `tests/wallet.test.ts` is the only importer and
+   the bundle did not grow a byte. The next increment is the React seam.
 2. **Read the payment requirements off the live 402 — and CHECK them.** ✅ **DONE
    2026-09-28** — `src/lib/requirements.ts`. It did not end up being an assertion pass over
    `Price`, because measuring the live 402 proved that impossible: `Price` kept four of the
@@ -1147,6 +1156,128 @@ then `eth_signTypedData_v4` over the digest `authorizationFor` already returns p
 `{v,r,s}` split, then step 4 (base64 `X-PAYMENT`), then step 5 (settlement — keep
 `kind: "settled"` as the only variant carrying `txHash`; do **not** add `paid: boolean`).
 Step 6 is partly done already: `whyNot` is per-price, not per-adapter.
+*(Step 1 landed later the same day — see Step 1l below. The sentence above is left as
+written, because it is the list the next steps were chosen from.)*
+
+### Step 1l also DONE (2026-09-28) — a wallet can be connected, and no answer is taken on trust
+
+`src/lib/wallet.ts` + `tests/wallet.test.ts` (65 tests). T4 step 1. Taken ahead of T3 on
+the same reasoning as steps 2 and 3-digest: connecting a wallet needs no forwarder and no
+owner decision, and only steps 4 and 5 genuinely wait on T3.
+
+**The module asks and never holds** — no key, no signature, no transaction, the same
+boundary `eip712.ts` and `requirements.ts` keep (rule 5). `tests/wallet.test.ts` enforces it
+by reading the source and banning `eth_sign`, `personal_sign`, `eth_sendTransaction`,
+`eth_sendRawTransaction`, `privateKey`, `PRIVATE_KEY` and `mnemonic`. ⚠️ It deliberately
+does **not** ban `eth_signTypedData_v4`: that call is where T4 goes next, and a test that
+forbids the next planned commit is a test somebody deletes without reading the reason. The
+sharpest ban is `eth_sign` — signing a 32-byte digest through it yields *the same signature*
+as `eth_signTypedData_v4` while showing the user opaque bytes instead of an amount and a
+recipient. A companion test proves the regex can tell those two apart, so the ban cannot
+rot into a no-op.
+
+🔴 **The near-bug: comparing chain ids as strings.** The obvious implementation is
+`answer === BASE.idHex`. It works. It passes every test in this repo. It is wrong, and it is
+wrong in a way this codebase could not have caught, because Base is `0x2105` — four digits,
+no letters, one canonical spelling. Any chain whose id contains `a`–`f` has two valid hex
+spellings and a case-sensitive compare picks one. `parseChainId` returns a `bigint` and the
+comparison downstream is numeric. **A decimal string is refused, not accepted generously:**
+`"2105"` is chain 2105 read as decimal and chain 8453 read as hex a provider forgot to
+prefix, and there is no way to tell which was meant. Guessing there means possibly signing
+on the wrong chain. Compare `errorCode` in the same file, which *does* accept a numeric
+string — the asymmetry is deliberate and documented in both places, because the cost of
+misreading an error code is a less friendly sentence. **Strictness is priced per field.**
+
+**Five states, not `{ address, chainId } | null`** (rule 10 again): `unavailable`, `failed`,
+`disconnected`, `wrongChain`, `ready`. A null collapses four situations that need four
+different sentences and three different buttons, and the panel would have to guess which —
+the guess being "install a wallet" said to somebody who has one, which is the same class of
+lie `lib/address.ts` documents when a mistyped address is told to paste an address.
+`ready` carries the account and **no chain id**, reusing the decision `PaymentRequirements`
+makes about `network`: a chain that has been checked has nothing left to report, so holding
+a `ready` *is* holding "on Base". A test asserts `Object.keys(state)` is exactly
+`["account", "kind"]`, so a later "just add chainId, the panel wants it" cannot land quietly.
+`wrongChain` does carry its id, because that is the unverified fact the user must see.
+
+**Every request ends by re-measuring.** EIP-3326 has `wallet_switchEthereumChain` resolve
+`null` on success — and a wallet that decided to leave you where you were also resolves
+`null`. The return value carries no information at all, so prompt-and-hope is not merely
+sloppy here, it is unimplementable. `connectWallet` and `requestBaseChain` both finish with a
+`readWallet`, and an error from the request they just made can only **relabel** that
+measurement, never replace it: an error code describes the instant of a refusal, the
+measurement describes now, and the user may have acted in between. `ready` and `failed` are
+never relabelled. Codes handled: `4001` declined, `-32002` a prompt is already open
+(MetaMask), `4902` the chain is not configured.
+
+🔴 **This build never calls `wallet_addEthereumChain`, and the refusal is in the copy the
+user reads.** Adding a chain is not a convenience, it is a write into the user's wallet that
+**outlives this page**: an RPC endpoint, an explorer and a currency symbol stored under the
+name "Base", after which every Base transaction they make *on any site* goes through
+whatever we wrote. Saving one manual step by permanently repointing somebody's RPC is a
+decision that is not ours to make. On `4902` the sentence says to add it in the wallet and
+says why we will not.
+
+**An unreadable chain id is not the wrong chain.** Collapsing the two tells somebody already
+on Base to switch to Base — the one instruction they cannot follow. And a non-array
+`eth_accounts` answer is `disconnected`, not `failed`: the only claim it supports is that
+there is no account to pay from, connecting fixes it either way, and "unlock your wallet"
+said to somebody whose wallet is not locked is unfollowable.
+
+**Three test bugs found while writing the tests, all mine, all worth recording:**
+1. ⚠️ **A negative assertion tripped on the module's own disclaimer.** `unreadableChain`
+   says "It is not a claim that you are on the wrong network", so
+   `not.toMatch(/wrong network/i)` failed on the sentence that *denies* the claim. Same trap
+   as a doc comment matching the grep it recommends (Step 1k). **Assert on the instruction a
+   user would act on**, not on a phrase the denial also contains.
+2. `"0x".padEnd(300, "9")` is valid hex, so the "absurd chain id" test measured `wrongChain`
+   rather than the refusal it was aiming at. Replaced with `"z".repeat(300)` — non-hex, and
+   the more realistic shape anyway (an error page where a chain id belonged) — plus a new
+   test that a merely enormous hex id reports as the wrong chain, which is correct.
+3. **The unsubscribe test was measuring the fake.** It retained the handler references and
+   called them after `stop()`; they still fire, because unsubscribing is the provider
+   forgetting the handler, not the closure becoming inert. Rewritten to fire every listener
+   before `stop()`, then assert the fake's listener array is empty — which, since the fake
+   splices on reference equality, *is* the proof that `watchWallet` removed the same function
+   object it added.
+
+**`watchWallet` is a doorbell, and must not learn to reload.** Its handler takes no
+arguments on purpose: `accountsChanged` carries accounts and no chain, `chainChanged`
+carries a chain and no accounts, so each payload is half a verdict and acting on half is how
+you end up displaying an account from one wallet with a chain from another. It requires
+*both* `on` and `removeListener` before subscribing — subscribing with no way to unsubscribe
+is a leak — and degrades to a no-op otherwise, because the events are a SHOULD in EIP-1193
+and some embedded providers ship `request` alone.
+
+⚠️ **`src/brand.ts` is the single rename point, and this module proved the guard works.**
+`npm run gate` failed on `tests/brand.test.ts` with `expected [ '/src/lib/wallet.ts' ] to
+deeply equal []` — four hardcoded "Quadra" literals, three in user-facing sentences and one
+in a doc comment (the guard checks *file text*, so comments count). The three sentences now
+template `${BRAND.name}`; the comment was reworded. The distinction the guard encodes is
+**prose vs identifier**: a name a person reads may change, a name some byte on a disk or on
+a chain is keyed to may not — which is why its four exemptions are a `localStorage` key, a
+hash domain tag, a backup format marker and an empty-leaf preimage. None of this file's
+strings are in that category. Note `tests/` is not scanned; the test-file comment was
+normalised anyway, and no assertion in it contains the product name.
+
+⚠️ **Nothing imports this yet, measured in the bundle rather than inferred.**
+`grep -cF` on `dist/assets/*.js` returns **0** for `wallet_switchEthereumChain`,
+`eth_requestAccounts`, `accountsChanged` and the literal `Free tools need no wallet`, while
+the four keccak control needles (`(1600-2*`, `^=369`, `&256)!==0`, `(1n<<64n)-1n`) return 1
+each, so the method itself is working. The bundle is **229.46 kB / gzip 75.21 kB before and
+after, with the same content hash** — identical to Step 1k's. This is the **third** module
+in that position, and the other two are why it is written down: `transaction.ts` still has
+only its own test as an importer, and `eip712.ts`'s status block claimed nothing imported it
+while `requirements.ts` had already been importing six names from it for a commit. That
+block was corrected in this commit to say what is actually true — the *domain* half ships
+(`TransferWithAuthorization`, `EIP712Domain` and `USD Coin` are each in the bundle once) and
+the *digest* half has no caller outside tests. **A stale absence claim is worse than none:**
+it reads as a measurement, so the next reader trusts it instead of grepping.
+
+**Next increment (commit B):** wire it in. A React seam holding a `Wallet`, the x402 panel
+rendering all five states, and T4 step 6's relaxation of `whyNot` — at which point re-read
+the warning in step 6 above, because when `NO_WALLET` leaves that composed string the payee
+refusal has to survive alone. Until then, the 65 tests say only that the verdicts are right
+about a **fake** provider. No real wallet has answered this code.
 
 ### Steps 2 and 3 are NOT done, and step 2 is not a deployment step
 

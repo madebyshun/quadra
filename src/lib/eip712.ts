@@ -96,20 +96,28 @@
  * encoding, the 224-byte struct encoding, the 66-byte prefixed preimage — which is
  * the same discipline `abiEncodeExtData` and `extDataHash` are pinned with.
  *
- * ── Status: NOTHING IMPORTS THIS YET ─────────────────────────────────────────
- * ⚠️ Measured 2026-09-28: no file under `src/` imports this module, so it is absent
- * from the production bundle (`grep -cF TransferWithAuthorization dist/assets/*.js`
- * → 0) and nothing a user can click reaches it. That is deliberate rather than
- * abandoned — it is step 3 of T4, and steps 1 and 2 are a wallet connection, which
- * is the owner-gated half. It is written down because a module at 100% coverage with
- * vectors matching a deployed contract looks exactly like a wired-up one. Re-grep for
- * `from "@/lib/eip712"` rather than trusting this paragraph.
+ * ── Status: HALF OF THIS SHIPS. The digest does not run ──────────────────────
+ * 🔴 This block said "NOTHING IMPORTS THIS YET" until 2026-09-28, and by then that
+ * was false — `lib/requirements.ts` imports six names from here and *is* reached by
+ * a panel. Re-measured in the bundle that day: `TransferWithAuthorization`,
+ * `EIP712Domain` and `USD Coin` are each present once in `dist/assets/*.js`. The
+ * consumer named in the old paragraph as "the next increment" had already landed and
+ * nobody came back to delete the claim. **A stale absence claim is worse than no
+ * claim**: it reads as a measurement, so the next reader trusts it instead of
+ * grepping, and it understates what a change to this file can break.
  *
- * The consumer this is waiting for is the 402 requirements check: read `payTo`,
- * `maxAmountRequired`, `asset` and `extra.{name,version}` off the live 402, assert
- * them against `USDC_DOMAIN` and `BLUEAGENT.knownPayTo`, and only then build a
- * digest. Signing an authorization derived from unverified requirements is the whole
- * risk, and that check is the next increment, not a later nicety.
+ * What is true now is narrower and splits the file in two. The **domain** half ships:
+ * `USDC_DOMAIN` and `domainSeparator` are what `checkRequirements` asserts the live
+ * 402's `asset` and `extra.{name,version}` against, so editing either changes whether
+ * a real 402 is accepted. The **digest** half does not run: `authorizationDigest` has
+ * exactly one caller, `authorizationFor` in `lib/requirements.ts`, and that function's
+ * only callers are in `tests/requirements.test.ts`. Nothing a user can click has ever
+ * produced a digest from this code, and nothing has ever signed one — that is T4's
+ * `eth_signTypedData_v4` step, which `lib/wallet.ts` deliberately stops short of.
+ *
+ * So: treat a change to `USDC_DOMAIN` as a change to the payment path, and a change to
+ * the encoders as still covered only by vectors. Re-grep `from "@/lib/eip712"` and the
+ * callers of `authorizationDigest` rather than trusting this paragraph either.
  */
 
 import { addressToUint } from "@/lib/address";

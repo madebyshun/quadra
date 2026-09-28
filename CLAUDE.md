@@ -33,7 +33,7 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. **1019 tests in 29 files**, 100% on all four
+in one go. Do not report "done" on a subset. **1084 tests in 30 files**, 100% on all four
 metrics, measured 2026-09-28.
 
 That count is a dated measurement, not a target — it is here so a fresh clone that comes
@@ -363,6 +363,23 @@ src/
                                clamp; an unrecognised payee is a VALUE (`Payee` is a union,
                                rule 10) because a rotated payee leaves the 402 perfectly
                                readable and throwing would make the price un-renderable
+                   wallet.ts — EIP-1193: connects, and re-measures instead of
+                               believing. Same boundary as eip712.ts/requirements.ts —
+                               asks, never holds (rule 5), and `tests/wallet.test.ts`
+                               reads the source to ban `eth_sign`, `personal_sign`,
+                               `eth_sendTransaction`, `privateKey` and `mnemonic`.
+                               `eth_signTypedData_v4` is deliberately NOT banned: T4 is
+                               going there, and a test that forbids the next planned
+                               commit is one somebody deletes without reading. 🔴 Five
+                               states, not `{address,chainId}|null` — unavailable /
+                               failed / disconnected / wrongChain / ready — because a
+                               null makes the panel guess, and the guess is "install a
+                               wallet" said to somebody who has one. `ready` carries no
+                               chainId (same reason `PaymentRequirements` carries no
+                               `network`: a checked chain has nothing left to report).
+                               🔴 Never calls `wallet_addEthereumChain` — that writes an
+                               RPC endpoint into the user's wallet that outlives this
+                               page and then carries their Base traffic everywhere else
                    backup.ts — the backup file format. localStorage is not a backup;
                                this is. Plaintext secrets by necessity and labelled as
                                such, never half-encrypted. Validates an import through
@@ -375,7 +392,7 @@ src/
   pages/           /docs /api /verify /404
   ui/              Window, Taskbar, Gel (button), Crt (output box)
   styles/          reset.css + theme.css — the XP/Aqua design system
-tests/             29 files, mirrors src/. TWO of them read Solidity rather than
+tests/             30 files, mirrors src/. TWO of them read Solidity rather than
                    restating its numbers: field.test.ts extracts FIELD_SIZE and
                    MAX_NOTE_VALUE from contracts/src/*.sol, and transaction.test.ts
                    extracts the pinned abi.encode vector from contracts/test/
