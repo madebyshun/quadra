@@ -33,14 +33,15 @@ describe("the phases", () => {
     expect(PHASES.map((p) => p.id)).toEqual(["dark", "idle", "warm", "icon", "welcome", "ready", "zoom", "fade"]);
     expect(TOTAL_MS).toBe(PHASES.reduce((s, p) => s + p.ms, 0));
     expect(startOf("dark")).toBe(0);
-    expect(startOf("idle")).toBe(1400);
-    expect(startOf("fade")).toBe(TOTAL_MS - 700);
+    expect(startOf("idle")).toBe(300);
+    expect(startOf("fade")).toBe(TOTAL_MS - 400);
   });
 
-  /** Slowed down on the owner's call of 2026-10-02: the boot itself, not counting the waits, is seven seconds and more. */
-  it("boot slowly, and wait for the visitor at the machine and at the welcome box", () => {
+  /** Sped up on the owner's call of 2026-10-21: the whole intro, waits included, in about six seconds. */
+  it("boot briskly, and still wait for the visitor at the machine and at the welcome box", () => {
     const boot = ["warm", "icon", "welcome"].map((id) => PHASES.find((p) => p.id === id)!.ms).reduce((a, b) => a + b, 0);
-    expect(boot).toBeGreaterThanOrEqual(6_000);
+    expect(boot).toBeLessThanOrEqual(3_500);
+    expect(TOTAL_MS).toBeLessThanOrEqual(7_000);
     expect(HOLDS).toEqual({ idle: "power", ready: "enter" });
   });
 
@@ -54,8 +55,8 @@ describe("the phases", () => {
 
   it("say which phase a moment is in, and how far through", () => {
     expect(phaseAt(0)).toEqual({ id: "dark", progress: 0 });
-    expect(phaseAt(700)).toEqual({ id: "dark", progress: 0.5 });
-    expect(phaseAt(1400)).toEqual({ id: "idle", progress: 0 });
+    expect(phaseAt(150)).toEqual({ id: "dark", progress: 0.5 });
+    expect(phaseAt(300)).toEqual({ id: "idle", progress: 0 });
     expect(phaseAt(-5)).toEqual({ id: "dark", progress: 0 });
     expect(phaseAt(TOTAL_MS)).toEqual({ id: "done", progress: 1 });
   });

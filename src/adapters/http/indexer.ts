@@ -178,6 +178,8 @@ export type IndexedCoinPage = {
   readonly coin: IndexedCoin;
   readonly trades: readonly IndexedTrade[];
   readonly candles: readonly IndexedCandle[];
+  /** every price, oldest first — the opening price at the launch when the index read it, then each trade's */
+  readonly points: readonly { readonly at: number; readonly price: number }[];
   readonly feesQuote: number | null;
   readonly feesToken: number | null;
   readonly feeBps: number | null;
@@ -214,6 +216,11 @@ export function parseCoinPage(body: unknown): IndexedCoinPage {
     coin,
     trades: listOf(b.trades).flatMap((t) => tradeOf(t) ?? []),
     candles: listOf(b.candles).flatMap((c) => candleOf(c) ?? []),
+    points: listOf(b.points).flatMap((v) => {
+      const at = isObj(v) ? numOf(v.at) : null;
+      const price = isObj(v) ? numOf(v.price) : null;
+      return at === null || price === null ? [] : [{ at, price }];
+    }),
     feesQuote: numOf(b.feesQuote),
     feesToken: numOf(b.feesToken),
     feeBps: numOf(b.feeBps),

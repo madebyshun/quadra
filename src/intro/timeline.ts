@@ -14,23 +14,25 @@
  * the welcome box until the screen is clicked — each for at most its `ms`, after which the intro
  * carries on by itself. It is a welcome, never a gate.
  */
+// Faster since 2026-10-21 (owner: "the intro needs to be quicker"): ~29 s → ~6.4 s end to end (twice: "faster still");
+// the two waits still wait for a click, they just carry on sooner by themselves.
 export const PHASES = [
   /** the room fades up; the machine is off */
-  { id: "dark", ms: 1400 },
+  { id: "dark", ms: 300 },
   /** the machine off on the desk: look around it, click it to switch it on */
-  { id: "idle", ms: 9000 },
+  { id: "idle", ms: 1200 },
   /** power: the LED lights, the tube warms to grey */
-  { id: "warm", ms: 1100 },
+  { id: "warm", ms: 400 },
   /** the boot icon on a dithered grey desktop */
-  { id: "icon", ms: 2400 },
+  { id: "icon", ms: 600 },
   /** the welcome box and its progress bar */
-  { id: "welcome", ms: 3200 },
+  { id: "welcome", ms: 800 },
   /** the welcome box, finished: click the screen to go in */
-  { id: "ready", ms: 9000 },
+  { id: "ready", ms: 1500 },
   /** the camera flies into the screen; the screen turns into the desktop */
-  { id: "zoom", ms: 2600 },
+  { id: "zoom", ms: 1200 },
   /** the overlay fades and the real page is underneath */
-  { id: "fade", ms: 700 },
+  { id: "fade", ms: 400 },
 ] as const;
 
 /** The phases that wait for the visitor, and what ends the wait. */
@@ -79,7 +81,7 @@ export function clampOrbit(o: Orbit): Orbit {
 }
 
 /** The camera's slow drift across the front of the machine takes this long, whatever the visitor does. */
-export const DRIFT_MS = 9000;
+export const DRIFT_MS = 1200;
 
 /** The phase a moment falls in, and how far through it (0..1). Past the end is `done`. */
 export function phaseAt(ms: number): { id: PhaseId | "done"; progress: number } {

@@ -150,18 +150,59 @@ export function TokenStats({ page, value, holders }: { page: Read<IndexedCoinPag
   );
 }
 
-/** The price over time, one point an hour, from the pool's own trades. */
+export type Frame = "trades" | "5m" | "1h" | "1d";
+export const FRAMES: readonly { readonly id: Frame; readonly label: string; readonly seconds: number }[] = [
+  { id: "trades", label: "Each trade", seconds: 0 },
+  { id: "5m", label: "5m", seconds: 300 },
+  { id: "1h", label: "1h", seconds: 3600 },
+  { id: "1d", label: "1d", seconds: 86_400 },
+];
+
+type Point = { readonly at: number; readonly price: number };
+type Bar = { readonly t: number; readonly o: number; readonly h: number; readonly l: number; readonly c: number };
+
+/** Prices into candles of `seconds` (0: one per point), oldest first. */
+export function bucket(points: readonly Point[], seconds: number): Bar[] {
+  const out: Bar[] = [];
+  for (const p of points) {
+    const t = seconds === 0 ? p.at : p.at - (p.at % seconds);
+    const last = out.at(-1);
+    if (seconds !== 0 && last && last.t === t * 1000) out[out.length - 1] = { ...last, h: Math.max(last.h, p.price), l: Math.min(last.l, p.price), c: p.price };
+    else out.push({ t: t * 1000, o: p.price, h: p.price, l: p.price, c: p.price });
+  }
+  return out;
+}
+
+/** The coarsest frame that still draws a line (two candles or more) — a coin minutes old falls to 5m or each trade. */
+export function autoFrame(points: readonly Point[]): Frame {
+  for (const f of ["1h", "5m"] as const) if (bucket(points, FRAMES.find((x) => x.id === f)!.seconds).length >= 2) return f;
+  return "trades";
+}
+
+/** The price over time, from the pool's own opening price and trades, in the frame the visitor picks. */
 export function TokenChart({ page }: { page: Read<IndexedCoinPage> }) {
+  const [picked, setPicked] = useState<Frame | null>(null);
   if (page === "reading") return <p className="dim">Reading the trades…</p>;
   if ("problem" in page) return <p className="tx__warn">No chart: {page.problem}</p>;
-  if (page.candles.length < 2) return <p className="dim">No chart yet — it needs trades in at least two different hours.</p>;
+  if (page.points.length < 2) return <p className="dim">No chart yet — it starts at the launch price and needs one trade after it.</p>;
+  const frame = picked ?? autoFrame(page.points);
   const qs = page.coin.quoteSymbol ?? "";
+  const bars = bucket(page.points, FRAMES.find((f) => f.id === frame)!.seconds);
   return (
-    <PriceChart
-      series={page.candles.map((c) => ({ t: c.at * 1000, o: c.open, h: c.high, l: c.low, c: c.close }))}
-      label={`${page.coin.symbol ?? "Coin"} price in ${qs}, hourly, from its pool's trades`}
-      format={(n) => `${n.toExponential(3)} ${qs}`}
-    />
+    <div className="stack">
+      <div className="row" role="group" aria-label="Chart frame">
+        {FRAMES.map((f) => (
+          <button key={f.id} type="button" className="chip chip--mode" aria-pressed={frame === f.id} onClick={() => setPicked(f.id)}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+      {bars.length < 2 ? (
+        <p className="dim">Every trade so far falls in one {frame} candle — pick a finer frame.</p>
+      ) : (
+        <PriceChart series={bars} label={`${page.coin.symbol ?? "Coin"} price in ${qs}, from its pool's opening price and trades`} format={(n) => `${n.toExponential(3)} ${qs}`} />
+      )}
+    </div>
   );
 }
 

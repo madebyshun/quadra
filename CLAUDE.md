@@ -55,7 +55,7 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. **1968 tests in 97 files**, 100% on all four metrics, measured 2026-10-21 after the app was wired to launchpad v3 (1945/96 on 2026-10-14; 1918/95 before the coin page, same day) (1684/76 on 2026-10-02, before the "more fun" programs, the wallet's fees,
+in one go. Do not report "done" on a subset. **1971 tests in 97 files**, 100% on all four metrics, measured 2026-10-21 after the coin chart's frames and opening price (1968/97 earlier that day, after the app was wired to launchpad v3; 1945/96 on 2026-10-14; 1918/95 before the coin page, same day) (1684/76 on 2026-10-02, before the "more fun" programs, the wallet's fees,
 pool trading, the indexer and launchpad recognition; 1682/76 before the doc audit's fixes) — it FELL from 1627/68 the same day, deliberately: o1 was taken out
 of Launch and `tests/launch.test.tsx` went with it to `archive/o1/` (1608/67 before the verdict, radar and Launch window read the
 launchpad; 1585/66 before the launchpad's window; 1548/60 on 2026-10-01 before the 3D intro; 1547/59 on 2026-09-30, before the seven basic skills were deleted
@@ -585,7 +585,7 @@ src/
                    `prefers-reduced-motion`, or without WebGL. SLOWER and INTERACTIVE since
                    2026-10-02 (owner): two phases WAIT for the visitor — `idle` (the machine off:
                    drag to turn around it, scroll to lean in, click it or Enter to switch on) and
-                   `ready` (the welcome box: click the SCREEN or Enter to go in) — each at most 9 s,
+                   `ready` (the welcome box: click the SCREEN or Enter to go in) — at most 1.2 s and 1.5 s (sped up twice on 2026-10-21, ~6.4 s end to end),
                    then it carries on by itself. The scene's `hit` raycasts the machine (the desk
                    excluded; the hole is "screen"); the orbit is unwound by the fly-in, which always
                    ends square. A click no longer skips — Esc and the Skip button do

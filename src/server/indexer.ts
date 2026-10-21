@@ -74,6 +74,12 @@ export type Detail = {
   readonly fee: number;
   /** v3's anti-sniper opening, read from the hook — `null` on v1/v2, which have none */
   readonly opening: { readonly startFee: number; readonly window: number } | null;
+  /**
+   * The pool's price the moment it opened: `sqrtPriceX96` from its own `Initialize` log, read in the
+   * launch block — so a chart starts at the launch, and a coin with one trade already has a line.
+   * `null` when the log could not be read: the chart then starts at the first trade, never at a guess.
+   */
+  readonly openSqrt: bigint | null;
 };
 
 export type Coin = {
@@ -306,6 +312,12 @@ export type CoinDetail = {
   readonly trades: readonly TradeRow[];
   /** oldest first, one per hour that had a trade */
   readonly candles: readonly Candle[];
+  /**
+   * Every price the coin has had, oldest first: the pool's opening price at the launch (when its
+   * `Initialize` log was read), then the price after each trade. The page buckets these into 5-minute,
+   * hourly or daily candles itself, so a coin minutes old still has a line.
+   */
+  readonly points: readonly { readonly at: number; readonly price: number }[];
   /** every fee the pool earned, in the quote (buys) and in the token (sells) — split 80/20 by `collect` */
   readonly feesQuote: number | null;
   readonly feesToken: number | null;
@@ -332,7 +344,7 @@ export function coinDetail(state: IndexState, token: string, now: number): CoinD
   const row = rowOf(state, coin, now);
   const d = coin.detail;
   const feeBps = row.feeBps;
-  if (!d) return { coin: row, trades: [], candles: [], feesQuote: null, feesToken: null, feeBps, maxPaidBps: null };
+  if (!d) return { coin: row, trades: [], candles: [], points: [], feesQuote: null, feesToken: null, feeBps, maxPaidBps: null };
   const swaps = [...(state.swaps.get(coin.poolId) ?? [])].sort((a, b) => a.block - b.block || a.key.localeCompare(b.key));
   const tokenDelta = (s: Swap) => (d.tokenIs0 ? s.amount0 : s.amount1);
   const quoteDelta = (s: Swap) => (d.tokenIs0 ? s.amount1 : s.amount0);
@@ -366,7 +378,9 @@ export function coinDetail(state: IndexState, token: string, now: number): CoinD
     else candles.push({ at, open: t.price, high: t.price, low: t.price, close: t.price, trades: 1 });
   }
   const maxPaidBps = swaps.length === 0 ? null : Math.max(...swaps.map((s) => s.fee)) / 100;
-  return { coin: row, trades: trades.reverse().slice(0, TRADES_SHOWN), candles, feesQuote: units(feesQuote, d.quoteDecimals), feesToken: units(feesToken, 18), feeBps, maxPaidBps };
+  const open = d.openSqrt === null ? [] : [{ at: coin.at, price: quotePerToken(d.openSqrt, d.tokenIs0, d.quoteDecimals) }];
+  const points = [...open, ...trades.map((t) => ({ at: t.at, price: t.price }))];
+  return { coin: row, trades: trades.reverse().slice(0, TRADES_SHOWN), candles, points, feesQuote: units(feesQuote, d.quoteDecimals), feesToken: units(feesToken, 18), feeBps, maxPaidBps };
 }
 
 /** The JSON the route serves. `now` is unix seconds. */
@@ -443,7 +457,19 @@ async function readDetail(state: IndexState, rpc: Rpc, coin: Coin): Promise<Deta
   }
   const q = state.quotes.get(lower)!;
   const fees = key.fee === DYNAMIC_FEE_FLAG ? await hookFee(rpc, key.hooks, poolIdOf(key)) : { fee: key.fee, opening: null };
-  return { quote, tokenIs0, name: String(await read(coin.token, "name")), symbol: String(await read(coin.token, "symbol")), quoteSymbol: q.symbol, quoteDecimals: q.decimals, ...fees };
+  const openSqrt = await openingSqrt(rpc, coin).catch(() => null);
+  return { quote, tokenIs0, name: String(await read(coin.token, "name")), symbol: String(await read(coin.token, "symbol")), quoteSymbol: q.symbol, quoteDecimals: q.decimals, ...fees, openSqrt };
+}
+
+/** v4-core's `Initialize`; its data words are fee, tickSpacing, hooks, sqrtPriceX96, tick. */
+const INITIALIZE_TOPIC = toHex(keccak256(utf8("Initialize(bytes32,address,address,uint24,int24,address,uint160,int24)")));
+
+/** The pool's opening sqrtPriceX96, from its own `Initialize` log in the launch block. */
+export async function openingSqrt(rpc: Rpc, coin: Coin): Promise<bigint | null> {
+  const block = `0x${coin.block.toString(16)}`;
+  const logs = listOf(await rpc("eth_getLogs", [{ address: UNISWAP_V4_POOL_MANAGER, topics: [INITIALIZE_TOPIC, coin.poolId], fromBlock: block, toBlock: block }]));
+  const data = logs.map((l) => (isObj(l) ? strOf(l.data) : null)).find((d): d is string => d !== null && d.length >= 2 + 64 * 5);
+  return data ? BigInt(`0x${data.slice(2 + 64 * 3, 2 + 64 * 4)}`) : null;
 }
 
 /** A v3 coin's chosen fee and its opening, from the hook its pool key names. A pool the hook never scheduled is an error, not a 0% fee. */

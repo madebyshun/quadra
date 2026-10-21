@@ -20,7 +20,7 @@ export function served(withMore = false): unknown {
   const sell = { ...ethSwap, logIndex: "0x18", data: encodeAbiParameters(SWAP_DATA, [-a0, -a1, ...rest] as never) };
   const later = { ...ethSwap, transactionHash: `${ethSwap.transactionHash.slice(0, -1)}0`, blockNumber: `0x${(52_066_748 + 3600).toString(16)}`, blockTimestamp: `0x${(AT + 7200).toString(16)}` };
   applySwaps(state, withMore ? [ethSwap, sell, later] : [ethSwap], clock);
-  state.coins.get(IX.launchedV1.result[0]!.topics[3]!)!.detail = { quote: "0x0000000000000000000000000000000000000000", tokenIs0: false, name: "test", symbol: "TEST", quoteSymbol: "ETH", quoteDecimals: 18, fee: 10_000, opening: null };
+  state.coins.get(IX.launchedV1.result[0]!.topics[3]!)!.detail = { quote: "0x0000000000000000000000000000000000000000", tokenIs0: false, name: "test", symbol: "TEST", quoteSymbol: "ETH", quoteDecimals: 18, fee: 10_000, opening: null, openSqrt: null };
   state.traders.set(ethSwap.transactionHash, COINS.owner);
   return JSON.parse(JSON.stringify({ ...coinDetail(state, COINS.eth, AT + 60)!, syncedTo: 1, head: 1, behind: 0, error: null }));
 }

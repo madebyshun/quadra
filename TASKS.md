@@ -6,7 +6,7 @@ Read `CLAUDE.md` first — it has the constraints and the rules that exist becau
 something broke. This file is only the work.
 
 **Before you start anything:** `npm install`, then `npm run gate`. It must be green
-(tsc clean, **1968 tests in 97 files** as measured 2026-10-21, after wiring the app to launchpad v3 — 1945/96 on 2026-10-14 (1918/95 before the coin page, same day), 1684/76 on 2026-10-02, 1682/76 before the doc
+(tsc clean, **1971 tests in 97 files** as measured 2026-10-21, after the coin chart's frames and opening price — 1968/97 earlier that day after wiring the app to launchpad v3, 1945/96 on 2026-10-14 (1918/95 before the coin page, same day), 1684/76 on 2026-10-02, 1682/76 before the doc
 audit's fixes —; `npm run gate:contracts` 77 tests (v2 30 + v3 47), 100% over 3 files — 100% on
 statements/branches/functions/lines, build succeeds). If it is not green on a fresh
 checkout, fix that before touching a task — you are looking at drift, not at your own

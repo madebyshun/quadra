@@ -12,6 +12,7 @@ import {
   CATCH_UP_MS,
   CHUNK,
   coinDetail,
+  openingSqrt,
   emptyState,
   FIRST_BLOCK,
   FRESH_MS,
@@ -84,6 +85,7 @@ function fakeNode(over: { fail?: (method: string, params: readonly unknown[]) =>
         return LAUNCH_LOGS.filter(inRange);
       }
       expect(f.address.toLowerCase()).toBe(PM);
+      if (f.topics[0] === INIT_TOPIC) return IX.initializeV1.result.filter((l) => inRange(l) && l.topics[1] === f.topics[1]);
       const ids = f.topics[1] as string[];
       expect(ids.length).toBeLessThanOrEqual(ID_BATCH);
       return SWAP_LOGS.filter((l) => inRange(l) && l.topics[0] === f.topics[0] && ids.includes(l.topics[1]!));
@@ -101,9 +103,12 @@ function fakeNode(over: { fail?: (method: string, params: readonly unknown[]) =>
   return { rpc, calls };
 }
 
+const INIT_TOPIC = keccak256(toBytes("Initialize(bytes32,address,address,uint24,int24,address,uint160,int24)"));
+/** the captured Initialize log's sqrtPriceX96 (data word 3) */
+const OPEN_SQRT = BigInt(`0x${IX.initializeV1.result[0]!.data.slice(2 + 64 * 3, 2 + 64 * 4)}`);
 const SWAP_DATA = parseAbiParameters("int128, int128, uint160, uint128, int24, uint24");
-const STOCK_DETAIL: Detail = { quote: COINS.aapl, tokenIs0: true, name: "x", symbol: "X", quoteSymbol: "AAPLc", quoteDecimals: 8, fee: 10_000, opening: null };
-const ETH_DETAIL: Detail = { quote: "0x0000000000000000000000000000000000000000", tokenIs0: false, name: "y", symbol: "Y", quoteSymbol: "ETH", quoteDecimals: 18, fee: 10_000, opening: null };
+const STOCK_DETAIL: Detail = { quote: COINS.aapl, tokenIs0: true, name: "x", symbol: "X", quoteSymbol: "AAPLc", quoteDecimals: 8, fee: 10_000, opening: null, openSqrt: null };
+const ETH_DETAIL: Detail = { quote: "0x0000000000000000000000000000000000000000", tokenIs0: false, name: "y", symbol: "Y", quoteSymbol: "ETH", quoteDecimals: 18, fee: 10_000, opening: null, openSqrt: null };
 
 describe("the event topics", () => {
   it("hashes Swap from v4-core's own declaration, and it is the topic the chain sent", () => {
@@ -291,9 +296,10 @@ describe("syncOnce", () => {
     // each chunk reads its launches BEFORE its swaps, so a pool trading in its launch chunk is found
     expect(calls.slice(0, 3).map((c) => (Array.isArray((c.params[0] as { address: unknown }).address) ? "launched" : "swap"))).toEqual(["launched", "swap", "launched"]);
     expect([...state.coins.values()].map((c) => c.detail)).toEqual([
-      { quote: "0x0000000000000000000000000000000000000000", tokenIs0: false, name: "test", symbol: "test", quoteSymbol: "ETH", quoteDecimals: 18, fee: 10_000, opening: null },
-      { quote: COINS.aapl, tokenIs0: false, name: "test", symbol: "test", quoteSymbol: "AAPLc", quoteDecimals: 8, fee: 10_000, opening: null },
-      { quote: COINS.aapl, tokenIs0: true, name: "test2", symbol: "test2", quoteSymbol: "AAPLc", quoteDecimals: 8, fee: 10_000, opening: null },
+      { quote: "0x0000000000000000000000000000000000000000", tokenIs0: false, name: "test", symbol: "test", quoteSymbol: "ETH", quoteDecimals: 18, fee: 10_000, opening: null, openSqrt: OPEN_SQRT },
+      // no Initialize log was captured for these pools: an absent log is null, never a guess
+      { quote: COINS.aapl, tokenIs0: false, name: "test", symbol: "test", quoteSymbol: "AAPLc", quoteDecimals: 8, fee: 10_000, opening: null, openSqrt: null },
+      { quote: COINS.aapl, tokenIs0: true, name: "test2", symbol: "test2", quoteSymbol: "AAPLc", quoteDecimals: 8, fee: 10_000, opening: null, openSqrt: null },
     ]);
     // AAPLc's symbol and decimals are read once for both coins paired with it
     expect(calls.filter((c) => c.method === "eth_call" && (c.params[0] as { to: string }).to === COINS.aapl)).toHaveLength(2);
@@ -578,10 +584,33 @@ describe("coinDetail and GET /coin", () => {
   it("an unknown coin is null; a coin whose pair is unread has no figures, never zeros; one with no trades has none", () => {
     const state = filled();
     expect(coinDetail(state, "0x0000000000000000000000000000000000000001", ethAt)).toBeNull();
-    expect(coinDetail(state, COINS.second, ethAt)).toMatchObject({ trades: [], candles: [], feesQuote: null, feesToken: null, feeBps: 100 });
+    expect(coinDetail(state, COINS.second, ethAt)).toMatchObject({ trades: [], candles: [], points: [], feesQuote: null, feesToken: null, feeBps: 100 });
     const second = [...state.coins.values()].find((c) => c.token === COINS.second)!;
     second.detail = STOCK_DETAIL;
     expect(coinDetail(state, COINS.second, ethAt)).toMatchObject({ trades: [], candles: [], feesQuote: 0, feesToken: 0 });
+  });
+
+  it("starts the points at the pool's opening price, read from its real Initialize log — the price the live index served", async () => {
+    const state = withTrades();
+    const coin = [...state.coins.values()].find((c) => c.token === COINS.eth)!;
+    const { rpc, calls } = fakeNode();
+    const sqrt = await openingSqrt(rpc, coin);
+    expect(sqrt).toBe(OPEN_SQRT);
+    expect(calls[0]!.params[0]).toMatchObject({ topics: [INIT_TOPIC, coin.poolId], fromBlock: "0x31a79bb", toBlock: "0x31a79bb" });
+    coin.detail = { ...ETH_DETAIL, openSqrt: sqrt };
+    const d = coinDetail(state, COINS.eth, ethAt + 7300)!;
+    expect(d.points[0]).toEqual({ at: coin.at, price: 4.973987206075924e-9 });
+    expect(d.points.slice(1).map((p) => p.at)).toEqual([ethAt, ethAt, ethAt + 7200]);
+    expect(d.points).toHaveLength(4);
+    // without the opening price, the line starts at the first trade
+    coin.detail = ETH_DETAIL;
+    expect(coinDetail(state, COINS.eth, ethAt)!.points.map((p) => p.at)).toEqual([ethAt, ethAt, ethAt + 7200]);
+  });
+
+  it("openingSqrt: no Initialize log (or a short one) is null; readDetail turns a failed read into null", async () => {
+    const coin = [...filled().coins.values()].find((c) => c.token === COINS.eth)!;
+    expect(await openingSqrt(fakeNode({ fail: () => [] }).rpc, coin)).toBeNull();
+    expect(await openingSqrt(fakeNode({ fail: () => [{ data: "0x00" }, "junk"] }).rpc, coin)).toBeNull();
   });
 
   const get = (path: string) => new Request(`http://localhost${INDEXER_PATH}${path}`, { headers: { "x-quadra": "1" } });
@@ -628,6 +657,7 @@ describe("the browser client: a coin's page", () => {
     expect(page.trades).toHaveLength(1);
     expect(page.trades[0]).toMatchObject({ side: "buy", feeIn: "quote", trader: null });
     expect(page.candles).toHaveLength(1);
+    expect(page.points).toEqual([{ at: ethAt, price: page.trades[0]!.price }]);
     expect(page).toMatchObject({ feeBps: 100, behind: 1 });
   });
 
@@ -644,6 +674,8 @@ describe("the browser client: a coin's page", () => {
     expect(page.trades).toEqual([expect.objectContaining({ side: "sell", feeIn: "token", trader: COINS.owner })]);
     expect(page.candles).toEqual([c]);
     expect(page.feesQuote).toBeNull();
+    expect(parseCoinPage({ ...s, points: [null, 3, { at: "x", price: 1 }, { at: 1 }, { at: 5, price: 2 }] }).points).toEqual([{ at: 5, price: 2 }]);
+    expect(parseCoinPage({ ...s, points: undefined }).points).toEqual([]);
     expect(() => parseCoinPage({ ...s, coin: null })).toThrow("The launchpad index answered without the coin.");
     expect(() => parseCoinPage("nonsense")).toThrow("without the coin");
   });

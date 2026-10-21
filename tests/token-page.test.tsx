@@ -5,7 +5,7 @@ import { CONTRACTS, UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
 import { parseCoinPage, type IndexedCoinPage } from "@/adapters/http/indexer";
 import { BLOCKSCOUT } from "@/skills/blockscout";
 import type { PoolValue } from "@/skills/launchpad";
-import { ago, Disclosures, inBoth, NewLaunches, TokenChart, TokenInfo, TokenStats, TokenTabs, TokenWarning, useCoinPage } from "@/features/panels/TokenPage";
+import { ago, autoFrame, bucket, Disclosures, FRAMES, inBoth, NewLaunches, TokenChart, TokenInfo, TokenStats, TokenTabs, TokenWarning, useCoinPage } from "@/features/panels/TokenPage";
 import { copy, FX } from "./fixtures/base";
 import { COINS } from "./fixtures/indexer";
 import { DOWN, net, useNet } from "./net";
@@ -123,7 +123,7 @@ describe("the page's cards and facts", () => {
     expect(screen.getByLabelText("Numbers")).toHaveTextContent("Market cap5 AAPLc");
   });
 
-  it("TokenChart: reading, a problem, fewer than two hours, a chart", () => {
+  it("TokenChart: reading, a problem, fewer than two points, the auto frame, picking one, one candle, a chart", async () => {
     const a = render(<TokenChart page="reading" />);
     expect(screen.getByText("Reading the trades…")).toBeInTheDocument();
     a.unmount();
@@ -131,14 +131,39 @@ describe("the page's cards and facts", () => {
     expect(screen.getByText("No chart: down")).toBeInTheDocument();
     b.unmount();
     const c = render(<TokenChart page={pageOf()} />);
-    expect(screen.getByText(/^No chart yet/)).toBeInTheDocument();
+    expect(screen.getByText(/^No chart yet — it starts at the launch price/)).toBeInTheDocument();
     c.unmount();
+    // the captured buy, its sell variant and the buy two hours later: two hourly candles, so 1h is chosen
     const p = pageOf(true);
     const d = render(<TokenChart page={p} />);
+    const pressed = () => screen.getAllByRole("button").filter((x) => x.getAttribute("aria-pressed") === "true").map((x) => x.textContent);
+    expect(pressed()).toEqual(["1h"]);
     expect(d.container.querySelector("svg")).not.toBeNull();
+    // a day holds every trade: one candle, no line
+    const day = Math.floor(AT / 86_400) * 86_400;
     d.unmount();
+    const e = render(<TokenChart page={{ ...p, points: [{ at: day + 10, price: 1 }, { at: day + 4000, price: 2 }] }} />);
+    expect(pressed()).toEqual(["1h"]);
+    await userEvent.click(screen.getByRole("button", { name: "1d" }));
+    expect(pressed()).toEqual(["1d"]);
+    expect(screen.getByText("Every trade so far falls in one 1d candle — pick a finer frame.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Each trade" }));
+    expect(e.container.querySelector("svg")).not.toBeNull();
+    e.unmount();
     render(<TokenChart page={{ ...p, coin: { ...p.coin, symbol: null, quoteSymbol: null } }} />);
-    expect(screen.getByLabelText(/^Coin price in , hourly/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Coin price in , from its pool's opening price/)).toBeInTheDocument();
+  });
+
+  it("bucket and autoFrame", () => {
+    const h = 3600 * 1000;
+    const pts = [{ at: h / 1000, price: 2 }, { at: h / 1000 + 10, price: 5 }, { at: h / 1000 + 20, price: 1 }, { at: h / 1000 + 400, price: 3 }];
+    expect(bucket(pts, 0).map((x) => x.t)).toEqual([h, h + 10_000, h + 20_000, h + 400_000]);
+    expect(bucket(pts, 300)).toEqual([{ t: h, o: 2, h: 5, l: 1, c: 1 }, { t: h + 300_000, o: 3, h: 3, l: 3, c: 3 }]);
+    expect(bucket(pts, 3600)).toEqual([{ t: h, o: 2, h: 5, l: 1, c: 3 }]);
+    expect(autoFrame(pts)).toBe("5m");
+    expect(autoFrame([pts[0]!, { at: 2 * 3600, price: 1 }])).toBe("1h");
+    expect(autoFrame(pts.slice(0, 2))).toBe("trades");
+    expect(FRAMES.map((f) => f.id)).toEqual(["trades", "5m", "1h", "1d"]);
   });
 
   it("TokenInfo: fees known, split 80/20; the coin's own fees only when there are some; nothing read", () => {

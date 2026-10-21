@@ -27,6 +27,14 @@
  *   erc20.json         eth_call name()/symbol() of both coins, symbol()/decimals() of AAPLc
  *                      (0xb200…C2e324d24d7eEcd1fb), name()/symbol() of 0xb200…d5c7 ("test")
  *
+ *
+ *   initialize-v1.json  eth_getLogs {address:PM, topics:[INITIALIZE,0xaeef…b2b5], 52,066,747..52,066,747}
+ *                      — the pool of 0xB200…0dF9 opening in its launch block; captured 2026-10-21 from
+ *                      Tenderly's gateway (mainnet.base.org answered "request limit reached"), with
+ *                      INITIALIZE=keccak("Initialize(bytes32,address,address,uint24,int24,address,uint160,int24)")
+ *                      = 0xdd466e67…6438. Its sqrtPriceX96 gives 4.973987206075924e-9 ETH per token,
+ *                      the opening price the live index served for that coin the same day
+ *
  * The capture script was scratchpad-only (capture-indexer.mjs); re-run the calls above to refresh.
  */
 import head from "./head.json";
@@ -39,8 +47,9 @@ import launchesV2 from "./launches-v2.json";
 import launchesV2Second from "./launches-v2-second.json";
 import txs from "./txs.json";
 import erc20 from "./erc20.json";
+import initializeV1 from "./initialize-v1.json";
 
-export const IX = { head, launchedV1, launchedV2, swapsV1, swapsV2, launchesV1, launchesV2, launchesV2Second, txs, erc20 };
+export const IX = { head, launchedV1, launchedV2, swapsV1, swapsV2, launchesV1, launchesV2, launchesV2Second, txs, erc20, initializeV1 };
 
 export const COINS = {
   /** v1, ETH pair */
