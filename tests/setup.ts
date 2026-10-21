@@ -23,5 +23,17 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   cleanup();
-  localStorage.clear();
+  // a server-side test runs under `@vitest-environment node`, which has no localStorage
+  if (typeof localStorage !== "undefined") localStorage.clear();
+});
+
+/**
+ * The page-wide block pulse (`lib/pulse.ts`) polls Base for as long as the taskbar is mounted —
+ * which is every test that renders the desktop. Those tests are about something else, so the shared
+ * store is swapped for one that never asks; a test about the pulse builds its own `pulseStore` and
+ * hands it in through `PulseContext`.
+ */
+vi.mock("@/lib/pulse", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/pulse")>();
+  return { ...real, PULSE: real.pulseStore(() => new Promise(() => {}), { set: () => 0, clear: () => {} }) };
 });

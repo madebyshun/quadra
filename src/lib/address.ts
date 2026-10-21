@@ -295,3 +295,16 @@ export function checksumDigestHex(value: string): string {
   }
   return toHex(keccak256(utf8(trimmed.slice(2).toLowerCase())));
 }
+
+/**
+ * `0xabcd…1234` — an address shortened for a tray, a title bar or a chip.
+ *
+ * Display only, and it does not validate: every caller already holds an address
+ * that came back from a provider through `readWallet`, which refuses an
+ * unusable one before this can ever see it. Truncating here would otherwise be
+ * the second place in the codebase that decides what an address looks like,
+ * which is the duplication this module was made to end.
+ */
+export function shortAddress(address: string): string {
+  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}

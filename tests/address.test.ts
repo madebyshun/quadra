@@ -31,8 +31,8 @@
  * too, but they would not *say* what broke, and the digest assertion names it.
  *
  * ── Two vectors that are not from the spec, and why they are here ─────────────
- * `AAPLC` and `USDC_BASE` are the real addresses this app ships in `src/config/`.
- * They are the product-tying vectors: the checksum machinery working on EIP-55's
+ * `USDC_ADDRESS` is the real address this app ships in `src/config/`, and mixed case.
+ * It is the product-tying vector: the checksum machinery working on EIP-55's
  * examples and failing on the token the pool actually pays in would be a passing
  * suite and a broken app.
  */
@@ -50,7 +50,6 @@ import {
   sameAddress,
   toChecksumAddress,
 } from "@/lib/address";
-import { AAPL_BASE } from "@/config/pair";
 import { USDC } from "@/config/chain";
 
 /** EIP-55's four ordinary examples: mixed case, correct checksum. */
@@ -81,8 +80,7 @@ const CANONICAL_ALL_LOWER = [
   "0x27b1fdb04752bbc536007a920d24acb045561c26",
 ] as const;
 
-/** From `src/config/pair.ts` and `src/config/chain.ts`. Both mixed case in the repo. */
-const AAPLC_ADDRESS: string = AAPL_BASE.address;
+/** From `src/config/chain.ts`. Mixed case in the repo. */
 const USDC_ADDRESS: string = USDC.address;
 
 /** A vector with no letters at all: simultaneously all-lower and all-upper. */
@@ -183,7 +181,6 @@ describe("toChecksumAddress", () => {
   });
 
   it("checksums the tokens this app actually ships", () => {
-    expect(toChecksumAddress(AAPLC_ADDRESS)).toBe(AAPLC_ADDRESS);
     expect(toChecksumAddress(USDC_ADDRESS)).toBe(USDC_ADDRESS);
   });
 });
@@ -316,7 +313,6 @@ describe("checkAddress", () => {
   });
 
   it("agrees with the repo's own shipped addresses", () => {
-    expect(checkAddress(AAPLC_ADDRESS).kind).toBe("checksummed");
     expect(checkAddress(USDC_ADDRESS).kind).toBe("checksummed");
   });
 });

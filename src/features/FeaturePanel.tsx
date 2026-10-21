@@ -2,32 +2,72 @@ import type { ReactNode } from "react";
 import type { Feature } from "@/features/registry";
 import { FEATURES, isEnabled } from "@/features/registry";
 import { Crt } from "@/ui/Crt";
-import { SendPanel } from "@/features/panels/SendPanel";
 import { InferencePanel } from "@/features/panels/InferencePanel";
 import { X402Panel } from "@/features/panels/X402Panel";
 import { HooksPanel } from "@/features/panels/HooksPanel";
 import { McpPanel } from "@/features/panels/McpPanel";
+import { WalletPanel } from "@/features/panels/WalletPanel";
+import { SkillWindow } from "@/features/panels/SkillWindow";
+import { SendPanel } from "@/features/panels/SendPanel";
+import { LaunchPanel } from "@/features/panels/LaunchPanel";
+import { CoinsPanel } from "@/features/panels/CoinsPanel";
+import { ProfilePanel } from "@/features/panels/ProfilePanel";
+import { TradePanel } from "@/features/panels/TradePanel";
+import { MarketsPanel } from "@/features/panels/MarketsPanel";
+import { SwapPanel } from "@/features/panels/SwapPanel";
+import { BridgePanel } from "@/features/panels/BridgePanel";
+import { TerminalPanel } from "@/features/panels/TerminalPanel";
+import { TaskManagerPanel } from "@/features/panels/TaskManagerPanel";
+import { TrashPanel } from "@/features/panels/TrashPanel";
+import { SoonPanel } from "@/features/panels/SoonPanel";
+import { RugsweeperPanel } from "@/features/panels/RugsweeperPanel";
+import { AchievementsPanel } from "@/features/panels/AchievementsPanel";
+import { LeaderboardPanel } from "@/features/panels/LeaderboardPanel";
+import { radarSkill } from "@/skills/radar";
+import { verdictSkill } from "@/skills/verdict";
+import { gateSkill } from "@/skills/gate";
+import { forensicsSkill } from "@/skills/forensics";
+import { launcherSkill } from "@/skills/launcher";
+import { sendCheckSkill } from "@/skills/sendcheck";
 
 /**
  * How each window explains itself before you touch anything. Second person,
  * no jargon, and it says what the thing actually does rather than what it is.
  */
 const EXPLAIN: Record<Feature["id"], string> = {
-  swap:
-    "Trade any token at the best price. In private mode the pool trades for you, so your wallet is never on the trade.",
+  wallet:
+    "Connect a wallet you control. Nothing here ever holds a key: anything that moves money is signed in your own wallet. Looking things up needs no wallet at all.",
+  terminal: "Type a command, get an answer read straight from Base. `help` lists every skill.",
+  research:
+    "See what launched on Base in the last hour, read straight from the chain and flagged, then put any token through a full verdict.",
+  safety:
+    "Before you buy: a real buy and sell of the token, run on Base without sending anything, plus what its owner can do, who really holds it, who launched it and how deep its market is.",
+  markets:
+    "Prices and charts for what you watch: tokens and Coinbase's stocks on Base. Every number says where it came from.",
+  trade: "Buy or sell a token or a Coinbase stock on Base, for USDC or ETH, at a live quote signed in your wallet.",
+  send: "Pay any address or Basename from your own wallet.",
+  swap: "Trade any token on Base, quoted live and signed in your wallet.",
+  bridge: "Move ETH or USDC from Base to Robinhood Chain, to your own address, signed in your wallet.",
+  launch:
+    "Put a coin out on Base, paired with ETH or a stock: a fixed supply nobody can mint, liquidity nobody can pull, and 80% of every trade's fee to you.",
+  coins:
+    "Every coin launched here, with its numbers. Open one for its page: its value, who launched it, the fees waiting, a buy or sell, and a full verdict.",
+  profile:
+    "Your wallet as you would want to read it — or anybody's: what it holds, the coins it launched here and the fees waiting, and what moved through it, with fake look-alike tokens called out.",
+  taskmgr: "This computer's CPU is Base. Watch it work: every block, how full it is, what gas costs, and which launchpads are busiest right now.",
+  trash: "Pools on Base that lost almost all their liquidity in the last three hours. You cannot restore them. You can find out why.",
+  soon: "Programs still in the box. They are switched off, so nothing in them runs.",
+  rugsweeper: "Minesweeper on the newest launches on Base. The mines are real: launches the radar flags red.",
+  achievements: "What you have earned here — some read from your wallet on Base, some counted on this computer.",
+  leaderboard: "The busiest launchers and coins on this computer's own launchpad.",
+  x402:
+    "This app's own tools, sold per call over x402 — the way an agent pays for them. Pick one, see its price, pay in USDC from your wallet, and get the report and the receipt. The same tools are free in the windows.",
+  mcp: "Plug all of this into your own AI agent. It runs on your computer, and your agent never holds your keys.",
   inference:
     "Run an AI model on a GPU that nobody can look into, not even its owner. Pick a model, ask it something, pay per question. The answer comes with a proof it ran inside the chip.",
-  router:
-    "Point this at any paid endpoint. It reads the price the server asks for, pays it from your balance, and hands you back the answer.",
-  send: "Pay any address. The pool pays them, so nothing on chain connects their address to yours.",
-  mcp: "Plug all of this into your own AI agent. It runs on your computer, and your agent never holds your keys.",
-  bridge: "Move what you hold out to another chain.",
-  launch: "Put a coin out, and send its fees to any X account.",
   audit: "Point it at a GitHub repo and get a score with the reasons written out.",
   hooks:
     "A Uniswap v4 pool can carry a hook: code the pool runs around every swap. What a hook may do is written into its own address, so it can be read, not promised.",
-  x402:
-    "Any endpoint that answers 402 is asking to be paid. This pays it, in USDC, and shows you the receipt.",
 };
 
 /**
@@ -36,7 +76,24 @@ const EXPLAIN: Record<Feature["id"], string> = {
  * that looks finished because it has a text box in it.
  */
 const BUILT: Partial<Record<Feature["id"], () => ReactNode>> = {
+  wallet: () => <WalletPanel />,
+  terminal: () => <TerminalPanel />,
+  research: () => <SkillWindow label="Research" window="research" skills={[radarSkill, verdictSkill, forensicsSkill, launcherSkill]} />,
+  safety: () => <SkillWindow label="Safety" window="safety" skills={[verdictSkill, gateSkill, sendCheckSkill]} />,
+  markets: () => <MarketsPanel />,
+  trade: () => <TradePanel />,
   send: () => <SendPanel />,
+  swap: () => <SwapPanel />,
+  bridge: () => <BridgePanel />,
+  launch: () => <LaunchPanel />,
+  coins: () => <CoinsPanel />,
+  taskmgr: () => <TaskManagerPanel />,
+  trash: () => <TrashPanel />,
+  soon: () => <SoonPanel />,
+  rugsweeper: () => <RugsweeperPanel />,
+  achievements: () => <AchievementsPanel />,
+  leaderboard: () => <LeaderboardPanel />,
+  profile: () => <ProfilePanel />,
   inference: () => <InferencePanel />,
   x402: () => <X402Panel />,
   hooks: () => <HooksPanel />,
@@ -46,27 +103,20 @@ const BUILT: Partial<Record<Feature["id"], () => ReactNode>> = {
 /**
  * What each switched-on-but-unbuilt window is actually waiting on.
  *
- * The notice used to read "switched on but not built yet" for all three, which is
- * true and close to useless. Three windows, three different missing pieces — and
- * two of them are waiting on the *same* piece as each other, which a reader can
- * act on and "not built" hides. Someone looking at an amber box cannot otherwise
- * tell a deliberate omission from a dependency nobody has got to, and those
- * warrant completely different reactions.
+ * The notice used to read "switched on but not built yet" for every one, which is
+ * true and close to useless. Each window is missing a different piece, and someone
+ * looking at an amber box cannot otherwise tell a deliberate omission from a
+ * dependency nobody has got to — those warrant completely different reactions.
  *
- * Deliberately no price in here, for `audit` least of all. The tool it would call
- * is paid, and writing what it costs into this file is the stale-price bug the
- * x402 panel is built to avoid — the failure mode of a frozen price is agreeing
- * to the wrong amount. So this names the id and points at the window that quotes
- * it live, which stays true whatever upstream charges tomorrow.
+ * Deliberately no price in here. Writing what something costs into this file is the
+ * stale-price bug the x402 panel is built to avoid — the failure mode of a frozen
+ * price is agreeing to the wrong amount. `swap`'s entry says a live price is what it
+ * is missing precisely so that nobody fills the gap with a number.
+ *
+ * (`audit` had an entry here until it was switched off on 2026-09-29. A reason kept
+ * for a switched-off window is an excuse for nothing, and a test forbids it.)
  */
-export const WAITING_ON: Readonly<Partial<Record<Feature["id"], string>>> = {
-  swap:
-    "a deployed pool. CONTRACTS.shieldedPool in src/config/chain.ts is null because nothing has been deployed and verified on Basescan, and this repo will not stand in a plausible-looking address to make a window render.",
-  router:
-    "wallet signing. Reading a server's price already works — the x402 window does it live — but paying one means signing a USDC authorization from your own wallet, and there is no signing code here yet.",
-  audit:
-    "wallet signing, the same piece the router is waiting on. The repo scorer it would call is `repo-health` upstream, which asks to be paid: open the x402 window to see the live price it is quoting today.",
-};
+export const WAITING_ON: Readonly<Partial<Record<Feature["id"], string>>> = {};
 
 /**
  * Switched on, and nothing behind it. The exact set of windows that render the
@@ -111,9 +161,7 @@ export function FeaturePanel({ feature }: { feature: Feature }) {
         built()
       ) : (
         <Crt label={`${feature.title} is not built yet`}>
-          <span className="crt__amber">
-            {notBuiltNotice(feature.title, WAITING_ON[feature.id])}
-          </span>
+          <span className="crt__amber">{notBuiltNotice(feature.title, WAITING_ON[feature.id])}</span>
         </Crt>
       )}
     </div>

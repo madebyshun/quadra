@@ -1,0 +1,266 @@
+import { useState } from "react";
+import { quoteSwap, type SwapQuote } from "@/adapters/http/relay";
+import { BASE } from "@/config/chain";
+import { BRAND } from "@/brand";
+import { FEE_BPS, RELAY } from "@/config/routes";
+import { formatAmount, parseAmount } from "@/lib/amount";
+import { balanceOf, type Asset } from "@/lib/erc20";
+import { messageOf } from "@/lib/errors";
+import { ethReceived, tokenReceived } from "@/lib/transact";
+import { explorer } from "@/skills/format";
+import { row, type Report, type Row, type Tone } from "@/skills/types";
+import { Crt } from "@/ui/Crt";
+import { Gel } from "@/ui/Gel";
+import { useWalletSession } from "@/ui/WalletProvider";
+import { ReportView } from "@/features/panels/ReportView";
+import { TxStepList, useTxSteps } from "@/features/panels/TxSteps";
+import { amountFor, assetFor, choiceFor, PercentButtons, TokenPicker, type Choice } from "@/features/panels/TokenPicker";
+import { useInbox } from "@/features/openWindow";
+import { WalletAssets } from "@/features/panels/WalletAssets";
+
+/**
+ * Trade any token on Base, quoted live by Relay and signed in the user's wallet.
+ *
+ * **Review** reads both tokens from the chain, checks the balance, fetches a live quote and
+ * passes it through `checkSwap` (where it goes, how much it may take); **Swap** signs it —
+ * approval first when one is needed, then the swap — and afterwards measures what actually
+ * arrived against the quoted minimum: a token from the swap's own Transfer events, ETH from the
+ * balance at that block (`lib/transact.ts` — a `latest` read once raced the chain and said 0).
+ *
+ * A quote is a price at a moment. One more than a minute old is refused at the click and
+ * has to be fetched again; the live quote is the only price this repo displays.
+ */
+
+/** A quote older than this is refused when Swap is pressed. */
+export const QUOTE_TTL_MS = 60_000;
+
+const SLIPPAGE = [
+  { bps: 50, label: "0.5%" },
+  { bps: 100, label: "1%" },
+  { bps: 300, label: "3%" },
+];
+
+type Review = {
+  readonly sell: Asset;
+  readonly buy: Asset;
+  readonly amount: bigint;
+  readonly quote: SwapQuote;
+  readonly quotedAt: number;
+  readonly short: boolean;
+};
+
+/** Relay's price impact as a tone: past 1% is worth a look, past 5% is a warning in red. */
+export function impactTone(percent: string | null): Tone {
+  const n = Math.abs(Number(percent));
+  return percent === null || Number.isNaN(n) ? "warn" : n > 5 ? "bad" : n > 1 ? "warn" : "ok";
+}
+
+function report(r: Review, balance: bigint, slippage: string): Report {
+  const { sell, buy, quote } = r;
+  const rows: Row[] = [
+    row("You pay", `${formatAmount(r.amount, sell.decimals)} ${sell.symbol}`),
+    row("Your balance", `${formatAmount(balance, sell.decimals)} ${sell.symbol}`, r.short ? { tone: "bad" } : {}),
+    row("You get, about", `${formatAmount(quote.out, buy.decimals)} ${buy.symbol}`),
+    row("At least", `${formatAmount(quote.min, buy.decimals)} ${buy.symbol} (slippage ${slippage})`),
+    row("Price impact", quote.impact === null ? "not reported" : `${quote.impact}%`, { tone: impactTone(quote.impact) }),
+    ...(buy.kind === "erc20" ? [row("Token you get", buy.address, { href: explorer.token(buy.address) })] : []),
+    row("Signs to", `Relay's verified contract ${sell.kind === "native" ? RELAY.router : RELAY.approvalProxy}`, {
+      href: explorer.address(sell.kind === "native" ? RELAY.router : RELAY.approvalProxy),
+      tone: "ok",
+    }),
+    ...(sell.kind === "erc20" && quote.steps.length > 1 ? [row("Approval", `exactly ${formatAmount(r.amount, sell.decimals)} ${sell.symbol} — never unlimited`)] : []),
+    row(`${BRAND.name} fee`, quote.feeOn ? `${FEE_BPS / 100}%` : "off — no fee address is set"),
+  ];
+  return {
+    title: "Review",
+    rows,
+    notes: [
+      "Checked before you sign: where each transaction goes and how much it may take. The minimum is enforced inside Relay's contract call, which this app does not decode — so after the swap it measures what actually arrived.",
+      `Quoted ${new Date(r.quotedAt).toLocaleTimeString()}. After a minute the quote must be fetched again.`,
+    ],
+    sources: ["Relay (quote)", `${BASE.name} RPC (tokens, balances)`],
+  };
+}
+
+/** One side of a pair a caller has already chosen — Trade's asset and what it is paid for with. */
+export type Picked = { readonly choice: Choice; readonly address: string; readonly symbol: string };
+
+/**
+ * `fixed` is Trade's way in: the pair is chosen outside (an asset and USDC or ETH), so the
+ * pickers and the wallet list are not shown and only the amount is asked. Everything after
+ * that — the quote, `checkSwap`, the signatures, what arrived — is this same code.
+ */
+export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked; readonly buy: Picked } } = {}) {
+  const { wallet, signingProvider } = useWalletSession();
+  const [sellChoice, setSellChoice] = useState<Choice>(fixed?.sell.choice ?? "USDC");
+  const [sellAddress, setSellAddress] = useState(fixed?.sell.address ?? "");
+  const [buyChoice, setBuyChoice] = useState<Choice>(fixed?.buy.choice ?? "ETH");
+  const [buyAddress, setBuyAddress] = useState(fixed?.buy.address ?? "");
+  const [amount, setAmount] = useState("");
+  const [slippage, setSlippage] = useState(SLIPPAGE[0]!);
+  const [review, setReview] = useState<(Review & { balance: bigint }) | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [reading, setReading] = useState(false);
+  /** what the swap delivered — `amount: null` when it could not be measured */
+  const [received, setReceived] = useState<{ amount: bigint | null } | null>(null);
+  const steps = useTxSteps();
+
+  const edit = <T,>(set: (v: T) => void) => (v: T) => {
+    set(v);
+    setReview(null);
+    setError(null);
+    setReceived(null);
+    steps.reset();
+  };
+
+  const ready = wallet?.kind === "ready" ? wallet : null;
+  const blocker = !ready
+    ? "Connect a wallet first"
+    : sellChoice === "other" && sellAddress.trim() === ""
+      ? "Enter the address of the token you pay"
+      : buyChoice === "other" && buyAddress.trim() === ""
+        ? "Enter the address of the token you get"
+        : amount.trim() === ""
+          ? "Enter an amount"
+          : null;
+
+  const onReview = async () => {
+    setReading(true);
+    setError(null);
+    try {
+      const account = ready!.account;
+      const [sell, buy] = await Promise.all([
+        assetFor(sellChoice, sellAddress, "Token you pay"),
+        assetFor(buyChoice, buyAddress, "Token you get"),
+      ]);
+      const value = parseAmount(amount, sell.decimals);
+      if (value === 0n) throw new Error("Enter an amount above zero.");
+      const [balance, quote] = await Promise.all([
+        balanceOf(sell, account),
+        quoteSwap({ user: account, sell, buy, amount: value, slippageBps: slippage.bps }),
+      ]);
+      setReview({ sell, buy, amount: value, quote, quotedAt: Date.now(), balance, short: balance < value });
+    } catch (e) {
+      setError(messageOf(e));
+    }
+    setReading(false);
+  };
+
+  // `swap 0x…` / `buy 0x…` from anywhere in the app: that token is what you get
+  useInbox(
+    "buy",
+    (address) => {
+      const c = choiceFor(address);
+      edit(setBuyChoice)(c);
+      setBuyAddress(c === "other" ? address : "");
+    },
+    fixed === undefined,
+  );
+
+  /** A token picked from the wallet list becomes what you pay. */
+  const pick = (address: string | null) => {
+    const c = choiceFor(address);
+    edit(setSellChoice)(c);
+    setSellAddress(c === "other" ? address! : "");
+    // an amount typed for the old token means nothing for the new one
+    setAmount("");
+  };
+
+  /** the % button being read, so the click shows at once */
+  const [pending, setPending] = useState<number | null>(null);
+  const fill = async (pct: number) => {
+    setPending(pct);
+    try {
+      edit(setAmount)(await amountFor(sellChoice, sellAddress, "Token you pay", ready!.account, pct));
+    } catch (e) {
+      setError(messageOf(e));
+    }
+    setPending(null);
+  };
+
+  const onSwap = async () => {
+    const r = review!;
+    if (Date.now() - r.quotedAt > QUOTE_TTL_MS) {
+      setReview(null);
+      setError("That quote is more than a minute old. Review again for a fresh one — nothing was sent.");
+      return;
+    }
+    const done = await steps.run(
+      signingProvider(),
+      ready!.account,
+      r.quote.steps.map((s) => ({ label: s.label, build: () => s.tx })),
+    );
+    if (done === null) return;
+    const swap = done[done.length - 1]!;
+    const account = ready!.account;
+    setReceived({ amount: r.buy.kind === "erc20" ? tokenReceived(swap, r.buy.address, account) : await ethReceived(swap, account) });
+  };
+
+  const started = steps.states.length > 0;
+
+  return (
+    <div className="stack">
+      {ready && !fixed ? <WalletAssets account={ready.account} label={`Pay with one of your assets on ${BASE.name}`} onPick={pick} /> : null}
+      <fieldset className="group">
+        <legend>{fixed ? `${fixed.sell.symbol} → ${fixed.buy.symbol} on ${BASE.name}` : `Swap on ${BASE.name}`}</legend>
+        {fixed ? null : (
+          <TokenPicker label="You pay" choice={sellChoice} address={sellAddress} onChoice={edit(setSellChoice)} onAddress={edit(setSellAddress)} />
+        )}
+        <label className="group__row">
+          <span>Amount</span>
+          <input className="field" aria-label="Amount" placeholder="0.0" inputMode="decimal" value={amount} onChange={(e) => edit(setAmount)(e.target.value)} />
+          {fixed ? <span className="unit">{fixed.sell.symbol}</span> : null}
+        </label>
+        <PercentButtons onPick={(p) => void fill(p)} pending={pending} disabled={!ready || (sellChoice === "other" && sellAddress.trim() === "")} />
+        {fixed ? null : (
+          <TokenPicker label="You get" choice={buyChoice} address={buyAddress} onChoice={edit(setBuyChoice)} onAddress={edit(setBuyAddress)} />
+        )}
+        <label className="group__row">
+          <span>Slippage</span>
+          <select
+            className="field"
+            aria-label="Slippage"
+            value={slippage.bps}
+            onChange={(e) => edit(setSlippage)(SLIPPAGE.find((s) => s.bps === Number(e.target.value))!)}
+          >
+            {SLIPPAGE.map((s) => (
+              <option key={s.bps} value={s.bps}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </fieldset>
+
+      {review === null ? (
+        <Gel className="mf__cta" onClick={() => void onReview()} disabled={blocker !== null || reading}>
+          {reading ? "Quoting…" : (blocker ?? "Get a quote")}
+        </Gel>
+      ) : (
+        <>
+          <ReportView report={report(review, review.balance, slippage.label)} />
+          <Gel className="mf__cta" onClick={() => void onSwap()} disabled={review.short || steps.running || started}>
+            {review.short ? `Not enough ${review.sell.symbol}` : started ? "Swapped — edit a field to swap again" : "Swap in wallet"}
+          </Gel>
+        </>
+      )}
+
+      {error ? (
+        <Crt label="Swap error">
+          <span className="crt__amber">{error}</span>
+        </Crt>
+      ) : null}
+      <TxStepList states={steps.states} label="Swap progress" />
+      {received === null || review === null ? null : received.amount === null ? (
+        <p className="tx__warn">
+          Confirmed, but what arrived could not be measured here — check your {review.buy.symbol} balance on Basescan.
+        </p>
+      ) : (
+        <p className={received.amount >= review.quote.min ? "tx__ok" : "tx__bad"}>
+          Received {formatAmount(received.amount < 0n ? 0n : received.amount, review.buy.decimals)} {review.buy.symbol} — the quoted
+          minimum was {formatAmount(review.quote.min, review.buy.decimals)}.
+        </p>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,648 @@
+{
+ "url": "https://api.dexscreener.com/tokens/v1/base/0xb200000000000000000000f65e17d8284b85e801,0xd048833f8ea1262405d6935014dda5f814145001,0x71d00c5ce4b2a2382796d6fe2d49fcbd9a17fb07,0xd3802fd2982c63870df73175da60d04caa8493aa,0x10d23558542f0fbe70956244b657cfd480e08401,0xe0b7abe03752cd50b3ad06fa6a67473d8dffd98f,0x42badc43c8ca43b7dc7cc15f22b16106d6180b07,0xc39bcce01347e2fbe12d311fee8a8eb08ad7604c,0x2334c68e34ddacb56c0c6f20c260fd4a4cdd4adf,0x17eead7b273f5caab42c00dabbac7e64e77d89bb,0xd98a590aad41f6d8cae345258d28590e8300081f,0xb200000000000000000000f7d43ec776d7a4c101,0x3f89cf65399860127862d468510fb56e03114c53,0x8d0e5c9c79f639dcba39ab46b2b13825032eb52c,0x5be78d96f9dc4ca33fa968771c77c37e4573c3aa,0xaa08550352cd58f7ac5a2332883cfd72a2c8406d,0x11e03b61076f4d80b212a1f24f87ac291766904d,0x5cb63e30f5546beaf5156d12b0bb1bbcc09b45b8,0xc611239950efad56cb456b7780d5b0e7a19522bb,0x0921afcea251ad228878b1a74fad747ba7130c41,0xbe1e1dea8c87be577c76bc7dbfd0dd9a4171116c,0xda9327c582ac4187d82837ad788d67b6be583c6e,0xd01acfef9f2c359291adae82d0f2908580e22ba3,0xb200000000000000000000fb3eb1f69d1969b420,0x07765d230196d372acf706f113fc301098cc2ce7,0x46957329347893e6c24a9b9d82ae44ade117a3d1,0x53fcc9428b2796e34f0cb632478995ccfc72d8c1,0xb20000000000000000000066242d4067724cb7a1,0x1fda7f80a41e0543e1d4c33dd8799767e83c7f1d,0xac33d2291bb379c2c6a1c660424135958b479a02",
+ "body": [
+  {
+   "chainId": "base",
+   "dexId": "uniswap",
+   "url": "https://dexscreener.com/base/0x7ba0c5f0c2060efe6d6940efd0ce82d766b7d1b1458f93a45279d4729bdf6a3b",
+   "pairAddress": "0x7ba0c5f0c2060efe6d6940efd0ce82d766b7d1b1458f93a45279d4729bdf6a3b",
+   "labels": [
+    "v4"
+   ],
+   "baseToken": {
+    "address": "0xd3802fD2982c63870df73175DA60D04CAA8493aa",
+    "name": "Basedog",
+    "symbol": "Basedog"
+   },
+   "quoteToken": {
+    "address": "0x0000000000000000000000000000000000000000",
+    "name": "Ether",
+    "symbol": "ETH"
+   },
+   "priceUsd": "0.000001684",
+   "txns": {
+    "m5": {
+     "buys": 3,
+     "sells": 1
+    },
+    "h1": {
+     "buys": 3,
+     "sells": 1
+    },
+    "h6": {
+     "buys": 3,
+     "sells": 1
+    },
+    "h24": {
+     "buys": 3,
+     "sells": 1
+    }
+   },
+   "volume": {
+    "h24": 1028,
+    "h6": 1028,
+    "h1": 1028,
+    "m5": 1028
+   },
+   "liquidity": {
+    "usd": 3023.04,
+    "base": 980257433,
+    "quote": 0.51
+   },
+   "marketCap": 1684,
+   "pairCreatedAt": 1790820155000
+  },
+  {
+   "chainId": "base",
+   "dexId": "uniswap",
+   "url": "https://dexscreener.com/base/0xbfb52c50d6d99a3ef43e9aa46458fa51c649a30b30c998b0bdca8b2b96698c3e",
+   "pairAddress": "0xbfb52c50d6d99a3ef43e9aa46458fa51c649a30b30c998b0bdca8b2b96698c3e",
+   "labels": [
+    "v4"
+   ],
+   "baseToken": {
+    "address": "0x10D23558542f0fbe70956244b657cfD480E08401",
+    "name": "stockmemes",
+    "symbol": "stockmemes"
+   },
+   "quoteToken": {
+    "address": "0x0000000000000000000000000000000000000000",
+    "name": "Ether",
+    "symbol": "ETH"
+   },
+   "priceUsd": "0.000006203",
+   "txns": {
+    "m5": {
+     "buys": 11,
+     "sells": 1
+    },
+    "h1": {
+     "buys": 11,
+     "sells": 1
+    },
+    "h6": {
+     "buys": 11,
+     "sells": 1
+    },
+    "h24": {
+     "buys": 11,
+     "sells": 1
+    }
+   },
+   "volume": {
+    "h24": 1107.02,
+    "h6": 1107.02,
+    "h1": 1107.02,
+    "m5": 1107.02
+   },
+   "liquidity": {
+    "usd": 5970.27,
+    "base": 807752230,
+    "quote": 0.3565
+   },
+   "marketCap": 6204,
+   "pairCreatedAt": 1790820125000
+  },
+  {
+   "chainId": "base",
+   "dexId": "uniswap",
+   "url": "https://dexscreener.com/base/0xd16512fe99413b9aaa7c4dd4c010a06667fb884c8a9fe5fb33488339f885568c",
+   "pairAddress": "0xd16512fe99413b9aaa7c4dd4c010a06667fb884c8a9fe5fb33488339f885568c",
+   "labels": [
+    "v4"
+   ],
+   "baseToken": {
+    "address": "0xE0B7ABE03752cD50B3ad06Fa6A67473D8dFFD98F",
+    "name": ".si Strategy",
+    "symbol": ".siSTRAT"
+   },
+   "quoteToken": {
+    "address": "0x0000000000000000000000000000000000000000",
+    "name": "Ether",
+    "symbol": "ETH"
+   },
+   "priceUsd": "0.0001421",
+   "txns": {
+    "m5": {
+     "buys": 21,
+     "sells": 9
+    },
+    "h1": {
+     "buys": 21,
+     "sells": 9
+    },
+    "h6": {
+     "buys": 21,
+     "sells": 9
+    },
+    "h24": {
+     "buys": 21,
+     "sells": 9
+    }
+   },
+   "volume": {
+    "h24": 17395.14,
+    "h6": 17395.14,
+    "h1": 17395.14,
+    "m5": 17395.14
+   },
+   "liquidity": {
+    "usd": 7682.81,
+    "base": 28591793,
+    "quote": 1.3452
+   },
+   "marketCap": 142149,
+   "pairCreatedAt": 1790820089000
+  },
+  {
+   "chainId": "base",
+   "dexId": "uniswap",
+   "url": "https://dexscreener.com/base/0x829af26970d814d1f1659fee7715ac20f75e59245a9b1fbb38d3048abc830fa3",
+   "pairAddress": "0x829af26970d814d1f1659fee7715ac20f75e59245a9b1fbb38d3048abc830fa3",
+   "labels": [
+    "v4"
+   ],
+   "baseToken": {
+    "address": "0x42BadC43C8ca43B7Dc7cC15f22B16106D6180B07",
+    "name": "SOON ",
+    "symbol": " SOON"
+   },
+   "quoteToken": {
+    "address": "0x4200000000000000000000000000000000000006",
+    "name": "Wrapped Ether",
+    "symbol": "WETH"
+   },
+   "priceUsd": "0.0000002656",
+   "txns": {
+    "m5": {
+     "buys": 1,
+     "sells": 0
+    },
+    "h1": {
+     "buys": 1,
+     "sells": 0
+    },
+    "h6": {
+     "buys": 1,
+     "sells": 0
+    },
+    "h24": {
+     "buys": 1,
+     "sells": 0
+    }
+   },
+   "volume": {
+    "h24": 0,
+    "h6": 0,
+    "h1": 0,
+    "m5": 0
+   },
+   "liquidity": {
+    "usd": 13283.14,
+    "base": 49999979981,
+    "quote": 1.976e-06
+   },
+   "marketCap": 26566,
+   "pairCreatedAt": 1790820069000
+  },
+  {
+   "chainId": "base",
+   "dexId": "uniswap",
+   "url": "https://dexscreener.com/base/0x18d564eb75c1cf04d79d9105cf8eebe82386421041fb5b70d509a470000fdab5",
+   "pairAddress": "0x18d564eb75c1cf04d79d9105cf8eebe82386421041fb5b70d509a470000fdab5",
+   "labels": [
+    "v4"
+   ],
+   "baseToken": {
+    "address": "0xB200000000000000000000F7d43ec776D7a4C101",
+    "name": "Sphura",
+    "symbol": "sphura"
+   },
+   "quoteToken": {
+    "address": "0x0000000000000000000000000000000000000000",
+    "name": "Ether",
+    "symbol": "ETH"
+   },
+   "priceUsd": "0.000004030",
+   "txns": {
+    "m5": {
+     "buys": 0,
+     "sells": 1
+    },
+    "h1": {
+     "buys": 1,
+     "sells": 1
+    },
+    "h6": {
+     "buys": 1,
+     "sells": 1
+    },
+    "h24": {
+     "buys": 1,
+     "sells": 1
+    }
+   },
+   "volume": {
+    "h24": 269.02,
+    "h6": 269.02,
+    "h1": 269.02,
+    "m5": 134.51
+   },
+   "marketCap": 4031,
+   "pairCreatedAt": 1790819907000
+  },
+  {
+   "chainId": "base",
+   "dexId": "uniswap",
+   "url": "https://dexscreener.com/base/0x9262c575c037aa5023f90ebbac1383ac2a258d4e8e0bc5d07c0d99ec03231dbf",
+   "pairAddress": "0x9262c575c037aa5023f90ebbac1383ac2a258d4e8e0bc5d07c0d99ec03231dbf",
+   "labels": [
+    "v4"
+   ],
+   "baseToken": {
+    "address": "0x3F89CF65399860127862D468510FB56E03114c53",
+    "name": "American Reserved Oil Supply",
+    "symbol": "AROS"
+   },
+   "quoteToken": {
+    "address": "0x4200000000000000000000000000000000000006",
+    "name": "Wrapped Ether",
+    "symbol": "WETH"
+   },
+   "priceUsd": "0.2015",
+   "txns": {
+    "m5": {
+     "buys": 0,
+     "sells": 0
+    },
+    "h1": {
+     "buys": 2,
+     "sells": 0
+    },
+    "h6": {
+     "buys": 2,
+     "sells": 0
+    },
+    "h24": {
+     "buys": 2,
+     "sells": 0
+    }
+   },
+   "volume": {
+    "h24": 2304.32,
+    "h6": 2304.32,
+    "h1": 2304.32,
+    "m5": 0
+   },
+   "liquidity": {
+    "usd": 67098.68,
+    "base": 321594,
+    "quote": 0.8536
+   },
+   "marketCap": 1938761872,
+   "pairCreatedAt": 1790819887000
+  },
+  {
+   "chainId": "base",
+   "dexId": "uniswap",
+   "url": "https://dexscreener.com/base/0x6dd1361660caadf3ba3f452e0e11a7df995d7b2d6acd09fff2cd50e1f5d6cd36",
+   "pairAddress": "0x6dd1361660caadf3ba3f452e0e11a7df995d7b2d6acd09fff2cd50e1f5d6cd36",
+   "labels": [
+    "v4"
+   ],
+   "baseToken": {
+    "address": "0xAa08550352cD58f7AC5a2332883cfD72a2C8406D",
+    "name": "Pongpong",
+    "symbol": "Pongpong"
+   },
+   "quoteToken": {
+    "address": "0x0000000000000000000000000000000000000000",
+    "name": "Ether",
+    "symbol": "ETH"
+   },
+   "priceUsd": "0.0001704",
+   "txns": {
+    "m5": {
+     "buys": 43,
+     "sells": 26
+    },
+    "h1": {
+     "buys": 61,
+     "sells": 39
+    },
+    "h6": {
+     "buys": 61,
+     "sells": 39
+    },
+    "h24": {
+     "buys": 61,
+     "sells": 39
+    }
+   },
+   "volume": {
+    "h24": 61190.46,
+    "h6": 61190.46,
+    "h1": 61190.46,
+    "m5": 43110.53
+   },
+   "liquidity": {
+    "usd": 8400.78,
+    "base": 24626280,
+    "quote": 1.5624
+   },
+   "marketCap": 170466,
+   "pairCreatedAt": 1790819835000
+  },
+  {
+   "chainId": "base",
+   "dexId": "uniswap",
+   "url": "https://dexscreener.com/base/0x5d0c66e00660d4a5b9b2e76eab6212dd3345a311246f4f0488f53ebe77471d41",
+   "pairAddress": "0x5d0c66e00660d4a5b9b2e76eab6212dd3345a311246f4f0488f53ebe77471d41",
+   "labels": [
+    "v4"
+   ],
+   "baseToken": {
+    "address": "0x11e03B61076f4d80b212A1F24F87Ac291766904d",
+    "name": "Kuma",
+    "symbol": "Kuma"
+   },
+   "quoteToken": {
+    "address": "0x0000000000000000000000000000000000000000",
+    "name": "Ether",
+    "symbol": "ETH"
+   },
+   "priceUsd": "0.0002240",
+   "txns": {
+    "m5": {
+     "buys": 61,
+     "sells": 42
+    },
+    "h1": {
+     "buys": 81,
+     "sells": 52
+    },
+    "h6": {
+     "buys": 81,
+     "sells": 52
+    },
+    "h24": {
+     "buys": 81,
+     "sells": 52
+    }
+   },
+   "volume": {
+    "h24": 60778.66,
+    "h6": 60778.66,
+    "h1": 60778.66,
+    "m5": 43081.61
+   },
+   "liquidity": {
+    "usd": 9633.27,
+    "base": 21999812,
+    "quote": 1.7489
+   },
+   "marketCap": 224036,
+   "pairCreatedAt": 1790819797000
+  },
+  {
+   "chainId": "base",
+   "dexId": "uniswap",
+   "url": "https://dexscreener.com/base/0x7a1381e82fbf21ba9d98c6e4b318e375904eb624adcd7bf2b45fb539257a9ae1",
+   "pairAddress": "0x7a1381e82fbf21ba9d98c6e4b318e375904eb624adcd7bf2b45fb539257a9ae1",
+   "labels": [
+    "v4"
+   ],
+   "baseToken": {
+    "address": "0x5cb63E30f5546Beaf5156d12b0Bb1bBCC09b45B8",
+    "name": "heyzues",
+    "symbol": "heyzues"
+   },
+   "quoteToken": {
+    "address": "0x1111111111166b7FE7bd91427724B487980aFc69",
+    "name": "Zora",
+    "symbol": "ZORA"
+   },
+   "priceUsd": "0.000007301",
+   "txns": {
+    "m5": {
+     "buys": 0,
+     "sells": 0
+    },
+    "h1": {
+     "buys": 0,
+     "sells": 0
+    },
+    "h6": {
+     "buys": 2,
+     "sells": 0
+    },
+    "h24": {
+     "buys": 2,
+     "sells": 0
+    }
+   },
+   "volume": {
+    "h24": 1.02,
+    "h6": 1.02,
+    "h1": 0,
+    "m5": 0
+   },
+   "marketCap": 7302,
+   "pairCreatedAt": 1790218061000
+  },
+  {
+   "chainId": "base",
+   "dexId": "uniswap",
+   "url": "https://dexscreener.com/base/0x6c3c3a93bc23527962a0bae39e6789cded83c8c05fb8485ec9b17eab5956b30a",
+   "pairAddress": "0x6c3c3a93bc23527962a0bae39e6789cded83c8c05fb8485ec9b17eab5956b30a",
+   "labels": [
+    "v4"
+   ],
+   "baseToken": {
+    "address": "0xDA9327c582ac4187D82837ad788d67b6BE583c6e",
+    "name": "United States Dividend Fund",
+    "symbol": "USDF"
+   },
+   "quoteToken": {
+    "address": "0x0000000000000000000000000000000000000000",
+    "name": "Ether",
+    "symbol": "ETH"
+   },
+   "priceUsd": "0.0007530",
+   "txns": {
+    "m5": {
+     "buys": 0,
+     "sells": 0
+    },
+    "h1": {
+     "buys": 1,
+     "sells": 0
+    },
+    "h6": {
+     "buys": 1,
+     "sells": 0
+    },
+    "h24": {
+     "buys": 1,
+     "sells": 0
+    }
+   },
+   "volume": {
+    "h24": 1.06,
+    "h6": 1.06,
+    "h1": 1.06,
+    "m5": 0
+   },
+   "marketCap": 753021,
+   "pairCreatedAt": 1790819699000
+  },
+  {
+   "chainId": "base",
+   "dexId": "uniswap",
+   "url": "https://dexscreener.com/base/0xcd97b85f7c631416520d55b7f643ddea762b829cec5f670080195f6f3daa48c8",
+   "pairAddress": "0xcd97b85f7c631416520d55b7f643ddea762b829cec5f670080195f6f3daa48c8",
+   "labels": [
+    "v4"
+   ],
+   "baseToken": {
+    "address": "0x46957329347893E6c24A9B9D82ae44Ade117A3d1",
+    "name": "AI DO MY WORK",
+    "symbol": "WORK"
+   },
+   "quoteToken": {
+    "address": "0x0000000000000000000000000000000000000000",
+    "name": "Ether",
+    "symbol": "ETH"
+   },
+   "priceUsd": "0.000002712",
+   "txns": {
+    "m5": {
+     "buys": 0,
+     "sells": 0
+    },
+    "h1": {
+     "buys": 4,
+     "sells": 1
+    },
+    "h6": {
+     "buys": 4,
+     "sells": 1
+    },
+    "h24": {
+     "buys": 4,
+     "sells": 1
+    }
+   },
+   "volume": {
+    "h24": 1433.52,
+    "h6": 1433.52,
+    "h1": 1433.52,
+    "m5": 0
+   },
+   "liquidity": {
+    "usd": 4031.16,
+    "base": 980257433,
+    "quote": 0.51
+   },
+   "marketCap": 2713,
+   "pairCreatedAt": 1790819549000
+  },
+  {
+   "chainId": "base",
+   "dexId": "uniswap",
+   "url": "https://dexscreener.com/base/0x63c669a07967107027856d8c36eed06427669d6be5674794da232c6ce27e236e",
+   "pairAddress": "0x63c669a07967107027856d8c36eed06427669d6be5674794da232c6ce27e236e",
+   "labels": [
+    "v4"
+   ],
+   "baseToken": {
+    "address": "0xb20000000000000000000066242d4067724cB7A1",
+    "name": "Reddit, Inc.",
+    "symbol": "RDDTc"
+   },
+   "quoteToken": {
+    "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "name": "USD Coin",
+    "symbol": "USDC"
+   },
+   "priceUsd": "149.30",
+   "txns": {
+    "m5": {
+     "buys": 0,
+     "sells": 0
+    },
+    "h1": {
+     "buys": 0,
+     "sells": 0
+    },
+    "h6": {
+     "buys": 1,
+     "sells": 0
+    },
+    "h24": {
+     "buys": 87,
+     "sells": 83
+    }
+   },
+   "volume": {
+    "h24": 24841.83,
+    "h6": 0.01,
+    "h1": 0,
+    "m5": 0
+   },
+   "liquidity": {
+    "usd": 9643.96,
+    "base": 44.9389,
+    "quote": 2934.3309
+   },
+   "marketCap": 41955,
+   "pairCreatedAt": 1790374257000
+  },
+  {
+   "chainId": "base",
+   "dexId": "uniswap",
+   "url": "https://dexscreener.com/base/0xb94825f65631048bff4b61bdb2e018c45327c8c7f177515d2ac8600e672708ae",
+   "pairAddress": "0xb94825f65631048bff4b61bdb2e018c45327c8c7f177515d2ac8600e672708ae",
+   "labels": [
+    "v4"
+   ],
+   "baseToken": {
+    "address": "0xac33D2291BB379c2c6a1C660424135958b479a02",
+    "name": "jessidoitt",
+    "symbol": "jessidoitt"
+   },
+   "quoteToken": {
+    "address": "0x1111111111166b7FE7bd91427724B487980aFc69",
+    "name": "Zora",
+    "symbol": "ZORA"
+   },
+   "priceUsd": "0.000007843",
+   "txns": {
+    "m5": {
+     "buys": 0,
+     "sells": 0
+    },
+    "h1": {
+     "buys": 1,
+     "sells": 0
+    },
+    "h6": {
+     "buys": 1,
+     "sells": 0
+    },
+    "h24": {
+     "buys": 1,
+     "sells": 0
+    }
+   },
+   "volume": {
+    "h24": 2,
+    "h6": 2,
+    "h1": 2,
+    "m5": 0
+   },
+   "marketCap": 7843,
+   "pairCreatedAt": 1790819481000
+  }
+ ]
+}

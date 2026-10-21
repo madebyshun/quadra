@@ -1,3 +1,4 @@
+import { toChecksumAddress } from "@/lib/address";
 import { describe, it, expect } from "vitest";
 import { BASE, USDC, WETH, CONTRACTS, FLAGS, requireContract, assertDeployed } from "@/config/chain";
 
@@ -49,31 +50,35 @@ describe("token constants", () => {
 });
 
 describe("our own contracts", () => {
-  it("are all still unset", () => {
-    for (const [name, addr] of Object.entries(CONTRACTS)) {
-      expect(addr, `CONTRACTS.${name} was set — deploy and verify it first`).toBeNull();
-    }
+  /**
+   * The fee recipient is the owner's own wallet, given 2026-09-30 and measured before it was
+   * written (see `CONTRACTS.treasury`). Pinned literally, so a change to where the money goes
+   * is a visible edit to this line and never a side effect.
+   */
+  it("sends fees to the owner's wallet, written with its checksum, and has no token yet", () => {
+    expect(CONTRACTS.treasury).toBe("0xD5C1dFc036F9911348EA8065F73c8123f4013FAB");
+    expect(toChecksumAddress(CONTRACTS.treasury!)).toBe(CONTRACTS.treasury);
+    expect(requireContract("treasury")).toBe(CONTRACTS.treasury);
+    expect(CONTRACTS.token, "CONTRACTS.token was set — deploy and verify it first").toBeNull();
   });
 
   it("throws naming the constant rather than returning a zero address", () => {
-    expect(() => requireContract("shieldedPool")).toThrowError(/CONTRACTS\.shieldedPool/);
-    expect(() => requireContract("treasury")).toThrowError(/not deployed yet/);
+    expect(() => requireContract("token")).toThrowError(/CONTRACTS\.token/);
+    expect(() => requireContract("token")).toThrowError(/not deployed yet/);
   });
 
   it("names the explorer in the error, so the fix is in the message", () => {
-    expect(() => requireContract("verifier")).toThrowError(/basescan\.org/);
+    expect(() => requireContract("token")).toThrowError(/basescan\.org/);
   });
 
-  it("never hands back a plausible-looking placeholder", () => {
-    for (const name of Object.keys(CONTRACTS) as Array<keyof typeof CONTRACTS>) {
-      let returned: string | null = null;
-      try {
-        returned = requireContract(name);
-      } catch {
-        // expected while unset
-      }
-      expect(returned).toBeNull();
+  it("never hands back a plausible-looking placeholder for what is unset", () => {
+    let returned: string | null = null;
+    try {
+      returned = requireContract("token");
+    } catch {
+      // expected while unset
     }
+    expect(returned).toBeNull();
   });
 });
 
@@ -101,10 +106,19 @@ describe("assertDeployed, the once-deployed path", () => {
 });
 
 describe("flags", () => {
-  it("only switches on what has something behind it", () => {
-    expect(FLAGS.bridge).toBe(false);
-    expect(FLAGS.launch).toBe(false);
-    expect(FLAGS.webhooks).toBe(false);
+  /**
+   * Launch is switched ON while unbuilt since 2026-09-30, on the owner's call: it goes out
+   * in public through o1 and its window names the missing key. Switched off is what has
+   * no place in the product right now — the stub enclave, and the two off-thesis panels.
+   */
+  it("switches off exactly what has no place in the product right now", () => {
+    const off = Object.entries(FLAGS)
+      .filter(([, on]) => !on)
+      .map(([name]) => name)
+      .sort();
+    // robinhood: Robinhood Chain hidden on the owner's call, 2026-10-02 — Base first
+    // x402Others: the x402 window sells only this app's own tools, 2026-10-02
+    expect(off).toEqual(["audit", "hooks", "inference", "robinhood", "webhooks", "x402Others"]);
   });
 
   it("is all booleans", () => {

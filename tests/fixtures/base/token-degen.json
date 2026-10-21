@@ -1,0 +1,17 @@
+{
+ "address_hash": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+ "circulating_market_cap": "39328691.0829059",
+ "circulating_supply": null,
+ "decimals": "18",
+ "exchange_rate": "0.00108986",
+ "holders_count": "1225549",
+ "name": "Degen",
+ "new_ui_multiplier": null,
+ "reputation": "ok",
+ "symbol": "DEGEN",
+ "total_supply": "36083622668802065124373821514",
+ "type": "ERC-20",
+ "ui_multiplier": null,
+ "ui_multiplier_effective_at": null,
+ "volume_24h": "3559818.678818853"
+}

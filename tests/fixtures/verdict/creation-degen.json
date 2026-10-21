@@ -1,0 +1,12 @@
+{
+ "hash": "0xcea27f1618e28ecc59b2faed86cdec29a92218261fe9efe374a39201e93545c5",
+ "from": {
+  "hash": "0x3C12B77aE8B7DD1FEB63D1D6a2A819AcdA0a41d2",
+  "is_contract": true,
+  "proxy_type": "eip7702"
+ },
+ "to": null,
+ "created_contract": {
+  "hash": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed"
+ }
+}

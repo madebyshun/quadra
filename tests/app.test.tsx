@@ -1,9 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { screen, within } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderAt, settle } from "./helpers";
 import { BRAND } from "@/brand";
-import { FEATURES, isEnabled } from "@/features/registry";
+import { CONTRACTS } from "@/config/chain";
+import { visibleFeatures, FEATURES, isEnabled, desktopFeatures, comingSoon } from "@/features/registry";
 
 describe("the desktop", () => {
   it("leads with the product name", () => {
@@ -11,44 +12,138 @@ describe("the desktop", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(BRAND.name);
   });
 
-  it("renders a card for every feature, on or off", () => {
+  /**
+   * The three status chips ("N of M switched on", "holds no key", "local pool,
+   * not deployed yet") were removed on the owner's call, along with `lib/status`.
+   * Asserted by absence rather than left to the eye, because a deleted module is
+   * exactly the kind of thing a later refactor re-introduces from a stale import.
+   */
+  it("does not put status chips under the tagline", () => {
     renderAt("/");
-    const cards = within(screen.getByLabelText("What you can do")).getAllByRole("link");
-    expect(cards).toHaveLength(FEATURES.length);
-  });
-
-  it("links each card at its own ?do= id", () => {
-    renderAt("/");
-    for (const f of FEATURES) {
-      const link = screen.getByRole("link", { name: new RegExp(`^${f.title}`) });
-      expect(link).toHaveAttribute("href", `/?do=${f.id}`);
+    expect(screen.queryByLabelText("What is true right now")).toBeNull();
+    // scoped to the header: "switched on" also appears in the off feature's blurb
+    const head = screen.getByRole("heading", { level: 1 }).closest("header")!;
+    expect(head.querySelectorAll(".chip")).toHaveLength(0);
+    expect(head).toHaveTextContent(BRAND.tagline);
+    for (const claim of [/switched on/, /holds no key/, /not deployed yet/]) {
+      expect(head.textContent).not.toMatch(claim);
     }
   });
 
-  it("says plainly that an off feature is off, instead of hiding it", () => {
+  it("puts every switched-on program on the desktop, the off ones in Coming Soon, and the Recycle Bin in its corner", () => {
     renderAt("/");
-    for (const f of FEATURES.filter((x) => !isEnabled(x))) {
-      const link = screen.getByRole("link", { name: new RegExp(`^${f.title}`) });
-      expect(link).toHaveTextContent("not switched on yet");
-      expect(link).toHaveAttribute("aria-disabled", "true");
-    }
+    const cards = within(screen.getByLabelText("What you can do")).getAllByRole("button");
+    expect(cards).toHaveLength(desktopFeatures().length);
+    expect(FEATURES.length - visibleFeatures().length).toBe(1);
+    expect(screen.queryByRole("button", { name: /^Bridge/ })).not.toBeInTheDocument();
+    // 2026-10-14: three dimmed "not switched on yet" icons read like a settings page — they moved into a folder
+    for (const f of comingSoon()) expect(within(screen.getByLabelText("What you can do")).queryByRole("button", { name: new RegExp(`^${f.title}`) })).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Coming Soon/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Recycle Bin" })).toHaveClass("desk-trash");
+  });
+
+  it("says plainly that an off feature is off, from the Coming Soon folder", async () => {
+    const user = userEvent.setup();
+    renderAt("/?do=soon");
+    const folder = screen.getByLabelText("Programs not switched on yet");
+    const off = comingSoon();
+    expect(off.length).toBeGreaterThan(0);
+    for (const f of off) expect(within(folder).getByRole("button", { name: new RegExp(`^${f.title}`) })).toHaveTextContent(f.blurb);
+    await user.click(within(folder).getByRole("button", { name: new RegExp(`^${off[0]!.title}`) }));
+    expect(screen.getByLabelText(`${off[0]!.title} is off`)).toHaveTextContent("not switched on");
   });
 
   it("shows the real blurb for a feature that is on", () => {
     renderAt("/");
-    const on = FEATURES.filter(isEnabled);
+    const on = desktopFeatures();
     expect(on.length).toBeGreaterThan(0);
     for (const f of on) {
-      const link = screen.getByRole("link", { name: new RegExp(`^${f.title}`) });
-      expect(link).toHaveTextContent(f.blurb);
-      expect(link).not.toHaveAttribute("aria-disabled");
+      const card = screen.getByRole("button", { name: new RegExp(`^${f.title}`) });
+      expect(card).toHaveTextContent(f.blurb);
+      expect(card).not.toHaveAttribute("aria-disabled");
     }
   });
 
-  it("offers the three doc pages", () => {
+  /**
+   * On the desktop these are buttons, not links. Following `/docs` unmounted the
+   * whole desktop — header and every other open window went with it — so
+   * a doc page now opens as a window like anything else. The routes still exist
+   * for a saved link; `renderAt("/docs")` below is what covers them.
+   */
+  it("offers the three doc pages as windows, not as navigation", () => {
     renderAt("/");
-    const docs = within(screen.getByLabelText("Read about it")).getAllByRole("link");
-    expect(docs.map((a) => a.getAttribute("href"))).toEqual(["/docs", "/api", "/verify"]);
+    const docs = within(screen.getByLabelText("Read about it")).getAllByRole("button");
+    expect(docs.map((b) => b.textContent)).toEqual([
+      expect.stringContaining("Docs"),
+      expect.stringContaining("API"),
+      expect.stringContaining("Verify"),
+    ]);
+    expect(within(screen.getByLabelText("Read about it")).queryAllByRole("link")).toEqual([]);
+  });
+
+  it("opens a doc page in place, keeping the desktop underneath", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+    await user.click(screen.getByRole("button", { name: /^Docs/ }));
+    await settle();
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(`Docs — ${BRAND.name}`);
+    // the header the old navigation threw away
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(BRAND.name);
+  });
+
+  it("opens each doc page from a saved ?do= link, with its own body", async () => {
+    const expected = [
+      ["docs", `Docs — ${BRAND.name}`, /never holds a key/],
+      ["api", "API", /Endpoints/],
+      ["verify", "Verify", /nothing checked yet/],
+    ] as const;
+    for (const [id, title, body] of expected) {
+      const { unmount } = renderAt(`/?do=${id}`);
+      await settle();
+      expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(title);
+      expect(screen.getByRole("heading", { level: 2 }).closest(".win")).toHaveTextContent(body);
+      unmount();
+    }
+  });
+
+  /**
+   * The Docs window says nothing about the product's own token, by decision. The
+   * token is not deployed, so any sentence about it is a plan, and a plan printed
+   * beside a checked on-chain address borrows that address's credibility. Pinned
+   * by absence, because prose about an unshipped token is exactly the kind of
+   * thing that creeps back in one helpful paragraph at a time.
+   */
+  it("says nothing about the product's own token, which does not exist", async () => {
+    expect(CONTRACTS.token).toBeNull();
+    renderAt("/?do=docs");
+    await settle();
+    const win = screen.getByRole("heading", { level: 2 }).closest(".win")!;
+    expect(win.textContent).not.toContain(BRAND.ticker);
+    expect(win.textContent).not.toContain(BRAND.ticker.replace("$", ""));
+    // what it does print is checkable: where every answer comes from
+    expect(win).toHaveTextContent("Blockscout");
+  });
+
+  it("opens a doc page from the Start menu too", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
+    await user.click(
+      within(screen.getByRole("menu", { name: "Start menu" })).getByRole("menuitem", { name: "API" }),
+    );
+    await settle();
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("API");
+  });
+
+  it("keeps a feature window open when a doc page is opened next to it", async () => {
+    const user = userEvent.setup();
+    renderAt("/?do=send");
+    await settle();
+    await user.click(screen.getByRole("button", { name: /^Verify/ }));
+    await settle();
+    const titles = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(titles).toContain("Send");
+    expect(titles).toContain("Verify");
   });
 
   it("shows no window frame until a feature is picked", () => {
@@ -72,9 +167,10 @@ describe("opening a feature with ?do=", () => {
     }
   });
 
-  it("replaces the desktop rather than stacking on it", () => {
-    renderAt("/?do=router");
-    expect(screen.queryByLabelText("What you can do")).not.toBeInTheDocument();
+  it("stacks the window on top of the desktop rather than replacing it", () => {
+    renderAt("/?do=bridge");
+    expect(screen.getByLabelText("What you can do")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Bridge");
   });
 
   it("falls back to the desktop for an unknown id", () => {
@@ -84,51 +180,136 @@ describe("opening a feature with ?do=", () => {
   });
 
   it("warns instead of offering controls when the feature is off", () => {
-    renderAt("/?do=bridge");
-    expect(screen.getByLabelText("Bridge is off")).toHaveTextContent(
+    renderAt("/?do=audit");
+    expect(screen.getByLabelText("Audit is off")).toHaveTextContent(
       /not switched on\. Nothing here will move money/,
     );
   });
 
-  /**
-   * Distinguishes the two ways a window can be empty. "Off" and "not built" are
-   * different facts, and a single shared placeholder blurred them — a flag being
-   * on used to be enough to make a window look ready.
-   */
-  it("says a switched-on feature is unbuilt, rather than showing a blank output", () => {
-    renderAt("/?do=swap");
-    expect(screen.getByLabelText("Swap is not built yet")).toHaveTextContent(
-      /switched on but not built yet.*nothing here will move money/i,
-    );
-    expect(screen.queryByLabelText("Swap output")).not.toBeInTheDocument();
-  });
-
-  it("gives Send and Inference real controls, not a placeholder", async () => {
-    renderAt("/?do=send");
+  it("gives the Terminal and Research real controls, not a placeholder", async () => {
+    const { unmount } = renderAt("/?do=terminal");
     await settle();
-    expect(screen.getByRole("button", { name: "Deposit" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Send is not built yet")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Command")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Terminal is not built yet")).not.toBeInTheDocument();
+    unmount();
+
+    renderAt("/?do=research");
+    await settle();
+    expect(screen.getByRole("button", { name: "Launch Radar" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Research is not built yet")).not.toBeInTheDocument();
   });
 });
 
+/** the window frame itself: the one element whose *own* aria-label is the title, not a descendant's */
+function windowFrame(title: string): HTMLElement {
+  return screen.getByLabelText(title, { selector: "section" });
+}
+
+describe("opening a feature from the desktop icon", () => {
+  it("clicking a card opens its window without a page navigation", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Send/ }));
+    expect(windowFrame("Send")).toBeInTheDocument();
+  });
+
+  it("clicking the same card twice does not open a second window", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+    const card = within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Send/ });
+    await user.click(card);
+    await user.click(card);
+    expect(screen.getAllByLabelText("Send", { selector: "section" })).toHaveLength(1);
+  });
+});
+
+describe("multiple windows", () => {
+  it("keeps two windows open and visible at once", async () => {
+    const user = userEvent.setup();
+    renderAt("/?do=send");
+    await settle();
+    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^MCP/ }));
+    expect(windowFrame("Send")).toBeInTheDocument();
+    expect(windowFrame("MCP tools")).toBeInTheDocument();
+  });
+
+  it("closing one window leaves the other open", async () => {
+    const user = userEvent.setup();
+    renderAt("/?do=send");
+    await settle();
+    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^MCP/ }));
+    await user.click(within(windowFrame("Send")).getByRole("button", { name: "Close" }));
+    expect(screen.queryByLabelText("Send", { selector: "section" })).not.toBeInTheDocument();
+    expect(windowFrame("MCP tools")).toBeInTheDocument();
+  });
+
+  it("clicking a background window brings it in front (its taskbar chip becomes active)", async () => {
+    const user = userEvent.setup();
+    renderAt("/?do=send");
+    await settle();
+    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^MCP/ }));
+    await user.click(windowFrame("Send"));
+    const sendChip = within(screen.getByLabelText("Taskbar")).getByRole("button", { name: "Send" });
+    expect(sendChip.className).toContain("chip--active");
+  });
+});
+
+describe("dragging, resizing and minimising a window", () => {
+  it("moves a window when its title bar is dragged", async () => {
+    renderAt("/?do=send");
+    await settle();
+    const win = windowFrame("Send");
+    const bar = win.querySelector(".win__bar")!;
+    const before = win.style.left;
+    fireDrag(bar, 0, 0, 40, 25);
+    expect(win.style.left).not.toBe(before);
+  });
+
+  it("resizes a window when its corner grip is dragged", async () => {
+    renderAt("/?do=send");
+    await settle();
+    const win = windowFrame("Send");
+    const grip = win.querySelector(".win__resize")!;
+    const beforeWidth = win.style.width;
+    fireDrag(grip, 0, 0, 80, 60);
+    expect(win.style.width).not.toBe(beforeWidth);
+  });
+
+  it("minimises a window to the taskbar and restores it at the same position", async () => {
+    const user = userEvent.setup();
+    renderAt("/?do=send");
+    await settle();
+    const win = windowFrame("Send");
+    const before = { left: win.style.left, top: win.style.top };
+    await user.click(within(win).getByRole("button", { name: "Minimise" }));
+    expect(win).not.toBeVisible();
+    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: "Send" }));
+    expect(win).toBeVisible();
+    expect({ left: win.style.left, top: win.style.top }).toEqual(before);
+  });
+});
+
+function fireDrag(handle: Element, x0: number, y0: number, x1: number, y1: number) {
+  act(() => {
+    handle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: x0, clientY: y0 }));
+    window.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: x1, clientY: y1 }));
+    window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  });
+}
+
 describe("closing the window", () => {
-  it("goes back to the desktop when the close light is clicked", async () => {
+  it("closes just that window when the close light is clicked", async () => {
     const user = userEvent.setup();
     renderAt("/?do=swap");
     await user.click(screen.getByRole("button", { name: "Close" }));
-    expect(screen.getByLabelText("What you can do")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Swap")).not.toBeInTheDocument();
   });
 
-  it("closes on Esc", async () => {
+  it("closes the topmost window on Esc", async () => {
     const user = userEvent.setup();
     renderAt("/?do=swap");
     await user.keyboard("{Escape}");
-    expect(screen.getByLabelText("What you can do")).toBeInTheDocument();
-  });
-
-  it("says so, since a keyboard shortcut nobody mentions does not exist", () => {
-    renderAt("/?do=swap");
-    expect(screen.getByText("Esc closes this.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Swap")).not.toBeInTheDocument();
   });
 
   it("ignores other keys", async () => {
@@ -138,20 +319,28 @@ describe("closing the window", () => {
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Swap");
   });
 
-  it("closes from the taskbar start button too", async () => {
+  it("shows the desktop again once every window is closed", async () => {
     const user = userEvent.setup();
     renderAt("/?do=mcp");
-    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button"));
+    await user.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.getByLabelText("What you can do")).toBeInTheDocument();
+  });
+
+  it("minimises every window from the taskbar start button", async () => {
+    const user = userEvent.setup();
+    renderAt("/?do=mcp");
+    await settle();
+    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
+    expect(windowFrame("MCP tools")).not.toBeVisible();
   });
 });
 
 describe("the taskbar", () => {
   it("is present on the desktop and names the product", () => {
     renderAt("/");
-    expect(within(screen.getByLabelText("Taskbar")).getByRole("button")).toHaveTextContent(
-      BRAND.name,
-    );
+    expect(
+      within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }),
+    ).toBeInTheDocument();
   });
 
   it("states the chain, because an address means nothing without one", () => {
@@ -162,7 +351,76 @@ describe("the taskbar", () => {
   it("names the open window while one is open", async () => {
     renderAt("/?do=inference");
     await settle();
-    expect(screen.getByLabelText("Taskbar")).toHaveTextContent("Private inference");
+    expect(
+      within(screen.getByLabelText("Taskbar")).getByRole("button", { name: "Private inference" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("the Start menu", () => {
+  it("opens on a Start click, listing every visible feature and the doc pages", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
+    const menu = screen.getByRole("menu", { name: "Start menu" });
+    expect(within(menu).getByRole("menuitem", { name: /Send/ })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Docs" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "API" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Verify" })).toBeInTheDocument();
+  });
+
+  it("marks an off feature in the menu without hiding it", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
+    const menu = screen.getByRole("menu", { name: "Start menu" });
+    const off = visibleFeatures().filter((f) => !isEnabled(f));
+    expect(off.length).toBeGreaterThan(0);
+    expect(within(menu).queryByRole("menuitem", { name: /Bridge/ })).not.toBeInTheDocument();
+    for (const f of off) {
+      const item = within(menu).getByRole("menuitem", { name: new RegExp(f.title) });
+      expect(item.className).toContain("start-menu__item--off");
+    }
+    const on = within(menu).getByRole("menuitem", { name: /^Send/ });
+    expect(on.className).not.toContain("start-menu__item--off");
+  });
+
+  it("opens a window in place from the Home page, and closes the menu", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
+    await user.click(
+      within(screen.getByRole("menu", { name: "Start menu" })).getByRole("menuitem", { name: /^Send/ }),
+    );
+    expect(windowFrame("Send")).toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: "Start menu" })).not.toBeInTheDocument();
+  });
+
+  it("closes on an outside click", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
+    expect(screen.getByRole("menu", { name: "Start menu" })).toBeInTheDocument();
+    await user.click(screen.getByRole("heading", { level: 1 }));
+    expect(screen.queryByRole("menu", { name: "Start menu" })).not.toBeInTheDocument();
+  });
+
+  it("closes on Escape", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
+    expect(screen.getByRole("menu", { name: "Start menu" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu", { name: "Start menu" })).not.toBeInTheDocument();
+  });
+
+  it("still minimises every window on the same click that opens the menu", async () => {
+    const user = userEvent.setup();
+    renderAt("/?do=mcp");
+    await settle();
+    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
+    expect(windowFrame("MCP tools")).not.toBeVisible();
+    expect(screen.getByRole("menu", { name: "Start menu" })).toBeInTheDocument();
   });
 });
 
@@ -208,7 +466,105 @@ describe("routing", () => {
   it("goes home from the taskbar on a standalone page, not nowhere", async () => {
     const user = userEvent.setup();
     renderAt("/api");
-    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button"));
+    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
     expect(screen.getByLabelText("What you can do")).toBeInTheDocument();
+  });
+});
+
+/**
+ * `x402` opens at prose height, never below panel height. MEASURED 2026-09-29: at panel
+ * height the output box of a confirmed, wallet-ready payment sat 43px below its own Pay
+ * button, and on a 673px viewport `pageHeight` alone came out SHORTER than a panel.
+ */
+describe("how tall a window opens", () => {
+  const heightOf = (title: string) => parseInt(screen.getByLabelText(title, { selector: ".win" }).style.height, 10);
+
+  function at(viewport: number) {
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: viewport });
+  }
+
+  it("opens x402 at prose height on a tall screen, taller than an ordinary panel", async () => {
+    at(900);
+    renderAt("/?do=x402");
+    await settle();
+    expect(heightOf("x402")).toBe(660);
+  });
+
+  it("sells only this app's own tools in x402: no BlueAgent, no any-URL, no request to either (2026-10-02)", async () => {
+    at(900);
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", (u: string) => (asked.push(String(u)), Promise.reject(new TypeError("Failed to fetch"))));
+    renderAt("/?do=x402");
+    await settle();
+    expect(screen.queryByRole("group", { name: "Pay" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /BlueAgent tools|Any x402 URL/ })).not.toBeInTheDocument();
+    expect(asked.some((u) => u.includes("blueagent") || u.includes("/upstream"))).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it("opens the own-tools-only x402 window for a wallet on the wrong chain, offering the switch", async () => {
+    at(900);
+    vi.stubGlobal("ethereum", {
+      request: ({ method }: { method: string }) =>
+        method === "eth_accounts" ? Promise.resolve(["0xabcdef0123456789abcdef0123456789abcdef01"]) : method === "eth_chainId" ? Promise.resolve("0x1") : Promise.reject(new Error("no")),
+    });
+    vi.stubGlobal("fetch", () => Promise.reject(new TypeError("Failed to fetch")));
+    renderAt("/?do=x402");
+    await settle();
+    expect(screen.getByLabelText("x402", { selector: ".win" })).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it("never opens x402 shorter than an ordinary panel, however short the screen", async () => {
+    at(673);
+    renderAt("/?do=x402");
+    await settle();
+    expect(heightOf("x402")).toBe(568);
+  });
+
+  it("leaves an ordinary panel at panel height", async () => {
+    at(900);
+    renderAt("/?do=wallet");
+    await settle();
+    expect(heightOf("Connect wallet")).toBe(568);
+  });
+
+  /** A money form grows by a whole review once filled in, so it opens tall where it can. */
+  it("opens every money window tall", async () => {
+    at(900);
+    for (const [id, title] of [["send", "Send"], ["swap", "Swap"], ["bridge", "Bridge"], ["launch", "Launch"]] as const) {
+      const { unmount } = renderAt(`/?do=${id}`);
+      await settle();
+      expect(heightOf(title), id).toBe(660);
+      unmount();
+    }
+  });
+});
+
+/**
+ * The Docs window's two lists are claims a reader can check in the app, so they are
+ * pinned to say the unfinished things out loud: nothing is deployed, and launch has not
+ * yet been measured against a live o1.
+ */
+describe("what the Docs window admits", () => {
+  it("lists what works and what does not, and claims no privacy", async () => {
+    renderAt("/?do=docs");
+    await settle();
+    const works = screen.getByLabelText("Works today");
+    const notYet = screen.getByLabelText("Not yet");
+    expect(works).toHaveTextContent(/Research:/);
+    expect(works).toHaveTextContent(/Safety:/);
+    expect(works).toHaveTextContent(/The Terminal/);
+    expect(works).toHaveTextContent(/Send ETH or any token.*launch a coin on this app's own launchpad/);
+    // Robinhood Chain is hidden (2026-10-02): the Docs do not offer a bridge to it
+    expect(works).not.toHaveTextContent(/Robinhood/);
+    expect(notYet).toHaveTextContent(/The app itself is not deployed/);
+    expect(notYet).toHaveTextContent(/launchpad contract has not been audited/);
+    /*
+      The privacy model was dropped on 2026-09-30. A leftover sentence promising it would
+      be a claim this build cannot keep, so the whole window is checked, not one list.
+    */
+    const win = windowFrame("Docs — " + BRAND.name);
+    expect(win.textContent).not.toMatch(/private|shielded|unlinkab|anonym/i);
   });
 });

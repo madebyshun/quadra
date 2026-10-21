@@ -8,18 +8,16 @@
  * parse. Hence this file.
  *
  * ── Why `src/` only, and why that is not a loophole ──────────────────────────
- * The doubles under `contracts/test/` are deliberately NOT held to 100%. They
- * contain branches nothing should reach — `ExpectingVerifier` returning false on a
- * mismatched vector, `GoodToken` reverting on an overdraft — which exist so a real
- * contract can be caught doing the wrong thing. Chasing those to 100% would mean
- * writing tests for the test scaffolding, and the usual way people do that is by
- * deleting the unreached guard, which is the opposite of the point.
+ * The doubles in `contracts/test/` (a recipient that refuses ETH, one that re-enters) are
+ * deliberately NOT held to 100%, and neither are the libraries in `contracts/lib/` (base-std,
+ * Uniswap v4) — those are measured by their own authors. `src/` is the part that holds other
+ * people's liquidity and fees. That is where the number has to be 100.
  *
- * `src/` is the part that holds money. That is where the number has to be 100.
+ * Revived 2026-10-02 for the launchpad (it first guarded the archived shielded pool).
  *
  * ── Why this is not in `npm run gate` ────────────────────────────────────────
  * The gate must run on a bare clone with nothing installed and no network. This
- * needs Foundry. Keeping them separate is what lets `npm run gate` stay the thing
+ * needs Base Foundry (`base-forge`). Keeping them separate is what lets `npm run gate` stay the thing
  * you can always run; `npm run gate:contracts` is the thing you run when you have
  * touched Solidity. Both are required before a deploy — see contracts/README.md.
  */
@@ -48,7 +46,9 @@ interface FileCoverage {
 }
 
 /**
- * Locate `forge`.
+ * Locate `base-forge` — Base's build of Foundry, the one that knows the B20 precompile. Stock
+ * `forge` compiles these contracts but every test that launches a token aborts with
+ * "call to non-contract address".
  *
  * `~/.foundry/bin` is where `foundryup` puts it and is frequently missing from a
  * non-interactive shell's PATH, which produces a confusing "command not found" for
@@ -58,11 +58,11 @@ interface FileCoverage {
  */
 function resolveForge(): string {
   const home = process.env.HOME ?? "";
-  const candidates = [join(home, ".foundry", "bin", "forge")];
+  const candidates = [join(home, ".foundry", "bin", "base-forge")];
   for (const candidate of candidates) {
     if (existsSync(candidate)) return candidate;
   }
-  return "forge";
+  return "base-forge";
 }
 
 function parseLcov(text: string): FileCoverage[] {
@@ -113,17 +113,17 @@ function main(): void {
   }
 
   const forge = resolveForge();
-  const workDir = mkdtempSync(join(tmpdir(), "quadra-cov-"));
+  const workDir = mkdtempSync(join(tmpdir(), "contracts-cov-"));
   const report = join(workDir, "lcov.info");
 
   try {
-    execFileSync(forge, ["coverage", "--report", "lcov", "--report-file", report], {
+    execFileSync(forge, ["coverage", "--report", "lcov", "--report-file", report, "--no-match-coverage", "(test|lib)"], {
       cwd: CONTRACTS,
       stdio: ["ignore", "ignore", "inherit"],
     });
   } catch {
     console.error(
-      `\n✗ \`${forge} coverage\` failed. Install Foundry (https://getfoundry.sh) or fix the ` +
+      `\n✗ \`${forge} coverage\` failed. Install Base Foundry (docs.base.org/sdks/base-anvil) or fix the ` +
         `failing tests first — this script only grades a suite that already passes.`,
     );
     rmSync(workDir, { recursive: true, force: true });
@@ -161,8 +161,8 @@ function main(): void {
     console.error("\n✗ contracts/src is not fully covered:\n");
     console.error(failures.join("\n"));
     console.error(
-      "\nThese contracts hold money. An uncovered branch in one of them is a path nobody " +
-        "has ever executed.\n",
+      "\nThese contracts hold other people's liquidity. An uncovered branch in one of them is a " +
+        "path nobody has ever executed.\n",
     );
     process.exit(1);
   }

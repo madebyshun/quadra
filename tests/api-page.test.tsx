@@ -1,85 +1,126 @@
-import { describe, expect, it } from "vitest";
-import { screen, within } from "@testing-library/react";
-import { ENDPOINTS, apiLede, endpointBadge, type Endpoint } from "@/pages/ApiPage";
+import { SKILLS } from "@/skills";
+import { describe, expect, it, vi } from "vitest";
+import { act, render, screen, within } from "@testing-library/react";
+import { apiLede, ApiBody, endpointBadge, ENDPOINTS, probeApi } from "@/pages/ApiPage";
 import { BRAND } from "@/brand";
 import { BLUEAGENT } from "@/config/upstream";
-import { renderAt } from "./helpers";
+import { apiHandler } from "@/server/api";
+import { API_PATH } from "@/server/apiPath";
+import type { Facilitator } from "@/server/cdp";
 
 /**
- * This page's job is to be believed, so the tests check a property rather than a
- * paragraph: nothing on it may present an endpoint this origin does not serve as
- * though it does.
+ * This page's job is to be believed, so the tests check a property rather than a paragraph:
+ * an endpoint is badged from what this origin ANSWERED when the page asked, and a copyable
+ * command for this origin appears only when it did answer.
  *
- * The page previously opened with "two endpoints, both public, both free to read"
- * and a `curl` for each. Neither existed. A test asserting that the heading said
- * "API" passed the whole time — which is why the assertions below are about
- * `live`, not about wording.
+ * History worth keeping: the page once said "two endpoints, both public, both free to read"
+ * with a `curl` for each, and neither existed; later it said "not built", which went stale the
+ * day the API was built. Asking the origin is what makes neither failure possible.
  */
 
-const LIVE: Endpoint = {
-  method: "GET",
-  path: "/api/services",
-  what: "Everything this router can pay.",
-  live: true,
+const SELLER: Facilitator = {
+  verify: async () => ({ isValid: true }),
+  settle: async () => ({ success: true, transaction: "0x1", network: "eip155:8453" }),
 };
 
-describe("the API page", () => {
-  it("marks every endpoint this origin does not serve as not built", () => {
-    renderAt("/api");
+/** This origin answered by the real API handler, with or without a facilitator key. */
+function served(facilitator: Facilitator | null) {
+  const handle = apiHandler({ facilitator });
+  vi.stubGlobal("fetch", (url: string, init?: RequestInit) => handle(new Request(new URL(url, location.origin), init)));
+}
+
+async function settle() {
+  await act(async () => {});
+  await act(async () => {});
+}
+
+describe("asking this origin", () => {
+  it("reads the real API's list as live, with its price and whether it is selling", async () => {
+    served(SELLER);
+    expect(await probeApi()).toEqual({ kind: "live", skills: SKILLS.length, usd: "$0.005", selling: true });
+    served(null);
+    expect(await probeApi()).toEqual({ kind: "live", skills: SKILLS.length, usd: "$0.005", selling: false });
+  });
+
+  it("reads anything else as absent — a static host's page, an error, the wrong JSON, no answer", async () => {
+    for (const answer of [
+      () => Promise.resolve(new Response("<!doctype html>")),
+      () => Promise.resolve(new Response(JSON.stringify({ skills: [] }), { status: 500 })),
+      () => Promise.resolve(new Response(JSON.stringify([]))),
+      () => Promise.resolve(new Response(JSON.stringify({ skills: "no" }))),
+      () => Promise.reject(new TypeError("offline")),
+    ]) {
+      vi.stubGlobal("fetch", answer);
+      expect(await probeApi()).toEqual({ kind: "absent" });
+    }
+    vi.stubGlobal("fetch", () => Promise.resolve(new Response(JSON.stringify({ skills: [1], price: null }))));
+    expect(await probeApi()).toEqual({ kind: "live", skills: 1, usd: null, selling: false });
+  });
+});
+
+describe("badges and the lede", () => {
+  const live = { kind: "live", skills: 2, usd: "$0.005", selling: true } as const;
+
+  it("badges each endpoint from the answer, and the paid one from whether it is selling", () => {
+    expect(endpointBadge({ kind: "reading" }, true)).toEqual({ className: "chip", label: "checking…" });
+    expect(endpointBadge({ kind: "absent" }, false)).toEqual({ className: "chip chip--warn", label: "not served here" });
+    expect(endpointBadge(live, false)).toEqual({ className: "chip chip--ok", label: "live" });
+    expect(endpointBadge(live, true)).toEqual({ className: "chip chip--ok", label: "live" });
+    expect(endpointBadge({ ...live, selling: false }, true)).toEqual({ className: "chip chip--warn", label: "not selling yet" });
+    expect(endpointBadge({ ...live, selling: false }, false)).toEqual({ className: "chip chip--ok", label: "live" });
+  });
+
+  it("says what was found, in each case", () => {
+    expect(apiLede({ kind: "reading" }, "https://o.test")).toBe("Asking https://o.test what it serves…");
+    expect(apiLede({ kind: "absent" }, "https://o.test")).toContain(`https://o.test answers no API — ${BRAND.name} is being served here without its server.`);
+    expect(apiLede(live, "https://o.test")).toBe("https://o.test serves 2 skills over HTTP — the list free, each call from $0.005 over x402.");
+    expect(apiLede({ ...live, usd: null }, "https://o.test")).toContain("each call priced over x402");
+    expect(apiLede({ ...live, selling: false }, "https://o.test")).toContain("payments are not switched on yet: this server has no Coinbase CDP key");
+  });
+
+  it("describes both endpoints under this app's own API path, and says which is paid", () => {
+    expect(ENDPOINTS.map((e) => [e.path, e.paid])).toEqual([
+      [API_PATH, false],
+      [`${API_PATH}/<id>?arg=…`, true],
+    ]);
+  });
+});
+
+describe("the page", () => {
+  it("offers no command for this origin while it answers nothing — only somebody else's that does", async () => {
+    render(<ApiBody />);
+    await settle();
     const list = screen.getByLabelText("Endpoints");
-    for (const endpoint of ENDPOINTS) {
-      const row = within(list).getByText(`${endpoint.method} ${endpoint.path}`).closest("li");
-      expect(row, endpoint.path).not.toBeNull();
-      expect(within(row as HTMLElement).getByText(endpoint.live ? "live" : "not built")).toBeInTheDocument();
+    for (const e of ENDPOINTS) {
+      const row = within(list).getByText(`${e.method} ${e.path}`).closest("li") as HTMLElement;
+      expect(within(row).getByText("not served here")).toBeInTheDocument();
     }
-  });
-
-  /**
-   * The strongest version of the honesty check, and the one that would have caught
-   * the original bug: a copyable command for this origin is a promise it answers.
-   * Upstream's catalog is a different matter — that URL really does answer, which
-   * is exactly why it is the only one allowed to appear as a command.
-   */
-  it("offers no runnable command for an endpoint that is not built", () => {
-    renderAt("/api");
     const commands = screen.getAllByText(/^curl /).map((el) => el.textContent ?? "");
-    expect(commands).not.toHaveLength(0);
-    for (const command of commands) {
-      expect(command, command).not.toContain(BRAND.domain);
-    }
-    expect(commands).toContain(`curl ${BLUEAGENT.catalog}`);
+    expect(commands).toEqual([`curl ${BLUEAGENT.catalog}`]);
   });
 
-  it("says plainly that there is no server on this origin", () => {
-    expect(apiLede(ENDPOINTS)).toContain("serves no API today");
-    expect(apiLede(ENDPOINTS)).toContain(BRAND.domain);
+  it("shows the commands, and live badges, once this origin has answered", async () => {
+    served(SELLER);
+    render(<ApiBody />);
+    await settle();
+    expect(screen.getByLabelText("Try it")).toHaveTextContent(`curl ${location.origin}${API_PATH}`);
+    expect(within(screen.getByLabelText("Endpoints")).getAllByText("live")).toHaveLength(2);
+    expect(screen.getByText(/PAYMENT-SIGNATURE/)).toBeInTheDocument();
   });
 
-  /**
-   * The wording that ships the day an endpoint goes up, checked now rather than
-   * first appearing in production. Same reason `installLine` takes `published`.
-   */
-  it("changes its lede once something is actually served", () => {
-    const lede = apiLede([...ENDPOINTS, LIVE]);
-    expect(lede).not.toContain("serves no API today");
-    expect(lede).toContain(BRAND.domain);
+  it("says the paid call is not selling yet when the server has no CDP key", async () => {
+    served(null);
+    render(<ApiBody />);
+    await settle();
+    expect(within(screen.getByLabelText("Endpoints")).getByText("not selling yet")).toBeInTheDocument();
   });
 
-  it("badges a live endpoint as live and an unbuilt one as not built", () => {
-    expect(endpointBadge(true)).toEqual({ className: "chip chip--ok", label: "live" });
-    expect(endpointBadge(false)).toEqual({ className: "chip chip--warn", label: "not built" });
-  });
-
-  /**
-   * Not a style rule. `live` is the flag every assertion above trusts, so an entry
-   * that forgets it would quietly opt out of all of them.
-   */
-  it("gives every endpoint a live flag and something to say", () => {
-    expect(ENDPOINTS).not.toHaveLength(0);
-    for (const endpoint of ENDPOINTS) {
-      expect(typeof endpoint.live, endpoint.path).toBe("boolean");
-      expect(endpoint.what.length, endpoint.path).toBeGreaterThan(0);
-      expect(endpoint.path.startsWith("/api/"), endpoint.path).toBe(true);
-    }
+  it("drops an answer that arrives after the page closed", async () => {
+    let release: (r: Response) => void = () => {};
+    vi.stubGlobal("fetch", () => new Promise<Response>((r) => (release = r)));
+    const view = render(<ApiBody />);
+    view.unmount();
+    release(new Response(JSON.stringify({ skills: [] })));
+    await settle();
   });
 });

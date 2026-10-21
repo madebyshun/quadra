@@ -31,6 +31,11 @@ describe("the BlueAgent seam", () => {
     }
   });
 
+  /** The pin in `config/payees.ts` is keyed by this; a typo here would pin a host that never answers. */
+  it("states its origin as exactly the origin of its base url", () => {
+    expect(BLUEAGENT.origin).toBe(new URL(BLUEAGENT.base).origin);
+  });
+
   it("records the known payee as a full address", () => {
     expect(BLUEAGENT.knownPayTo).toMatch(/^0x[0-9a-fA-F]{40}$/);
   });

@@ -1,8 +1,8 @@
 /**
  * Money is bigint base units plus the token's decimals, never a float.
  *
- * This exists because of one specific hazard already documented in config/pair.ts:
- * AAPLc has 8 decimals while USDC has 6 and WETH has 18. A float path that gets
+ * This exists because of one specific hazard (CLAUDE.md hard rule 3): a B20 share
+ * token has 8 decimals while USDC has 6 and WETH has 18. A float path that gets
  * the exponent wrong misprices by 10^10, which does not look like a bug in the
  * output — it looks like a 10-billion-x price move, so nothing downstream rejects
  * it. Every conversion therefore takes `decimals` explicitly; there is no default.

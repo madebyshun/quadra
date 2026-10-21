@@ -1,0 +1,12 @@
+{
+ "hash": "0xd3496cecaef4eb10e7aeed1fc40ba8802e2e539784ee53329ada1ece2f344488",
+ "from": {
+  "hash": "0x46b979bFC409eF07f7b18Fd05cE02241c26e2cDe",
+  "is_contract": false,
+  "proxy_type": null
+ },
+ "to": null,
+ "created_contract": {
+  "hash": "0xcBa5d18a934F86B264dC566D4f9F0a90988D32b3"
+ }
+}

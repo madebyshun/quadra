@@ -1,0 +1,42 @@
+{
+ "poolId": "0xfd17093b599adccfbd80f59d4ec33e8b096abfb1495d5b61c658c71ef898108d",
+ "swaps": [
+  {
+   "fromBlock": 52070397,
+   "toBlock": 52071396,
+   "result": [
+    {
+     "address": "0x498581ff718922c3f8e6a244956af099b2652b2b",
+     "topics": [
+      "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f",
+      "0xfd17093b599adccfbd80f59d4ec33e8b096abfb1495d5b61c658c71ef898108d",
+      "0x0000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f996"
+     ],
+     "data": "0x00000000000000000000000000000000000000000000018883bf83457a72e9d8ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8b26000000000000000000000000000000000000000000000008afa0c7af8e1238e10000000000000000000000000000000000000000000000001c10e0b12747ade3fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9e3f00000000000000000000000000000000000000000000000000000000000002710",
+     "blockNumber": "0x31a8a6c",
+     "transactionHash": "0x500648596b123c6f28884b906468ac93dd3ebf3f7ddc2bfaee195975d86e3b73",
+     "transactionIndex": "0x4b",
+     "blockHash": "0xaf8fabbd5da52ca7453bd9ecd54a0f36dd8d76ee5bd55facaa4f9ce84ef936c0",
+     "logIndex": "0x2d6",
+     "blockTimestamp": "0x6abf71bb",
+     "removed": false
+    }
+   ]
+  },
+  {
+   "fromBlock": 52071397,
+   "toBlock": 52072396,
+   "result": []
+  },
+  {
+   "fromBlock": 52072397,
+   "toBlock": 52073396,
+   "result": []
+  },
+  {
+   "fromBlock": 52073397,
+   "toBlock": 52074396,
+   "result": []
+  }
+ ]
+}

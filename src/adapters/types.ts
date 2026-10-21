@@ -1,10 +1,10 @@
 /**
- * The seam between the UI and the two things this product does not have yet:
- * a deployed shielded pool, and a real TEE.
+ * The seam between the UI and the services it reads through: a paid-tool catalog
+ * (x402) and an inference enclave. (The shielded pool that used to sit here was
+ * archived on 2026-09-30 with the rest of the privacy model — see `archive/privacy/`.)
  *
- * The UI is built against these interfaces only. A local implementation makes
- * the whole app runnable and testable now; the on-chain implementation drops in
- * later without the UI changing.
+ * The UI is built against these interfaces only, so a local implementation keeps
+ * the app runnable and testable and a live one drops in without the UI changing.
  *
  * ── The one rule that shapes every type below ──────────────────────────────
  * A stub that emits a plausible-looking proof is WORSE than no stub, because it
@@ -14,7 +14,6 @@
  * developer must remember not to do — it does not typecheck.
  */
 
-import type { Commitment, TreeRoot } from "@/lib/note";
 import type { PaymentRequirements } from "@/lib/requirements";
 
 export type TokenRef = {
@@ -22,169 +21,6 @@ export type TokenRef = {
   symbol: string;
   decimals: number;
 };
-
-/** Where a fact was anchored, if anywhere. */
-export type Anchoring =
-  | { kind: "onchain"; txHash: string; block: number }
-  | { kind: "local"; why: string };
-
-/**
- * A note is the money. The secret lives in the browser and nowhere else: losing
- * it loses the funds, and leaking it hands them over. Never log a whole note,
- * never put one in a url, never send one to a server.
- *
- * ── Why `commitment` is a type and not a string ──────────────────────────────
- * It used to be `commitment: string`, and the local pool filled it with a random
- * 32 bytes. That typechecked, it read as correct, and it committed to nothing: no
- * secret's knowledge was provable from it, so no circuit could ever be written
- * against those notes. `Commitment` in `lib/note.ts` is a discriminated union
- * carrying the hash scheme that produced it, so a value hashed with the stand-in
- * cannot reach the chain boundary without the difference being handled. Same
- * device as `Anchoring` above, and for the same reason.
- */
-export type Note = {
-  id: string;
-  /** public: what goes on chain, derived from `amount` and `secret` */
-  commitment: Commitment;
-  /**
-   * Which leaf of the commitment tree this note is, counted from zero.
-   *
-   * Part of the note rather than derivable from it, because the tree assigns it:
-   * `MerkleTreeWithHistory._insert` returns `nextIndex` and increments. It is here
-   * because the nullifier's preimage includes it — without it the same secret at two
-   * positions would produce one nullifier, and spending either would mark both.
-   *
-   * Public. It identifies a position in a tree everyone can read, not an owner.
-   */
-  leafIndex: number;
-  /**
-   * PRIVATE: never leaves the browser.
-   *
-   * A field element rather than a hex string. The scheme's inputs are field
-   * elements, so carrying it in the arithmetic type it is actually used as means
-   * there is no parse step to get wrong and no place for a 33-byte "field element"
-   * to hide.
-   */
-  secret: bigint;
-  token: TokenRef;
-  /** base units, per token.decimals */
-  amount: bigint;
-  createdAt: string;
-  /**
-   * When this note was spent, for display. **Not the authority on whether it was.**
-   *
-   * The pool refuses a double-spend from its nullifier set, the way the contract
-   * does (`ShieldedPool.isSpent`), because that is the rule that will still be true
-   * on chain — a timestamp is a local convenience that no verifier can check. The
-   * two are written in one place so they cannot disagree; `tests/adapters.test.ts`
-   * asserts the invariant rather than trusting it.
-   */
-  spentAt: string | null;
-  anchoring: Anchoring;
-};
-
-export type Receipt = {
-  /** what happened, in the second person, for the CRT panel */
-  summary: string;
-  anchoring: Anchoring;
-};
-
-/**
- * Everything a proof needs about one note's place in the tree.
- *
- * This is the input a circuit consumes: it proves "I know the secret behind a leaf
- * that is in the tree with this root" without saying which leaf. So the shape is
- * `lib/tree.ts`'s `MerklePath`, with the two ends **tagged** — see `TaggedField` in
- * `lib/note.ts`.
- *
- * ── Why the ends are tagged and the middle is not ────────────────────────────
- * `root` and `leaf` are the two values that leave this browser: the root is what a
- * contract checks against `isKnownRoot`, the leaf is what was inserted. A root
- * computed from the stand-in hash matches no deployed pool, so shipping it as a bare
- * bigint would let an unprovable number reach a chain boundary looking exactly like a
- * provable one — the hazard the header of this file is about.
- *
- * The `siblings` stay bare bigints on purpose. They are interior nodes, meaningless
- * except under a root that is already tagged, and tagging each of twenty of them
- * would be twenty copies of one fact about the whole witness. Tag the boundary, not
- * every node behind it.
- */
-export type NoteWitness = {
-  readonly root: TreeRoot;
-  readonly leaf: Commitment;
-  readonly leafIndex: number;
-  /** Sibling at each level, leaf upward. `siblings.length === levels`. */
-  readonly siblings: readonly bigint[];
-  /** True where the path node is the RIGHT child, so the sibling hashes first. */
-  readonly isRight: readonly boolean[];
-};
-
-export interface ShieldedPool {
-  /** Put money in. Returns the note you must keep. */
-  deposit(token: TokenRef, amount: bigint): Promise<Note>;
-  /** Notes this browser is holding, newest first. Unspent only unless asked. */
-  notes(opts?: { includeSpent?: boolean }): Promise<Note[]>;
-  /** Spend a note to pay an address. The pool pays, not you. */
-  send(noteId: string, to: string, amount: bigint): Promise<Receipt>;
-  /** Take money back out to an address you control. */
-  withdraw(noteId: string, to: string): Promise<Receipt>;
-  /**
-   * The nullifiers this pool has seen, as hex. Mirrors `ShieldedPool.isSpent`.
-   *
-   * Part of the interface because it is public on chain — anyone can read that
-   * mapping, so hiding it here would make the local pool look more private than the
-   * real one rather than less, which is the wrong direction for every seam in this
-   * file. It leaks nothing: a nullifier is unlinkable to its commitment without the
-   * secret, which is the entire reason the scheme uses one.
-   */
-  nullifiers(): Promise<string[]>;
-  /**
-   * The current commitment-tree root.
-   *
-   * On the interface rather than only on the local pool, because a pool that cannot
-   * say what its root is cannot be proven against — every proof is a statement about
-   * one root, and `MerkleTreeWithHistory.isKnownRoot` is what the contract checks it
-   * with. The on-chain adapter reads `ShieldedPool.getLastRoot()`; the local one
-   * computes it. Neither can forget to have one.
-   *
-   * Tagged, so a root the stand-in hash produced cannot be mistaken for a root a
-   * deployed pool would recognise.
-   */
-  root(): Promise<TreeRoot>;
-  /**
-   * The Merkle witness for a note this browser holds.
-   *
-   * Here for the same reason as `root()`: it is the other half of what a proof needs,
-   * and the local pool can serve it today. **Not** on the contract — the chain stores
-   * only `filledSubtrees` and cannot reconstruct a path for an arbitrary leaf, which
-   * is why a client keeps its own copy of the tree. So the on-chain adapter will build
-   * this from its own tree too, and the interface is what makes that obligation
-   * visible instead of a surprise on deployment day.
-   */
-  witness(noteId: string): Promise<NoteWitness>;
-  /**
-   * Hand the notes out as a file, and take them back from one. See `lib/backup.ts`.
-   *
-   * On the interface for the same reason as `witness()`, and the reason is easy to get
-   * backwards: a live pool does **not** make these unnecessary. The chain holds
-   * commitments and nullifiers; it holds no secret, so it cannot reconstruct a note and
-   * cannot restore anybody. A deployed pool's user is in exactly the same position as a
-   * local one's — the notes are the money, the notes are in the browser, and a cleared
-   * site-data dialog ends them. Putting these here means an on-chain adapter cannot be
-   * written without answering "and how does its user get their notes back?", which is
-   * otherwise the question that only comes up after someone has lost some.
-   *
-   * ⚠️ `importBackup` is a pool operation and not a store operation, even though the
-   * file format work happens in `lib/backup.ts`. A restore replaces the state the live
-   * object has already cached; doing it around the pool means the next write puts the
-   * old notes back over the restored ones. The note on `LocalShieldedPool.importBackup`
-   * has the measurement.
-   */
-  exportBackup(): Promise<{ filename: string; body: string }>;
-  importBackup(text: string): Promise<{ notes: number }>;
-  /** True when this is backed by a deployed pool rather than local state. */
-  readonly isLive: boolean;
-}
 
 /**
  * Proof that inference ran inside an enclave.
@@ -290,7 +126,14 @@ export interface Catalog {
   tools(): Promise<Tool[]>;
   /** Read the price without paying it. Free upstream, so free here too. */
   quote(toolId: string): Promise<Quote>;
-  run(toolId: string, input: Record<string, string>): Promise<ToolRun>;
+  /**
+   * `payment` is the base64 `X-PAYMENT` header `lib/payment.ts` built from a signed
+   * authorization, or `undefined` for a free tool. It is a parameter rather than
+   * something `run` builds itself, because building it needs a connected wallet and a
+   * signature — steps the panel owns, not the adapter (hard rule 5: nothing under
+   * `adapters/` may hold a key or ask one to sign).
+   */
+  run(toolId: string, input: Record<string, string>, payment?: string): Promise<ToolRun>;
   /**
    * Why THIS price cannot be run, or `null` when it can.
    *
@@ -314,7 +157,6 @@ export interface Catalog {
 }
 
 export type Adapters = {
-  pool: ShieldedPool;
   enclave: Enclave;
   catalog: Catalog;
 };

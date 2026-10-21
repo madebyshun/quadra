@@ -26,8 +26,8 @@
  * Two fields look symmetric and are not, and getting the direction backwards
  * defeats the check while looking like it passed:
  *
- *   `payTo`      comes FROM upstream. `BLUEAGENT.knownPayTo` is only ever an
- *                assertion — never a destination. A constant used as the
+ *   `payTo`      comes FROM upstream. The payee pinned for that origin
+ *                (`config/payees.ts`) is only ever an assertion — never a destination. A constant used as the
  *                destination keeps paying the old payee after upstream rotates,
  *                which is a silent misroute rather than an error.
  *
@@ -103,10 +103,11 @@
 
 import { sameAddress } from "@/lib/address";
 import { BASE, USDC } from "@/config/chain";
-import { BLUEAGENT } from "@/config/upstream";
+import { pinnedPayee } from "@/config/payees";
 import {
   authorizationDigest,
   MAX_AUTHORIZATION_SECONDS,
+  SETTLEMENT_SLACK_SECONDS,
   randomNonce,
   USDC_DOMAIN,
   validityWindow,
@@ -168,19 +169,28 @@ const WHOLE = /^\d+$/;
  * Who gets paid, and whether this build recognises them.
  *
  * ⚠️ There is deliberately no `recognised: boolean`. Same rule as `Attestation` and
- * `Anchoring` in `adapters/types.ts`: a false boolean is a field that gets ignored,
+ * `Settlement` in `adapters/types.ts`: a false boolean is a field that gets ignored,
  * whereas the `unrecognised` variant carries a `why` a panel has to render and
  * `whyNotSign` has to refuse. The failure explains itself or it does not exist.
  */
 export type Payee =
-  /** Matches `BLUEAGENT.knownPayTo`. */
+  /** Matches the payee pinned for the origin that sent the 402. */
   | { readonly kind: "known"; readonly address: string }
   /**
-   * A real address, but not the one this build was told to expect. Upstream may
-   * have rotated its payee, or this build's constant may be stale — from here both
-   * look identical, which is exactly why this is not signed automatically.
+   * A real address, but not the one pinned for this origin. Upstream may have rotated
+   * its payee, or this build's pin may be stale — from here both look identical,
+   * which is exactly why this is not signed automatically.
    */
-  | { readonly kind: "unrecognised"; readonly address: string; readonly why: string };
+  | { readonly kind: "unrecognised"; readonly address: string; readonly why: string }
+  /**
+   * An origin nobody has pinned a payee for, so there is nothing to compare against.
+   *
+   * Its own variant rather than folded into `unrecognised`, because the two call for
+   * different reactions: "this changed" is a warning about a known server, "this is
+   * new" is a first meeting. A merged message would have to be vague about which, and
+   * the payee check is the one place on the path where vagueness costs money.
+   */
+  | { readonly kind: "unpinned"; readonly address: string; readonly why: string };
 
 /**
  * A 402's requirements, after every check in this file has passed.
@@ -194,13 +204,52 @@ export type Payee =
 export type PaymentRequirements = {
   readonly toolId: string;
   readonly payee: Payee;
+  /**
+   * The `accepts` entry this was read from, VERBATIM — every field, including the ones
+   * this file does not check (`extra.credentialTypes`, `currency`, …).
+   *
+   * Kept because the standard x402 v2 client header echoes it back as `accepted`, and a
+   * server matches that echo against its own list. Rebuilding it from the checked fields
+   * drops whatever the server added and turns a correct payment into "no matching
+   * requirement". MEASURED 2026-09-29: api.onesource.io's entry carries `currency`,
+   * `maxAmountRequired`, `recipient` and `extra.credentialTypes` beside the fields checked
+   * here. Safe to echo precisely because every field that decides the money — scheme,
+   * network, asset, amount, payee, window, domain — was checked on THIS object.
+   */
+  readonly accepted: Readonly<Record<string, unknown>>;
+  /** The 402's own `resource` block, echoed in the v2 payment header when there was one. */
+  readonly resource: Readonly<Record<string, unknown>> | null;
+  /**
+   * How many other ways to pay the server offered that this build does not sign — shown,
+   * so "0.01 USDC" is not mistaken for the only price on the table.
+   */
+  readonly passedOver: number;
   /** Base units of `asset`, exact. Never a display string. */
   readonly value: bigint;
   /** The asset, with decimals from this repo's verified table — never from upstream. */
   readonly asset: TokenRef;
   /** Built from config. Upstream's `extra` was compared against it, not copied into it. */
   readonly domain: Eip712Domain;
-  /** Upstream's `maxTimeoutSeconds`, checked against the cap. */
+  /**
+   * Upstream's `maxTimeoutSeconds`, verbatim. **Not the window that gets signed** — it
+   * is what the payee said it needs, and it goes back out in the header's `accepted`
+   * block where it has to mirror the 402 field for field.
+   */
+  readonly askedSeconds: bigint;
+  /**
+   * The window this build actually signs: `askedSeconds + SETTLEMENT_SLACK_SECONDS`,
+   * checked against the cap.
+   *
+   * 🔴 **Two fields rather than one, because they are two different numbers and the
+   * difference is the whole point.** A single `lifetimeSeconds` had to be either the ask
+   * (and then the signature expires before the payee's own deadline — see
+   * `SETTLEMENT_SLACK_SECONDS`) or the signed window (and then the header's `accepted`
+   * block no longer mirrors the 402, which is the one thing a facilitator diffs). The
+   * failure of collapsing them is silent in both directions, so the type keeps both and
+   * names which is which — the same reason `Payee` is a union rather than a boolean.
+   *
+   * Anything describing *exposure* to a user reads this one. It is the larger number.
+   */
   readonly lifetimeSeconds: bigint;
 };
 
@@ -225,30 +274,75 @@ function str(value: unknown, what: string): string {
 /* ── the checks, one per field ────────────────────────────────────────────────── */
 
 /**
- * The single `accepts` entry, or a refusal naming how many there were.
- *
- * ⚠️ **Exactly one, not "the first of however many".** Measured: every paid id
- * sends one. x402 permits several, and when upstream starts offering a choice,
- * silently taking `accepts[0]` would pick a payment method on the user's behalf and
- * show them a price that was one of two. Which one to prefer — cheapest? a
- * particular asset? — is a decision nobody has made, and defaulting to array order
- * is the one way of making it that cannot be reviewed.
+ * Whether this build could sign an `accepts` entry at all: the `exact` scheme, on Base,
+ * in USDC, by EIP-3009. A cheap sieve over a list, NOT the check — whatever it lets
+ * through still goes through every assertion below.
  */
-function onlyAccept(body: Json, toolId: string): Json {
+function couldSign(entry: unknown): boolean {
+  if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return false;
+  const e = entry as Json;
+  const extra = typeof e.extra === "object" && e.extra !== null ? (e.extra as Json) : {};
+  return (
+    e.scheme === SUPPORTED_SCHEME &&
+    e.network === `eip155:${BASE.id}` &&
+    typeof e.asset === "string" &&
+    sameAddress(e.asset, USDC.address) &&
+    (extra.assetTransferMethod === undefined || extra.assetTransferMethod === EIP3009)
+  );
+}
+
+/** `"exact on eip155:8453"`, or `?` for whatever a field turned out not to be. */
+function describeOffer(entry: unknown): string {
+  const e = typeof entry === "object" && entry !== null ? (entry as Json) : {};
+  const text = (v: unknown) => (typeof v === "string" ? v : "?");
+  return `${text(e.scheme)} on ${text(e.network)}`;
+}
+
+/**
+ * The `accepts` entry to read, and how many others were passed over.
+ *
+ * 🔴 **Exactly one SIGNABLE entry — never "the first of however many".** This rule used
+ * to be "exactly one entry, full stop", measured against the one upstream that sent one.
+ * MEASURED 2026-09-29 across x402 servers listed on Coinbase's Bazaar, that is not what
+ * the ecosystem sends: x402.ottoai.services offers three (exact by EIP-3009 on Base,
+ * exact by permit2 on Base, exact on Solana), api.onesource.io offers two (exact and
+ * batch-settlement). "Exactly one" refused them all.
+ *
+ * What the old rule protected is kept: this never picks by array order, and never picks
+ * between two prices. When several entries are offered, the ones this build could not
+ * sign are set aside; if exactly one remains, it is not a choice — it is the only way
+ * this build can pay — and `passedOver` says the others existed. If two or more remain,
+ * that IS a choice between prices, and it is refused as before. A single entry skips the
+ * sieve and goes straight to the field checks, so its refusal names the field that was
+ * wrong rather than a generic "none signable".
+ */
+function chooseAccept(body: Json, toolId: string): { accept: Json; passedOver: number } {
   const accepts = body.accepts;
   if (!Array.isArray(accepts) || accepts.length === 0) {
     throw new Error(
       `${toolId} asked for payment but named no way to pay it, so there is nothing here to agree to.`,
     );
   }
-  if (accepts.length > 1) {
+  if (accepts.length === 1) {
+    return { accept: obj(accepts[0], "a payment requirement"), passedOver: 0 };
+  }
+  const signable = accepts.filter(couldSign);
+  const [only] = signable;
+  if (signable.length === 1) {
+    return { accept: only as Json, passedOver: accepts.length - 1 };
+  }
+  if (signable.length === 0) {
     throw new Error(
-      `${toolId} offered ${accepts.length} ways to pay. This build reads one and will not ` +
-        "choose between them for you: picking the first would show you a price that was " +
-        "only one of several.",
+      `${toolId} offered ${accepts.length} ways to pay and this build can sign none of them — ` +
+        `it signs only "exact" EIP-3009 transfers of ${USDC.symbol} on ${BASE.name}. Offered: ` +
+        `${accepts.map(describeOffer).join(", ")}.`,
     );
   }
-  return obj(accepts[0], "a payment requirement");
+  throw new Error(
+    `${toolId} offered ${signable.length} ways to pay that this build could sign, and it will ` +
+      "not choose between them for you: picking one would show you a price that was only one " +
+      "of several.",
+  );
 }
 
 /** The envelope version, checked before anything inside the envelope is read. */
@@ -329,6 +423,31 @@ function assertAsset(accept: Json, toolId: string): TokenRef {
   return USDC;
 }
 
+/** The one asset-transfer method this build signs. See `assertTransferMethod`. */
+const EIP3009 = "eip3009";
+
+/**
+ * EIP-3009 or nothing. Absent means EIP-3009 — that is the `exact` scheme's default and
+ * what every entry measured before 2026-09-29 meant by omission.
+ *
+ * MEASURED 2026-09-29: x402.ottoai.services offers `exact` on Base twice, the second with
+ * `extra.assetTransferMethod: "permit2"`. Same scheme, same chain, same asset, same amount
+ * — and a different contract call with a different signature. Signing an EIP-3009
+ * authorization against a permit2 requirement produces a well-formed payment the server
+ * cannot use, so it is refused by name rather than attempted.
+ */
+function assertTransferMethod(accept: Json, toolId: string): void {
+  const extra = obj(accept.extra, "the EIP-712 domain fields");
+  const method = extra.assetTransferMethod;
+  if (method !== undefined && method !== EIP3009) {
+    throw new Error(
+      `${toolId} wants payment through ${JSON.stringify(method)}, and this build signs only ` +
+        "EIP-3009 transfer authorizations. A signature for one method is useless — and " +
+        "misleading — against the other, so nothing was signed.",
+    );
+  }
+}
+
 /**
  * The EIP-712 domain, taken from config once upstream's claim about it has matched.
  *
@@ -386,13 +505,23 @@ function assertValue(accept: Json, toolId: string, asset: TokenRef): bigint {
 }
 
 /**
- * The authorization lifetime upstream asks for, checked against the cap.
+ * The window upstream asks for, and the longer one this build will sign.
  *
  * Refused rather than clamped, in both directions. Clamping down signs a window
  * that expires before upstream can settle, which fails and reads as a bug here;
  * clamping up signs more standing permission than anyone asked for.
+ *
+ * 🔴 **The cap is applied to the SIGNED total, not to the ask.** Checking `raw` and then
+ * adding slack afterwards would let a payee asking for exactly
+ * `MAX_AUTHORIZATION_SECONDS` receive a signature `SETTLEMENT_SLACK_SECONDS` past it —
+ * a bound defeated by the line after the bound, which is the shape of bug that survives
+ * review because both halves read correctly on their own. The error names both numbers so
+ * the arithmetic is visible to whoever hits it.
  */
-function assertLifetime(accept: Json, toolId: string): bigint {
+function assertWindow(
+  accept: Json,
+  toolId: string,
+): { readonly askedSeconds: bigint; readonly lifetimeSeconds: bigint } {
   const raw = accept.maxTimeoutSeconds;
   if (typeof raw !== "number" || !Number.isSafeInteger(raw) || raw <= 0) {
     throw new Error(
@@ -401,40 +530,65 @@ function assertLifetime(accept: Json, toolId: string): bigint {
         "is not something to default.",
     );
   }
-  const lifetime = BigInt(raw);
-  if (lifetime > MAX_AUTHORIZATION_SECONDS) {
+  const askedSeconds = BigInt(raw);
+  const lifetimeSeconds = askedSeconds + SETTLEMENT_SLACK_SECONDS;
+  if (lifetimeSeconds > MAX_AUTHORIZATION_SECONDS) {
     throw new Error(
-      `${toolId} wants an authorization valid for ${lifetime} seconds, longer than the ` +
-        `${MAX_AUTHORIZATION_SECONDS} this build will sign. An authorization is a bearer ` +
+      `${toolId} wants an authorization valid for ${askedSeconds} seconds, which this build ` +
+        `would sign as ${lifetimeSeconds} to leave it room to settle — longer than the ` +
+        `${MAX_AUTHORIZATION_SECONDS} it will sign at all. An authorization is a bearer ` +
         "instrument: anyone holding it can spend it until it expires, so a long window is a " +
         "standing withdrawal permission rather than a payment.",
     );
   }
-  return lifetime;
+  return { askedSeconds, lifetimeSeconds };
 }
 
 /**
  * The payee, classified rather than approved.
  *
- * ⚠️ This is the one address on the whole path where EIP-55 cannot help: both
- * upstream's `payTo` and `BLUEAGENT.knownPayTo` are all-lowercase, which carries no
- * checksum to verify (`checkAddress` returns `unchecked` for both). The comparison
- * against the constant is therefore not a belt-and-braces extra — it is the only
- * check this field has.
+ * ⚠️ This is the one address on the whole path where EIP-55 cannot help: BlueAgent's
+ * `payTo` and its pin are both all-lowercase, which carries no checksum to verify
+ * (`checkAddress` returns `unchecked` for both). The comparison against the pin is
+ * therefore not a belt-and-braces extra — it is the only check this field has.
+ *
+ * Keyed by `origin` — where the 402 actually came from — because that is the only
+ * identity the browser verified. See `config/payees.ts`.
  */
-function classifyPayee(accept: Json, toolId: string): Payee {
+function classifyPayee(
+  accept: Json,
+  toolId: string,
+  origin: string,
+  lookup: PinLookup,
+): Payee {
   const address = str(accept.payTo, "payee");
-  if (sameAddress(address, BLUEAGENT.knownPayTo)) {
+  const pinned = lookup(origin);
+  if (pinned === null) {
+    return {
+      kind: "unpinned",
+      address,
+      /**
+       * Names the ORIGIN, not the tool id: for a pasted URL the id is the whole URL, and a
+       * sentence that repeats it before getting to the point was measured in a browser
+       * wrapping to seven lines above the one control that resolves it.
+       */
+      why:
+        `This build has no record of who ${origin} gets paid to, so ${address} cannot be checked ` +
+        "against anything — the server asking to be paid is the only one naming it. Confirm it " +
+        "somewhere else before anything signs to it.",
+    };
+  }
+  if (sameAddress(address, pinned)) {
     return { kind: "known", address };
   }
   return {
     kind: "unrecognised",
     address,
     why:
-      `${toolId} wants to be paid to ${address}, and this build expects ` +
-      `${BLUEAGENT.knownPayTo}. Upstream may have moved its payee, or this build's record of ` +
-      "it may be out of date — from here those look identical, and one of them means the " +
-      "money goes somewhere nobody chose. Confirm the new address before signing to it.",
+      `${toolId} wants to be paid to ${address}, and this build expects ${origin} to be paid ` +
+      `to ${pinned}. Upstream may have moved its payee, or this build's record of it may be ` +
+      "out of date — from here those look identical, and one of them means the money goes " +
+      "somewhere nobody chose. Confirm the new address before signing to it.",
   };
 }
 
@@ -450,19 +604,46 @@ function classifyPayee(accept: Json, toolId: string): Payee {
  * caller should not be handed a rotated-payee warning about a 402 that was also on
  * the wrong chain.
  */
-export function checkRequirements(toolId: string, body: unknown): PaymentRequirements {
+/**
+ * Who an origin is pinned to be paid to, or `null`. `config/payees.ts` is the default;
+ * the x402 window passes one that also knows the payees its user has confirmed.
+ */
+export type PinLookup = (origin: string) => string | null;
+
+export function checkRequirements(
+  toolId: string,
+  origin: string,
+  body: unknown,
+  lookup: PinLookup = pinnedPayee,
+): PaymentRequirements {
   const envelope = obj(body, "a payment requirement");
   assertVersion(envelope, toolId);
 
-  const accept = onlyAccept(envelope, toolId);
+  const { accept, passedOver } = chooseAccept(envelope, toolId);
   assertScheme(accept, toolId);
   assertNetwork(accept, toolId);
   const asset = assertAsset(accept, toolId);
+  assertTransferMethod(accept, toolId);
   const domain = assertDomain(accept, toolId);
   const value = assertValue(accept, toolId, asset);
-  const lifetimeSeconds = assertLifetime(accept, toolId);
+  const { askedSeconds, lifetimeSeconds } = assertWindow(accept, toolId);
+  const resource = envelope.resource;
 
-  return { toolId, payee: classifyPayee(accept, toolId), value, asset, domain, lifetimeSeconds };
+  return {
+    toolId,
+    payee: classifyPayee(accept, toolId, origin, lookup),
+    accepted: accept,
+    resource:
+      typeof resource === "object" && resource !== null && !Array.isArray(resource)
+        ? (resource as Json)
+        : null,
+    passedOver,
+    value,
+    asset,
+    domain,
+    askedSeconds,
+    lifetimeSeconds,
+  };
 }
 
 /**
@@ -472,13 +653,14 @@ export function checkRequirements(toolId: string, body: unknown): PaymentRequire
  * "Run for 0.01 USDC" and refuses every time promises something it knows it will not
  * do. This is for the refusals known before the click.
  *
- * Only one reason today, and it is the whole reason `Payee` is a union: everything
- * else that could go wrong threw during `checkRequirements`, so holding a
+ * The only reasons are the payee's, and that is the whole reason `Payee` is a union:
+ * everything else that could go wrong threw during `checkRequirements`, so holding a
  * `PaymentRequirements` already means the chain, asset, domain, amount and window
- * are good.
+ * are good. A changed payee and an unpinned one both refuse, each in its own words.
  */
 export function whyNotSign(requirements: PaymentRequirements): string | null {
-  return requirements.payee.kind === "known" ? null : requirements.payee.why;
+  const { payee } = requirements;
+  return payee.kind === "known" ? null : payee.why;
 }
 
 /**

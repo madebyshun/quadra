@@ -1,353 +1,220 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAdapters } from "@/adapters/AdaptersProvider";
-import type { Note, Receipt } from "@/adapters/types";
-import {
-  type AddressCheck,
-  assertChecksummedAddress,
-  checkAddress,
-  describeChecksum,
-} from "@/lib/address";
+import { useState } from "react";
+import { useInbox } from "@/features/openWindow";
+import { transfersOf } from "@/skills/profile";
+import { historyOf, historyRow } from "@/skills/sendcheck";
+import { BASE } from "@/config/chain";
+import { sameAddress } from "@/lib/address";
 import { formatAmount, parseAmount } from "@/lib/amount";
-import { offerDownload, readTextFile } from "@/lib/download";
-import { USDC } from "@/config/chain";
+import { accountKind, balanceOf, transferData } from "@/lib/erc20";
+import { messageOf } from "@/lib/errors";
+import type { TxRequest } from "@/lib/transact";
+import { explorer } from "@/skills/format";
+import { resolveTarget, type Target } from "@/skills/target";
+import { row, type Report, type Row } from "@/skills/types";
 import { Crt } from "@/ui/Crt";
 import { Gel } from "@/ui/Gel";
-import { Anchor } from "@/features/panels/Anchor";
+import { useWalletSession } from "@/ui/WalletProvider";
+import { ReportView } from "@/features/panels/ReportView";
+import { TxStepList, useTxSteps } from "@/features/panels/TxSteps";
+import { amountFor, assetFor, choiceFor, PercentButtons, TokenPicker, type Choice } from "@/features/panels/TokenPicker";
+import { WalletAssets } from "@/features/panels/WalletAssets";
 
 /**
- * Put money in, pay someone out of it, take it back, or carry it out as a file.
+ * Send ETH or any token on Base from the connected wallet, to an address or a Basename.
  *
- * Every amount here goes through parseAmount, so the input is either an exact
- * base-unit bigint or a thrown error the user reads — there is no path where a
- * typo becomes a silently rounded number. USDC is the only token for now because
- * it is the one the router pays in; the token is in the state so adding AAPLc is
- * a select, not a rewrite.
+ * Two clicks on purpose. **Review** reads everything the wallet will not show clearly —
+ * which address a Basename resolves to, what the token contract says it is, whether the
+ * balance covers it, whether the recipient is a contract — and lays it out as a report.
+ * **Send** hands exactly that transaction to the wallet. Changing any field throws the
+ * review away, so what was reviewed is always what gets signed.
  *
- * ── Why backup is in this panel and not its own window ───────────────────────
- * It is the same object as the notes list: the thing being backed up is what the user
- * is looking at, and the moment they need to think about a backup is the moment they
- * first see a note appear. A separate card would be one more thing to find, and the
- * people who would never find it are exactly the ones who lose money.
+ * Public: this is an ordinary transfer, visible on Basescan like any other. (The private
+ * send that used to live in this window was archived with the privacy model, 2026-09-30.)
  */
 
-const TOKEN = { address: USDC.address, symbol: USDC.symbol, decimals: USDC.decimals };
+type Review = {
+  readonly report: Report;
+  readonly tx: TxRequest;
+  readonly label: string;
+  /** a reason the send cannot go ahead, worn by the button */
+  readonly blocked: string | null;
+};
 
-/**
- * What the CRT is showing.
- *
- * A discriminated union rather than one `Receipt | null`, because a backup is not a
- * receipt and rendering it as one would lie in the user's favour and against them at the
- * same time. `Anchor` prints "Not on chain: …" in amber for a `local` anchoring — correct
- * and useful after a deposit, actively misleading after an export, where not being on
- * chain is the entire feature. A successful backup would come back looking like a warning.
- */
-type Output =
-  | { kind: "receipt"; receipt: Receipt }
-  /** A plain sentence: something happened that no chain has an opinion about. */
-  | { kind: "plain"; text: string };
+/** Below this much ETH left over, a native send leaves too little to pay for the next transaction. */
+const GAS_RESERVE = 10n ** 13n;
+
+async function buildReview(from: string, choice: Choice, typedToken: string, typedTo: string, typedAmount: string): Promise<Review> {
+  const [asset, target] = await Promise.all([assetFor(choice, typedToken, "Token address"), resolveTarget(typedTo, "Recipient")]);
+  const amount = parseAmount(typedAmount, asset.decimals);
+  if (amount === 0n) throw new Error("Enter an amount above zero.");
+  // the sender's own history, for Send Check's look-alike test: a failed read is a row, never a pass
+  const [balance, kind, moved] = await Promise.all([balanceOf(asset, from), accountKind(target.address), transfersOf(from).catch(() => null)]);
+  const history = sameAddress(target.address, from)
+    ? null
+    : moved === null
+      ? row("Your history", "not checked — your token history could not be read; compare the address with where you got it", { tone: "warn" })
+      : historyRow(target.address, historyOf(from, moved));
+  /** a fake transfer named this address as if you had paid it: address poisoning, and the send is refused */
+  const planted = history?.tone === "bad" && history.value.includes("PLANTED");
+  /** a wallet with an EIP-7702 delegation is still a wallet: only real contracts get the warning */
+  const contract = kind.kind === "contract";
+
+  const shown = `${formatAmount(amount, asset.decimals)} ${asset.symbol}`;
+  const short = balance < amount;
+  const rows: Row[] = [
+    row("You send", shown),
+    asset.kind === "native"
+      ? row("Token", "ETH, Base's own currency")
+      : row("Token", `${asset.symbol} · ${asset.address}`, { href: explorer.token(asset.address) }),
+    row("To", target.via ? `${target.via} → ${target.address}` : target.address, { href: explorer.address(target.address) }),
+    row("Your balance", `${formatAmount(balance, asset.decimals)} ${asset.symbol}`, short ? { tone: "bad" } : {}),
+    row("Network", `${BASE.name} (${BASE.id})`),
+    ...recipientWarnings(target, from, contract),
+    ...(history && history.tone !== undefined ? [history] : []),
+    ...(asset.kind === "native" && !short && balance - amount < GAS_RESERVE
+      ? [row("Gas", "This leaves almost no ETH to pay for the next transaction.", { tone: "warn" })]
+      : []),
+  ];
+  const tx: TxRequest =
+    asset.kind === "native"
+      ? { to: target.address, value: amount }
+      : { to: asset.address, data: transferData(target.address, amount) };
+  return {
+    report: {
+      title: "Review",
+      rows,
+      notes: ["Your wallet shows this again before anything is sent. Nothing moves until you approve it there."],
+      sources: ["Base RPC", ...(target.via ? ["Basenames"] : []), "Blockscout (your token transfers)"],
+    },
+    tx,
+    label: `Send ${shown} to ${target.via ?? target.address}`,
+    blocked: planted ? "Refused: a planted address" : short ? `Not enough ${asset.symbol}` : null,
+  };
+}
+
+function recipientWarnings(target: Target, from: string, contract: boolean): Row[] {
+  return [
+    ...(sameAddress(target.address, from) ? [row("Recipient", "That is your own address.", { tone: "warn" })] : []),
+    ...(contract
+      ? [row("Recipient", "This address is a contract. Tokens sent to a contract that cannot handle them are lost for good.", { tone: "warn" })]
+      : []),
+  ];
+}
 
 export function SendPanel() {
-  const { pool } = useAdapters();
-
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [depositText, setDepositText] = useState("10");
+  const { wallet, signingProvider } = useWalletSession();
+  const [choice, setChoice] = useState<Choice>("ETH");
+  const [token, setToken] = useState("");
   const [to, setTo] = useState("");
-  const [sendText, setSendText] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
-  const [output, setOutput] = useState<Output | null>(null);
+  const [amount, setAmount] = useState("");
+  const [review, setReview] = useState<Review | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reading, setReading] = useState(false);
+  const steps = useTxSteps();
 
-  /**
-   * The EIP-55 verdict for whatever is in the To field, or `null` while it is empty.
-   *
-   * `null` rather than a `malformed` verdict for the empty case: an untouched field has
-   * not made a mistake, and telling somebody their blank input is not an address is
-   * scolding them for not having typed yet. Anything non-empty gets classified, including
-   * half-typed addresses — that is correct, because a half-typed address IS malformed and
-   * the field is the right place to learn it.
-   */
-  const toChecksum = useMemo((): AddressCheck | null => {
-    return to.trim() === "" ? null : checkAddress(to);
-  }, [to]);
+  /** Any edit throws the review away: what was reviewed is what gets signed. */
+  const edit = (set: (v: string) => void) => (v: string) => {
+    set(v);
+    setReview(null);
+    setError(null);
+    steps.reset();
+  };
 
-  const refresh = useCallback(async () => {
-    setNotes(await pool.notes());
-  }, [pool]);
+  // `send 0x…` from anywhere in the app — a Send Check's "Send to it", a profile — fills the recipient
+  useInbox("to", edit(setTo));
 
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  const ready = wallet?.kind === "ready" ? wallet : null;
+  const blocker = !ready
+    ? "Connect a wallet first"
+    : choice === "other" && token.trim() === ""
+      ? "Enter the token address"
+      : to.trim() === ""
+        ? "Enter a recipient"
+        : amount.trim() === ""
+          ? "Enter an amount"
+          : null;
 
-  /**
-   * One place where every action's failure becomes a message. Each handler below
-   * throws a real Error, so the UI never has to invent wording for a failure it
-   * does not understand.
-   */
-  const run = useCallback(
-    async (action: () => Promise<Output>) => {
-      setError(null);
-      try {
-        setOutput(await action());
-      } catch (e) {
-        setOutput(null);
-        setError(e instanceof Error ? e.message : String(e));
-      }
-      await refresh();
-    },
-    [refresh],
-  );
+  const onReview = async () => {
+    setReading(true);
+    setError(null);
+    try {
+      setReview(await buildReview(ready!.account, choice, token, to, amount));
+    } catch (e) {
+      setError(messageOf(e));
+    }
+    setReading(false);
+  };
 
-  /** Most actions produce a receipt; wrapping here keeps that off every call site. */
-  const runReceipt = useCallback(
-    (action: () => Promise<Receipt>) =>
-      run(async () => ({ kind: "receipt", receipt: await action() })),
-    [run],
-  );
+  /** A token picked from the wallet list: the known ones by name, anything else by address. */
+  const pick = (address: string | null) => {
+    const c = choiceFor(address);
+    edit((v) => setChoice(v as Choice))(c);
+    setToken(c === "other" ? address! : "");
+    // an amount typed for the old token means nothing for the new one
+    setAmount("");
+  };
 
-  const deposit = () =>
-    runReceipt(async () => {
-      const note = await pool.deposit(TOKEN, parseAmount(depositText, TOKEN.decimals));
-      setSelected(note.id);
-      return {
-        summary: `You put ${formatAmount(note.amount, TOKEN.decimals)} ${TOKEN.symbol} in. Keep this note: it is the money.`,
-        anchoring: note.anchoring,
-      };
-    });
+  /** the % button being read, so the click shows at once */
+  const [pending, setPending] = useState<number | null>(null);
+  const fill = async (pct: number) => {
+    setPending(pct);
+    try {
+      edit(setAmount)(await amountFor(choice, token, "Token address", ready!.account, pct));
+    } catch (e) {
+      setError(messageOf(e));
+    }
+    setPending(null);
+  };
 
-  const send = () =>
-    runReceipt(async () => {
-      if (!selected) throw new Error("Pick a note to spend.");
-      const recipient = assertChecksummedAddress(to, "Recipient");
-      return pool.send(selected, recipient, parseAmount(sendText, TOKEN.decimals));
-    });
+  const onSend = async () => {
+    const r = review!;
+    await steps.run(signingProvider(), ready!.account, [{ label: r.label, build: () => r.tx }]);
+  };
 
-  const withdraw = () =>
-    runReceipt(async () => {
-      if (!selected) throw new Error("Pick a note to withdraw.");
-      const recipient = assertChecksummedAddress(to, "Recipient");
-      return pool.withdraw(selected, recipient);
-    });
-
-  /**
-   * ⚠️ Says the file was **offered**, not that it was saved.
-   *
-   * Nothing here can know whether it reached a disk — that is decided by the browser's
-   * download UI and by the user, neither of which reports back (see `offerDownload`).
-   * "Backed up ✓" would be the app claiming a fact it does not have, about the one file
-   * standing between the user and losing everything. So the wording tells them to go and
-   * check, which is the action that actually makes the backup real.
-   */
-  const exportBackup = () =>
-    run(async () => {
-      const file = await pool.exportBackup();
-      offerDownload(file);
-      return {
-        kind: "plain",
-        text:
-          `Saving ${file.filename} — ${notes.length === 1 ? "1 note" : `all ${notes.length} notes`}, ` +
-          `secrets included. Open your downloads and check the file is there before you rely on it.`,
-      };
-    });
-
-  /**
-   * Takes the `<input>` itself rather than reaching for it through a ref.
-   *
-   * A ref would be `HTMLInputElement | null`, so the reset below would need a null
-   * check — for a state that cannot happen, since the only caller is that input's own
-   * `onChange` and an element firing an event is by definition mounted. An unreachable
-   * branch is not free here: it can never be exercised, so it sits against the 100%
-   * requirement forever and the honest ways to satisfy it are a non-null assertion
-   * (a lie if it ever could be null) or a test that fakes a state the app cannot
-   * reach. Passing the element makes the impossible state unrepresentable instead,
-   * which is the same move as `requireContract()` refusing to hand back a plausible
-   * zero address.
-   */
-  const restore = (input: HTMLInputElement) =>
-    run(async () => {
-      /**
-       * `undefined` when the user opened the picker and cancelled. Not an error and not
-       * silence either — a cancelled restore that printed nothing is indistinguishable
-       * from one that failed without a message.
-       */
-      const picked = input.files?.[0];
-      if (!picked) throw new Error("No file picked, so nothing was restored.");
-      const { notes: restored } = await pool.importBackup(await readTextFile(picked));
-      return {
-        kind: "plain",
-        text: `Restored ${restored === 1 ? "1 note" : `${restored} notes`} from ${picked.name}. Check the amounts below against what you expected.`,
-      };
-    }).finally(() => {
-      /**
-       * Cleared after every restore so picking the same file twice actually fires. A file
-       * input does not emit `change` when the chosen file is identical to the last one, and
-       * the second attempt is exactly what a user makes after a refusal they have just
-       * fixed. `tests/panels.test.tsx` has the measurement.
-       */
-      input.value = "";
-    });
-
-  const total = notes.reduce((sum, n) => sum + n.amount, 0n);
+  const done = steps.states.length > 0;
 
   return (
     <div className="stack">
+      {ready ? <WalletAssets account={ready.account} label={`Your assets on ${BASE.name} — pick one to send`} onPick={pick} /> : null}
       <fieldset className="group">
-        <legend>Put money in</legend>
-        <label className="group__row">
-          <span>Amount</span>
-          <input
-            className="field"
-            value={depositText}
-            onChange={(e) => setDepositText(e.target.value)}
-            aria-label="Amount to deposit"
-            inputMode="decimal"
-          />
-          <span className="group__unit">{TOKEN.symbol}</span>
-        </label>
-        <Gel onClick={deposit}>Deposit</Gel>
-        {/*
-          🔴 The warning is in the deposit flow, before the money goes in, because that is
-          the last moment it is free to act on. Persistence made the app survive a reload,
-          which made it *look* durable — and it is not: clearing site data, closing a
-          private window, or a browser reclaiming storage takes every note with it, and
-          there is no server-side copy by design. A user who learns this after depositing
-          learns it from an empty pool.
-        */}
-        <p className="dim">
-          These notes live in this browser and nowhere else. Clearing site data or losing
-          this browser loses the money — there is no copy on any server. Export a backup
-          below once you have put something in.
-        </p>
-      </fieldset>
-
-      <fieldset className="group">
-        <legend>
-          Your notes — {formatAmount(total, TOKEN.decimals)} {TOKEN.symbol} in {notes.length}
-        </legend>
-        {notes.length === 0 ? (
-          <p className="dim">No notes yet. Put something in above.</p>
-        ) : (
-          <ul className="notes notes--scroll" aria-label="Your notes">
-            {notes.map((n) => (
-              <li key={n.id}>
-                <label className="notes__row">
-                  <input
-                    type="radio"
-                    name="note"
-                    checked={selected === n.id}
-                    onChange={() => setSelected(n.id)}
-                    aria-label={`Note ${n.id}, ${formatAmount(n.amount, n.token.decimals)} ${n.token.symbol}`}
-                  />
-                  <code className="notes__amount">
-                    {formatAmount(n.amount, n.token.decimals)} {n.token.symbol}
-                  </code>
-                  <code className="notes__id dim">{n.id}</code>
-                </label>
-              </li>
-            ))}
-          </ul>
-        )}
-      </fieldset>
-
-      <fieldset className="group">
-        <legend>Pay out of a note</legend>
+        <legend>Send on {BASE.name}</legend>
+        <TokenPicker
+          label="Token"
+          choice={choice}
+          address={token}
+          onChoice={(c) => edit((v) => setChoice(v as Choice))(c)}
+          onAddress={edit(setToken)}
+        />
         <label className="group__row">
           <span>To</span>
-          <input
-            className="field"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            placeholder="0x…"
-            aria-label="Address to pay"
-            spellCheck={false}
-          />
+          <input className="field" aria-label="Recipient" placeholder="0x… or name.base.eth" spellCheck={false} value={to} onChange={(e) => edit(setTo)(e.target.value)} />
         </label>
-        {/*
-          The checksum verdict, live, BEFORE the button is pressed.
-
-          ⚠️ This is the whole product value of the increment and it has to be here rather
-          than in the error path: after `Send` there is nothing to warn about, because on
-          a real chain the payment has already happened. A lowercase address says so out
-          loud instead of staying silent, since silence next to a field reads as approval
-          and "cannot be checked" is materially weaker than "checked".
-        */}
-        {toChecksum !== null && (
-          <p className={toChecksum.kind === "checksummed" ? "dim" : "caution"}>
-            {describeChecksum(toChecksum)}
-          </p>
-        )}
         <label className="group__row">
           <span>Amount</span>
-          <input
-            className="field"
-            value={sendText}
-            onChange={(e) => setSendText(e.target.value)}
-            aria-label="Amount to send"
-            inputMode="decimal"
-          />
-          <span className="group__unit">{TOKEN.symbol}</span>
+          <input className="field" aria-label="Amount" placeholder="0.0" inputMode="decimal" value={amount} onChange={(e) => edit(setAmount)(e.target.value)} />
         </label>
-        <div className="row">
-          <Gel onClick={send} disabled={notes.length === 0}>
-            Send
-          </Gel>
-          <Gel quiet onClick={withdraw} disabled={notes.length === 0}>
-            Withdraw all of it
-          </Gel>
-        </div>
+        <PercentButtons onPick={(p) => void fill(p)} pending={pending} disabled={!ready || (choice === "other" && token.trim() === "")} />
       </fieldset>
 
-      <fieldset className="group">
-        <legend>Back up your notes</legend>
-        {/*
-          The plaintext warning is not hidden behind a details element or softened. The file
-          IS the money: a backup without the secrets restores nothing, so it is exactly as
-          valuable as the pool it came from. Saying that plainly is what makes the user
-          careful with it, and it is the reason `lib/backup.ts` does not pretend to encrypt.
-        */}
-        <p className="dim">
-          The file holds your note secrets in plain text. Anyone who opens it can spend
-          your money, so keep it like cash — not in a shared folder, not in email.
-        </p>
-        <div className="row">
-          <Gel onClick={exportBackup} disabled={notes.length === 0}>
-            Export a backup
+      {review === null ? (
+        <Gel className="mf__cta" onClick={() => void onReview()} disabled={blocker !== null || reading}>
+          {reading ? "Reading…" : (blocker ?? "Review")}
+        </Gel>
+      ) : (
+        <>
+          <ReportView report={review.report} />
+          <Gel className="mf__cta" onClick={() => void onSend()} disabled={review.blocked !== null || steps.running || done}>
+            {review.blocked ?? (done ? "Sent — edit a field to send again" : "Send in wallet")}
           </Gel>
-        </div>
-        <label className="group__row">
-          <span>Restore</span>
-          <input
-            className="field"
-            type="file"
-            accept="application/json,.json"
-            aria-label="Backup file to restore"
-            /**
-             * `currentTarget` read synchronously, which is the only time it is valid —
-             * React nulls it once the handler returns, and the reset runs after an await.
-             * Reading it here passes the element itself, which outlives the event.
-             */
-            onChange={(e) => void restore(e.currentTarget)}
-          />
-        </label>
-        <p className="dim">
-          Restoring only works into a browser with no notes in it. If this one already has
-          some, export them first — nothing here will merge two pools or overwrite one.
-        </p>
-      </fieldset>
+        </>
+      )}
 
-      <Crt label="Send output">
-        {error ? (
+      {error ? (
+        <Crt label="Send error">
           <span className="crt__amber">{error}</span>
-        ) : output === null ? (
-          <span className="crt__dim">{"// nothing run yet"}</span>
-        ) : output.kind === "receipt" ? (
-          <>
-            <span>{output.receipt.summary}</span>
-            <Anchor anchoring={output.receipt.anchoring} />
-          </>
-        ) : (
-          <span>{output.text}</span>
-        )}
-      </Crt>
+        </Crt>
+      ) : null}
+      <TxStepList states={steps.states} label="Send progress" />
     </div>
   );
 }

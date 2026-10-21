@@ -1,0 +1,60 @@
+[
+ {
+  "chainId": "base",
+  "dexId": "uniswap",
+  "url": "https://dexscreener.com/base/0xc9034c3e7f58003e6ae0c8438e7c8f4598d5acaa",
+  "pairAddress": "0xc9034c3E7F58003E6ae0C8438e7c8f4598d5ACAA",
+  "labels": [
+   "v3"
+  ],
+  "baseToken": {
+   "address": "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
+   "name": "Degen",
+   "symbol": "DEGEN"
+  },
+  "quoteToken": {
+   "address": "0x4200000000000000000000000000000000000006",
+   "name": "Wrapped Ether",
+   "symbol": "WETH"
+  },
+  "priceNative": "0.0000004098",
+  "priceUsd": "0.001091",
+  "txns": {
+   "m5": {
+    "buys": 0,
+    "sells": 0
+   },
+   "h1": {
+    "buys": 173,
+    "sells": 19
+   },
+   "h6": {
+    "buys": 245,
+    "sells": 167
+   },
+   "h24": {
+    "buys": 404,
+    "sells": 582
+   }
+  },
+  "volume": {
+   "h24": 93013.41,
+   "h6": 28213.11,
+   "h1": 15441.68,
+   "m5": 0
+  },
+  "priceChange": {
+   "h1": -0.05,
+   "h6": 1.26,
+   "h24": 0.46
+  },
+  "liquidity": {
+   "usd": 132845.39,
+   "base": 60706751,
+   "quote": 24.9931
+  },
+  "fdv": 39390172,
+  "marketCap": 39390172,
+  "pairCreatedAt": 1704655845000
+ }
+]

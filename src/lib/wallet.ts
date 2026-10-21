@@ -189,10 +189,19 @@ function detail(err: unknown): string {
   return err instanceof Error && err.message !== "" ? ` (${err.message})` : "";
 }
 
+/*
+ * Nothing injected is NOT the same as "you cannot sign in", and this string used
+ * to say it was — "there is nothing to ask", full stop. WalletConnect and
+ * Coinbase Smart Wallet both open a session with no extension present, so the
+ * accurate sentence names them first and leaves installing as the alternative.
+ * A true-but-discouraging line on the one screen a first-time visitor reads is
+ * indistinguishable from a sign-in that does not work.
+ */
 const NO_WALLET_HERE =
-  "No wallet is available in this browser, so there is nothing to ask. Install a browser " +
-  `wallet and reload, or open ${BRAND.name} inside a wallet's own browser. Free tools need ` +
-  "no wallet.";
+  "No browser wallet is injected here, so there is nothing on this device to ask. You can " +
+  "still sign in: WalletConnect pairs a wallet on your phone, and Coinbase Smart Wallet needs " +
+  "no extension at all. Install a browser wallet and reload if you would rather use one, or " +
+  `open ${BRAND.name} inside a wallet's own browser. Free tools need no wallet.`;
 
 const NOT_CONNECTED =
   "No account is connected yet. Connect one to pay for a run — the free tools need no " +
@@ -272,6 +281,10 @@ const USER_REJECTED = 4001;
 const ALREADY_PENDING = -32002;
 /** EIP-3326: the wallet has no such chain configured. */
 const CHAIN_NOT_ADDED = 4902;
+/** EIP-1193: the wallet does not support the method. */
+const UNSUPPORTED_METHOD = 4200;
+/** JSON-RPC: no such method. Some wallets answer an unknown method this way instead. */
+const METHOD_NOT_FOUND = -32601;
 
 /**
  * The numeric code off a provider error, or `null`.
@@ -415,6 +428,42 @@ export async function connectWallet(provider = injectedProvider()): Promise<Wall
     return relabel(await readWallet(provider), connectNote(err));
   }
   return readWallet(provider);
+}
+
+/**
+ * Open the wallet's own ACCOUNT PICKER, even when this site already has an account.
+ *
+ * MEASURED by the owner 2026-09-30: with MetaMask connected, there was no way to switch to a
+ * second MetaMask account. `eth_requestAccounts` is why — once a site has permission it
+ * resolves at once with the account already granted and shows nothing. EIP-2255's
+ * `wallet_requestPermissions` for `eth_accounts` shows the picker every time. A wallet that
+ * does not implement it (4200 / -32601) falls back to `connectWallet`, so nothing gets worse.
+ * Browser extensions only: a WalletConnect or Coinbase session picks its account in its own app.
+ */
+export async function chooseAccount(provider = injectedProvider()): Promise<Wallet> {
+  if (provider === null) return { kind: "unavailable", why: NO_WALLET_HERE };
+  try {
+    await provider.request({ method: "wallet_requestPermissions", params: [{ eth_accounts: {} }] });
+  } catch (err) {
+    const code = errorCode(err);
+    if (code === UNSUPPORTED_METHOD || code === METHOD_NOT_FOUND) return connectWallet(provider);
+    return relabel(await readWallet(provider), connectNote(err));
+  }
+  return readWallet(provider);
+}
+
+/**
+ * Ask the wallet to forget this site's access (`wallet_revokePermissions`), so the next connect
+ * shows the account picker instead of silently reusing the old account. Best effort: a wallet
+ * without the method keeps its grant, which is why Disconnect also says to remove the site in
+ * the wallet itself. Never throws.
+ */
+export async function releaseAccounts(provider = injectedProvider()): Promise<void> {
+  try {
+    await provider?.request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] });
+  } catch {
+    // the wallet keeps its grant; the sentence Disconnect leaves already covers this
+  }
 }
 
 /**

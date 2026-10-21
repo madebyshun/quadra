@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { formatAmount, parseAmount } from "@/lib/amount";
-import { AAPL_BASE } from "@/config/pair";
 
 /**
- * The hazard this file exists for: AAPLc has 8 decimals, USDC has 6, WETH has 18.
- * Every case below names its token, because a test that says "decimals = 8" and
- * nothing else would still pass if the constant it is guarding moved to 18.
+ * The hazard this file exists for: a B20 share token has 8 decimals, USDC has 6,
+ * WETH has 18 (CLAUDE.md hard rule 3). The 8 is written out here rather than read
+ * from config because the app ships no B20 token any more — the rule outlived the
+ * token that taught it, and still applies to the next one.
  */
+
+/** Every B20 share token is 8. See hard rule 3. */
+const B20_DECIMALS = 8;
 
 describe("parseAmount", () => {
   it("reads whole numbers", () => {
@@ -15,10 +18,9 @@ describe("parseAmount", () => {
     expect(parseAmount("250", 6)).toBe(250_000_000n);
   });
 
-  it("reads AAPLc at its real 8 decimals", () => {
-    expect(AAPL_BASE.decimals).toBe(8);
-    expect(parseAmount("1.5", AAPL_BASE.decimals)).toBe(150_000_000n);
-    expect(parseAmount("1", AAPL_BASE.decimals)).toBe(100_000_000n);
+  it("reads a B20 share token at its real 8 decimals", () => {
+    expect(parseAmount("1.5", B20_DECIMALS)).toBe(150_000_000n);
+    expect(parseAmount("1", B20_DECIMALS)).toBe(100_000_000n);
   });
 
   it("gives a different answer for the same text at 6, 8 and 18 decimals", () => {
@@ -74,7 +76,7 @@ describe("parseAmount", () => {
     );
   });
 
-  it("refuses over-precision on AAPLc specifically", () => {
+  it("refuses over-precision at 8 decimals specifically", () => {
     expect(() => parseAmount("1.123456789", 8)).toThrow("This token has 8 decimals");
     expect(parseAmount("1.12345678", 8)).toBe(112_345_678n);
   });
@@ -109,7 +111,7 @@ describe("formatAmount", () => {
     expect(formatAmount(1n, 8)).toBe("0.00000001");
   });
 
-  it("writes AAPLc at 8 decimals", () => {
+  it("writes a B20 share token at 8 decimals", () => {
     expect(formatAmount(150_000_000n, 8)).toBe("1.5");
     expect(formatAmount(112_345_678n, 8)).toBe("1.12345678");
   });
@@ -143,9 +145,9 @@ describe("formatAmount", () => {
 
 describe("the 10^10 hazard the module header names", () => {
   it("shows what getting the exponent wrong costs, so the guard is not abstract", () => {
-    const aaplc = parseAmount("1", AAPL_BASE.decimals);
+    const b20 = parseAmount("1", B20_DECIMALS);
     const asIf18 = parseAmount("1", 18);
-    expect(asIf18 / aaplc).toBe(10n ** 10n);
+    expect(asIf18 / b20).toBe(10n ** 10n);
   });
 
   it("cannot be papered over by a default, because there is no default", () => {

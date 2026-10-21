@@ -1,6 +1,7 @@
 import type { Catalog, Quote, Tool, ToolField, ToolRun } from "@/adapters/types";
 import { USDC } from "@/config/chain";
 import { checkRequirements } from "@/lib/requirements";
+import { BLUEAGENT } from "@/config/upstream";
 
 /**
  * The upstream tool catalog, offline.
@@ -40,7 +41,11 @@ import { checkRequirements } from "@/lib/requirements";
 
 const WHY_LOCAL = "nothing was charged — this ran against the local stub, not the catalog";
 
-/** The published payee, not a made-up one. Kept in sync with `BLUEAGENT.knownPayTo`. */
+/**
+ * The published payee, not a made-up one. Kept in sync with `BLUEAGENT.knownPayTo`, and
+ * the stub's 402s are checked as coming from `BLUEAGENT.origin` — the stub mirrors that
+ * directory, so it answers as that origin would.
+ */
 const PAY_TO = "0x02950ad38ada1d599375bd447e080cd404809205";
 
 /**
@@ -152,7 +157,7 @@ export function priceOf(tool: LocalTool): Quote["price"] {
   }
   return {
     kind: "paid",
-    requirements: checkRequirements(tool.id, {
+    requirements: checkRequirements(tool.id, BLUEAGENT.origin, {
       x402Version: 2,
       accepts: [
         {
@@ -187,7 +192,12 @@ export class LocalCatalog implements Catalog {
     return { toolId: tool.id, price: priceOf(tool) };
   }
 
-  async run(toolId: string, input: Record<string, string>): Promise<ToolRun> {
+  /**
+   * `_payment` is accepted and ignored: the interface takes it so a paid tool can be
+   * wired the same way against every adapter, but this stub never charges anything,
+   * signed or not — see the header for why that must stay true.
+   */
+  async run(toolId: string, input: Record<string, string>, _payment?: string): Promise<ToolRun> {
     const tool = find(toolId);
     const missing = tool.inputs
       .filter((field) => field.required && !(input[field.name] ?? "").trim())

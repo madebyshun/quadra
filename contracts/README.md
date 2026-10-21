@@ -1,275 +1,246 @@
-# contracts — Quadra's shielded pool
+# contracts/ — the launchpad
 
-Solidity for Base 8453. Three contracts, 100% coverage on `src/`, and a suite whose
-per-file counts are in the table at the bottom — and checked against it.
+One contract, `src/LaunchFactory.sol` (v2), decided by the owner on 2026-10-02 ("build our own on
+Base, not o1"; then "pair with stocks on Base like o1, and take o1 out of Launch"): a launch
+creates a token nobody administers, a Uniswap v4 pool for it against **ETH or an enabled quote
+asset — Coinbase's stock tokens on Base** — and puts the whole supply into that pool as liquidity
+no function can take out. The pool's 1% fee is the only income, split 80% to the launcher and 20%
+to the protocol, in whatever each trade paid with.
 
-**Nothing here is deployed.** `CONTRACTS.shieldedPool` and `CONTRACTS.verifier` in
-`src/config/chain.ts` are still `null`, and they stay `null` until something is
-deployed *and* verified on Basescan. See "What is missing" below — the gap is not
-a deployment step, it is a circuit.
+v1 (ETH pairs only) is deployed at `0xcDb2eC1c487fbcB6B4AF25cCD86aFf8120FaB8a5` and its exact source
+is in `deployed/`. Its tokens keep trading and anyone can `collect` their fees forever; the app
+reads both factories. **v2 is deployed** (owner, 2026-10-02) at
+`0xef1F427bB57e0ECd7BB8051cE8bC7AAb709a0c03`, block 52,068,913 — verified on Blockscout, bytecode
+identical to this build with immutables masked. New launches go to it.
 
----
+**v3 is built and NOT deployed** (2026-10-14): `src/LaunchFactoryV3.sol` + `src/LaunchHook.sol` —
+v2 plus a fee the launcher chooses and an anti-sniper opening. Its section is below
+("v3 — the chosen fee and the anti-sniper opening"); everything v2 guarantees, v3 keeps.
 
-## Running it
+## What one `launch(name, symbol, contractURI, salt, quote, quoteIn)` does, in one transaction
 
-Foundry only. No `lib/`, no submodules, no `npm install` for this half.
+1. **The token** — a B20 Asset (Base's native token standard, a precompile at `0xB20f…0000`),
+   18 decimals, created with `initialAdmin = address(0)`. Its `initCalls` mint the whole supply
+   (1,000,000,000) to the factory and set the ERC-7572 `contractURI`. B20 lets factory-originated
+   init calls bypass role gates, so this works with no role ever granted — and because no admin
+   exists, **no role can ever be granted again**: no mint, pause, seize or rename, forever.
+2. **The pool** — Uniswap v4, token/quote, 1% fee, tick spacing 200, no hook, opened at the
+   quote's `startTick`. `quote` is `address(0)` for ETH, or an address the quote admin enabled.
+   The token does not exist before this transaction, so nobody can open the pool first at a
+   different price.
+3. **The liquidity** — the whole supply as ONE single-sided position from the opening price to
+   the far end of the usable range, on whichever side the token sorts to. Prices are kept as a
+   tick of TOKEN-PER-QUOTE in raw units, so one number serves both orientations: token is
+   currency1 → the pool opens at `startTick`, range [lowest usable, startTick]; token is currency0
+   → the pool opens at `-startTick`, range [-startTick, highest usable]. A buy can never exhaust
+   it. The position belongs to the factory, which has **no code path that removes liquidity** —
+   `collect` pokes it with a zero change, which is how v4 pays out fees.
+4. **The first buy** — `quoteIn` of the quote, swapped for the launcher in the same transaction at
+   the opening price, before any bot can see the pool. ETH rides as `msg.value` (which must equal
+   `quoteIn`); an asset is pulled with `transferFrom` straight from the buyer to the pool manager,
+   so **approve the factory for exactly `quoteIn` first** (the Launch window does, as its own
+   signature). `msg.value` must be 0 for an asset.
+
+Rounding leaves a few wei of the token — sent to `0x…dEaD`.
+
+## Opening prices — the quote admin
+
+ETH's opening tick is fixed at deploy (191,200: ≈ 2×10^8 tokens per ETH, the billion opens at
+≈ 5 ETH). Every other quote is enabled with `setQuote(quote, enabled, startTick)` by the **quote
+admin** — the wallet that deployed, handed on only in two steps (`proposeQuoteAdmin` →
+`acceptQuoteAdmin`). It can enable, disable and re-price quotes for NEW launches; it cannot touch
+a pool, a position, a fee or a launch that already exists.
+
+Ticks are never typed by hand. `scripts/quote-ticks.ts` prices each of Coinbase's stocks so its
+pair opens at the same dollar value as an ETH launch — ETH from DexScreener, the stock from its
+Chainlink NAV in Coinbase's own API — and prints one `setQuote` line per stock. A stock with no
+NAV or with a paused feature is skipped, and the app never offers a stock whose TRANSFER is paused.
+🔴 Stocks have **8 decimals** (hard rule 3): the same tick is ten orders of magnitude apart
+between ETH and a stock. MEASURED 2026-10-02: NVDAc at $231.42 → tick 396,800, the supply opens at
+≈ 58.6 NVDAc.
+
+A stock's issuer may restrict who holds it (B20 transfer policies). MEASURED on NVDAc: its
+sender, receiver and executor policies all authorised the pool manager, the v1 factory and an
+arbitrary address. A payout a quote refuses is kept in `owed[account][currency]` for
+`withdraw(currency)` instead of blocking every other payout of the same collection.
+
+## The token's address cannot be stolen
+
+The B20 salt is `keccak256(abi.encode(caller, salt))`, so the address a launcher computed with
+`predictToken(caller, salt)` is theirs: anyone replaying their salt gets a different token.
+
+## Fees
+
+`collect(token)` — callable by anyone — pokes the position and pays out both currencies (buyers
+pay the fee in the quote, sellers in the token), returning `(amount0, amount1)` in the pool's
+order: `CREATOR_SHARE_BPS` = 8000 to the launcher's recipient, the rest to `protocolRecipient`.
+Everything is pushed; anything a recipient (or a quote's policy) refuses waits in `owed`. The
+launcher's recipient can hand itself on (`setCreatorRecipient`); the protocol recipient changes
+only in two steps (`proposeProtocolRecipient` → `acceptProtocolRecipient`).
+
+## Build, test, measure
+
+Base Foundry is required (stock Foundry cannot reach the B20 precompile):
 
 ```
-forge build          # lints as it compiles; warnings are errors
-forge test           # all three suites
-forge coverage       # expects 100% on src/
+curl -L https://raw.githubusercontent.com/base/base-anvil/HEAD/foundryup/install | bash
+base-foundryup --install v1.1.1
+npm install                 # Uniswap v4-core / v4-periphery come from npm, through lib/ symlinks
+npm run gate:contracts      # base-forge build → base-forge test → 100% coverage of src/
+PATH="$HOME/.foundry/bin:$PATH" npx vite-node scripts/simulate-launchpad.ts   # hand-run, mainnet state
+PATH="$HOME/.foundry/bin:$PATH" npx vite-node scripts/simulate-launchpad-v3.ts   # v3: the opening fee, hand-run
 ```
 
-⚠️ **Run these from `contracts/`, not the repo root.** `foundry.toml` lives here, and the
-root has none — so from up there forge treats the TypeScript `src/` as an empty Solidity
-project, prints "Nothing to compile", runs zero tests and **exits 0**. A wrong-directory
-invocation looks exactly like a passing one. The npm scripts below pin the directory;
-that is the reason to prefer them.
+The tests (30) run against the real B20 precompile (Base Foundry registers it locally) and a real
+Uniswap v4 `PoolManager` deployed from v4-core's own source — no stand-in for either — with an
+8-decimal B20 standing in for a stock, in both pool orientations. The simulation runs one
+`eth_simulateV1` block against REAL Base state with a keyless address: deploy v2, enable NVDAc at
+its live tick, buy NVDAc through Relay, launch an ETH pair with a first buy, approve and launch an
+NVDAc pair with a first buy, collect both. MEASURED 2026-10-02: every call succeeded against
+Coinbase's real NVDAc and its real transfer policies — the NVDAc launcher got 9.33M tokens for
+0.558 NVDAc, the ETH launcher 1.99M for 0.01 ETH, and the factory was left holding no NVDAc.
 
-From the repo root, all of it plus both gates in one command:
+Vendored: `lib/base-std` is base-std v1.1.0 (`src/`, README, LICENSE only), from
+`github.com/base/base-std`. `lib/v4-core` and `lib/v4-periphery` are symlinks into `node_modules`
+— MEASURED, `base-forge coverage`'s analyser cannot follow a relative import inside a library
+outside the project root, though `build` can.
+
+## v3 — the chosen fee and the anti-sniper opening
+
+Decided by the owner after measuring two competitors: basepad.si lets a creator pick 1% or 3% (46%
+of its launches chose 3%); feel.cash charges a falling anti-sniper fee (50% → the normal fee over
+15 s). v3 = v2 + both, with nothing of v2 given up.
+
+`launch(name, symbol, contractURI, salt, quote, quoteIn, fee)` — v2's call plus `fee`:
+`FEE_LOW` = 10,000 (1%) or `FEE_HIGH` = 30,000 (3%). Anything else reverts `BadFee()` (tested over
+every other uint24 by fuzzing). ⚠️ A different selector from v1/v2's `launch`: the Launch window
+needs the new ABI before it can send to v3.
+
+**The pool.** Same B20 token (no admin, the whole 1B supply), same single-sided position owned by
+the factory, same tick spacing 200 for both fees (so one opening tick per quote serves both and
+`setQuote` is unchanged). What changes is the key: `fee = LPFeeLibrary.DYNAMIC_FEE_FLAG` (0x800000)
+and `hooks = factory.hook()`. A reader that displays `key.fee` will show 8388608 — the coin's fee is
+`hook.schedules(poolId).fee`, or the `LaunchFee(token, fee)` event.
+
+**The hook** (`LaunchHook`, ≈ 140 lines) sets each swap's LP fee from `beforeSwap`, with
+`OVERRIDE_FEE_FLAG`:
+
+    fee(t) = chosen + (startFee − chosen) × (window − t) / window   for t < window   (rounded down)
+    fee(t) = chosen                                                  for t ≥ window
+
+`t` is seconds since the pool opened (the launch block's timestamp). Defaults: `startFee` 500,000
+(50%), `window` 15 s — both immutable, set once at deploy, validated (`startFee` ≥ 3% and ≤ 100%,
+`window` > 0). A 1% coin: 50% at 0 s, 46.73% at 1 s, 25.5% at 7.5 s, 1% from 15 s. Sells pay it too,
+so the launcher cannot dump in the window either. Base's blocks are 2 s apart, so in practice the
+steps a swap can land on are 0, 2, 4 … 14 s.
+- **The launcher's first buy pays the CHOSEN fee**, not the opening one: it is the factory's own
+  swap, inside the launch transaction, and the hook exempts `sender == factory` explicitly. The
+  factory swaps nowhere else.
+- **Only this factory's pools.** `beforeInitialize` refuses any `sender` but the factory. This also
+  closes a gap v2 has: in v2, anybody who read `predictToken` could initialize the coin's (hookless)
+  pool first at another price, making the launch revert. In v3 that pool key needs the hook, and the
+  hook says no.
+- **Nobody else adds liquidity during the window** (`beforeAddLiquidity`, sender ≠ factory →
+  `Opening()`): the opening fee is the launch's — liquidity placed in front of the snipers would
+  otherwise take their fees. After the window anyone may add, as in v2, and removing one's own
+  liquidity is never blocked (the hook has no remove permission).
+- **What it cannot do:** take anything (no return-delta permission of any kind — the opening fee is an
+  LP fee, earned by the factory's locked position and split 80/20 by `collect` like every other fee);
+  touch liquidity (it never calls the pool manager); change a fee (no owner, no setter; a pool's fee
+  and opening second are written once by the factory, before the pool exists — `register`, factory
+  only).
+
+**The hook's address is its permissions** (v4 reads the low 14 bits): exactly `beforeInitialize |
+beforeAddLiquidity | beforeSwap` = `0x2880`. The FACTORY deploys the hook in its own constructor
+with `CREATE2` and a mined salt, so `hook.factory()` is the factory by construction — no "set the
+factory once" function, no owner. The salt is mined against the factory's address, which is the
+deploying wallet's next CREATE address (`script/HookSalt.sol`: v4-periphery's HookMiner pattern,
+with the init-code hash computed once instead of per salt). A salt that gives any other bits makes
+the constructor revert `HookAddressNotValid` (tested).
+
+**Events.** `Launched` keeps v1/v2's exact signature (`Launched(address,address,bytes32,uint256,uint256)`
+— topic0, the indexed token, creator and poolId all in the same places, tested), so one log reader still
+serves every factory. New: `LaunchFee(address indexed token, uint24 fee)`, emitted just before it.
+
+### Measured
+
+- **Tests:** 47 in `test/LaunchFactoryV3.t.sol` (v2's 30 ported, plus the fee and the hook), against the
+  real B20 precompile and a real v4 PoolManager, the hook at a mined address exactly as on mainnet:
+  fee at 0 s = 50%, at half the window exactly halfway (a 20 s window: 25.5% at 10 s), every second of
+  the default window on the line, the chosen fee from `window` on; the launcher's first buy paying 1%
+  / 3% (ETH and a stock) in a block where anyone else pays 50%; a pool the factory did not open
+  refused (including the coin's own predicted key); other liquidity refused in the window and
+  removable after; 1% and 3% both work, every other fee reverts; and a STRUCTURAL check that the
+  factory reaches `modifyLiquidity` exactly twice (the supply in, a zero poke) and the hook never calls
+  the pool manager (needs `fs_permissions` read on `./src`, in foundry.toml). Three mutants of the hook
+  — no first-buy exemption, no factory check at initialize, no decay — each fail named tests.
+  `npm run gate:contracts`: 77 tests (30 v2 + 47 v3), 100% lines/functions/branches of all three files
+  in `src/`.
+- **Mainnet simulation** (`scripts/simulate-launchpad-v3.ts`, hand-run, 2026-10-14): one
+  `eth_simulateV1` call, three blocks (the fee depends on the block's time, so the clock must move):
+  deploy v3 (hook salt mined in the script) → launch a 1% and a 3% coin with 0.01 ETH first buys →
+  collect: **1.000% and 3.000%** → at T+1 s a sniper buys 0.1 ETH of the 1% coin → collect:
+  **46.733%** (0.0467333 ETH) → at T+20 s 0.1 ETH buys of each → **1.000% and 3.000%**. The sniper got
+  10.55M tokens for 0.1 ETH; the buyer at T+20 s 19.03M for the same 0.1 ETH.
+- **Gas, mainnet state, same block:** launch with a 0.01 ETH first buy — v2 631,478, v3 685,443
+  (+53,965, +8.5%: the hook's schedule slot, four calls into it — register, initialize, add liquidity, the first buy — and the extra event). A 0.1 ETH buy through
+  a router — v2 121,207, v3 129,358 (+8.2k a swap, the `beforeSwap` call). Deploy: v3 + hook
+  3,644,963 (v2: 2,918,088). Runtime size: factory 13,251 B, hook 2,691 B.
+
+### Deploying v3 — the owner's step, with the owner's key
+
+Same shape as v2's below: read `script/DeployLaunchFactoryV3.s.sol` first. It is ONE transaction
+(the factory deploys the hook). The script mines the salt for the deploying wallet's next CREATE
+address AT THE TIME IT RUNS (so the dry run's salt may differ from the broadcast's — that is fine),
+and refuses to finish if the factory or the hook landed elsewhere. Do not send anything else from
+the keystore while the script is broadcasting: the nonce would move, and the deploy would revert
+(`HookAddressNotValid`), never mis-deploy. MEASURED 2026-10-14, dry run on mainnet state from forge's default sender:
+the hook mined at salt 0x1838 → `0x7eF9…2880`, ≈ 4.74M gas for the script (≈ 0.00005 ETH at
+0.0107 gwei).
 
 ```
-npm run gate:contracts
+cd contracts
+# 1. dry run
+base-forge script script/DeployLaunchFactoryV3.s.sol --rpc-url https://mainnet.base.org --account quadra-deployer
+# 2. deploy and verify (the hook is verified as a contract created by the factory)
+base-forge script script/DeployLaunchFactoryV3.s.sol --rpc-url https://mainnet.base.org \
+  --account quadra-deployer --broadcast --verify --verifier blockscout \
+  --verifier-url https://base.blockscout.com/api/
+# 3. from the repo root: today's opening ticks for the stocks, then run the setQuote lines it prints
+#    (setQuote is v2's, unchanged; the ticks serve 1% and 3% coins alike)
+npx vite-node scripts/quote-ticks.ts <v3 factory address>
 ```
 
-That is `forge build` → `forge test` → `scripts/check-contract-coverage.ts` →
-`scripts/check-contract-tests.ts`.
+Then read back before pointing the app at it: `hook()` and its `factory()` (= the factory),
+`startFee()` = 500000, `window()` = 15, the hook address ending in bits `0x2880`, `FEE_LOW` /
+`FEE_HIGH`, `quotes(0x0…0)` = (true, 191200), `protocolRecipient` = treasury. The app's
+`LAUNCHPAD_EXPECTS`, the Launch window's ABI (`launch` takes `fee`), and anything reading `key.fee`
+need v3 changes first — not made here.
 
-🔴 **`npm run gate` and `npm run gate:contracts` are separate on purpose, and merging
-them would break the first one.** `npm run gate` has to stay runnable on a bare clone
-with nothing installed and no network; `gate:contracts` needs Foundry. Keeping them
-apart is what lets `npm run gate` be the thing you can always run. Both are required
-before anything is deployed.
+⚠️ v3 is not audited either, and it adds the first hook this launchpad has used.
 
-If `forge` is not on your `PATH` in a non-interactive shell, it is probably at
-`~/.foundry/bin/forge` — the coverage script already checks there, because
-`foundryup` puts it somewhere a login shell finds and a script does not.
+## Deploying v2 — the owner's step, with the owner's key
 
----
+This repo holds no key and deploys nothing. Read `script/DeployLaunchFactory.s.sol` first (it
+checks the chain and the PoolManager before spending gas). The deploying wallet becomes the quote
+admin, so use the same keystore for step 3.
 
-## No forge-std, deliberately
+```
+cd contracts
+# 1. dry run
+base-forge script script/DeployLaunchFactory.s.sol --rpc-url https://mainnet.base.org --account quadra-deployer
+# 2. deploy and verify
+base-forge script script/DeployLaunchFactory.s.sol --rpc-url https://mainnet.base.org \
+  --account quadra-deployer --broadcast --verify --verifier blockscout \
+  --verifier-url https://base.blockscout.com/api/
+# 3. from the repo root: today's opening ticks, then run the setQuote lines it prints
+npx vite-node scripts/quote-ticks.ts <factory address>
+```
 
-`test/Harness.sol` is a hand-written stand-in: the `Vm` interface methods this suite
-actually uses, `assertTrue` / `assertFalse` / `assertEq` / `assertNotEq`, and nothing
-else. It exists so `forge test` runs on a fresh clone with zero installs and no
-`--recurse-submodules` — the same property the frontend gate has.
+Then put the address in `CONTRACTS.launchFactory` (src/config/chain.ts) only after checking it on
+Blockscout — the Launch window refuses to send to anything else (hard rule 1), and it reads every
+number it relies on back from the factory before each launch.
 
-**The cost, stated rather than discovered later:** these assertions revert instead of
-collecting, so a failing test reports its first bad assertion and stops. forge-std
-would print all of them. That is a real loss and the trade is the offline property.
-If the suite ever grows to where that hurts, adding forge-std is a legitimate change —
-just do it knowing it makes a clean clone need a submodule.
-
-The cheatcode address is written as the literal
-`0x7109709ECfa91a80626fF3989D68f67F5b1DD12D` because computing it needs the very cast
-the linter is configured to object to.
-
----
-
-## What each contract is
-
-### `MerkleTreeWithHistory.sol`
-
-Append-only tree of note commitments, plus the last 30 roots.
-
-The root history looks like a bug and is not. A withdrawal proves "my note is a leaf
-under root R", and the prover has to choose R before building the proof. By the time
-the transaction lands, someone else may have deposited and moved the root. Accepting
-only the newest root means every proof races every deposit, and on a busy block nobody
-wins — the pool appears broken precisely when it is being used.
-
-That window is a **privacy parameter**, not a convenience: proving against an old root
-narrows the anonymity set to deposits made before it. 30 is Tornado's number for the
-same reason.
-
-Empty-subtree roots are computed in the constructor from the deployed hasher rather
-than hard-coded. A hard-coded table is the answer for one specific hash function, and
-this contract does not know which one it was handed — a MiMC table in a Poseidon
-deployment produces a tree whose roots no circuit agrees with, and nothing reverts.
-
-### `SafeTransfer.sol`
-
-ERC-20 moves that fail loudly. Empty return data is success (USDT's shape), `true` is
-success, everything else including `false` is failure.
-
-The dangerous direction is the second one. A token that returns `false` instead of
-reverting gets read as success by code that ignores the return value, so a withdrawal
-would verify the proof, burn the nullifiers, append the commitments, "pay" the
-recipient and emit `Withdrawal` — with the note spent, the money still in the pool,
-and no error anywhere for the user to point at.
-
-Also refuses an address with no code, because a call to a codeless account succeeds
-and returns nothing, which the empty-return-data rule would otherwise read as a
-completed payment.
-
-### `ShieldedPool.sol`
-
-Join-split, 2-in/2-out, one ERC-20 fixed at construction. `transact` is the only entry
-point: deposit, withdraw and note-to-note are the same operation with a different sign
-on `extAmount`. Separate `deposit` / `withdraw` functions would make the two
-distinguishable by selector, which is the exact link the pool exists to break.
-
-🔴 **Two amounts, and conflating them was a real insolvency.** `extAmount` is what
-crosses the boundary on the *user's* behalf and is a field of `ExtData`; `publicAmount`
-is what the *pool's balance* changes by and is derived, not supplied —
-`publicAmountFor(extData)` returns `extAmount - fee`. An earlier version took
-`publicAmount` as calldata and charged the relayer fee against the payout on a
-withdrawal but against the pool on a deposit or an internal transfer, so the
-conservation law it enforced had a case analysis in it while `IVerifier` documented the
-unconditional `sum(inputs) + publicAmount == sum(outputs)`. Against a circuit built to
-the documented spec, a relayed deposit skimmed its fee from other depositors and a
-relayed internal transfer was a repeatable drain — silently, landing on whoever
-withdrew last. The rule now: **whatever leaves the pool is proven as leaving, whether a
-recipient or a relayer receives it.** The regression suite is the
-"what moves must equal what was proven" section of `ShieldedPool.t.sol`, and every test
-in it fails against the old implementation.
-
-⚠️ **Join-split leaks amounts, and that is an open decision — see `TASKS.md` T7.**
-Fixed denominations (Tornado's design) make every withdrawal look like every other.
-Arbitrary amounts do not: deposit 137.42 and withdraw 137.42 and the link is visible
-to anyone reading the chain, with no cryptography broken. The shape was chosen because
-the UI already promises arbitrary amounts, but the guarantee is weaker and the UI must
-not claim otherwise.
-
-One pool, one asset, deliberately. Two assets sharing one tree means a proof for a
-note of asset A can be redeemed in asset B until the asset is inside the note *and*
-inside the circuit. Deploy a pool per asset.
-
----
-
-## What is missing, and why it cannot be faked here
-
-**There is no verifier.** `IVerifier` has no implementation under `src/`, and there
-will not be one until a circuit is written and its Groth16 verifier generated.
-
-🔴 **`contracts/test/doubles/TestVerifier.sol` contains `AcceptingVerifier`, which
-returns `true` for everything. Nothing under `src/` may import it, ever.** It compiles,
-the suite goes green, the pool "works", and the only symptom is that anybody can drain
-it. It exists so the pool's own logic can be tested; it is not a placeholder for the
-real thing and it is not a step on the way to one.
-
-**`TestHasher` is keccak and cannot ship either.** It satisfies every property the tree
-needs — deterministic, in-field, collision-resistant — which is exactly what makes it
-dangerous. A 20-level keccak Merkle path is a proof a browser cannot produce. Shipped,
-it gives a pool whose deposits work, whose tree is valid, and whose withdrawals nobody
-can afford to prove. The real deployment needs Poseidon.
-
-So what the on-chain code checks, and therefore what is trustworthy:
-
-- the root was one this tree really had, recently
-- neither nullifier has been seen before, and both are now spent
-- the proof verifies against the public inputs, **in the verifier's own words**
-- the external data really is the data that was proven over
-- the tokens moved, or the whole transaction reverted
-
-Only the circuit can check the rest: that the inputs exist under the root, that the
-nullifiers derive from them, and that value is conserved. A verifier returning `true`
-without proving those turns this contract into a faucet and nothing here could tell.
-
----
-
-## Tests
-
-| Suite | Tests | What it is for |
-|---|---|---|
-| `MerkleTreeWithHistory.t.sol` | 25 | tree mechanics, the 30-root window, capacity, field bounds |
-| `SafeTransfer.t.sol` | 17 | one test per real-world token misbehaviour |
-| `ShieldedPool.t.sol` | 64 | the pool's own rules, with the verifier as a double |
-
-**This table is the only place the repo states these numbers, and
-`scripts/check-contract-tests.ts` holds it to them** — per suite, in both directions, and it
-also fails on a suite that runs but is not listed. It said 90 total for a while after the
-real number was 104, in six places across four files; every other copy now describes the
-property and points here.
-
-⚠️ **Two of those 64 are load-bearing for the frontend, and nothing in this directory
-says so.** `test_encodesExtDataAsFourStaticWords` and `test_pinsTheExtDataDigestAndItsFold`
-exist to write down one `abi.encode(ExtData)` output, its keccak digest, and the folded
-field element, as literals the compiler asserts. `tests/transaction.test.ts` in the repo
-root then **reads those literals out of the `.sol` file** and checks the hand-written
-encoder in `src/lib/transaction.ts` against them, because a zero-dependency browser has no
-ABI coder and no keccak. So deleting or renaming that pinned-vector block breaks a
-TypeScript suite two directories away — and it breaks it with a "no longer parses" error
-naming this file, which is the one thing a reader needs to know. Same arrangement, opposite
-direction, as `tests/field.test.ts` reading `FIELD_SIZE` out of `src/`.
-
-🔴 **A count guard is not redundant with the coverage gate, and the difference is the
-reason this one exists.** Coverage measures which lines ran, not how many ways. Delete ten
-of the seventeen `SafeTransfer` tests and the remaining seven still touch every line of
-`SafeTransfer.sol` — coverage stays at 100%, the gate stays green, and the middle row goes
-on claiming "one test per real-world token misbehaviour" while most of those tokens are no
-longer tested. That claim is what makes the file trustworthy and it is precisely what
-coverage cannot see. So if a number here goes **down**, the commit message has to say which
-behaviour stopped being asserted; nothing else will notice.
-
-`test/doubles/TestTokens.sol` is eight token shapes, each a pattern that really shipped
-on Ethereum or Base rather than an invented adversary: no-return (USDT), false-return
-(old ZRX), non-boolean return, oversized return, fee-on-transfer, surplus-delivering,
-reverting, and a well-behaved control. All at **8 decimals**, matching the B20 share
-tokens this pool is aimed at — a double that lied about its decimals would let an
-off-by-10^10 bug pass here and surface in production.
-
-Fee-on-transfer and surplus are both **refused**, and the asymmetry is the point:
-`_pullExactly` checks `!=`, not `<`. A shortfall makes a note a claim on money that is
-not there; a surplus belongs to nobody and accumulates as an unaccounted balance that
-every later solvency argument has to special-case.
-
-**What these tests do not say anything about:** circuit soundness. Every proof in the
-suite is accepted or rejected by a double because that is what the test told it to do.
-
-### Coverage is a gate, not a report
-
-`forge coverage` prints a table and exits 0 no matter how bad the numbers are — there
-is no `--fail-under`. `scripts/check-contract-coverage.ts` parses the lcov and fails if
-any file under `src/` is below 100% on lines, functions or branches.
-
-It grades `src/` only. The doubles contain branches nothing should reach, which exist
-so a real contract can be caught doing the wrong thing; chasing those to 100% means
-writing tests for the test scaffolding, and the usual way that ends is by deleting the
-unreached guard.
-
-**The guard was verified by making it fail** — an uncovered function was added to
-`MerkleTreeWithHistory.sol`, the script was confirmed to fail on lines, functions and
-branches, and then it was reverted. A coverage gate that has never failed is not a
-verified gate.
-
----
-
-## Traps measured in this directory
-
-🔴 **`deny = "warnings"` belongs in `[profile.default]`, not `[lint]`.** forge accepts
-it under `[lint]` while resolving `deny` back to `"never"` — the strictness switches
-itself off and the build goes green for the wrong reason. It prints one line about an
-unknown config key and nothing else. **Verify with `forge config | grep deny`, never by
-whether the build passed.**
-
-🔴 **`[lint] ignore = ["test/**"]` matches nothing at all.** `test/*` covers the top
-level only; `test/**/*` is what reaches `test/doubles/`. Both entries are required.
-Measured by appending a deliberately bad cast to a file in `test/doubles/` and counting
-warnings under each pattern. **An ignore list that silently matches nothing reads
-exactly like a working one** — whenever you edit it, add a violation you expect it to
-swallow and confirm the count goes to zero.
-
-🔴 **`vm.expectRevert` binds to the next *external call*, not to the next statement.**
-Any view call made while building arguments consumes the expectation, and the failure
-message ("next call did not revert as expected") points at the wrong call entirely.
-This cost 12 simultaneous failures in one run: the `_args()` helper calls
-`pool.getLastRoot()`. Hoist all argument construction above the `expectRevert`.
-
-**A `view` interface cannot be instrumented.** `IVerifier.verifyProof` is `view`, so no
-implementation can record what it was called with — a recording double is impossible.
-`ExpectingVerifier` inverts it instead: a non-view `expect()` setter stores the vector,
-and `verifyProof` returns whether it matches. The `view` interface is right, not an
-obstacle: a verifier that could record could also return a different answer for the
-same proof depending on what it had seen before.
-
----
-
-## Before any of this holds money
-
-1. A real circuit, and a Groth16 verifier generated from it.
-2. Poseidon, deployed, with the same parameters the circuit uses.
-3. A trusted setup whose provenance is written down.
-4. An external audit. 100% coverage says every branch has been executed, not that the
-   design is sound — those are different claims and only the first one is measured here.
-5. `CONTRACTS.*` filled in from a Basescan-verified deployment, never from a deploy log.
+⚠️ Not audited. It is small (≈ 425 lines), uses no hook and no upgrade path, and its tests and the
+mainnet simulation pass — none of which is an audit. It will hold the liquidity of every token
+launched through it, permanently.

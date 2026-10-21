@@ -12,6 +12,8 @@ import type { Catalog } from "@/adapters/types";
 import { BLUEAGENT } from "@/config/upstream";
 import { USDC, WETH } from "@/config/chain";
 import { USDC_DOMAIN } from "@/lib/eip712";
+import { paymentHeader } from "@/lib/payment";
+import { authorizationFor } from "@/lib/requirements";
 
 /**
  * The real catalog, against the bodies production actually sends.
@@ -112,6 +114,7 @@ function answering(answer: Answer): { urls: string[] } {
     return Promise.resolve({
       status: answer.status ?? 200,
       json: () => Promise.resolve(answer.body),
+      headers: new Headers(),
     });
   });
   return { urls };
@@ -316,15 +319,17 @@ describe("quoting against a live 402", () => {
    *
    * Worth its own test because the old shape made them unreachable rather than wrong:
    * `scheme`, `extra` and `maxTimeoutSeconds` were read off the wire and dropped, so no
-   * downstream check could have looked at them however careful it was. `lifetimeSeconds`
+   * downstream check could have looked at them however careful it was. `askedSeconds`
    * is the one with a number attached — 120 from upstream, where this build's own
-   * fallback said 600.
+   * fallback said 600. `lifetimeSeconds` is longer still: the ask plus
+   * `SETTLEMENT_SLACK_SECONDS`, the window this build actually signs.
    */
   it("keeps the settlement window and the domain upstream named, instead of dropping them", async () => {
     answering({ status: 402, body: PAID });
     const quote = await new HttpCatalog().quote("token-price");
     if (quote.price.kind !== "paid") throw new Error("expected a paid quote");
-    expect(quote.price.requirements.lifetimeSeconds).toBe(120n);
+    expect(quote.price.requirements.askedSeconds).toBe(120n);
+    expect(quote.price.requirements.lifetimeSeconds).toBe(180n);
     expect(quote.price.requirements.domain).toBe(USDC_DOMAIN);
   });
 
@@ -345,7 +350,7 @@ describe("quoting against a live 402", () => {
   });
 
   it("falls back to its own wording when a free answer carries no hint", () => {
-    const price = parsePrice("hood-live", 200, { free: true });
+    const price = parsePrice("hood-live", BLUEAGENT.origin, 200, { free: true });
     if (price.kind !== "free") throw new Error("expected a free quote");
     expect(price.why).toMatch(/without asking for payment/);
   });
@@ -376,14 +381,14 @@ describe("quoting against a live 402", () => {
   });
 
   it("catches the unavailable code even if the status is not 501", () => {
-    expect(() => parsePrice("honeypot", 200, { code: "TOOL_UNAVAILABLE" })).toThrow(
+    expect(() => parsePrice("honeypot", BLUEAGENT.origin, 200, { code: "TOOL_UNAVAILABLE" })).toThrow(
       /upstream answered 200/,
     );
   });
 
   it("refuses a 402 that names no way to pay", () => {
-    expect(() => parsePrice("token-price", 402, { x402Version: 2 })).toThrow(/named no way to pay/);
-    expect(() => parsePrice("token-price", 402, { x402Version: 2, accepts: [] })).toThrow(
+    expect(() => parsePrice("token-price", BLUEAGENT.origin, 402, { x402Version: 2 })).toThrow(/named no way to pay/);
+    expect(() => parsePrice("token-price", BLUEAGENT.origin, 402, { x402Version: 2, accepts: [] })).toThrow(
       /named no way to pay/,
     );
   });
@@ -393,7 +398,7 @@ describe("quoting against a live 402", () => {
    * there is no `code`, no `free` and no `accepts` to branch on.
    */
   it("refuses a body that is not an object", () => {
-    expect(() => parsePrice("t", 402, "Payment Required")).toThrow("not a JSON object");
+    expect(() => parsePrice("t", BLUEAGENT.origin, 402, "Payment Required")).toThrow("not a JSON object");
   });
 });
 
@@ -418,7 +423,7 @@ describe("what a paid quote delegates", () => {
   });
 
   it("hands the body to the requirements checker instead of reading fields itself", () => {
-    expect(() => parsePrice("token-price", 402, withAccept({ asset: WETH.address }))).toThrow(
+    expect(() => parsePrice("token-price", BLUEAGENT.origin, 402, withAccept({ asset: WETH.address }))).toThrow(
       /verified the decimals of exactly one asset/,
     );
   });
@@ -437,7 +442,7 @@ describe("what a paid quote delegates", () => {
 
   /** Names the tool, because the error surfaces in a window that shows several. */
   it("names the tool in the refusal", () => {
-    expect(() => parsePrice("blue-audit", 402, withAccept({ scheme: "upto" }))).toThrow(
+    expect(() => parsePrice("blue-audit", BLUEAGENT.origin, 402, withAccept({ scheme: "upto" }))).toThrow(
       /^blue-audit wants to be paid under/,
     );
   });
@@ -458,13 +463,14 @@ describe("running a tool", () => {
    * `run` reads text on purpose — a missing forwarder answers 200 with HTML, and
    * `res.json()` would throw a parse error instead of letting that case be named.
    */
-  function posting(answer: { status?: number; text: string }): Posted[] {
+  function posting(answer: { status?: number; text: string; responseHeader?: string | null }): Posted[] {
     const sent: Posted[] = [];
     vi.stubGlobal("fetch", (url: string, init: RequestInit) => {
       sent.push({ url: String(url), init });
       return Promise.resolve({
         status: answer.status ?? 200,
         text: () => Promise.resolve(answer.text),
+        headers: new Headers(answer.responseHeader == null ? {} : { "x-payment-response": answer.responseHeader }),
       });
     });
     return sent;
@@ -515,12 +521,13 @@ describe("running a tool", () => {
   });
 
   /**
-   * The reason a paid run stops is now genuinely the wallet — CORS was the reason
-   * until the forwarder landed, and keeping that wording would have sent the next
-   * reader looking for a header problem that no longer exists.
+   * The reason a paid run stops with no `payment` attached is that nothing was
+   * attached — not a header problem, and not "no signing code" any more: signing
+   * code exists (`lib/payment.ts`), so this is what happens when the caller did not
+   * use it.
    */
-  it("names the signature it cannot produce, not a header problem", () => {
-    expect(NO_WALLET).toMatch(/signing a USDC authorization/);
+  it("names the missing payment, not a header problem", () => {
+    expect(NO_WALLET).toMatch(/no payment was attached/);
     expect(NO_WALLET).toMatch(/Nothing was charged/);
     expect(NO_WALLET).not.toMatch(/CORS/);
   });
@@ -592,37 +599,25 @@ describe("running a tool", () => {
   });
 
   /**
-   * Per price, not per adapter. With the forwarder in place the six $0.00 ids really
-   * do run while the other 109 cannot, so a single flag for the whole catalog would
-   * have to be wrong about one half of it — either refusing free tools over a wallet
-   * they never wanted, or offering paid ones a run that can only throw.
+   * `whyNot` is about the price, not about whether a wallet happens to be connected —
+   * that fact belongs to the panel now (`lib/wallet.ts`'s `Wallet`, tracked live). A
+   * recognised payee at a known price is simply runnable.
    */
-  it("blocks the button for a paid price and allows it for a free one", () => {
+  it("allows both a free price and a paid one with a recognised payee", () => {
     const catalog = new HttpCatalog();
     expect(catalog.whyNot({ kind: "free", why: "no payment" })).toBeNull();
-    expect(catalog.whyNot(parsePrice("token-price", 402, PAID))).toBe(NO_WALLET);
+    expect(catalog.whyNot(parsePrice("token-price", BLUEAGENT.origin, 402, PAID))).toBeNull();
   });
 
-  /**
-   * ⚠️ Two independent reasons, and the missing wallet is named first because it is the
-   * one that goes away.
-   *
-   * Signing lands and `NO_WALLET` disappears; a payee upstream rotated does not. If the
-   * payee note were first it would read as the headline today and as a leftover
-   * afterwards, so this asserts the ORDER and not merely that both strings appear. Both
-   * do have to appear: reporting only the wallet would hide the durable problem behind
-   * the temporary one, and reporting only the payee would tell a user to fix upstream
-   * when this window cannot pay anybody yet.
-   */
-  it("reports an unrecognised payee as well as the missing wallet, in that order", () => {
-    const rotated = parsePrice("token-price", 402, {
+  /** A payee upstream rotated away from the one this build recognises is still refused. */
+  it("reports an unrecognised payee", () => {
+    const rotated = parsePrice("token-price", BLUEAGENT.origin, 402, {
       ...PAID,
       accepts: [{ ...PAID.accepts[0], payTo: WETH.address }],
     });
     const why = new HttpCatalog().whyNot(rotated);
-    expect(why).toContain(NO_WALLET);
-    expect(why).toMatch(/second problem/);
-    expect(why?.indexOf(NO_WALLET)).toBe(0);
+    expect(why).not.toBeNull();
+    expect(why).not.toContain(NO_WALLET);
   });
 
   /**
@@ -632,5 +627,115 @@ describe("running a tool", () => {
    */
   it("is not live, even though its reads are", () => {
     expect(new HttpCatalog().isLive).toBe(false);
+  });
+});
+
+describe("running a tool with a payment attached", () => {
+  const asCatalog = (): Catalog => new HttpCatalog();
+
+  function posting(answer: { status?: number; text: string; responseHeader?: string | null }): {
+    url: string;
+    init: RequestInit;
+  }[] {
+    const sent: { url: string; init: RequestInit }[] = [];
+    vi.stubGlobal("fetch", (url: string, init: RequestInit) => {
+      sent.push({ url: String(url), init });
+      return Promise.resolve({
+        status: answer.status ?? 200,
+        text: () => Promise.resolve(answer.text),
+        headers: new Headers(answer.responseHeader == null ? {} : { "x-payment-response": answer.responseHeader }),
+      });
+    });
+    return sent;
+  }
+
+  /** An EIP-55 vector, so `authorizationFor` accepts it as `from`. */
+  const FROM = "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed";
+  const SIGNATURE = `0x${"a".repeat(130)}`;
+
+  /** The header this build would actually send for `PAID`, signed by a fixed vector. */
+  function signedPayment(): string {
+    const price = parsePrice("token-price", BLUEAGENT.origin, 402, PAID);
+    if (price.kind !== "paid") throw new Error("expected a paid price");
+    const { authorization } = authorizationFor(
+      price.requirements,
+      FROM,
+      1_800_000_000n,
+      Uint8Array.from({ length: 32 }, (_, i) => i + 1),
+    );
+    return paymentHeader(price.requirements, authorization, SIGNATURE);
+  }
+
+  const RAN = { tool: "token-price", price: 1.23 };
+
+  it("attaches it as the X-Payment header", async () => {
+    const sent = posting({ text: JSON.stringify(RAN) });
+    await asCatalog().run("token-price", { token: "0xabc" }, signedPayment());
+    const headers = sent[0]?.init.headers as Record<string, string>;
+    expect(headers["X-Payment"]).toBe(signedPayment());
+  });
+
+  /**
+   * A 402 with a `payment` attached means the facilitator refused the header itself —
+   * a different failure from `NO_WALLET`, which is what happens when nothing was
+   * attached at all. Conflating the two would tell someone who just signed something
+   * to go connect a wallet they already connected.
+   */
+  it("reports a refused payment distinctly from a missing one", async () => {
+    posting({ status: 402, text: JSON.stringify({ error: "signature expired" }) });
+    await expect(asCatalog().run("token-price", {}, signedPayment())).rejects.toThrow(
+      "token-price was not run. Upstream refused the payment: signature expired Nothing was charged.",
+    );
+  });
+
+  it("still says so plainly when a refused payment carries no reason", async () => {
+    posting({ status: 402, text: JSON.stringify({}) });
+    await expect(asCatalog().run("token-price", {}, signedPayment())).rejects.toThrow(
+      "token-price was not run. Upstream refused the payment and gave no reason. Nothing was charged.",
+    );
+  });
+
+  /**
+   * `X-Payment-Response` is base64 JSON with an optional `txHash` — measured in
+   * BlueAgent's own x402 client, which treats it as best-effort. A legible one here
+   * is the only case allowed to report `settled`.
+   */
+  it("reports settled, with the payee and amount read back off the sent header", async () => {
+    const responseHeader = btoa(JSON.stringify({ txHash: "0xdeadbeef" }));
+    posting({ text: JSON.stringify(RAN), responseHeader });
+    const run = await asCatalog().run("token-price", { token: "0xabc" }, signedPayment());
+    expect(run.settlement).toEqual({
+      kind: "settled",
+      txHash: "0xdeadbeef",
+      payTo: BLUEAGENT.knownPayTo,
+      amountBaseUnits: 10_000n,
+    });
+  });
+
+  it.each([
+    ["no response header at all", null],
+    ["a header that is not base64 JSON", "not base64 json"],
+    ["a header whose JSON has no txHash", btoa(JSON.stringify({ ok: true }))],
+  ])("reports unsettled rather than fabricating a txHash: %s", async (_what, responseHeader) => {
+    posting({ text: JSON.stringify(RAN), responseHeader });
+    const run = await asCatalog().run("token-price", { token: "0xabc" }, signedPayment());
+    expect(run.settlement.kind).toBe("unsettled");
+    if (run.settlement.kind !== "unsettled") throw new Error("expected unsettled");
+    expect(run.settlement.why).toMatch(/no settlement proof/);
+  });
+
+  /**
+   * This adapter sent `payment` a moment ago, so it must be able to read its own
+   * `accepted` block back. Reaching a payment this build cannot parse is a bug in this
+   * file — not upstream's — and it must throw rather than fabricate a `payTo` or
+   * `amountBaseUnits` for a `settled` result (see the note on `decodeSentPayment`).
+   */
+  it("refuses to fabricate a settled payee or amount from a payment it cannot read back", async () => {
+    const responseHeader = btoa(JSON.stringify({ txHash: "0xdeadbeef" }));
+    posting({ text: JSON.stringify(RAN), responseHeader });
+    const unreadable = btoa(JSON.stringify({ accepted: { payTo: 123, amount: "10000" } }));
+    await expect(asCatalog().run("token-price", { token: "0xabc" }, unreadable)).rejects.toThrow(
+      "Sent a payment header this build cannot read back to report what it paid.",
+    );
   });
 });

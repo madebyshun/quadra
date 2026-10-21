@@ -113,6 +113,23 @@
   border-radius: var(--radius-window) var(--radius-window) 0 0;
   padding: 0 3px 3px;
   box-shadow: var(--shadow-window);
+  box-sizing: border-box;
+}
+
+/*
+ * A window on the multi-window desktop, positioned and sized by inline style
+ * (React owns x/y/width/height as state — this only supplies the mechanics).
+ * Selector carries two classes on purpose: `.desktop > *` two blocks up sets
+ * `position: relative` on every direct child at equal (0,1,0) specificity, and
+ * source order alone is exactly the trap this file's own header warns about
+ * (see CLAUDE.md, "CSS cascade order beats intent"). `.win.win--floating` is
+ * (0,2,0) and wins regardless of where either rule sits.
+ */
+.win.win--floating {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .win__bar {
@@ -131,6 +148,10 @@
     var(--xp-title-a) 100%
   );
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.win--floating .win__bar {
+  cursor: move;
 }
 
 .win__title {
@@ -191,6 +212,28 @@
   padding: 14px;
 }
 
+.win--floating .win__body {
+  flex: 1;
+  overflow: auto;
+}
+
+/* the diagonal grip at the bottom-right corner — the only resize handle, no edges */
+.win__resize {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--xp-border-mid) 0px,
+    var(--xp-border-mid) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
 /* ===================================================================
    Aqua gel button
    =================================================================== */
@@ -241,11 +284,31 @@
   filter: brightness(0.92);
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }
+/*
+  🔴 A `filter` CANNOT express "disabled", because it moves the label and the
+  background it sits on by the SAME amount. This was `grayscale(1)
+  brightness(1.15)` with `color: var(--xp-ink-dim)` and it made the primary
+  button's text INVISIBLE: greyscaling `--aqua-blue-b` lands on ~#9b9b9b and
+  lifting it gives ~#b3b3b3, while the dim ink greyscales to ~#7b7b7b — about
+  1.6:1, which is not a contrast, it is a blank lozenge. It went unseen for as
+  long as it did because `.gel--quiet` is already light, so the quiet disabled
+  buttons next to it stayed perfectly readable and the row looked deliberate.
+  A disabled button therefore gets its own flat palette rather than a
+  transform of the enabled one, and the gloss is dimmed rather than lifted.
+*/
 .gel:disabled {
   cursor: not-allowed;
-  filter: grayscale(1) brightness(1.15);
+  filter: none;
   color: var(--xp-ink-dim);
-  text-shadow: none;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+  border-color: #b9b6ad;
+  background: linear-gradient(180deg, #fbfbfa 0%, #e7e5de 48%, #dcd9d1 52%, #eae8e1 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 1px 1px rgba(0, 0, 0, 0.12);
+}
+.gel:disabled::after {
+  opacity: 0.35;
 }
 .gel:focus-visible {
   outline: 2px solid var(--xp-hot);
@@ -429,6 +492,55 @@
   color: var(--xp-ink-soft);
 }
 
+/*
+  A row of controls with no label column: the deposit box and its button, the
+  backup pair, the swap's direction toggle. `.group__row` is a three-column grid
+  sized for `label / field / unit`, so dropping a button into it either squeezes
+  the field into the 74px label track or spills onto a second line. Flex is the
+  right shape for "these belong together", and the two modifiers below are the
+  whole reason the panels now fit their windows without scrolling.
+*/
+.group__row--actions {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.group__row--actions .field {
+  width: auto;
+  flex: 1 1 140px;
+}
+
+/* label / field / unit / button — one more track than the default row. */
+.group__row--unit {
+  grid-template-columns: 74px 1fr auto auto;
+}
+
+/*
+  Written as a descendant selector, not a bare `.field--short`, and that is not
+  redundancy. MEASURED 2026-09-28 in a browser: the deposit box rendered full
+  width, because `.group__row--actions .field` above is (0,2,0) and a bare
+  `.field--short` is (0,1,0) — the modifier lost to the rule it was meant to
+  narrow, no matter where it sat in the file. A modifier for an element that
+  only ever appears inside a compound-selector context has to match that
+  context's specificity or it does nothing at all, silently.
+*/
+.group__row--actions .field--short {
+  width: 96px;
+  flex: 0 0 96px;
+}
+
+/*
+  A file input's intrinsic minimum width is its "Choose File / No file chosen"
+  shell, which is wider than the flex basis and so refused to shrink — the
+  backup row wrapped onto a second line (63px tall for one row of controls).
+  `min-width: 0` is the part that actually does the work; a flex item will not
+  go below min-content without it.
+*/
+.group__row--actions .field--file {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
 .group__unit {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -441,29 +553,148 @@
   line-height: 1.5;
 }
 
+/* ===================================================================
+   The money form — one row per decision, one button that says why it
+   cannot be pressed.
+
+   The shape came from a design ShunTr handed over: Network, Token with
+   its balance on the right, a large amount with 25/50/100% beneath it,
+   a recipient, and a single full-width action. The part worth keeping
+   is not the look, it is that the button carries the blocker as its
+   label instead of sitting greyed out next to nothing — a disabled
+   control with no reason is the user guessing which of four fields is
+   wrong. `.gel:disabled` right above is why the label stays readable
+   while it is disabled at all.
+   =================================================================== */
+
+.mf {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.mf__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 10px;
+  border: 1px solid var(--xp-border-mid);
+  border-radius: var(--radius-control);
+  background: linear-gradient(180deg, #fff 0%, #f6f5f0 100%);
+  font-family: var(--font-ui);
+  font-size: 11px;
+}
+
+.mf__label {
+  color: var(--xp-ink-dim);
+  white-space: nowrap;
+}
+
+.mf__value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--xp-ink);
+}
+
+/*
+  The amount row stacks instead of sitting on one line, because the number is
+  the thing being decided and gets the size to match. `:focus-within` on the
+  row rather than an outline on the input: the input has no border of its own,
+  so an outline drawn on it floats in the middle of the box it lives in.
+*/
+.mf__row--amount {
+  display: grid;
+  gap: 4px;
+}
+
+.mf__row--amount:focus-within {
+  border-color: var(--aqua-blue-c);
+  box-shadow: 0 0 0 2px rgba(79, 143, 224, 0.35);
+}
+
+.mf__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mf__amount {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  line-height: 1.1;
+  color: var(--xp-ink);
+}
+
+.mf__amount:focus {
+  outline: none;
+}
+
+.mf__amount::placeholder {
+  color: var(--xp-border-mid);
+}
+
+/* a sunken field dropped into a form row takes the space the label leaves */
+.mf__row .field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mf__pcts {
+  display: flex;
+  gap: 6px;
+}
+
+/*
+  A percentage of the SELECTED NOTE, not of a balance — this pool spends one
+  note at a time, so "100%" that meant the whole wallet would be a number the
+  Send button then refuses. The chips are disabled whenever no note is picked,
+  which is the only state where the percentage has nothing to be a percentage of.
+*/
+.chip--pct {
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+
+.chip--pct:hover:not(:disabled) {
+  background: linear-gradient(180deg, #fff, #e8eef8);
+  border-color: var(--aqua-blue-c);
+}
+
+.chip--pct:disabled {
+  cursor: not-allowed;
+  color: var(--xp-border-mid);
+}
+
+.mf__cta {
+  width: 100%;
+  min-height: 30px;
+  /*
+   * Pinned to the bottom of the window while its content scrolls. MEASURED 2026-09-30: a
+   * Swap review pushed "Swap in wallet" 31px below the fold — the review is what the user
+   * reads before pressing it, so it has to be allowed to be long, and the button has to
+   * stay reachable anyway. It drops back into place once scrolled to.
+   */
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+}
+
 .notes {
   list-style: none;
   margin: 0;
   padding: 0;
   border: 1px solid var(--xp-border-mid);
   background: var(--xp-sunken);
-}
-
-/*
-  The height cap belongs to the lists that can grow, not to every list that wants
-  a sunken box. It lived on `.notes` itself until the panels were looked at in a
-  browser: 168px is about four of SendPanel's one-line rows, and about two and a
-  half of the MCP panel's, which each carry a paragraph — so that list rendered as
-  a box with its third entry sliced through the middle of the glyphs. Nothing in
-  jsdom has a layout, so no test could have seen it.
-
-  Applied only to SendPanel's note list, which is the one a user can make
-  arbitrarily long. The other three are fixed-length reads — five MCP tools, the
-  build's limits, fourteen v4 permission bits — and are better shown whole.
-*/
-.notes--scroll {
-  max-height: 168px;
-  overflow-y: auto;
 }
 
 .notes > li + li {
@@ -530,7 +761,6 @@
 
 .home {
   max-width: 900px;
-  margin: 0 auto;
   gap: 18px;
 }
 
@@ -538,6 +768,7 @@
   display: grid;
   gap: 8px;
   justify-items: start;
+  max-width: 640px;
   padding: 10px 2px 0;
 }
 
@@ -562,70 +793,139 @@
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.55);
 }
 
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
-  gap: 10px;
+/*
+ * The icon field: left-anchored, like the icons on a real desktop — fills
+ * downward first and only starts a second column once a column is full,
+ * rather than the old edge-to-edge card grid. `flex-flow: column wrap` (not
+ * a grid with a guessed row count) is what makes that adapt to the actual
+ * rendered height of a tile instead of overflowing past the taskbar when a
+ * blurb wraps to an extra line — see the max-height note below.
+ */
+.icon-field {
+  display: flex;
+  flex-flow: column wrap;
+  align-content: flex-start;
+  gap: 2px 4px;
+  /* leaves room for `.home__head` above and the taskbar below without scrolling */
+  max-height: calc(100vh - 250px);
 }
 
-.cards--docs {
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+/*
+ * `display: contents` hands each list's `<li>`s to `.icon-field`'s flex
+ * layout directly — the `<ul>` keeps its `aria-label` and list role for
+ * screen readers and for `getAllByRole`, but renders no box of its own, so
+ * the two lists cascade into shared columns instead of stacking as separate
+ * blocks (which is what pushed "Read about it" below the fold before this).
+ */
+.icons {
+  display: contents;
+}
+
+.icons--docs .icon {
   opacity: 0.95;
 }
 
-.card {
+/*
+ * A desktop icon. Most are `<button>` (opening a window is not navigation any
+ * more — see `Desktop.tsx`); the three doc links stay `<a>`, because those
+ * really do go to another route. Unlike the old card, there is no panel
+ * background and (since the tile came off) no chrome at all, same as a real
+ * OS desktop —
+ * so `font: inherit` and `text-align: center` exist purely to undo the
+ * `<button>` UA defaults that would otherwise fight the centred label.
+ */
+.icon {
   display: grid;
-  gap: 3px;
-  align-content: start;
-  height: 100%;
-  padding: 11px 12px 12px;
-  border: 1px solid var(--xp-border-mid);
-  border-radius: 5px;
-  background: linear-gradient(180deg, #fff 0%, var(--xp-face) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 2px 5px rgba(0, 0, 0, 0.22);
-  color: var(--xp-ink);
+  justify-items: center;
+  gap: 4px;
+  width: 108px;
+  padding: 6px 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
   text-decoration: none;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
 }
 
-.card:hover {
-  border-color: var(--xp-hot);
-  text-decoration: none;
-  filter: brightness(1.03);
+.icon:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
-.card:focus-visible {
-  outline: 2px solid var(--xp-hot);
-  outline-offset: 2px;
+.icon:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
 }
 
-.card__title {
+/*
+ * The glyph, and nothing behind it.
+ *
+ * This was a 40px rounded Aqua tile with a 22px line drawing on top of it, which
+ * reads as two objects — a shape, and an icon inside the shape — where a desktop
+ * icon should read as one. With the tile gone, `currentColor` is the OUTLINE of a
+ * 1-bit icon rather than the whole drawing (see `ui/icons.tsx`), so it is near
+ * black: the white body of each glyph is what separates it from the wallpaper,
+ * exactly as it did on a Macintosh desktop. The box keeps its 40px so no grid
+ * row moves.
+ */
+.icon__glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: #10161f;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
+}
+
+.icon__title {
   font-family: var(--font-title);
-  font-size: 15px;
+  font-size: 12px;
   font-weight: 700;
-  color: var(--xp-title-c);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
 }
 
-.card__blurb {
+.icon__blurb {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   font-family: var(--font-mac);
-  font-size: 11.5px;
-  line-height: 1.4;
-  color: var(--xp-ink-soft);
+  font-size: 10.5px;
+  line-height: 1.3;
+  /*
+   * Every blurb reserves both of its clamped lines, even the one-liners.
+   * `.icon-field` wraps in columns, so an icon that is one line shorter than
+   * its neighbour offsets every icon below it in that column and the rows stop
+   * lining up — a ragged desktop, visible in a screenshot and invisible to the
+   * suite, which can only see that the text is present.
+   */
+  min-height: 2.6em;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
 }
 
-.card--off {
-  opacity: 0.6;
+.icon--off {
   cursor: not-allowed;
 }
 
-.card--off .card__title {
-  color: var(--xp-ink-dim);
+/* No tile to grey out any more: a switched-off icon is a faded one, whole. */
+.icon--off .icon__glyph {
+  opacity: 0.45;
 }
 
-.card--doc .card__title {
-  color: var(--xp-ink-soft);
+.icon--off .icon__title,
+.icon--off .icon__blurb {
+  opacity: 0.7;
 }
+
+/*
+ * The doc icons used to carry a green tile. Nothing tints them now — a 1-bit
+ * icon set has no second colour, and the label already says which is which.
+ */
 
 /* ===================================================================
    Taskbar
@@ -668,6 +968,105 @@
   filter: brightness(1.12);
 }
 
+.taskbar__start-wrap {
+  position: relative;
+  height: 100%;
+}
+
+/*
+ * The Start menu pops up from the taskbar, so it anchors to the bottom of
+ * `.taskbar__start-wrap` rather than the viewport — it has to move if the
+ * button ever does.
+ */
+.start-menu {
+  position: absolute;
+  bottom: calc(var(--taskbar-h) + 4px);
+  left: 4px;
+  z-index: 50;
+  display: grid;
+  gap: 2px;
+  min-width: 190px;
+  padding: 4px;
+  border: 1px solid var(--xp-border-dark);
+  border-radius: 6px;
+  background: var(--xp-face);
+  box-shadow: var(--shadow-window);
+}
+
+.start-menu__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.start-menu__list--docs {
+  padding-top: 4px;
+  border-top: 1px solid var(--xp-border-mid);
+}
+
+.start-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  color: var(--xp-ink);
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.start-menu__item:hover {
+  background: var(--aqua-blue-c);
+  color: #fff;
+}
+
+.start-menu__item--off {
+  color: var(--xp-ink-dim);
+}
+
+.taskbar__windows {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  overflow-x: auto;
+}
+
+/*
+ * A taskbar chip is a `<button>` now (one per open window, clicking toggles
+ * minimize/restore/focus — see `Taskbar.tsx`), so it needs the same UA-default
+ * reset `.card` needed: no border-family font, a pointer cursor, and a visible
+ * focus ring since `.chip`'s own border is too faint on the blue taskbar.
+ */
+.chip--task {
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  max-width: 160px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chip--task:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+
+.chip--task.chip--active {
+  background: linear-gradient(180deg, var(--aqua-graphite-a), #fff);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
+  color: var(--xp-ink);
+}
+
 .taskbar__tray {
   margin-left: auto;
   display: flex;
@@ -680,13 +1079,154 @@
   box-shadow: inset 1px 0 0 #0e5cad;
 }
 
+.taskbar__wallet {
+  border: none;
+  border-radius: var(--radius-control);
+  padding: 2px 8px;
+  font: inherit;
+  color: #fff;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.taskbar__wallet:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+.taskbar__wallet:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/*
+ * A tray balloon: anchored bottom-RIGHT, over the tray button that opens it, and
+ * narrow. It used to be a centred banner up to 92vw wide that opened on every load,
+ * and MEASURED 2026-09-29 at 1120×760 it covered the bottom of a centred window —
+ * the Send button included. Centred put it exactly where windows open; the right
+ * edge is where the tray is, so the balloon now sits beside the thing it belongs
+ * to and off the middle of the screen. When it opens by itself is
+ * `WalletStatus.tsx`'s `opensItself`.
+ */
+.wallet-banner {
+  position: fixed;
+  right: 8px;
+  bottom: calc(var(--taskbar-h) + 8px);
+  z-index: 60;
+  display: grid;
+  gap: 8px;
+  width: min(330px, calc(100vw - 16px));
+  padding: 8px 10px;
+  border: 1px solid var(--xp-border-dark);
+  border-radius: 6px;
+  background: var(--xp-face);
+  box-shadow: var(--shadow-window);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--xp-ink);
+}
+
+.wallet-banner__text {
+  margin: 0;
+  /* room for the ✕, which sits in the corner rather than wrapping onto a line of its own */
+  padding-right: 18px;
+}
+
+.wallet-banner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.wallet-banner__dismiss {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  border: none;
+  background: transparent;
+  color: var(--xp-ink-dim);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.wallet-banner__dismiss:hover {
+  color: var(--xp-ink);
+}
+
 /* ===================================================================
    One-window shell
    =================================================================== */
 
-.shell {
-  max-width: 720px;
+/*
+ * The standalone pages (`/docs`, `/api`, `/verify`) get the same left-hand
+ * icon menu the desktop has, so `.page` reuses `.icon-field` as a fixed-width
+ * column beside the single-window `.shell` rather than stacking them.
+ */
+.page {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+  max-width: 1040px;
   margin: 0 auto;
+}
+
+/*
+ * 🔴 `max-height: none` lived here and turned the field into ONE column of all
+ * thirteen icons — 1393px tall, so `/docs` scrolled to 1473px with the window
+ * pinned at the top and the icons trailing two screens below it. The page has
+ * no `.home__head`, so it gets a smaller reserve than the desktop's 250px, but
+ * it still needs a cap: without one the icon column, not the content, decides
+ * how tall the page is.
+ */
+.page .icon-field {
+  flex: 0 0 auto;
+  max-height: calc(100vh - 60px);
+}
+
+/*
+ * On a phone the icon field fills ROWS, not columns. `column wrap` under a
+ * height cap starts a new 108px column every few icons, and a short or narrow
+ * screen runs out of width first: MEASURED 2026-10-02 over CDP with true
+ * device metrics, `/` laid out 462px wide at 390×844 and 2030px wide at
+ * 844×390 (one icon per column, thirteen columns). Rows wrap at the viewport
+ * edge by construction, so the page scrolls down — which a phone expects —
+ * instead of sideways.
+ *
+ * The thresholds come from the measured 105px tile, not taste. Under 570px
+ * tall the field holds two icons a column, so thirteen need seven columns
+ * (816px) and more below that; under 600px wide even five a column needs
+ * three (368px) with nothing to spare. Above both, the column layout fits and
+ * is left exactly as it was — the desktop does not move.
+ *
+ * This block sits AFTER `.page .icon-field` on purpose: that rule is (0,2,0)
+ * and would keep its `max-height` over a bare `.icon-field` here, so the page
+ * variant is overridden by name. `.page` itself stacks, because a row-wrapping
+ * field beside the shell sizes to max-content — all thirteen in one line.
+ */
+@media (max-width: 600px), (max-height: 570px) {
+  .icon-field {
+    flex-flow: row wrap;
+    max-height: none;
+  }
+
+  .page {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .page .icon-field {
+    align-self: stretch;
+    max-height: none;
+  }
+}
+
+.shell {
+  flex: 1;
+  min-width: 0;
+  max-width: 720px;
   display: grid;
   gap: 8px;
 }
@@ -737,6 +1277,45 @@
 .chip--bad {
   border-color: var(--bad);
   color: var(--bad);
+}
+
+/*
+  A chip that is a button: the x402 window's "which half" switch and the limits'
+  Change. Declared AFTER `.chip` on purpose — same specificity, so order decides
+  (CLAUDE.md: cascade order beats intent). `aria-pressed` is the state, so the
+  style follows what a screen reader is told rather than a second class to forget.
+*/
+.chip--mode {
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+.chip--mode:hover {
+  border-color: var(--aqua-blue-c);
+  color: var(--xp-ink);
+}
+.chip--mode[aria-pressed="true"] {
+  background: linear-gradient(180deg, var(--aqua-graphite-a), #fff);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
+  border-color: var(--aqua-blue-c);
+  color: var(--xp-ink);
+}
+
+/*
+  A checkbox with its sentence. The sentence is ONE flex item (a <span>), so it wraps
+  as prose; with the text and the <code> as separate items it rendered as three
+  columns, MEASURED 2026-09-29. `break-all` is on the address only — an address has
+  no spaces to wrap at — never on the prose around it (CLAUDE.md, "mo / ve money").
+*/
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex: 1 1 100%;
+  font-size: 11px;
+  color: var(--xp-ink);
+}
+.check code {
+  word-break: break-all;
 }
 
 .mono {
@@ -793,4 +1372,1286 @@
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ===================================================================
+   Skill reports — the table every Research/Safety answer renders as.
+
+   One row per fact: label left, value right, a tinted left rule only where
+   there is a verdict. Colour is never the only signal — the value says
+   "yes"/"no"/"not checked" in words — so a red rule adds urgency to a
+   sentence that already says it.
+   =================================================================== */
+.report {
+  border: 1px solid var(--xp-border-mid);
+  background: #fff;
+  padding: 8px 10px;
+}
+.report__title {
+  margin: 0 0 6px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--xp-ink);
+}
+.report__rows {
+  margin: 0;
+  display: grid;
+  gap: 1px;
+}
+.report__row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 40%) 1fr;
+  gap: 8px;
+  padding: 3px 6px;
+  border-left: 3px solid transparent;
+  font-size: 11px;
+}
+.report__row:nth-child(odd) {
+  background: #f6f5f0;
+}
+.report__row dt {
+  color: var(--xp-ink-dim);
+}
+.report__row dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  color: var(--xp-ink);
+  /* addresses and hashes have no spaces to wrap at; prose values wrap normally */
+  overflow-wrap: anywhere;
+}
+.report__row--ok {
+  border-left-color: var(--ok);
+}
+.report__row--warn {
+  border-left-color: var(--warn);
+}
+.report__row--bad {
+  border-left-color: var(--bad);
+}
+.report__row--bad dd {
+  color: var(--bad);
+  font-weight: 600;
+}
+.report__sources {
+  margin: 6px 0 0;
+  font-size: 10.5px;
+  color: var(--xp-ink-dim);
+}
+
+/* The Terminal's scrollback: the newest answer stays in view (TerminalPanel scrolls it). */
+.terminal {
+  display: grid;
+  gap: 8px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.terminal__prompt {
+  display: block;
+  color: #7fd6ff;
+}
+
+/* A wallet's own icon (EIP-6963), beside its name on a button or in the Connected line. */
+.wallet-icon {
+  /* reset.css makes every img a block; an icon sits in the line of text beside it */
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+  margin-right: 6px;
+  border-radius: 3px;
+}
+
+/* A run of transactions (Send, Swap, Bridge, Launch): each step, and what the chain said. */
+.tx {
+  margin: 0;
+  padding: 6px 8px 6px 26px;
+  font-size: 12px;
+  background: var(--xp-sunken);
+  border: 1px solid var(--xp-border-mid);
+}
+.tx__step {
+  padding: 3px 0;
+}
+.tx__ok {
+  color: var(--ok);
+  font-weight: 600;
+}
+.tx__warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+.tx__bad {
+  color: var(--bad);
+  font-weight: 600;
+}
+
+/* ===================================================================
+   Markets — the desktop gadget (a Vista-sidebar strip on the right)
+   and the Markets window's list and chart.
+   =================================================================== */
+
+.gadget {
+  position: fixed;
+  top: 22px;
+  right: 18px;
+  width: 300px;
+  max-height: calc(100vh - var(--taskbar-h) - 44px);
+  overflow: auto;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(8, 28, 68, 0.58);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(6px);
+  color: #fff;
+}
+
+.gadget__title {
+  margin: 0 2px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.gadget__rows,
+.markets__list {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gadget__row {
+  display: grid;
+  grid-template-columns: minmax(48px, 1fr) auto 54px 90px;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gadget__row:hover,
+.gadget__row[aria-pressed="true"] {
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.gadget__sym {
+  display: grid;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.gadget__sym small {
+  font-size: 9px;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.gadget__px {
+  font-family: var(--font-mono, monospace);
+  text-align: right;
+}
+
+.gadget__chg {
+  font-family: var(--font-mono, monospace);
+  text-align: right;
+}
+
+.gadget .gadget__chg.up {
+  color: #7cf09a;
+}
+.gadget .gadget__chg.down {
+  color: #ff8f86;
+}
+
+.spark {
+  display: block;
+}
+.spark--none {
+  font-size: 10px;
+  text-align: center;
+  opacity: 0.7;
+}
+.gadget .spark--up polyline {
+  stroke: #7cf09a;
+}
+.gadget .spark--down polyline {
+  stroke: #ff8f86;
+}
+
+.gadget__foot {
+  margin-top: 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+
+/* On a narrow screen the gadget joins the page flow under the icons instead of covering them. */
+@media (max-width: 1180px) {
+  .gadget {
+    position: static;
+    width: auto;
+    max-width: 420px;
+    max-height: none;
+  }
+}
+
+/*
+ * In the Markets window the same rows sit on a light surface, list above chart. One column on
+ * purpose: MEASURED 2026-09-30 in a real render, a side-by-side list and chart in a ~460px window
+ * left the details table ~10px wide, wrapping "$2,684.25" one character per line — invisible to
+ * jsdom, obvious in a screenshot.
+ */
+.markets {
+  display: grid;
+  gap: 10px;
+}
+
+.markets__list .gadget__row {
+  background: #fff;
+  border-color: var(--xp-border-mid);
+  color: var(--xp-ink);
+}
+.markets__list .gadget__chg.up {
+  color: var(--ok);
+}
+.markets__list .gadget__chg.down {
+  color: var(--bad);
+}
+.markets__list .spark--up polyline {
+  stroke: var(--ok);
+}
+.markets__list .spark--down polyline {
+  stroke: var(--bad);
+}
+
+.chart {
+  margin: 0;
+  padding: 6px;
+  border: 1px solid var(--xp-border-mid);
+  background: #fff;
+}
+
+.chart__svg {
+  display: block;
+  width: 100%;
+  height: 180px;
+}
+.chart__svg--up .chart__line {
+  stroke: var(--ok);
+}
+.chart__svg--up .chart__area {
+  fill: rgba(29, 122, 46, 0.12);
+}
+.chart__svg--down .chart__line {
+  stroke: var(--bad);
+}
+.chart__svg--down .chart__area {
+  fill: rgba(179, 38, 30, 0.1);
+}
+
+.chart__axis {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--xp-ink-dim);
+}
+
+/* The wallet's own assets, above Send and Swap: one row per asset, a click picks it. */
+.assets {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 150px;
+  overflow: auto;
+}
+
+.assets__row {
+  display: grid;
+  grid-template-columns: minmax(60px, 1fr) auto 84px;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 6px;
+  border: 1px solid var(--xp-border-mid);
+  border-radius: 3px;
+  background: #fff;
+  color: var(--xp-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.assets__row:hover {
+  background: var(--xp-sunken);
+}
+
+.assets__amount,
+.assets__value {
+  font-family: var(--font-mono, monospace);
+  text-align: right;
+}
+
+.assets__value {
+  color: var(--xp-ink-dim);
+}
+
+/* Chain sections in the gadget and the Markets window — Base first, Robinhood Chain after. */
+.gadget__section + .gadget__section {
+  margin-top: 6px;
+}
+.gadget__group {
+  margin: 0 2px 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.markets__list .gadget__group {
+  color: var(--xp-ink-dim);
+  opacity: 1;
+}
+/* A price from a pool under THIN_MARKET_USD: marked, with the depth in the row's tooltip. */
+.gadget__px--thin {
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+/*
+ * Launch's extra-information rows: key, value, remove. Same specificity as `.group__row`
+ * (0,1,0) and declared after it, so it wins by position — the one rule of the two that can.
+ */
+.group__row--extra {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+}
+.group > .check {
+  margin-bottom: 8px;
+}
+
+/* Trade: the asset list (a light surface, like the Markets window) and a unit after an amount. */
+.trade__list {
+  display: grid;
+  gap: 3px;
+  max-height: 210px;
+  overflow: auto;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+  border: 1px solid var(--xp-border-mid);
+  background: var(--xp-field, #fff);
+}
+.trade__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 64px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--xp-ink);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.trade__row:hover,
+.trade__row[aria-pressed="true"] {
+  border-color: var(--xp-border-mid);
+  background: rgba(49, 106, 197, 0.1);
+}
+.trade__row .gadget__sym small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trade__row .gadget__chg.up {
+  color: var(--ok);
+}
+.trade__row .gadget__chg.down {
+  color: var(--bad);
+}
+.unit {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: var(--xp-ink-dim);
+}
+.trade__list {
+  max-height: 150px;
+}
+/* the picked asset in one block: name, price and change, and for a stock its share ratio and status */
+.trade__pick {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--xp-border-mid);
+  background: var(--xp-field, #fff);
+  font-size: 11px;
+  color: var(--xp-ink);
+}
+.trade__pick small {
+  color: var(--xp-ink-dim);
+  font-size: 10px;
+}
+.trade__sep {
+  align-self: center;
+  font-size: 11px;
+  color: var(--xp-ink-dim);
+}
+.trade__counters {
+  display: inline-flex;
+  gap: 6px;
+}
+.trade__more summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--xp-ink-soft);
+}
+
+/* ===================================================================
+   The intro: a 3D Macintosh Quadra that boots and flies into its screen
+   (src/intro/). The page's own desktop is underneath the whole time.
+   =================================================================== */
+
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  overflow: hidden;
+  /* drag to look around; a hand over what a click will act on (2026-10-02: interactive) */
+  cursor: grab;
+  touch-action: none;
+  background: radial-gradient(ellipse at 50% 38%, #1d2230 0%, #0b0d13 58%, #050608 100%);
+  transition: opacity 700ms ease;
+}
+
+.intro:active {
+  cursor: grabbing;
+}
+
+.intro--hover {
+  cursor: pointer;
+}
+
+.intro__hint {
+  position: absolute;
+  inset: auto 0 22px;
+  margin: 0;
+  text-align: center;
+  font: 12px var(--font-ui);
+  color: #aeb6c6;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  animation: intro-hint 900ms ease both;
+}
+
+@keyframes intro-hint {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* the last phase: the screen is already the desktop, so the overlay simply lets go */
+.intro--fade,
+.intro--done {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.intro__stage,
+.intro__css,
+.intro__gl {
+  position: absolute;
+  inset: 0;
+}
+
+.intro__loading {
+  position: absolute;
+  inset: auto 0 46%;
+  margin: 0;
+  text-align: center;
+  font: 12px var(--font-mono);
+  color: #7d8597;
+  letter-spacing: 0.08em;
+}
+
+.intro__skip {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #c9cfdb;
+  font: 11px var(--font-ui);
+  cursor: pointer;
+}
+
+.intro__skip:hover,
+.intro__skip:focus-visible {
+  background: rgba(255, 255, 255, 0.14);
+  outline: none;
+}
+
+/* The tube. 640 × 480 CSS pixels, scaled onto the 3D screen; the corner matches SCREEN_CORNER. */
+.boot {
+  width: 640px;
+  height: 480px;
+  border-radius: 28.8px;
+  overflow: hidden;
+  background: #000;
+  pointer-events: none;
+}
+
+.boot__tube {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: #000;
+}
+
+/* scanlines and the tube's darker edges, over every phase */
+.boot__tube::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px);
+  box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+/* power on: a bright line that opens into a grey screen */
+.boot--warm {
+  background: #9c9c9c;
+  animation: boot-warm 1000ms ease-out both;
+}
+
+@keyframes boot-warm {
+  0% {
+    clip-path: inset(49.6% 0 49.6% 0);
+    filter: brightness(3);
+  }
+  60% {
+    clip-path: inset(0 0 0 0);
+    filter: brightness(1.6);
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    filter: brightness(1);
+  }
+}
+
+/* the classic 50% grey dither of the time — still under the desktop as it fades in */
+.boot--icon,
+.boot--welcome,
+.boot--ready,
+.boot--zoom,
+.boot--fade,
+.boot--done {
+  background: repeating-conic-gradient(#8e8e8e 0 25%, #b3b3b3 0 50%) 0 0 / 2px 2px;
+}
+
+.boot__icon {
+  image-rendering: pixelated;
+}
+
+.boot__dialog {
+  width: 380px;
+  padding: 18px 22px 16px;
+  background: #fff;
+  border: 2px solid #000;
+  box-shadow:
+    inset 0 0 0 3px #fff,
+    inset 0 0 0 5px #000,
+    3px 3px 0 #000;
+  font-family: Geneva, "Lucida Grande", Verdana, sans-serif;
+  color: #000;
+  text-align: center;
+}
+
+.boot__welcome {
+  margin: 4px 0 2px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.boot__line {
+  margin: 0 0 14px;
+  font-size: 13px;
+}
+
+.boot__bar {
+  height: 12px;
+  border: 1px solid #000;
+  padding: 1px;
+}
+
+.boot__bar span {
+  display: block;
+  height: 100%;
+  background: repeating-linear-gradient(90deg, #000 0 6px, #333 6px 7px);
+  transform-origin: left;
+  animation: boot-bar 2900ms steps(18) both;
+}
+
+@keyframes boot-bar {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.boot__block {
+  margin: 10px 0 0;
+  font: 12px var(--font-mono);
+}
+
+/* the fly-in: the screen becomes the desktop the page is about to show */
+.boot__desk {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: start;
+  padding: 26px 22px;
+  background: linear-gradient(180deg, #1a5fc4 0%, #3c87dc 38%, #6fb0e8 52%, #79a83c 62%, #4f7c28 100%);
+  animation: boot-desk 450ms ease-out both;
+}
+
+/* the name is there to be recognised on the way in, then it leaves: the last frame is the bare
+   desktop gradient, the same one the real page has behind it, so the hand-over does not jump */
+.boot__desk span {
+  font: 700 40px var(--font-title);
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  animation: boot-name 1500ms ease-in both;
+}
+
+@keyframes boot-name {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes boot-desk {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Coins: one line naming the coin and its value, above its trade */
+.coin__head {
+  margin: 0;
+  font-size: 13px;
+}
+
+/* Coins: the launchpad as a window — a head, four numbers, then the feed */
+.coins__hero {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--xp-border-mid);
+  border-radius: 4px;
+  background: linear-gradient(180deg, var(--xp-face-lit), var(--xp-face));
+}
+.coins__hero p {
+  margin: 0;
+}
+.coins__title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--xp-title-a);
+}
+.coins__cta {
+  justify-self: start;
+  margin-top: 4px;
+}
+.coins__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+.coins__stat {
+  padding: 6px 8px;
+  background: var(--xp-sunken);
+  border: 1px solid var(--xp-border-mid);
+  border-radius: 3px;
+}
+.coins__stat dt {
+  font-size: 10px;
+  color: var(--xp-ink-dim);
+}
+.coins__stat dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.group__row--actions .coins__asset {
+  flex: 0 0 auto;
+  width: auto;
+  margin-left: auto;
+}
+
+/* Profile: who the address is, as a two-column list above the tabs */
+.profile__head {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 3px 10px;
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--xp-sunken);
+  border: 1px solid var(--xp-border-mid);
+  border-radius: 3px;
+  font-size: 12px;
+}
+.profile__head dt {
+  color: var(--xp-ink-dim);
+}
+.profile__head dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* the welcome box, finished, waiting: the prompt blinks like a period cursor */
+.boot__go {
+  margin: 12px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  animation: boot-go 1100ms steps(2) infinite;
+}
+
+@keyframes boot-go {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* Next steps (2026-10-02, "link everything together"): a row's small ↗, a report's buttons,
+   and the Terminal's ↳ lines under an answer — each runs a command line */
+.report__go {
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--xp-border-mid);
+  border-radius: 3px;
+  background: var(--xp-face-lit);
+  color: var(--xp-title-a);
+  font: 10px var(--font-ui);
+  line-height: 15px;
+  cursor: pointer;
+  vertical-align: 1px;
+}
+
+.report__go:hover {
+  background: var(--xp-face);
+}
+
+.report__next {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.terminal__next {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 2px 0 8px;
+}
+
+.terminal__step {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #7fd8ff;
+  font: inherit;
+  text-decoration: underline dotted;
+  cursor: pointer;
+}
+
+.terminal__step:hover {
+  color: #c4ecff;
+}
+
+/* ── The machine's own programs (2026-10-14: "make it more fun") ─────────────────────────────── */
+
+/* the block clock: the supercomputer's heartbeat, in the tray */
+.tray__clock {
+  display: grid;
+  justify-items: end;
+  line-height: 1.15;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+.tray__clock--stale .tray__block {
+  color: #ffd27a;
+}
+.tray__block {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  opacity: 0.92;
+}
+.tray__beat {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #8aa;
+}
+.tray__beat--live {
+  background: #6dff6d;
+  animation: beat 1.2s ease-out;
+}
+@keyframes beat {
+  0% { box-shadow: 0 0 0 0 rgba(109, 255, 109, 0.9); }
+  100% { box-shadow: 0 0 0 7px rgba(109, 255, 109, 0); }
+}
+.tray__sound {
+  border: none;
+  background: none;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+/* the Recycle Bin keeps its corner, above the taskbar */
+.desk-trash {
+  position: fixed;
+  right: 18px;
+  bottom: 52px;
+  width: 96px;
+  z-index: 1;
+}
+
+/* Task Manager */
+.tm__stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 14px;
+  margin: 0;
+}
+.tm__stats dt {
+  font-size: 11px;
+  color: var(--xp-ink-dim);
+}
+.tm__stats dd {
+  margin: 0;
+  font-size: 16px;
+}
+.tm__caption {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+.tm__graph {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 64px;
+  padding: 4px;
+  background: #000;
+  border: 2px inset var(--xp-border-mid);
+}
+.tm__bar {
+  flex: 1;
+  min-width: 3px;
+  background: #33ff33;
+}
+.tm__source {
+  font-size: 11px;
+}
+.tm__procs {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  background: var(--xp-sunken);
+  border: 1px solid var(--xp-border-mid);
+}
+.tm__procs th,
+.tm__procs td {
+  text-align: left;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--xp-face-dim);
+}
+.tm__procs td:last-child {
+  width: 40%;
+}
+.tm__meter {
+  display: block;
+  height: 8px;
+  background: var(--xp-title-a);
+}
+.tm__ours td {
+  font-weight: 700;
+}
+
+/* the Recycle Bin's files */
+.bin {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.bin__item {
+  display: grid;
+  gap: 3px;
+  padding: 6px 8px;
+  background: var(--xp-sunken);
+  border: 1px solid var(--xp-border-mid);
+}
+.bin__file {
+  font-weight: 700;
+}
+.bin__why {
+  font-size: 12px;
+}
+
+/* the Coming Soon folder */
+.folder {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+}
+.folder__item {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 4px;
+  border: 1px dashed var(--xp-border-mid);
+  background: var(--xp-sunken);
+  color: var(--xp-ink);
+  cursor: pointer;
+  text-align: center;
+}
+.folder__item .icon__blurb {
+  color: var(--xp-ink-dim);
+  font-size: 11px;
+}
+
+/* Q, the assistant */
+.q {
+  position: fixed;
+  right: 16px;
+  bottom: 120px;
+  z-index: 9000;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 32px));
+}
+.q__bubble {
+  position: relative;
+  padding: 10px 12px;
+  background: #ffffe1;
+  color: var(--xp-ink);
+  border: 1px solid #000;
+  border-radius: 8px;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.25);
+  font-size: 13px;
+}
+.q__bubble p {
+  margin: 0 0 8px;
+}
+.q--bad .q__bubble {
+  border-color: var(--bad);
+}
+.q__go,
+.q__close,
+.q__off {
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.q__off {
+  border: none;
+  background: none;
+  text-decoration: underline;
+  color: var(--xp-ink-dim);
+}
+
+/* Achievements and the Leaderboard */
+.ach__head {
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+.ach,
+.lb {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.ach__item {
+  display: flex;
+  gap: 8px;
+  padding: 5px 8px;
+  background: var(--xp-sunken);
+  border: 1px solid var(--xp-border-mid);
+}
+.ach__item--locked {
+  opacity: 0.6;
+}
+.ach__badge {
+  font-size: 18px;
+  line-height: 1;
+}
+.ach__item--earned .ach__badge {
+  color: #d29a00;
+}
+.lb li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  background: var(--xp-sunken);
+  border: 1px solid var(--xp-face-dim);
+}
+.lb__rank {
+  width: 28px;
+}
+.lb__who {
+  border: none;
+  background: none;
+  color: var(--xp-title-a);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+  flex: 1;
+  text-align: left;
+}
+
+/* Rugsweeper */
+.sweep__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+  background: var(--xp-face-dim);
+  border: 2px inset var(--xp-border-mid);
+}
+.sweep__lcd {
+  background: #000;
+  color: #ff2b2b;
+  padding: 1px 6px;
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+.sweep__face {
+  font-size: 20px;
+  width: 34px;
+  height: 34px;
+  border: 2px outset #fff;
+  background: var(--xp-face);
+  cursor: pointer;
+}
+.sweep {
+  display: grid;
+  gap: 0;
+  width: min(100%, 320px);
+  margin: 0 auto;
+  border: 3px inset var(--xp-border-mid);
+}
+.sweep__cell {
+  aspect-ratio: 1;
+  padding: 0;
+  border: 2px outset #fff;
+  background: var(--xp-face-dim);
+  font: 700 14px/1 var(--font-mono, monospace);
+  cursor: pointer;
+}
+.sweep__cell--open {
+  border: 1px solid var(--xp-border-mid);
+  background: #e8e6dc;
+  cursor: default;
+}
+.sweep__cell--mine {
+  background: #f4c7c3;
+}
+.sweep__cell--hit {
+  background: var(--bad);
+}
+.sweep__mines {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+/* the screensaver */
+.saver {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: #000;
+  overflow: hidden;
+  cursor: none;
+}
+.saver__block {
+  position: absolute;
+  left: -40%;
+  padding: 6px 10px;
+  color: #6dff6d;
+  border: 1px solid #1f6f1f;
+  background: rgba(10, 60, 10, 0.6);
+  white-space: nowrap;
+  animation: drift 12s linear infinite;
+}
+@keyframes drift {
+  to { transform: translateX(160vw); }
+}
+.saver__name {
+  position: absolute;
+  bottom: 24px;
+  width: 100%;
+  text-align: center;
+  color: #3fa9ff;
+  font-size: 14px;
+}
+
+/* the Base card */
+.card-box svg {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--xp-border-mid);
+}
+
+/* the Terminal's input line: the prompt sits against the box (MEASURED 2026-10-14: in .group__row's
+   label column it floated 80px left of it) */
+.terminal__line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.terminal__line .field {
+  flex: 1;
+}
+
+/* ── A coin's page (2026-10-14, after launch.o1.exchange's token page) ─────────────────────── */
+.newstrip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  white-space: nowrap;
+}
+.newstrip__tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e7d32;
+}
+.token__warn {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  background: #fff6d6;
+  border: 1px solid #d9b44a;
+}
+.token__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 6px;
+}
+.token__card {
+  display: grid;
+  gap: 1px;
+  padding: 6px 8px;
+  background: var(--xp-sunken);
+  border: 1px solid var(--xp-border-mid);
+  font-size: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.token__card strong {
+  font-size: 14px;
+}
+.token__label {
+  font-size: 11px;
+  color: var(--xp-ink-dim);
+}
+.token__info {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 3px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+.token__info dt {
+  color: var(--xp-ink-dim);
+}
+.token__info dd {
+  margin: 0;
+}
+.token__trades {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  background: var(--xp-sunken);
+}
+.token__trades th,
+.token__trades td {
+  text-align: left;
+  padding: 3px 5px;
+  border-bottom: 1px solid var(--xp-face-dim);
+}
+.tone-ok {
+  color: #1e7d32;
+  font-weight: 700;
+}
+.tone-bad {
+  color: var(--bad);
+  font-weight: 700;
+}
+.token__holders {
+  margin: 0;
+  padding-left: 22px;
+  font-size: 12px;
 }

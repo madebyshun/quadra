@@ -59,8 +59,8 @@
  * ── 🔴 `value` and `to` come off the live 402, never from here ────────────────
  * This module takes them as arguments and asserts nothing about where they came
  * from, because it cannot. The rule lives with the caller: the router reads `payTo`
- * and the amount out of the 402 response it is answering, and
- * `BLUEAGENT.knownPayTo` in `config/upstream.ts` exists **only to assert against** —
+ * and the amount out of the 402 response it is answering, and the payee pinned
+ * per origin in `config/payees.ts` exists **only to assert against** —
  * a constant used as the destination is a constant that keeps paying the old payee
  * after upstream moves.
  *
@@ -291,6 +291,30 @@ export const DEFAULT_AUTHORIZATION_SECONDS = 600n;
 
 /** The cap. Past this it stops being a payment and becomes a standing permission. */
 export const MAX_AUTHORIZATION_SECONDS = 3600n;
+
+/**
+ * Slack added to the window a payee asks for, so its own deadline fits inside ours.
+ *
+ * 🔴 **Signing a window exactly equal to the advertised `maxTimeoutSeconds` leaves the
+ * payee none of it.** The number upstream sends means "I may need up to this long to
+ * settle", measured from the moment it *receives* the payment — but `validBefore` is
+ * measured from the moment this browser *signs* it, and between those two instants sits
+ * a POST, a facilitator, and a block. A window of exactly 120 seconds gives a payee that
+ * asked for 120 whatever is left after the round trip, so the last requests before
+ * expiry fail intermittently and look like a flaky endpoint rather than a clock problem.
+ *
+ * MEASURED 2026-09-28, from the only client of this payee that has actually been paid
+ * (`apps/hub/HubView.tsx` in the upstream repo, read for its wire format): it signs
+ * `now + maxTimeoutSeconds + 60`, and its own comment gives this reason plus clock skew
+ * against a facilitator neither side runs. Sixty seconds is copied from a working
+ * implementation rather than picked, which is the only reason it is a number and not a
+ * question.
+ *
+ * ⚠️ It widens a bearer instrument, so it is bounded like one: the **signed** total is
+ * what `MAX_AUTHORIZATION_SECONDS` caps, never the asked figure. Capping the ask would
+ * let a payee asking for exactly the maximum receive a signature above it.
+ */
+export const SETTLEMENT_SLACK_SECONDS = 60n;
 
 /**
  * The `validAfter` / `validBefore` pair for an authorization signed now.

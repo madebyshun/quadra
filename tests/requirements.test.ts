@@ -12,6 +12,7 @@ import {
   authorizationDigest,
   encodeAuthorization,
   MAX_AUTHORIZATION_SECONDS,
+  SETTLEMENT_SLACK_SECONDS,
   USDC_DOMAIN,
 } from "@/lib/eip712";
 import { BASE, USDC } from "@/config/chain";
@@ -64,7 +65,31 @@ function withEnvelope(patch: Record<string, unknown>): unknown {
   return { ...LIVE, ...patch };
 }
 
-const checked = () => checkRequirements("token-price", LIVE);
+const checked = () => checkRequirements("token-price", BLUEAGENT.origin, LIVE);
+
+describe("what is kept for the payment header", () => {
+  /** Echoed verbatim — see `PaymentRequirements.accepted` for why rebuilding it breaks payments. */
+  it("keeps the chosen entry itself, extra fields and all", () => {
+    const extraFields = { ...LIVE.accepts[0], currency: LIVE.accepts[0].asset, extra: { name: "USD Coin", version: "2", credentialTypes: ["authorization"] } };
+    const r = checkRequirements("block-number", BLUEAGENT.origin, withEnvelope({ accepts: [extraFields] }));
+    expect(r.accepted).toBe(extraFields);
+    expect(r.passedOver).toBe(0);
+  });
+
+  it("keeps the 402's resource block, and nothing when it is absent or not an object", () => {
+    expect(checked().resource).toBe(LIVE.resource);
+    expect(checkRequirements("t", BLUEAGENT.origin, withEnvelope({ resource: undefined })).resource).toBeNull();
+    expect(checkRequirements("t", BLUEAGENT.origin, withEnvelope({ resource: ["x"] })).resource).toBeNull();
+    expect(checkRequirements("t", BLUEAGENT.origin, withEnvelope({ resource: null })).resource).toBeNull();
+  });
+
+  /** The x402 window passes a lookup that also knows the payees its user confirmed. */
+  it("asks the lookup it is given, not only the built-in pins", () => {
+    const origin = "https://elsewhere.example";
+    const r = checkRequirements("t", origin, LIVE, (o) => (o === origin ? BLUEAGENT.knownPayTo : null));
+    expect(r.payee.kind).toBe("known");
+  });
+});
 
 /** A signer address. An EIP-55 vector, so it is checksummed rather than merely well-shaped. */
 const FROM = "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed";
@@ -91,14 +116,19 @@ describe("reading the live 402", () => {
   });
 
   it("carries the tool id it was asked about, so a refusal can name it", () => {
-    expect(checkRequirements("wallet-risk", withAccept({ amount: "50000" })).toolId).toBe(
+    expect(checkRequirements("wallet-risk", BLUEAGENT.origin, withAccept({ amount: "50000" })).toolId).toBe(
       "wallet-risk",
     );
   });
 
   it("reads the settlement window upstream asks for rather than defaulting one", () => {
     // 120, not the 600 `DEFAULT_AUTHORIZATION_SECONDS` guesses. See the header.
-    expect(checked().lifetimeSeconds).toBe(120n);
+    expect(checked().askedSeconds).toBe(120n);
+  });
+
+  it("signs a window past the ask, wide enough for a facilitator to settle", () => {
+    // 120 + SETTLEMENT_SLACK_SECONDS (60). See the header on `assertWindow`.
+    expect(checked().lifetimeSeconds).toBe(180n);
   });
 
   it("recognises the payee", () => {
@@ -106,15 +136,15 @@ describe("reading the live 402", () => {
   });
 
   it("reads the other two measured prices too", () => {
-    expect(checkRequirements("wallet-risk", withAccept({ amount: "50000" })).value).toBe(50_000n);
-    expect(checkRequirements("blue-audit", withAccept({ amount: "1000000" })).value).toBe(
+    expect(checkRequirements("wallet-risk", BLUEAGENT.origin, withAccept({ amount: "50000" })).value).toBe(50_000n);
+    expect(checkRequirements("blue-audit", BLUEAGENT.origin, withAccept({ amount: "1000000" })).value).toBe(
       1_000_000n,
     );
   });
 
   it("refuses a body that is not an object at all", () => {
     for (const body of [null, "402", 7, [LIVE]]) {
-      expect(() => checkRequirements("token-price", body)).toThrow(/not a JSON object/);
+      expect(() => checkRequirements("token-price", BLUEAGENT.origin, body)).toThrow(/not a JSON object/);
     }
   });
 });
@@ -126,18 +156,18 @@ describe("the envelope version", () => {
   });
 
   it("refuses a version it has never read, naming both", () => {
-    expect(() => checkRequirements("token-price", withEnvelope({ x402Version: 3 }))).toThrow(
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withEnvelope({ x402Version: 3 }))).toThrow(
       /x402 version 3, and this build reads version 2/,
     );
   });
 
   it("refuses a missing version rather than assuming the one it knows", () => {
     const { x402Version: _dropped, ...rest } = LIVE;
-    expect(() => checkRequirements("token-price", rest)).toThrow(/x402 version undefined/);
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, rest)).toThrow(/x402 version undefined/);
   });
 
   it("refuses a version sent as a string, because 2 and \"2\" are different claims", () => {
-    expect(() => checkRequirements("token-price", withEnvelope({ x402Version: "2" }))).toThrow(
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withEnvelope({ x402Version: "2" }))).toThrow(
       /x402 version "2"/,
     );
   });
@@ -150,14 +180,14 @@ describe("the envelope version", () => {
       x402Version: 99,
       accepts: [{ ...LIVE.accepts[0], network: "eip155:1" }],
     };
-    expect(() => checkRequirements("token-price", body)).toThrow(/x402 version 99/);
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, body)).toThrow(/x402 version 99/);
   });
 });
 
 describe("choosing how to pay", () => {
   it("refuses a 402 that names no way to pay it", () => {
     for (const accepts of [[], undefined, "exact", {}]) {
-      expect(() => checkRequirements("token-price", withEnvelope({ accepts }))).toThrow(
+      expect(() => checkRequirements("token-price", BLUEAGENT.origin, withEnvelope({ accepts }))).toThrow(
         /named no way to pay it/,
       );
     }
@@ -166,19 +196,86 @@ describe("choosing how to pay", () => {
   it("⚠️ refuses to choose when upstream offers more than one, and says how many", () => {
     const second = { ...LIVE.accepts[0], amount: "20000" };
     expect(() =>
-      checkRequirements("token-price", withEnvelope({ accepts: [LIVE.accepts[0], second] })),
+      checkRequirements("token-price", BLUEAGENT.origin, withEnvelope({ accepts: [LIVE.accepts[0], second] })),
     ).toThrow(/offered 2 ways to pay/);
   });
 
-  it("does not silently take the first of several even when the first is fine", () => {
+  /**
+   * MEASURED 2026-09-29 from x402.ottoai.services (listed on Coinbase's Bazaar), with the
+   * payee swapped for BlueAgent's so the pin applies: exact/EIP-3009 on Base, exact/permit2
+   * on Base, exact on Solana. The real ecosystem offers several; the old "exactly one" rule
+   * refused this whole server.
+   */
+  const OTTO_SHAPE = [
+    { ...LIVE.accepts[0], amount: "1000", maxTimeoutSeconds: 300 },
+    {
+      ...LIVE.accepts[0],
+      amount: "1000",
+      maxTimeoutSeconds: 300,
+      extra: { name: "USD Coin", version: "2", assetTransferMethod: "permit2" },
+    },
+    {
+      scheme: "exact",
+      network: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+      amount: "1000",
+      asset: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      payTo: "6XcSfqJHr9vNW2vbiRaMqUYVm7shDgLepca54wUTDPN5",
+      maxTimeoutSeconds: 300,
+      extra: { feePayer: "D6ZhtNQ5nT9ZnTHUbqXZsTx5MH2rPFiBBggX4hY1WePM" },
+    },
+  ];
+
+  it("takes the one offer this build can sign, and counts the ones it passed over", () => {
+    const r = checkRequirements("crypto-news", BLUEAGENT.origin, withEnvelope({ accepts: OTTO_SHAPE }));
+    expect(r.value).toBe(1000n);
+    expect(r.passedOver).toBe(2);
+    expect(r.accepted).toBe(OTTO_SHAPE[0]);
+  });
+
+  /** Position is not the rule: the signable entry wins wherever it sits, junk before it included. */
+  it("finds the signable offer wherever it is in the list, not by taking the first", () => {
+    const shuffled = [OTTO_SHAPE[2], { junk: 1 }, OTTO_SHAPE[1], OTTO_SHAPE[0]];
+    const r = checkRequirements("crypto-news", BLUEAGENT.origin, withEnvelope({ accepts: shuffled }));
+    expect(r.accepted).toBe(OTTO_SHAPE[0]);
+    expect(r.passedOver).toBe(3);
+  });
+
+  it("refuses when several are offered and none can be signed, naming what was offered", () => {
+    expect(() =>
+      checkRequirements(
+        "crypto-news", BLUEAGENT.origin,
+        withEnvelope({ accepts: [OTTO_SHAPE[1], OTTO_SHAPE[2], null, { scheme: 7 }] }),
+      ),
+    ).toThrow(/offered 4 ways to pay and this build can sign none of them.*exact on eip155:8453, exact on solana:.*\? on \?, \? on \?/);
+  });
+
+  it("does not silently take the first of two it COULD sign", () => {
     // The first entry is the verbatim live one. Accepting it would be the bug.
     expect(() =>
-      checkRequirements("token-price", withEnvelope({ accepts: [LIVE.accepts[0], { junk: 1 }] })),
-    ).toThrow(/will not choose between them for you/);
+      checkRequirements(
+        "token-price", BLUEAGENT.origin,
+        withEnvelope({ accepts: [LIVE.accepts[0], { ...LIVE.accepts[0], payTo: "0x1111111111111111111111111111111111111111" }] }),
+      ),
+    ).toThrow(/2 ways to pay that this build could sign.*will not choose between them for you/);
+  });
+
+  /** A lone permit2 entry goes through the field checks, so the refusal names the method. */
+  it("refuses a single permit2 offer by name rather than signing EIP-3009 against it", () => {
+    expect(() => checkRequirements("crypto-news", BLUEAGENT.origin, withEnvelope({ accepts: [OTTO_SHAPE[1]] }))).toThrow(
+      /through "permit2".*signs only EIP-3009/,
+    );
+  });
+
+  it("accepts an explicit eip3009 method as the same as saying nothing", () => {
+    const r = checkRequirements(
+      "token-price", BLUEAGENT.origin,
+      withAccept({ extra: { name: "USD Coin", version: "2", assetTransferMethod: "eip3009" } }),
+    );
+    expect(r.value).toBe(10_000n);
   });
 
   it("refuses a requirement that is not an object", () => {
-    expect(() => checkRequirements("token-price", withEnvelope({ accepts: [null] }))).toThrow(
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withEnvelope({ accepts: [null] }))).toThrow(
       /not a JSON object/,
     );
   });
@@ -191,19 +288,19 @@ describe("the settlement scheme", () => {
   });
 
   it("🔴 refuses any other scheme, because the same signature would mean something else", () => {
-    expect(() => checkRequirements("token-price", withAccept({ scheme: "upto" }))).toThrow(
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ scheme: "upto" }))).toThrow(
       /"upto" scheme, and this build only signs "exact"/,
     );
   });
 
   it("refuses a missing scheme", () => {
-    expect(() => checkRequirements("token-price", withAccept({ scheme: undefined }))).toThrow(
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ scheme: undefined }))).toThrow(
       /no payment scheme/,
     );
   });
 
   it("refuses an empty scheme, which is not the same as `exact`", () => {
-    expect(() => checkRequirements("token-price", withAccept({ scheme: "" }))).toThrow(
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ scheme: "" }))).toThrow(
       /no payment scheme/,
     );
   });
@@ -216,13 +313,13 @@ describe("the chain", () => {
   });
 
   it("🔴 refuses another chain, naming it", () => {
-    expect(() => checkRequirements("token-price", withAccept({ network: "eip155:1" }))).toThrow(
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ network: "eip155:1" }))).toThrow(
       /payment on chain 1, and this build signs only for Base \(8453\)/,
     );
   });
 
   it("refuses a bare chain id rather than guessing it means eip155", () => {
-    expect(() => checkRequirements("token-price", withAccept({ network: "8453" }))).toThrow(
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ network: "8453" }))).toThrow(
       /not the CAIP-2 form/,
     );
   });
@@ -230,26 +327,26 @@ describe("the chain", () => {
   it("refuses a friendly chain name, even the right one", () => {
     // "base" is unambiguous to a human and is not a chain id. A lenient parse here
     // would be a guess about the one field that prevents cross-chain replay.
-    expect(() => checkRequirements("token-price", withAccept({ network: "base" }))).toThrow(
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ network: "base" }))).toThrow(
       /not the CAIP-2 form/,
     );
   });
 
   it("refuses a namespace that is not eip155", () => {
     expect(() =>
-      checkRequirements("token-price", withAccept({ network: "solana:8453" })),
+      checkRequirements("token-price", BLUEAGENT.origin, withAccept({ network: "solana:8453" })),
     ).toThrow(/not the CAIP-2 form/);
   });
 
   it("refuses a missing network", () => {
-    expect(() => checkRequirements("token-price", withAccept({ network: undefined }))).toThrow(
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ network: undefined }))).toThrow(
       /no network/,
     );
   });
 
   it("refuses a chain id with anything around it", () => {
     for (const network of ["eip155:8453 ", " eip155:8453", "eip155:8453:1", "eip155:"]) {
-      expect(() => checkRequirements("token-price", withAccept({ network }))).toThrow(
+      expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ network }))).toThrow(
         /not the CAIP-2 form/,
       );
     }
@@ -265,14 +362,14 @@ describe("the asset", () => {
     // The constant is the check; a cosmetic case change upstream is not a typo, and
     // refusing it would reject the right token for the wrong reason. See `assertAsset`.
     for (const asset of [USDC.address.toLowerCase(), USDC.address.toUpperCase().replace("0X", "0x")]) {
-      expect(checkRequirements("token-price", withAccept({ asset })).asset).toBe(USDC);
+      expect(checkRequirements("token-price", BLUEAGENT.origin, withAccept({ asset })).asset).toBe(USDC);
     }
   });
 
   it("🔴 refuses an asset whose decimals nothing here has verified", () => {
     expect(() =>
       checkRequirements(
-        "token-price",
+        "token-price", BLUEAGENT.origin,
         withAccept({ asset: "0x4200000000000000000000000000000000000006" }),
       ),
     ).toThrow(/nothing to divide by/);
@@ -280,18 +377,18 @@ describe("the asset", () => {
 
   it("names the one asset it does know, so the refusal is actionable", () => {
     expect(() =>
-      checkRequirements("token-price", withAccept({ asset: "0x" + "11".repeat(20) })),
+      checkRequirements("token-price", BLUEAGENT.origin, withAccept({ asset: "0x" + "11".repeat(20) })),
     ).toThrow(new RegExp(`USDC at ${USDC.address}`));
   });
 
   it("refuses a missing asset", () => {
-    expect(() => checkRequirements("token-price", withAccept({ asset: undefined }))).toThrow(
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ asset: undefined }))).toThrow(
       /no asset address/,
     );
   });
 
   it("refuses something that is not an address, rather than answering \"different asset\"", () => {
-    expect(() => checkRequirements("token-price", withAccept({ asset: "USDC" }))).toThrow();
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ asset: "USDC" }))).toThrow();
   });
 });
 
@@ -307,34 +404,34 @@ describe("the EIP-712 domain", () => {
 
   it("🔴 refuses a different version, because a deployed token's domain cannot change", () => {
     expect(() =>
-      checkRequirements("token-price", withAccept({ extra: { name: "USD Coin", version: "3" } })),
+      checkRequirements("token-price", BLUEAGENT.origin, withAccept({ extra: { name: "USD Coin", version: "3" } })),
     ).toThrow(/domain "USD Coin" version "3"/);
   });
 
   it("refuses a different name", () => {
     expect(() =>
-      checkRequirements("token-price", withAccept({ extra: { name: "USDC", version: "2" } })),
+      checkRequirements("token-price", BLUEAGENT.origin, withAccept({ extra: { name: "USDC", version: "2" } })),
     ).toThrow(/domain "USDC" version "2"/);
   });
 
   it("names what it expected, so a stale config can be told from a wrong upstream", () => {
     expect(() =>
-      checkRequirements("token-price", withAccept({ extra: { name: "USDC", version: "2" } })),
+      checkRequirements("token-price", BLUEAGENT.origin, withAccept({ extra: { name: "USDC", version: "2" } })),
     ).toThrow(/this build has "USD Coin" version "2" verified/);
   });
 
   it("refuses a missing extra block", () => {
-    expect(() => checkRequirements("token-price", withAccept({ extra: undefined }))).toThrow(
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ extra: undefined }))).toThrow(
       /EIP-712 domain fields that is not a JSON object/,
     );
   });
 
   it("refuses a missing name or version", () => {
     expect(() =>
-      checkRequirements("token-price", withAccept({ extra: { version: "2" } })),
+      checkRequirements("token-price", BLUEAGENT.origin, withAccept({ extra: { version: "2" } })),
     ).toThrow(/no EIP-712 domain name/);
     expect(() =>
-      checkRequirements("token-price", withAccept({ extra: { name: "USD Coin" } })),
+      checkRequirements("token-price", BLUEAGENT.origin, withAccept({ extra: { name: "USD Coin" } })),
     ).toThrow(/no EIP-712 domain version/);
   });
 });
@@ -342,32 +439,32 @@ describe("the EIP-712 domain", () => {
 describe("the amount", () => {
   it("refuses anything that is not a whole number of base units", () => {
     for (const amount of ["1e4", " 10000", "10000 ", "0.01", "-10000", "10_000", ""]) {
-      expect(() => checkRequirements("token-price", withAccept({ amount }))).toThrow();
+      expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ amount }))).toThrow();
     }
   });
 
   it("refuses a number, because upstream sends a string and a float would round", () => {
-    expect(() => checkRequirements("token-price", withAccept({ amount: 10_000 }))).toThrow(
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ amount: 10_000 }))).toThrow(
       /no amount/,
     );
   });
 
   it("🔴 refuses a price of zero rather than treating it as free", () => {
-    expect(() => checkRequirements("token-price", withAccept({ amount: "0" }))).toThrow(
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ amount: "0" }))).toThrow(
       /spend gas to move no money/,
     );
   });
 
   it("accepts exactly the cap", () => {
     expect(
-      checkRequirements("token-price", withAccept({ amount: `${MAX_TOOL_PRICE_BASE_UNITS}` }))
+      checkRequirements("token-price", BLUEAGENT.origin, withAccept({ amount: `${MAX_TOOL_PRICE_BASE_UNITS}` }))
         .value,
     ).toBe(MAX_TOOL_PRICE_BASE_UNITS);
   });
 
   it("🔴 refuses one base unit over the cap, and does not reduce it to fit", () => {
     expect(() =>
-      checkRequirements("token-price", withAccept({ amount: `${MAX_TOOL_PRICE_BASE_UNITS + 1n}` })),
+      checkRequirements("token-price", BLUEAGENT.origin, withAccept({ amount: `${MAX_TOOL_PRICE_BASE_UNITS + 1n}` })),
     ).toThrow(/Nothing was reduced to fit/);
   });
 
@@ -378,7 +475,7 @@ describe("the amount", () => {
 
   it("names the asset in the refusal, so 5000000 is not read as dollars", () => {
     expect(() =>
-      checkRequirements("token-price", withAccept({ amount: "9999999999" })),
+      checkRequirements("token-price", BLUEAGENT.origin, withAccept({ amount: "9999999999" })),
     ).toThrow(/base units of USDC/);
   });
 });
@@ -386,27 +483,26 @@ describe("the amount", () => {
 describe("the settlement window", () => {
   it("refuses a window that is not a whole number of seconds", () => {
     for (const maxTimeoutSeconds of [undefined, "120", 120.5, 0, -120, Number.NaN, Infinity]) {
-      expect(() => checkRequirements("token-price", withAccept({ maxTimeoutSeconds }))).toThrow(
+      expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ maxTimeoutSeconds }))).toThrow(
         /not a whole number of seconds/,
       );
     }
   });
 
-  it("accepts exactly the cap", () => {
+  it("accepts an ask that lands exactly on the cap once slack is added", () => {
+    const askedSeconds = MAX_AUTHORIZATION_SECONDS - SETTLEMENT_SLACK_SECONDS;
     expect(
       checkRequirements(
-        "token-price",
-        withAccept({ maxTimeoutSeconds: Number(MAX_AUTHORIZATION_SECONDS) }),
+        "token-price", BLUEAGENT.origin,
+        withAccept({ maxTimeoutSeconds: Number(askedSeconds) }),
       ).lifetimeSeconds,
     ).toBe(MAX_AUTHORIZATION_SECONDS);
   });
 
-  it("🔴 refuses a longer window with the bearer-instrument reason", () => {
+  it("🔴 refuses an ask whose signed window lands past the cap", () => {
+    const askedSeconds = MAX_AUTHORIZATION_SECONDS - SETTLEMENT_SLACK_SECONDS + 1n;
     expect(() =>
-      checkRequirements(
-        "token-price",
-        withAccept({ maxTimeoutSeconds: Number(MAX_AUTHORIZATION_SECONDS) + 1 }),
-      ),
+      checkRequirements("token-price", BLUEAGENT.origin, withAccept({ maxTimeoutSeconds: Number(askedSeconds) })),
     ).toThrow(/standing withdrawal permission rather than a payment/);
   });
 
@@ -414,7 +510,7 @@ describe("the settlement window", () => {
     // Clamping would sign a window that expires before upstream can settle, which
     // then reads as a bug in this app rather than as upstream asking for too much.
     expect(() =>
-      checkRequirements("token-price", withAccept({ maxTimeoutSeconds: 86_400 })),
+      checkRequirements("token-price", BLUEAGENT.origin, withAccept({ maxTimeoutSeconds: 86_400 })),
     ).toThrow();
   });
 });
@@ -422,12 +518,12 @@ describe("the settlement window", () => {
 describe("the payee", () => {
   it("matches the known payee in any capitalisation", () => {
     const upper = `0x${BLUEAGENT.knownPayTo.slice(2).toUpperCase()}`;
-    expect(checkRequirements("token-price", withAccept({ payTo: upper })).payee.kind).toBe("known");
+    expect(checkRequirements("token-price", BLUEAGENT.origin, withAccept({ payTo: upper })).payee.kind).toBe("known");
   });
 
   it("⚠️ carries an unrecognised payee as a value, so the price still reads", () => {
     const other = "0x1111111111111111111111111111111111111111";
-    const requirements = checkRequirements("token-price", withAccept({ payTo: other }));
+    const requirements = checkRequirements("token-price", BLUEAGENT.origin, withAccept({ payTo: other }));
     expect(requirements.payee.kind).toBe("unrecognised");
     // Everything else parsed, which is the point: this is readable, just not signable.
     expect(requirements.value).toBe(10_000n);
@@ -436,26 +532,47 @@ describe("the payee", () => {
 
   it("names both addresses, so a rotation can be told from a stale constant", () => {
     const other = "0x1111111111111111111111111111111111111111";
-    const { payee } = checkRequirements("token-price", withAccept({ payTo: other }));
+    const { payee } = checkRequirements("token-price", BLUEAGENT.origin, withAccept({ payTo: other }));
     expect(payee.kind === "unrecognised" && payee.why).toContain(other);
     expect(payee.kind === "unrecognised" && payee.why).toContain(BLUEAGENT.knownPayTo);
   });
 
+  /**
+   * The pin belongs to the ORIGIN that sent the 402, not to the payee address or to a
+   * directory name. The same payee, answered from a different origin, is not "known":
+   * this build has no record of who that origin is paid to. That is the property that
+   * lets the checker serve any x402 endpoint without trusting any of them by default.
+   */
+  it("calls a payee unpinned when its origin has no pin, even if the address is familiar", () => {
+    const { payee } = checkRequirements("token-price", "https://elsewhere.example", LIVE);
+    expect(payee.kind).toBe("unpinned");
+    expect(payee.kind === "unpinned" && payee.why).toContain("https://elsewhere.example");
+    expect(payee.kind === "unpinned" && payee.why).toContain(BLUEAGENT.knownPayTo);
+  });
+
+  it("names the pinned payee's origin when the address has changed", () => {
+    const { payee } = checkRequirements(
+      "token-price", BLUEAGENT.origin,
+      withAccept({ payTo: "0x1111111111111111111111111111111111111111" }),
+    );
+    expect(payee.kind === "unrecognised" && payee.why).toContain(BLUEAGENT.origin);
+  });
+
   it("refuses a missing payee", () => {
-    expect(() => checkRequirements("token-price", withAccept({ payTo: undefined }))).toThrow(
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ payTo: undefined }))).toThrow(
       /no payee/,
     );
   });
 
   it("refuses a malformed payee rather than calling it unrecognised", () => {
     // "not an address" and "a different account" must not look the same here.
-    expect(() => checkRequirements("token-price", withAccept({ payTo: "0xdeadbeef" }))).toThrow();
+    expect(() => checkRequirements("token-price", BLUEAGENT.origin, withAccept({ payTo: "0xdeadbeef" }))).toThrow();
   });
 
   it("is classified last, so a wrong chain is reported ahead of a rotation", () => {
     expect(() =>
       checkRequirements(
-        "token-price",
+        "token-price", BLUEAGENT.origin,
         withAccept({ payTo: "0x1111111111111111111111111111111111111111", network: "eip155:1" }),
       ),
     ).toThrow(/payment on chain 1/);
@@ -469,12 +586,25 @@ describe("whether it will be signed", () => {
 
   it("refuses an unrecognised payee with the payee's own reason", () => {
     const requirements = checkRequirements(
-      "token-price",
+      "token-price", BLUEAGENT.origin,
       withAccept({ payTo: "0x1111111111111111111111111111111111111111" }),
     );
     expect(whyNotSign(requirements)).toBe(
       requirements.payee.kind === "unrecognised" ? requirements.payee.why : null,
     );
+  });
+});
+
+describe("an origin nobody pinned", () => {
+  const unpinned = () => checkRequirements("token-price", "https://elsewhere.example", LIVE);
+
+  it("reads the price but will not sign it", () => {
+    expect(unpinned().value).toBe(10_000n);
+    expect(whyNotSign(unpinned())).toMatch(/no record of who https:\/\/elsewhere\.example gets paid to/);
+  });
+
+  it("refuses to build an authorization for it at all", () => {
+    expect(() => authorizationFor(unpinned(), FROM, NOW, NONCE)).toThrow(/Nothing was signed/);
   });
 });
 
@@ -492,8 +622,8 @@ describe("the authorization and the digest", () => {
     expect(signable().authorization.validAfter).toBe(0n);
   });
 
-  it("closes the window at upstream's own maxTimeoutSeconds past now", () => {
-    expect(signable().authorization.validBefore).toBe(NOW + 120n);
+  it("closes the window past upstream's own maxTimeoutSeconds, with slack added", () => {
+    expect(signable().authorization.validBefore).toBe(NOW + 120n + SETTLEMENT_SLACK_SECONDS);
   });
 
   it("uses the nonce it was given", () => {
@@ -530,7 +660,7 @@ describe("the authorization and the digest", () => {
 
   it("🔴 refuses to sign to an unrecognised payee even when asked directly", () => {
     const requirements = checkRequirements(
-      "token-price",
+      "token-price", BLUEAGENT.origin,
       withAccept({ payTo: "0x1111111111111111111111111111111111111111" }),
     );
     expect(() => authorizationFor(requirements, FROM, NOW, NONCE)).toThrow(/Nothing was signed/);

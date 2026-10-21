@@ -1,0 +1,77 @@
+{
+ "tokens": [
+  {
+   "contract_address": "0xb200000000000000000000C2e324d24d7eEcd1fb",
+   "symbol": "AAPLc",
+   "name": "Apple Inc.",
+   "decimals": 8,
+   "icon_url": "https://metadata.coinbase.com/equity_icons/873819f4b14efe44b94abecbc8e8864d2998163abd0ca55b449ee6eb07d0d94c.png",
+   "total_supply": 7676.33367346,
+   "isin": "US0378331005",
+   "multiplier": 1,
+   "nav_price": 338.845,
+   "nav_price_updated_at": "2026-09-30T14:39:01Z"
+  },
+  {
+   "contract_address": "0xB2000000000000000000000d8ce462E99ee7A47B",
+   "symbol": "AMDc",
+   "name": "Advanced Micro Devices, Inc.",
+   "decimals": 8,
+   "icon_url": "https://metadata.coinbase.com/equity_icons/15a01962474463e33042583faa6ddaa2ca493101d56d49337b8f7530ecf10a50.png",
+   "total_supply": 47,
+   "isin": "US0079031078",
+   "multiplier": 1
+  },
+  {
+   "contract_address": "0xb2000000000000000000009b870441031d4d8a41",
+   "symbol": "DKNGc",
+   "name": "DraftKings Inc.",
+   "decimals": 8,
+   "icon_url": "https://metadata.coinbase.com/equity_icons/be55bff30474ca82127ed1ee1e414453e5b70566e96444b49287b7935df0c147.png",
+   "total_supply": 0.01290309,
+   "isin": "US26142V1052",
+   "multiplier": 1,
+   "paused_features": [
+    0,
+    1,
+    2
+   ]
+  },
+  {
+   "contract_address": "0xb2000000000000000000002D0BA3164cc74f58B7",
+   "symbol": "GOOGLc",
+   "name": "Alphabet Inc.",
+   "decimals": 8,
+   "icon_url": "https://metadata.coinbase.com/equity_icons/0e80e31df40f7c42b49a3c7f6d23c6351625d73f235aeb69006ddee9221702b0.png",
+   "total_supply": 8176.02770147,
+   "isin": "US02079K3059",
+   "multiplier": 1.0003771186767842,
+   "nav_price": 348.35132026,
+   "nav_price_updated_at": "2026-09-30T14:44:15Z"
+  },
+  {
+   "contract_address": "0xb20000000000000000000078ee7ce2fE4908108C",
+   "symbol": "NVDAc",
+   "name": "NVIDIA Corporation",
+   "decimals": 8,
+   "icon_url": "https://metadata.coinbase.com/equity_icons/1fee9b7a44e800d438dd9d96c3283e05784c925c2c871a48ff735950740b551a.png",
+   "total_supply": 18732.02269708,
+   "isin": "US67066G1040",
+   "multiplier": 1,
+   "nav_price": 231.284,
+   "nav_price_updated_at": "2026-09-30T14:22:03Z"
+  },
+  {
+   "contract_address": "0xb2000000000000000000001e800a7f5189430cD0",
+   "symbol": "TSLAc",
+   "name": "Tesla Inc.",
+   "decimals": 8,
+   "icon_url": "https://metadata.coinbase.com/equity_icons/a3b67028295d0e9fa3182c867b8a9afed5ebcbd8c012de3a46e160ae5e490980.png",
+   "total_supply": 4727.02212741,
+   "isin": "US88160R1014",
+   "multiplier": 1,
+   "nav_price": 349.621,
+   "nav_price_updated_at": "2026-09-30T14:06:19Z"
+  }
+ ]
+}

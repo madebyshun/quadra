@@ -1,23 +1,47 @@
-import { describe, it, expect } from "vitest";
-import { FEATURES, VISIBLE_FEATURES, resolveFeature, isEnabled } from "@/features/registry";
+import { describe, it, expect, vi } from "vitest";
+import { CORNER, FEATURES, comingSoon, desktopFeatures, visibleFeatures, resolveFeature, isEnabled } from "@/features/registry";
 import { FLAGS } from "@/config/chain";
+
+const flags = vi.hoisted(() => ({ robinhood: false, allOn: false }));
+vi.mock("@/config/chain", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/config/chain")>();
+  return { ...real, FLAGS: new Proxy(real.FLAGS, { get: (t, k) => (flags.allOn ? true : k === "robinhood" ? flags.robinhood : t[k as keyof typeof t]) }) };
+});
 
 /**
  * Feature ids are permanent: they are the `?do=` in every link anyone saved.
  * The list below is pinned literally so that renaming an id fails here instead
  * of silently 404-ing a link that is already out in the world.
+ *
+ * One id was dropped on 2026-09-30: `router`, the private-balance agent payer, archived
+ * with the privacy model. That was only acceptable because nothing is public yet — no
+ * link to it exists outside this repo. Once the site is live, an id is removed by
+ * redirecting it, never by deleting it.
  */
 const SHIPPED_IDS = [
-  "swap",
-  "inference",
-  "router",
+  "wallet",
+  "terminal",
+  "research",
+  "safety",
+  "markets",
+  "trade",
   "send",
-  "mcp",
+  "swap",
   "bridge",
   "launch",
+  "coins",
+  "profile",
+  "taskmgr",
+  "rugsweeper",
+  "achievements",
+  "leaderboard",
+  "x402",
+  "mcp",
+  "inference",
   "audit",
   "hooks",
-  "x402",
+  "soon",
+  "trash",
 ] as const;
 
 describe("the feature registry", () => {
@@ -85,18 +109,64 @@ describe("resolveFeature", () => {
 describe("isEnabled", () => {
   it("reads the flag table, not a field on the feature", () => {
     for (const f of FEATURES) {
-      expect(isEnabled(f), f.id).toBe(FLAGS[f.flag]);
+      expect(isEnabled(f), f.id).toBe(FLAGS[f.flag] && (f.id !== "bridge" || FLAGS.robinhood));
     }
   });
 
-  it("reports the two unbuilt features as off", () => {
+  /**
+   * `audit` and `hooks` went off on 2026-09-29 as off-thesis. On 2026-09-30 `launch` came
+   * back on (it goes out in public through o1) and `inference` went off — it is a stub
+   * with no enclave behind it, and an on-chain supercomputer does not need one to start.
+   * Pinned as a list so turning one back on is a visible decision rather than a flag
+   * nobody noticed flipping.
+   */
+  it("reports the switched-off features as off", () => {
     const off = FEATURES.filter((f) => !isEnabled(f)).map((f) => f.id);
-    expect(off).toEqual(["bridge", "launch"]);
+    // bridge: on its own flag, but its only destination is Robinhood Chain, hidden 2026-10-02
+    expect(off).toEqual(["bridge", "inference", "audit", "hooks"]);
+  });
+
+  it("no longer resolves the archived router id", () => {
+    expect(resolveFeature("router")).toBeNull();
   });
 });
 
-describe("VISIBLE_FEATURES", () => {
-  it("shows off features too, rather than hiding them", () => {
-    expect(VISIBLE_FEATURES).toHaveLength(FEATURES.length);
+describe("visibleFeatures", () => {
+  it("shows off features too, rather than hiding them — all but Robinhood Chain's", () => {
+    expect(visibleFeatures().map((f) => f.id)).toEqual(FEATURES.map((f) => f.id).filter((id) => id !== "bridge"));
+    expect(resolveFeature("bridge")?.robinhood).toBe(true);
+  });
+
+  it("brings Bridge back, on, the day Robinhood Chain is switched on", () => {
+    flags.robinhood = true;
+    expect(visibleFeatures()).toHaveLength(FEATURES.length);
+    expect(isEnabled(resolveFeature("bridge")!)).toBe(true);
+    flags.robinhood = false;
+  });
+});
+
+describe("the desktop's icons (2026-10-14)", () => {
+  it("puts the switched-off programs in Coming Soon, not on the desktop", () => {
+    expect(comingSoon().map((f) => f.id)).toEqual(["inference", "audit", "hooks"]);
+    const desk = desktopFeatures().map((f) => f.id);
+    for (const id of ["inference", "audit", "hooks", "bridge"]) expect(desk).not.toContain(id);
+    expect(desk).toContain("soon");
+  });
+
+  it("keeps the Recycle Bin in its own corner", () => {
+    expect([...CORNER]).toEqual(["trash"]);
+    expect(desktopFeatures().map((f) => f.id)).not.toContain("trash");
+  });
+
+  it("hides the Coming Soon folder when nothing is waiting in it", () => {
+    flags.allOn = true;
+    try {
+      expect(comingSoon()).toEqual([]);
+      const desk = desktopFeatures().map((f) => f.id);
+      expect(desk).not.toContain("soon");
+      expect(desk).toContain("bridge");
+    } finally {
+      flags.allOn = false;
+    }
   });
 });

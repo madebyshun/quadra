@@ -1,17 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AdaptersProvider, useAdapters } from "@/adapters/AdaptersProvider";
-import { LocalShieldedPool } from "@/adapters/local/pool";
 import { LocalEnclave } from "@/adapters/local/enclave";
 import { LOCAL_TOOLS, LocalCatalog, priceOf } from "@/adapters/local/catalog";
 import { NO_WALLET } from "@/adapters/http/catalog";
 import { BLUEAGENT } from "@/config/upstream";
 import type { Adapters, Model, Quote, Tool } from "@/adapters/types";
 import { notBuiltNotice, UNBUILT, WAITING_ON } from "@/features/FeaturePanel";
-import type { Feature } from "@/features/registry";
-import { Anchor, Attested, Settled } from "@/features/panels/Anchor";
-import { SendPanel } from "@/features/panels/SendPanel";
+import { Attested, Settled } from "@/features/panels/Anchor";
 import { InferencePanel } from "@/features/panels/InferencePanel";
 import { X402Panel } from "@/features/panels/X402Panel";
 import { HooksPanel } from "@/features/panels/HooksPanel";
@@ -19,8 +16,16 @@ import { installLine, McpPanel } from "@/features/panels/McpPanel";
 import { HOOK_PERMISSIONS } from "@/lib/hooks";
 import { MCP_BUILD, MCP_TOOLS, mcpConfigSnippet } from "@/lib/manifest";
 import { checkRequirements } from "@/lib/requirements";
-import { USDC } from "@/config/chain";
+import { WalletProvider } from "@/ui/WalletProvider";
+import { BASE, USDC } from "@/config/chain";
 import { renderAt, settle } from "./helpers";
+
+/** The x402 window's BlueAgent and any-URL halves are HIDDEN in the product (FLAGS.x402Others, 2026-10-02) but kept — and tested here switched on. */
+vi.mock("@/config/chain", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/config/chain")>();
+  return { ...real, FLAGS: { ...real.FLAGS, x402Others: true } };
+});
+
 
 const PAYEE = "0x1111111111111111111111111111111111111111";
 
@@ -29,22 +34,39 @@ const byId = (id: string) => LOCAL_TOOLS.find((t) => t.id === id)!;
 
 function stub(): Adapters {
   return {
-    pool: new LocalShieldedPool(),
     enclave: new LocalEnclave(),
     catalog: new LocalCatalog(),
   };
 }
 
 /**
- * Mount one panel against a fresh pool, the way a window does.
+ * Mount one panel against fresh adapters, the way a window does.
  *
  * Awaits a flush inside `act` because both panels load from their adapter in an
  * effect: without it the resolution lands outside act, React warns, and every
  * assertion races the first paint. Returning a promise makes that unavoidable at
  * the call site rather than something each test must remember.
  */
+/**
+ * The provider stack a panel really sits in, as one value.
+ *
+ * Exported as a function rather than inlined because the `rerender` calls below
+ * have to rebuild the SAME stack — they rebuilt only `AdaptersProvider`, so the
+ * moment a panel started reading the wallet session they threw on the second
+ * render instead of the first, which reads as a re-render bug rather than a
+ * missing provider. `WalletProvider` wraps every panel, not just the ones that
+ * currently need it, because that is what `App.tsx` does.
+ */
+function wrap(node: React.ReactNode, value: Adapters) {
+  return (
+    <AdaptersProvider value={value}>
+      <WalletProvider>{node}</WalletProvider>
+    </AdaptersProvider>
+  );
+}
+
 async function mount(node: React.ReactNode, value: Adapters = stub()) {
-  const rendered = render(<AdaptersProvider value={value}>{node}</AdaptersProvider>);
+  const rendered = render(wrap(node, value));
   await act(async () => {});
   return { ...rendered, adapters: value };
 }
@@ -67,7 +89,7 @@ const amount = (label: string) => screen.getByLabelText(label);
 const out = (label: string) => screen.getByRole("group", { name: label });
 
 describe("AdaptersProvider", () => {
-  it("refuses to hand out a private pool to a component outside it", () => {
+  it("refuses to hand out adapters to a component outside it", () => {
     function Orphan() {
       useAdapters();
       return null;
@@ -84,8 +106,8 @@ describe("AdaptersProvider", () => {
 
   it("builds real adapters when no value is passed", () => {
     function Show() {
-      const { pool, enclave } = useAdapters();
-      return <span>{`${pool.isLive} ${enclave.isLive}`}</span>;
+      const { catalog, enclave } = useAdapters();
+      return <span>{`${catalog.isLive} ${enclave.isLive}`}</span>;
     }
     render(
       <AdaptersProvider>
@@ -95,780 +117,28 @@ describe("AdaptersProvider", () => {
     expect(screen.getByText("false false")).toBeInTheDocument();
   });
 
-  it("keeps one pool across re-renders, so notes are not lost", async () => {
-    const value = stub();
-    const { rerender } = await mount(<SendPanel />, value);
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-    await waitFor(() => expect(screen.getByLabelText(/^Note 0x/)).toBeInTheDocument());
-
-    rerender(
-      <AdaptersProvider value={value}>
-        <SendPanel />
+  /**
+   * The fallback is built once per provider, not once per render. A panel that re-read
+   * the catalog on every render would refetch it on every keystroke.
+   */
+  it("keeps the same adapters across re-renders", () => {
+    const seen: Adapters[] = [];
+    function Record() {
+      seen.push(useAdapters());
+      return null;
+    }
+    const { rerender } = render(
+      <AdaptersProvider>
+        <Record />
       </AdaptersProvider>,
     );
-    await waitFor(() => expect(screen.getByLabelText(/^Note 0x/)).toBeInTheDocument());
-  });
-});
-
-describe("SendPanel: putting money in", () => {
-  it("starts with no notes and says so", async () => {
-    await mount(<SendPanel />);
-    expect(screen.getByText("No notes yet. Put something in above.")).toBeInTheDocument();
-    expect(within(out("Send output")).getByText("// nothing run yet")).toBeInTheDocument();
-  });
-
-  it("disables both spend buttons while there is nothing to spend", async () => {
-    await mount(<SendPanel />);
-    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Withdraw all of it" })).toBeDisabled();
-  });
-
-  it("deposits the typed amount and lists it as a note", async () => {
-    await mount(<SendPanel />);
-    await userEvent.clear(amount("Amount to deposit"));
-    await userEvent.type(amount("Amount to deposit"), "12.5");
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-
-    await waitFor(() => expect(screen.getByText("12.5 USDC")).toBeInTheDocument());
-    expect(within(out("Send output")).getByText(/You put 12.5 USDC in/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
-  });
-
-  it("says the note is the money, because losing it loses the funds", async () => {
-    await mount(<SendPanel />);
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/it is the money/)).toBeInTheDocument(),
+    rerender(
+      <AdaptersProvider>
+        <Record />
+      </AdaptersProvider>,
     );
-  });
-
-  it("totals the notes in the legend", async () => {
-    await mount(<SendPanel />);
-    const field = amount("Amount to deposit");
-    for (const value of ["4", "6.25"]) {
-      await userEvent.clear(field);
-      await userEvent.type(field, value);
-      await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-    }
-    await waitFor(() => expect(screen.getByText(/10.25 USDC in 2/)).toBeInTheDocument());
-  });
-
-  it("selects the note it just created, so Send works without a second click", async () => {
-    await mount(<SendPanel />);
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-    await waitFor(() => expect(screen.getByRole("radio")).toBeChecked());
-  });
-
-  it("refuses an over-precise amount and says nothing was rounded", async () => {
-    await mount(<SendPanel />);
-    await userEvent.clear(amount("Amount to deposit"));
-    await userEvent.type(amount("Amount to deposit"), "1.0000001");
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/Nothing was rounded/)).toBeInTheDocument(),
-    );
-    expect(screen.getByText("No notes yet. Put something in above.")).toBeInTheDocument();
-  });
-
-  it("refuses a non-numeric amount", async () => {
-    await mount(<SendPanel />);
-    await userEvent.clear(amount("Amount to deposit"));
-    await userEvent.type(amount("Amount to deposit"), "ten");
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/not a plain decimal number/)).toBeInTheDocument(),
-    );
-  });
-
-  it("refuses an empty amount", async () => {
-    await mount(<SendPanel />);
-    await userEvent.clear(amount("Amount to deposit"));
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText("Enter an amount.")).toBeInTheDocument(),
-    );
-  });
-});
-
-describe("SendPanel: paying out", () => {
-  async function withNote(value = "10") {
-    const mounted = await mount(<SendPanel />);
-    await userEvent.clear(amount("Amount to deposit"));
-    await userEvent.type(amount("Amount to deposit"), value);
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-    await waitFor(() => expect(screen.getByRole("radio")).toBeChecked());
-    return mounted;
-  }
-
-  it("pays an address and returns the change as a new note", async () => {
-    await withNote("10");
-    await userEvent.type(amount("Address to pay"), PAYEE);
-    await userEvent.type(amount("Amount to send"), "3");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
-
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/You paid 3 USDC/)).toBeInTheDocument(),
-    );
-    expect(screen.getByText("7 USDC")).toBeInTheDocument();
-    expect(screen.getByText(/7 USDC in 1/)).toBeInTheDocument();
-  });
-
-  it("says the pool paid, so the payee cannot see which note it came from", async () => {
-    await withNote();
-    await userEvent.type(amount("Address to pay"), PAYEE);
-    await userEvent.type(amount("Amount to send"), "1");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/The pool paid it/)).toBeInTheDocument(),
-    );
-  });
-
-  /**
-   * `vitalik.eth` rather than arbitrary junk, because a name is the failure this
-   * particular sentence exists for: an ENS name IS a real thing that resolves
-   * somewhere, so the message has to say why this field will not take one instead of
-   * only calling it invalid.
-   */
-  it("rejects something that is not an address before touching the note", async () => {
-    await withNote();
-    await userEvent.type(amount("Address to pay"), "vitalik.eth");
-    await userEvent.type(amount("Amount to send"), "1");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
-
-    await waitFor(() =>
-      expect(
-        within(out("Send output")).getByText(/not a 20-byte hex address/),
-      ).toBeInTheDocument(),
-    );
-    expect(
-      within(out("Send output")).getByText(/a name or a ticker never does/),
-    ).toBeInTheDocument();
-    expect(screen.getByText("10 USDC")).toBeInTheDocument();
-  });
-
-  it("refuses to overspend a note, naming both amounts", async () => {
-    await withNote("2");
-    await userEvent.type(amount("Address to pay"), PAYEE);
-    await userEvent.type(amount("Amount to send"), "5");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() =>
-      expect(
-        within(out("Send output")).getByText("That note holds 2 USDC, which is less than 5."),
-      ).toBeInTheDocument(),
-    );
-  });
-
-  it("withdraws the whole note and says the amount is now public", async () => {
-    await withNote("5");
-    await userEvent.type(amount("Address to pay"), PAYEE);
-    await userEvent.click(screen.getByRole("button", { name: "Withdraw all of it" }));
-
-    await waitFor(() =>
-      expect(
-        within(out("Send output")).getByText(/the amount is now public/),
-      ).toBeInTheDocument(),
-    );
-    expect(screen.getByText("No notes yet. Put something in above.")).toBeInTheDocument();
-  });
-
-  it("will not withdraw to a non-address", async () => {
-    await withNote();
-    await userEvent.type(amount("Address to pay"), "0x123");
-    await userEvent.click(screen.getByRole("button", { name: "Withdraw all of it" }));
-    await waitFor(() =>
-      expect(
-        within(out("Send output")).getByText(/not a 20-byte hex address/),
-      ).toBeInTheDocument(),
-    );
-  });
-
-  it("asks for a note when a second one exists and none is chosen", async () => {
-    const { adapters } = await mount(<SendPanel />);
-    // Two notes deposited behind the UI's back: neither is selected.
-    await adapters.pool.deposit(
-      { address: "0x0", symbol: "USDC", decimals: 6 },
-      1_000_000n,
-    );
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-    await waitFor(() => expect(screen.getAllByRole("radio")).toHaveLength(2));
-
-    await userEvent.click(screen.getAllByRole("radio")[1] as HTMLElement);
-    await userEvent.type(amount("Address to pay"), PAYEE);
-    await userEvent.type(amount("Amount to send"), "1");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/You paid 1 USDC/)).toBeInTheDocument(),
-    );
-  });
-
-  /**
-   * Reachable by closing the window and opening it again: the pool is shared, so
-   * the notes come back but the panel's own selection does not.
-   */
-  it("asks you to pick a note when one exists but none is chosen", async () => {
-    const value = stub();
-    await value.pool.deposit({ address: USDC.address, symbol: "USDC", decimals: 6 }, 5_000_000n);
-    await mount(<SendPanel />, value);
-    await waitFor(() => expect(screen.getByRole("radio")).not.toBeChecked());
-
-    await userEvent.type(amount("Address to pay"), PAYEE);
-    await userEvent.type(amount("Amount to send"), "1");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText("Pick a note to spend.")).toBeInTheDocument(),
-    );
-
-    await userEvent.click(screen.getByRole("button", { name: "Withdraw all of it" }));
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText("Pick a note to withdraw.")).toBeInTheDocument(),
-    );
-  });
-
-  it("reports a non-Error rejection from the pool rather than swallowing it", async () => {
-    const value = stub();
-    value.pool = patch(value.pool, {
-      isLive: false,
-      notes: async () => [],
-      deposit: () => Promise.reject("the pool rejected with a string"),
-    });
-    await mount(<SendPanel />, value);
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-    await waitFor(() =>
-      expect(
-        within(out("Send output")).getByText("the pool rejected with a string"),
-      ).toBeInTheDocument(),
-    );
-  });
-
-  it("clears a previous error when the next action succeeds", async () => {
-    await withNote();
-    await userEvent.type(amount("Address to pay"), "nope");
-    await userEvent.type(amount("Amount to send"), "1");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() =>
-      expect(
-        within(out("Send output")).getByText(/not a 20-byte hex address/),
-      ).toBeInTheDocument(),
-    );
-
-    await userEvent.clear(amount("Address to pay"));
-    await userEvent.type(amount("Address to pay"), PAYEE);
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/You paid 1 USDC/)).toBeInTheDocument(),
-    );
-    expect(
-      within(out("Send output")).queryByText(/not a 20-byte hex address/),
-    ).not.toBeInTheDocument();
-  });
-
-  it("never shows an on-chain claim while the pool is local", async () => {
-    await withNote();
-    await userEvent.type(amount("Address to pay"), PAYEE);
-    await userEvent.type(amount("Amount to send"), "1");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
-
-    const panel = out("Send output");
-    await waitFor(() => expect(within(panel).getByText(/Not on chain/)).toBeInTheDocument());
-    expect(panel.textContent).not.toMatch(/basescan/i);
-    expect(within(panel).queryByRole("link")).not.toBeInTheDocument();
-  });
-});
-
-/**
- * The EIP-55 verdict under the To field.
- *
- * Its own arithmetic is `tests/address.test.ts`, verified against
- * `cast to-check-sum-address`. What only a panel can show is the part that makes it
- * worth anything: that the verdict is on screen BEFORE the button is pressed, that a
- * contradicted checksum stops the payment, and that a lowercase address is not silently
- * passed off as verified.
- *
- * ⚠️ Why the timing is the subject of every test here rather than the wording. On a real
- * chain a send is final the moment it lands, so a warning in the error path is a warning
- * about money that is already gone. A test that only pressed Send and read the output
- * would pass against a build that shows nothing at all until it is too late to matter.
- */
-describe("SendPanel: the checksum verdict, before the button", () => {
-  /** `cast to-check-sum-address 0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed` */
-  const CHECKSUMMED = "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed";
-  /** The same 40 hex digits with the second character's case flipped: one wrong bit. */
-  const CONTRADICTED = "0x5AAeb6053F3E94C9b9A09f33669435E7Ef1BeAed";
-
-  async function withNote(value = "10") {
-    const mounted = await mount(<SendPanel />);
-    await userEvent.clear(amount("Amount to deposit"));
-    await userEvent.type(amount("Amount to deposit"), value);
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-    await waitFor(() => expect(screen.getByRole("radio")).toBeChecked());
-    return mounted;
-  }
-
-  it("says nothing at all while the field is empty", async () => {
-    await mount(<SendPanel />);
-    expect(screen.queryByText(/EIP-55/)).not.toBeInTheDocument();
-  });
-
-  it("confirms a matching checksum as soon as it is typed, with no click", async () => {
-    await mount(<SendPanel />);
-    await userEvent.type(amount("Address to pay"), CHECKSUMMED);
-    expect(screen.getByText("EIP-55 checksum matches.")).toBeInTheDocument();
-    expect(within(out("Send output")).getByText("// nothing run yet")).toBeInTheDocument();
-  });
-
-  /**
-   * 🔴 The one that matters. The warning is on screen while the money is still in the
-   * note — not after a send, where there would be nothing left to warn about.
-   *
-   * The output is asserted to hold no payment rather than to hold the placeholder: the
-   * deposit that created the note already printed its receipt there, and "nothing run
-   * yet" would be asserting the wrong thing. What has to be true is that nothing has
-   * been *spent* while this warning is being read.
-   */
-  it("warns about a contradicted checksum before anything is spent", async () => {
-    await withNote();
-    await userEvent.type(amount("Address to pay"), CONTRADICTED);
-
-    expect(screen.getByText(/does not match/)).toBeInTheDocument();
-    expect(screen.getByText("10 USDC")).toBeInTheDocument();
-    expect(within(out("Send output")).queryByText(/You paid/)).not.toBeInTheDocument();
-  });
-
-  /**
-   * 🔴 And the refusal, so the warning is not merely advisory. A panel that warned and
-   * then paid anyway would be strictly worse than one that said nothing, because the
-   * user would have read a warning and watched it be ignored.
-   */
-  it("refuses to send to a contradicted checksum, leaving the note intact", async () => {
-    await withNote();
-    await userEvent.type(amount("Address to pay"), CONTRADICTED);
-    await userEvent.type(amount("Amount to send"), "1");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
-
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/does not match/)).toBeInTheDocument(),
-    );
-    expect(screen.getByText("10 USDC")).toBeInTheDocument();
-  });
-
-  it("refuses to withdraw to a contradicted checksum too", async () => {
-    await withNote();
-    await userEvent.type(amount("Address to pay"), CONTRADICTED);
-    await userEvent.click(screen.getByRole("button", { name: "Withdraw all of it" }));
-
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/does not match/)).toBeInTheDocument(),
-    );
-    expect(screen.getByText("10 USDC")).toBeInTheDocument();
-  });
-
-  /**
-   * 🔴 Never offers the recomputed spelling. `toChecksumAddress` only changes case, so
-   * on a mismatch the "corrected" address is the typo wearing valid capitalisation — a
-   * suggestion here would launder a wrong account into a plausible-looking one.
-   */
-  it("does not offer a corrected spelling of the address it just refused", async () => {
-    await mount(<SendPanel />);
-    await userEvent.type(amount("Address to pay"), CONTRADICTED);
-
-    const line = screen.getByText(/does not match/);
-    expect(line.textContent).not.toContain(CHECKSUMMED);
-    expect(line.textContent).toMatch(/Copy it again/);
-  });
-
-  /**
-   * ⚠️ A lowercase address must still be spendable — explorers and wallets hand those
-   * out and refusing them would make the app unusable — but it must not be reported as
-   * if it had been checked. This is the "silence reads as approval" case.
-   */
-  it("passes a lowercase address through while saying it was never checked", async () => {
-    await withNote();
-    await userEvent.type(amount("Address to pay"), CHECKSUMMED.toLowerCase());
-    expect(screen.getByText(/no EIP-55 checksum to verify/)).toBeInTheDocument();
-
-    await userEvent.type(amount("Amount to send"), "1");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/You paid 1 USDC/)).toBeInTheDocument(),
-    );
-  });
-
-  /**
-   * The unchecked and mismatch cases are both warnings and a match is not, so they must
-   * not share a style: a verified address styled like a caution trains the user to
-   * ignore the caution. `.dim` is the footnote voice, `.caution` the amber one — the
-   * class is asserted because nothing else in the suite can see the difference, and
-   * because a typo'd class name renders as unstyled text that no assertion would catch.
-   */
-  it("styles a match as a footnote and everything else as a caution", async () => {
-    await mount(<SendPanel />);
-
-    await userEvent.type(amount("Address to pay"), CHECKSUMMED);
-    expect(screen.getByText("EIP-55 checksum matches.")).toHaveClass("dim");
-
-    await userEvent.clear(amount("Address to pay"));
-    await userEvent.type(amount("Address to pay"), CHECKSUMMED.toLowerCase());
-    expect(screen.getByText(/no EIP-55 checksum to verify/)).toHaveClass("caution");
-
-    await userEvent.clear(amount("Address to pay"));
-    await userEvent.type(amount("Address to pay"), CONTRADICTED);
-    expect(screen.getByText(/does not match/)).toHaveClass("caution");
-  });
-
-  /**
-   * A half-typed address is malformed, and saying so is correct rather than rude: the
-   * field is where you find out, and the alternative is a blank space that looks like
-   * approval until the moment you press Send.
-   */
-  it("classifies a half-typed address rather than waiting for the full length", async () => {
-    await mount(<SendPanel />);
-    await userEvent.type(amount("Address to pay"), "0x5aAeb605");
-    expect(screen.getByText(/not a 20-byte hex address/)).toHaveClass("caution");
-  });
-});
-
-/**
- * Taking the notes out as a file, and putting them back.
- *
- * The format itself is `tests/backup.test.ts` and the cache behaviour is
- * `tests/adapters.test.ts`. What is left for here is the part only a panel has: whether
- * the user is *told* the things that stop them losing money — that the browser is not a
- * backup, that the file is plaintext, and that the app cannot confirm the download.
- */
-describe("SendPanel: backup and restore", () => {
-  /**
-   * jsdom has no `URL.createObjectURL`. Assigned rather than stubbed for the reasons in
-   * `tests/download.test.ts`, and the urls are collected so a test can prove a real blob
-   * was produced rather than the button merely not throwing.
-   */
-  const objectUrls: Blob[] = [];
-
-  beforeEach(() => {
-    objectUrls.length = 0;
-    (URL as unknown as { createObjectURL: (b: Blob) => string }).createObjectURL = (b) => {
-      objectUrls.push(b);
-      return `blob:quadra/${objectUrls.length}`;
-    };
-    (URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL = () => {};
-  });
-
-  afterEach(() => {
-    delete (URL as unknown as Record<string, unknown>).createObjectURL;
-    delete (URL as unknown as Record<string, unknown>).revokeObjectURL;
-  });
-
-  const picker = () => screen.getByLabelText("Backup file to restore") as HTMLInputElement;
-
-  /** Deposit once, so there is something worth backing up. */
-  async function withNote(value = "5") {
-    const mounted = await mount(<SendPanel />);
-    await userEvent.clear(amount("Amount to deposit"));
-    await userEvent.type(amount("Amount to deposit"), value);
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-    await waitFor(() => expect(screen.getByLabelText(/^Note 0x/)).toBeInTheDocument());
-    return mounted;
-  }
-
-  /** The bytes the export button actually handed the browser. */
-  function exportedText(): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(String(r.result));
-      r.onerror = () => reject(r.error);
-      r.readAsText(objectUrls[0] as Blob);
-    });
-  }
-
-  /**
-   * 🔴 The warning, not the feature. A user who never learns that this browser is the only
-   * place the money exists does not go looking for an export button, so this sentence is
-   * load-bearing in a way the buttons are not — and it has to be where they are *before*
-   * they deposit, which is the last moment it is free to act on.
-   */
-  it("warns that the browser is the only copy, in the deposit flow", async () => {
-    await mount(<SendPanel />);
-    const warning = screen.getByText(/live in this browser and nowhere else/);
-    expect(warning).toBeInTheDocument();
-    expect(warning).toHaveTextContent("no copy on any server");
-    /** Present before any deposit — the point is to be read first. */
-    expect(screen.getByText("No notes yet. Put something in above.")).toBeInTheDocument();
-  });
-
-  it("says the backup file is plaintext and to treat it like cash", async () => {
-    await mount(<SendPanel />);
-    expect(screen.getByText(/plain text/)).toHaveTextContent("keep it like cash");
-  });
-
-  it("says restoring only works into an empty browser, before anyone tries", async () => {
-    await mount(<SendPanel />);
-    expect(screen.getByText(/only works into a browser with no notes/)).toBeInTheDocument();
-  });
-
-  it("has nothing to export until there is a note", async () => {
-    await mount(<SendPanel />);
-    expect(screen.getByRole("button", { name: "Export a backup" })).toBeDisabled();
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Export a backup" })).toBeEnabled(),
-    );
-  });
-
-  it("hands the browser a real file with the notes in it", async () => {
-    await withNote();
-    await userEvent.click(screen.getByRole("button", { name: "Export a backup" }));
-
-    await waitFor(() => expect(objectUrls).toHaveLength(1));
-    expect((objectUrls[0] as Blob).type).toBe("application/json");
-    const parsed = JSON.parse(await exportedText()) as { format: string; pool: { notes: unknown[] } };
-    expect(parsed.format).toBe("quadra.pool.backup.v1");
-    expect(parsed.pool.notes).toHaveLength(1);
-  });
-
-  /**
-   * ⚠️ "Saving", never "Saved". Whether the file reached a disk is decided by the download
-   * UI and the user, and neither tells the app. A tick here would be the product asserting
-   * a fact it cannot observe, about the only file standing between the user and total loss.
-   */
-  it("says the file is being saved and to go and check it, not that it is backed up", async () => {
-    await withNote();
-    await userEvent.click(screen.getByRole("button", { name: "Export a backup" }));
-
-    const panel = out("Send output");
-    await waitFor(() => expect(within(panel).getByText(/quadra-pool-backup-/)).toBeInTheDocument());
-    expect(panel.textContent).toMatch(/check the file is there/);
-    expect(panel.textContent).toMatch(/secrets included/);
-    expect(panel.textContent).not.toMatch(/backed up|Saved|✓/);
-  });
-
-  /**
-   * 🔴 The reason `Output` is a union. `Anchor` renders a `local` anchoring as "Not on
-   * chain: …" in the warning colour, which is right after a deposit and wrong after an
-   * export — not being on chain is the feature. Reusing the receipt path would have made
-   * every successful backup look like a failed one.
-   */
-  it("does not dress a successful export up as an on-chain warning", async () => {
-    await withNote();
-    await userEvent.click(screen.getByRole("button", { name: "Export a backup" }));
-
-    const panel = out("Send output");
-    await waitFor(() => expect(within(panel).getByText(/Saving quadra-pool/)).toBeInTheDocument());
-    expect(panel.textContent).not.toMatch(/Not on chain/);
-  });
-
-  it("counts one note as a note and several as notes", async () => {
-    await withNote();
-    await userEvent.click(screen.getByRole("button", { name: "Export a backup" }));
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/1 note, secrets included/)).toBeInTheDocument(),
-    );
-
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-    await userEvent.click(screen.getByRole("button", { name: "Export a backup" }));
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/all 2 notes/)).toBeInTheDocument(),
-    );
-  });
-
-  /** A backup written by one browser, as the user would actually hand it over. */
-  async function backupFile(
-    name = "quadra-pool-backup-2026-09-28.json",
-    amounts: readonly bigint[] = [2_500_000n],
-  ): Promise<File> {
-    const source = new LocalShieldedPool();
-    for (const amount of amounts) {
-      await source.deposit(
-        { address: USDC.address, symbol: USDC.symbol, decimals: USDC.decimals },
-        amount,
-      );
-    }
-    const { body } = await source.exportBackup();
-    return new File([body], name, { type: "application/json" });
-  }
-
-  it("restores the notes from a picked file and lists them", async () => {
-    await mount(<SendPanel />);
-    await userEvent.upload(picker(), await backupFile());
-
-    await waitFor(() => expect(screen.getByText("2.5 USDC")).toBeInTheDocument());
-    expect(within(out("Send output")).getByText(/Restored 1 note from/)).toBeInTheDocument();
-  });
-
-  /**
-   * The plural half of the count — and worth more than the word it pins.
-   *
-   * A restore that reported "3 notes" while landing only the first would satisfy the
-   * single-note test above and read on screen as an unqualified success. So the count in
-   * the message is checked against the notes actually listed, which is the only thing
-   * that distinguishes a restore from a claim about one. It is also why the amounts are
-   * all different: three notes of equal value cannot show a dropped one.
-   */
-  it("restores every note in a multi-note backup, not just the first", async () => {
-    await mount(<SendPanel />);
-    await userEvent.upload(
-      picker(),
-      await backupFile("three-notes.json", [1_000_000n, 2_000_000n, 3_000_000n]),
-    );
-
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/Restored 3 notes from/)).toBeInTheDocument(),
-    );
-    expect(screen.getByText("1 USDC")).toBeInTheDocument();
-    expect(screen.getByText("2 USDC")).toBeInTheDocument();
-    expect(screen.getByText("3 USDC")).toBeInTheDocument();
-    /** The legend totals them, so a note listed but not counted would show up here. */
-    expect(screen.getByText(/6 USDC in 3/)).toBeInTheDocument();
-  });
-
-  it("names the file it restored from, so a wrong pick is visible", async () => {
-    await mount(<SendPanel />);
-    await userEvent.upload(picker(), await backupFile("from-the-old-laptop.json"));
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/from-the-old-laptop\.json/)).toBeInTheDocument(),
-    );
-  });
-
-  it("tells the user to check the restored amounts rather than trusting the count", async () => {
-    await mount(<SendPanel />);
-    await userEvent.upload(picker(), await backupFile());
-    await waitFor(() =>
-      expect(out("Send output").textContent).toMatch(/Check the amounts below/),
-    );
-  });
-
-  it("refuses to restore over notes this browser already holds, and keeps them", async () => {
-    await withNote("7");
-    await userEvent.upload(picker(), await backupFile());
-
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/already holds notes/)).toBeInTheDocument(),
-    );
-    /** The refusal is inert: the note that was here is still here and still listed. */
-    expect(screen.getByText("7 USDC")).toBeInTheDocument();
-    expect(screen.queryByText("2.5 USDC")).not.toBeInTheDocument();
-  });
-
-  /**
-   * ⚠️ Both files are named `.json` deliberately. `userEvent.upload` honours the input's
-   * `accept`, so a `.txt` never reaches the handler and the test would pass by never
-   * running the code. It is also the realistic case: a truncated or corrupted backup keeps
-   * the name it was exported under, and `accept` is a dialog filter a real user gets past
-   * with drag-and-drop anyway — so the contents are the only thing worth checking.
-   */
-  it("says which kind of wrong file it was handed", async () => {
-    await mount(<SendPanel />);
-    await userEvent.upload(picker(), new File(["not json"], "truncated.json"));
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/not even JSON/)).toBeInTheDocument(),
-    );
-
-    await userEvent.upload(picker(), new File(['{"hello":true}'], "other.json"));
-    await waitFor(() =>
-      expect(
-        within(out("Send output")).getByText(/A backup starts with "format"/),
-      ).toBeInTheDocument(),
-    );
-  });
-
-  it("names an empty file instead of complaining about its contents", async () => {
-    await mount(<SendPanel />);
-    await userEvent.upload(picker(), new File([""], "half-written.json"));
-    await waitFor(() =>
-      expect(
-        within(out("Send output")).getByText(/half-written\.json is empty/),
-      ).toBeInTheDocument(),
-    );
-  });
-
-  /**
-   * 🔴 Clearing the input is not tidiness. A file input fires no `change` event when the
-   * user picks the same file twice, so without the reset the second attempt does nothing
-   * at all — no notes, no error, no reaction. And the second attempt is the normal case:
-   * it is what someone does after a refusal they have just gone and fixed.
-   *
-   * MEASURED: with the `.finally` reset removed, **each half of this test fails on its
-   * own** — the `value` assertion reads back `C:\fakepath\truncated.json`, and the re-pick
-   * genuinely fires nothing, leaving the deposit receipt on screen. The mechanical half was
-   * checked first and caught it; the behavioural half was then checked alone, because a
-   * test that only ever asserts the mechanism would keep passing if `userEvent.upload`
-   * stopped honouring input state and the real bug came back.
-   */
-  it("lets the same file be picked again after a refusal", async () => {
-    await mount(<SendPanel />);
-    const file = new File(["not json"], "truncated.json");
-
-    await userEvent.upload(picker(), file);
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/not even JSON/)).toBeInTheDocument(),
-    );
-    /** The mechanism, asserted directly: the input is empty again, ready for a re-pick. */
-    expect(picker().value).toBe("");
-
-    /**
-     * Something else happens in between, so the CRT is no longer showing the first error.
-     * That is what makes the re-pick observable: if the second `upload` fired no event, the
-     * deposit receipt would still be on screen.
-     */
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-    await waitFor(() => expect(out("Send output").textContent).toMatch(/You put/));
-
-    await userEvent.upload(picker(), file);
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/not even JSON/)).toBeInTheDocument(),
-    );
-  });
-
-  /**
-   * A cancelled picker must say so. Printing nothing is the tempting shape and it is
-   * indistinguishable, from the user's side, from a restore that failed silently.
-   */
-  it("says nothing was restored when the picker is cancelled", async () => {
-    await mount(<SendPanel />);
-    await act(async () => {
-      picker().dispatchEvent(new Event("change", { bubbles: true }));
-    });
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/No file picked/)).toBeInTheDocument(),
-    );
-  });
-
-  /** An export that throws must reach the user, not the console. */
-  it("surfaces a failed export instead of swallowing it", async () => {
-    const value = stub();
-    await mount(
-      <SendPanel />,
-      patch(value, {
-        pool: patch(value.pool, {
-          exportBackup: () => Promise.reject(new Error("This browser refused to read the pool.")),
-        }),
-      }),
-    );
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Export a backup" })).toBeEnabled(),
-    );
-    await userEvent.click(screen.getByRole("button", { name: "Export a backup" }));
-
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/refused to read the pool/)).toBeInTheDocument(),
-    );
-    expect(objectUrls).toHaveLength(0);
-  });
-});
-
-describe("Anchor", () => {
-  it("links a real transaction to Basescan", () => {
-    render(<Anchor anchoring={{ kind: "onchain", txHash: `0x${"a".repeat(64)}`, block: 33 }} />);
-    expect(screen.getByText(/block/)).toHaveTextContent("On chain in block 33.");
-    const link = screen.getByRole("link", { name: "See it on Basescan" });
-    expect(link).toHaveAttribute("href", `https://basescan.org/tx/0x${"a".repeat(64)}`);
-    expect(link).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
-  });
-
-  it("says why, when there is nothing on chain", () => {
-    render(<Anchor anchoring={{ kind: "local", why: "the pool is not deployed" }} />);
-    expect(screen.getByText("Not on chain: the pool is not deployed.")).toBeInTheDocument();
-    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(seen).toHaveLength(2);
+    expect(seen[1]).toBe(seen[0]);
   });
 });
 
@@ -1025,11 +295,7 @@ describe("InferencePanel", () => {
     await userEvent.selectOptions(amount("Model"), "quadra-large");
 
     // A fresh enclave object re-runs the load effect, as switching windows would.
-    rerender(
-      <AdaptersProvider value={{ ...value, enclave: new LocalEnclave() }}>
-        <InferencePanel />
-      </AdaptersProvider>,
-    );
+    rerender(wrap(<InferencePanel />, { ...value, enclave: new LocalEnclave() }));
     await waitFor(() => expect(amount("Model")).toHaveValue("quadra-large"));
   });
 
@@ -1069,12 +335,12 @@ describe("InferencePanel", () => {
 
 describe("X402Panel", () => {
   it("loads the catalog and picks the first tool", async () => {
-    await mount(<X402Panel />);
+    await mount(<X402Panel start="directory" />);
     expect(amount("Tool")).toHaveValue("hood-live");
   });
 
   it("offers every tool with its own one-line summary", async () => {
-    await mount(<X402Panel />);
+    await mount(<X402Panel start="directory" />);
     const options = within(amount("Tool")).getAllByRole("option");
     expect(options).toHaveLength(LOCAL_TOOLS.length);
     expect(options[0]).toHaveTextContent(
@@ -1087,7 +353,7 @@ describe("X402Panel", () => {
    * sometimes does not is the wording this asserts against.
    */
   it("says on the button what the run will cost", async () => {
-    await mount(<X402Panel />);
+    await mount(<X402Panel start="directory" />);
     expect(screen.getByRole("button", { name: "Run — free" })).toBeInTheDocument();
     await userEvent.selectOptions(amount("Tool"), "liquidity-depth");
     await waitFor(() =>
@@ -1104,7 +370,7 @@ describe("X402Panel", () => {
    * copied from the wire to the screen.
    */
   it("names the payee and the chain before anything is signed", async () => {
-    await mount(<X402Panel />);
+    await mount(<X402Panel start="directory" />);
     await userEvent.selectOptions(amount("Tool"), "token-price");
     await waitFor(() => expect(screen.getByText(/0\.01 USDC on Base/)).toBeInTheDocument());
     expect(screen.getByText(BLUEAGENT.knownPayTo)).toBeInTheDocument();
@@ -1113,19 +379,20 @@ describe("X402Panel", () => {
   /**
    * The window is on screen next to the price, because the amount alone understates
    * what is being agreed to: an EIP-3009 authorization is a bearer slip, so the risk is
-   * the amount for as long as the slip stays live. Upstream asks for 120 seconds, which
-   * this build read off the live 402 rather than using its own 600-second fallback.
+   * the amount for as long as the slip stays live. Upstream asks for 120 seconds; this
+   * build signs 180 (120 + `SETTLEMENT_SLACK_SECONDS`), which is the number the panel
+   * must show — that is the window actually being agreed to, not the ask.
    */
   it("says how long the authorization it asks for stays spendable", async () => {
-    await mount(<X402Panel />);
+    await mount(<X402Panel start="directory" />);
     await userEvent.selectOptions(amount("Tool"), "token-price");
     await waitFor(() =>
-      expect(screen.getByText(/stays spendable for 120 seconds/)).toBeInTheDocument(),
+      expect(screen.getByText(/stays spendable for 180 seconds/)).toBeInTheDocument(),
     );
   });
 
   it("says a free tool touches no wallet at all", async () => {
-    await mount(<X402Panel />);
+    await mount(<X402Panel start="directory" />);
     expect(screen.getByText(/Free\. No payment is sent/)).toBeInTheDocument();
     expect(screen.queryByText(BLUEAGENT.knownPayTo)).not.toBeInTheDocument();
     expect(screen.queryByText(/stays spendable/)).not.toBeInTheDocument();
@@ -1153,7 +420,7 @@ describe("X402Panel", () => {
    */
   it("warns about a payee it does not recognise, without calling the price an error", async () => {
     const stranger = "0x1111111111111111111111111111111111111112";
-    const rotated = checkRequirements("token-price", {
+    const rotated = checkRequirements("token-price", BLUEAGENT.origin, {
       x402Version: 2,
       accepts: [
         {
@@ -1171,7 +438,7 @@ describe("X402Panel", () => {
     value.catalog = patch(value.catalog, {
       quote: () => Promise.resolve({ toolId: "token-price", price: { kind: "paid", requirements: rotated } }),
     });
-    await mount(<X402Panel />, value);
+    await mount(<X402Panel start="directory" />, value);
     await waitFor(() => expect(screen.getByText(/0\.01 USDC on Base/)).toBeInTheDocument());
     expect(screen.getByText(new RegExp(`wants to be paid to ${stranger}`))).toBeInTheDocument();
     expect(screen.getByText(/Confirm the new address before signing/)).toBeInTheDocument();
@@ -1179,7 +446,7 @@ describe("X402Panel", () => {
   });
 
   it("shows a field for each input the tool declares, and none otherwise", async () => {
-    await mount(<X402Panel />);
+    await mount(<X402Panel start="directory" />);
     await userEvent.selectOptions(amount("Tool"), "gas-tracker");
     await waitFor(() => expect(screen.queryByText("What it needs")).not.toBeInTheDocument());
     await userEvent.selectOptions(amount("Tool"), "competitor-scan");
@@ -1195,7 +462,7 @@ describe("X402Panel", () => {
    * did not type into the form in front of them.
    */
   it("clears the inputs when the tool changes, so nothing carries over", async () => {
-    await mount(<X402Panel />);
+    await mount(<X402Panel start="directory" />);
     await userEvent.selectOptions(amount("Tool"), "token-price");
     await waitFor(() => expect(amount("token")).toBeInTheDocument());
     await userEvent.type(amount("token"), "0xdead");
@@ -1205,7 +472,7 @@ describe("X402Panel", () => {
   });
 
   it("runs a free tool and says no charge was made", async () => {
-    await mount(<X402Panel />);
+    await mount(<X402Panel start="directory" />);
     await userEvent.click(screen.getByRole("button", { name: "Run — free" }));
     await waitFor(() =>
       expect(within(out("x402 output")).getByText(/No charge:/)).toBeInTheDocument(),
@@ -1213,7 +480,7 @@ describe("X402Panel", () => {
   });
 
   it("runs a paid tool and says outright that nothing was paid", async () => {
-    await mount(<X402Panel />);
+    await mount(<X402Panel start="directory" />);
     await userEvent.selectOptions(amount("Tool"), "token-price");
     await waitFor(() => expect(amount("token")).toBeInTheDocument());
     await userEvent.type(amount("token"), "0xabc");
@@ -1224,7 +491,7 @@ describe("X402Panel", () => {
   });
 
   it("never shows a payment link while the catalog is local", async () => {
-    await mount(<X402Panel />);
+    await mount(<X402Panel start="directory" />);
     await userEvent.click(screen.getByRole("button", { name: "Run — free" }));
     await waitFor(() =>
       expect(within(out("x402 output")).getByText(/nothing ran/)).toBeInTheDocument(),
@@ -1233,7 +500,7 @@ describe("X402Panel", () => {
   });
 
   it("surfaces a missing input instead of running anyway", async () => {
-    await mount(<X402Panel />);
+    await mount(<X402Panel start="directory" />);
     await userEvent.selectOptions(amount("Tool"), "competitor-scan");
     await waitFor(() => expect(amount("project")).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: "Run for 0.2 USDC" }));
@@ -1245,7 +512,7 @@ describe("X402Panel", () => {
   });
 
   it("clears a previous failure when the next run succeeds", async () => {
-    await mount(<X402Panel />);
+    await mount(<X402Panel start="directory" />);
     await userEvent.selectOptions(amount("Tool"), "blue-audit");
     await waitFor(() => expect(amount("prompt")).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: "Run for 1 USDC" }));
@@ -1265,7 +532,7 @@ describe("X402Panel", () => {
     value.catalog = patch(value.catalog, {
       run: () => Promise.reject("upstream said no"),
     });
-    await mount(<X402Panel />, value);
+    await mount(<X402Panel start="directory" />, value);
     await userEvent.click(screen.getByRole("button", { name: "Run — free" }));
     await waitFor(() =>
       expect(within(out("x402 output")).getByText("upstream said no")).toBeInTheDocument(),
@@ -1281,7 +548,7 @@ describe("X402Panel", () => {
     value.catalog = patch(value.catalog, {
       quote: () => Promise.reject(new Error("the 402 could not be read")),
     });
-    await mount(<X402Panel />, value);
+    await mount(<X402Panel start="directory" />, value);
     await waitFor(() =>
       expect(
         within(out("x402 output")).getByText("the 402 could not be read"),
@@ -1294,7 +561,7 @@ describe("X402Panel", () => {
   it("reports a non-Error rejection from a quote too", async () => {
     const value = stub();
     value.catalog = patch(value.catalog, { quote: () => Promise.reject("no quote") });
-    await mount(<X402Panel />, value);
+    await mount(<X402Panel start="directory" />, value);
     await waitFor(() =>
       expect(within(out("x402 output")).getByText("no quote")).toBeInTheDocument(),
     );
@@ -1303,20 +570,16 @@ describe("X402Panel", () => {
   it("shows nothing to run when the catalog is empty", async () => {
     const value = stub();
     value.catalog = patch(value.catalog, { tools: async () => [] });
-    await mount(<X402Panel />, value);
+    await mount(<X402Panel start="directory" />, value);
     expect(screen.getByRole("button", { name: "Run" })).toBeDisabled();
     expect(screen.queryByText("What it needs")).not.toBeInTheDocument();
   });
 
   it("keeps the tool you chose when the list reloads", async () => {
     const value = stub();
-    const { rerender } = await mount(<X402Panel />, value);
+    const { rerender } = await mount(<X402Panel start="directory" />, value);
     await userEvent.selectOptions(amount("Tool"), "competitor-scan");
-    rerender(
-      <AdaptersProvider value={value}>
-        <X402Panel />
-      </AdaptersProvider>,
-    );
+    rerender(wrap(<X402Panel start="directory" />, value));
     await settle();
     expect(amount("Tool")).toHaveValue("competitor-scan");
   });
@@ -1330,7 +593,7 @@ describe("X402Panel", () => {
           release = resolve;
         }),
     });
-    const { unmount } = await mount(<X402Panel />, value);
+    const { unmount } = await mount(<X402Panel start="directory" />, value);
     unmount();
     const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
@@ -1353,7 +616,7 @@ describe("X402Panel", () => {
             })
           : real.quote(id),
     });
-    await mount(<X402Panel />, value);
+    await mount(<X402Panel start="directory" />, value);
     await userEvent.selectOptions(amount("Tool"), "competitor-scan");
     await userEvent.selectOptions(amount("Tool"), "token-price");
     await waitFor(() => expect(screen.getByText(/0\.01 USDC on Base/)).toBeInTheDocument());
@@ -1378,7 +641,7 @@ describe("X402Panel", () => {
 
   /** 66 of the 115 tools upstream declare one. A form that demands them strands those tools. */
   it("marks an optional field as optional", async () => {
-    await mount(<X402Panel />);
+    await mount(<X402Panel start="directory" />);
     await userEvent.selectOptions(amount("Tool"), "competitor-scan");
     await waitFor(() => expect(amount("competitors")).toBeInTheDocument());
     expect(screen.getByText("project")).toBeInTheDocument();
@@ -1395,7 +658,7 @@ describe("X402Panel", () => {
     value.catalog = patch(value.catalog, {
       tools: () => Promise.reject(new Error("The catalog answered 503.")),
     });
-    await mount(<X402Panel />, value);
+    await mount(<X402Panel start="directory" />, value);
     expect(within(out("x402 output")).getByText("The catalog answered 503.")).toBeInTheDocument();
     expect(within(amount("Tool")).queryAllByRole("option")).toHaveLength(0);
   });
@@ -1403,7 +666,7 @@ describe("X402Panel", () => {
   it("reports a non-Error rejection from the catalog load too", async () => {
     const value = stub();
     value.catalog = patch(value.catalog, { tools: () => Promise.reject("upstream hung up") });
-    await mount(<X402Panel />, value);
+    await mount(<X402Panel start="directory" />, value);
     expect(within(out("x402 output")).getByText("upstream hung up")).toBeInTheDocument();
   });
 
@@ -1416,13 +679,13 @@ describe("X402Panel", () => {
   it("disables the button and gives the reason when a run is impossible", async () => {
     const value = stub();
     value.catalog = patch(value.catalog, { whyNot: () => NO_WALLET });
-    await mount(<X402Panel />, value);
+    await mount(<X402Panel start="directory" />, value);
     expect(screen.getByRole("button", { name: "Run — free" })).toBeDisabled();
     expect(screen.getByText(NO_WALLET)).toBeInTheDocument();
   });
 
   it("offers the button when the adapter says a run can be attempted", async () => {
-    await mount(<X402Panel />);
+    await mount(<X402Panel start="directory" />);
     expect(screen.getByRole("button", { name: "Run — free" })).toBeEnabled();
     expect(screen.queryByText(NO_WALLET)).not.toBeInTheDocument();
   });
@@ -1437,7 +700,7 @@ describe("X402Panel", () => {
     value.catalog = patch(value.catalog, {
       whyNot: (price) => (price.kind === "free" ? null : NO_WALLET),
     });
-    await mount(<X402Panel />, value);
+    await mount(<X402Panel start="directory" />, value);
     expect(screen.getByRole("button", { name: "Run — free" })).toBeEnabled();
 
     await userEvent.selectOptions(amount("Tool"), "competitor-scan");
@@ -1453,9 +716,185 @@ describe("X402Panel", () => {
   it("keeps the button disabled while the price is still being read", async () => {
     const value = stub();
     value.catalog = patch(value.catalog, { quote: () => new Promise<Quote>(() => {}) });
-    await mount(<X402Panel />, value);
+    await mount(<X402Panel start="directory" />, value);
     expect(screen.getByRole("button", { name: "Run" })).toBeDisabled();
     expect(screen.getByText("Reading the price…")).toBeInTheDocument();
+  });
+});
+
+/**
+ * An injected wallet, driven by a method → answer map — the same shape as
+ * `tests/wallet.test.ts`'s `fake`, kept local rather than shared because this file
+ * only ever needs the happy path a `ready` wallet gives the panel.
+ */
+function fakeWallet(answers: Record<string, unknown>) {
+  return {
+    request: (args: { method: string }) => {
+      if (!(args.method in answers)) {
+        return Promise.reject(new Error(`test did not stub ${args.method}`));
+      }
+      const answer = answers[args.method];
+      try {
+        return Promise.resolve(typeof answer === "function" ? (answer as () => unknown)() : answer);
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    },
+  };
+}
+
+/** EIP-55 checksummed, so `authorizationFor` accepts it as the signer. */
+const ACCOUNT = "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed";
+const SIGNATURE = `0x${"a".repeat(130)}`;
+
+describe("X402Panel: wallet + signing", () => {
+  /**
+   * The button no longer waits for a wallet to enable — see the note on `go` in
+   * `X402Panel.tsx` — but a `ready` wallet changes what a click DOES: it signs first
+   * and hands the adapter a payment, instead of calling `run` with none at all.
+   */
+  it("signs an authorization and attaches it before running, once a wallet is ready", async () => {
+    vi.stubGlobal(
+      "ethereum",
+      fakeWallet({
+        eth_accounts: [ACCOUNT],
+        eth_chainId: BASE.idHex,
+        eth_signTypedData_v4: SIGNATURE,
+      }),
+    );
+    const value = stub();
+    let sentPayment: string | undefined;
+    const real = value.catalog;
+    value.catalog = patch(real, {
+      run: (toolId: string, input: Record<string, string>, payment?: string) => {
+        sentPayment = payment;
+        return real.run(toolId, input, payment);
+      },
+    });
+    await mount(<X402Panel start="directory" />, value);
+    await userEvent.selectOptions(amount("Tool"), "gas-tracker");
+    await waitFor(() => expect(screen.getByText(ACCOUNT.toLowerCase())).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Run for 0.01 USDC" }));
+    await waitFor(() => expect(sentPayment).toBeDefined());
+    const decoded = JSON.parse(atob(sentPayment!)) as {
+      payload: { authorization: { from: string }; signature: string };
+    };
+    expect(decoded.payload.authorization.from).toBe(ACCOUNT.toLowerCase());
+    expect(decoded.payload.signature).toBe(SIGNATURE);
+  });
+
+  /** `wrongChain` gets a switch prompt, not a connect one — there is already an account. */
+  it("offers to switch chains, not to connect, when the wallet is on the wrong one", async () => {
+    let chainId = "0x1";
+    vi.stubGlobal(
+      "ethereum",
+      fakeWallet({
+        eth_accounts: [ACCOUNT],
+        eth_chainId: () => chainId,
+        wallet_switchEthereumChain: () => {
+          chainId = BASE.idHex;
+        },
+      }),
+    );
+    await mount(<X402Panel start="directory" />);
+    await userEvent.selectOptions(amount("Tool"), "gas-tracker");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Switch to Base" })).toBeInTheDocument(),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Switch to Base" }));
+    await waitFor(() => expect(screen.getByText(ACCOUNT.toLowerCase())).toBeInTheDocument());
+  });
+
+  /** No account at all gets the generic connect prompt, and clicking it asks for one. */
+  it("offers to connect when there is no account yet, and asks for one on click", async () => {
+    let connected = false;
+    const provider = fakeWallet({
+      eth_accounts: () => (connected ? [ACCOUNT] : []),
+      // Connect opens the wallet's account picker (EIP-2255), as MetaMask does
+      wallet_requestPermissions: () => {
+        connected = true;
+        return [{ parentCapability: "eth_accounts" }];
+      },
+      eth_chainId: BASE.idHex,
+    });
+    vi.stubGlobal("ethereum", provider);
+    await mount(<X402Panel start="directory" />);
+    await userEvent.selectOptions(amount("Tool"), "gas-tracker");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Connect wallet" })).toBeInTheDocument(),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
+    await waitFor(() => expect(screen.getByText(ACCOUNT.toLowerCase())).toBeInTheDocument());
+  });
+
+  /**
+   * With no wallet ready at all, a click still runs — for the local stub that is a
+   * documented no-op, not a refusal — rather than a click the panel silently eats.
+   */
+  it("still runs a paid tool with no wallet touched at all", async () => {
+    await mount(<X402Panel start="directory" />);
+    await userEvent.selectOptions(amount("Tool"), "gas-tracker");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Connect wallet" })).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Run for 0.01 USDC" }));
+    await waitFor(() =>
+      expect(within(out("x402 output")).getByText(/Not paid:/)).toBeInTheDocument(),
+    );
+  });
+
+  /**
+   * Never trusts the event's own payload — see `watchWallet`'s header — so the doorbell
+   * re-reads through `eth_accounts`/`eth_chainId` rather than acting on whatever
+   * `accountsChanged` handed it. A provider that can subscribe (`on`/`removeListener`)
+   * is what makes this doorbell fire at all; `fakeWallet` above has neither, which is
+   * why every other test here only ever sees the state read on mount.
+   */
+  it("re-reads the wallet when the provider rings its doorbell, not from the event payload", async () => {
+    let account = "" as string;
+    const listeners: { event: string; handler: () => void }[] = [];
+    const provider = {
+      request: (args: { method: string }) => {
+        if (args.method === "eth_accounts") return Promise.resolve(account ? [account] : []);
+        if (args.method === "eth_chainId") return Promise.resolve(BASE.idHex);
+        return Promise.reject(new Error(`test did not stub ${args.method}`));
+      },
+      on: (event: string, handler: () => void) => void listeners.push({ event, handler }),
+      removeListener: (event: string, handler: () => void) => {
+        const at = listeners.findIndex((l) => l.event === event && l.handler === handler);
+        if (at >= 0) listeners.splice(at, 1);
+      },
+    };
+    vi.stubGlobal("ethereum", provider);
+    await mount(<X402Panel start="directory" />);
+    await userEvent.selectOptions(amount("Tool"), "gas-tracker");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Connect wallet" })).toBeInTheDocument());
+    account = ACCOUNT;
+    await act(async () => {
+      listeners.filter((l) => l.event === "accountsChanged").forEach((l) => l.handler());
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(screen.getByText(ACCOUNT.toLowerCase())).toBeInTheDocument());
+  });
+
+  /**
+   * The window between `readWallet` reporting `ready` and the click can close on its
+   * own — an extension disabled, a tab that lost `window.ethereum` — so `go` measures
+   * again rather than trusting the state it already rendered.
+   */
+  it("refuses to sign with no wallet provider left to sign with, even though the state still says ready", async () => {
+    vi.stubGlobal(
+      "ethereum",
+      fakeWallet({ eth_accounts: [ACCOUNT], eth_chainId: BASE.idHex }),
+    );
+    await mount(<X402Panel start="directory" />);
+    await userEvent.selectOptions(amount("Tool"), "gas-tracker");
+    await waitFor(() => expect(screen.getByText(ACCOUNT.toLowerCase())).toBeInTheDocument());
+    vi.stubGlobal("ethereum", undefined);
+    await userEvent.click(screen.getByRole("button", { name: "Run for 0.01 USDC" }));
+    await waitFor(() =>
+      expect(
+        within(out("x402 output")).getByText("No wallet provider is available to sign with. Nothing was charged."),
+      ).toBeInTheDocument(),
+    );
   });
 });
 
@@ -1574,6 +1013,13 @@ describe("HooksPanel", () => {
  * `lib/manifest.ts`. The server side is covered by `tests/mcp.test.ts`.
  */
 describe("McpPanel", () => {
+  it("lists every skill as a tool, with what each takes and which arguments are optional", () => {
+    render(<McpPanel />);
+    const list = within(screen.getByLabelText("Skill tools"));
+    expect(list.getByText("quadra_verdict").closest("li")).toHaveTextContent(/Takes: token_address\.$/);
+    expect(list.getByText("quadra_radar").closest("li")).toHaveTextContent(/Takes: minutes \(optional\)\.$/);
+  });
+
   it("lists every tool the server actually advertises", () => {
     render(<McpPanel />);
     const list = within(screen.getByLabelText("MCP tools"));
@@ -1636,99 +1082,46 @@ describe("McpPanel", () => {
 });
 
 describe("the whole app, through a window", () => {
-  it("opens Send from the desktop and can put money in", async () => {
-    renderAt("/?do=send");
-    await settle();
-    await userEvent.click(screen.getByRole("button", { name: "Deposit" }));
-    await waitFor(() =>
-      expect(within(out("Send output")).getByText(/You put 10 USDC in/)).toBeInTheDocument(),
-    );
-  });
-
-  it("opens Inference from the desktop", async () => {
-    renderAt("/?do=inference");
-    await settle();
-    await waitFor(() => expect(amount("Model")).toHaveValue("quadra-small"));
-  });
-
-  it("says outright when a switched-on feature is not built yet", () => {
-    renderAt("/?do=swap");
-    expect(
-      screen.getByText(/Swap is switched on but not built yet/),
-    ).toBeInTheDocument();
-  });
-
   it("still says a switched-off feature is off, not unbuilt", () => {
-    renderAt("/?do=bridge");
-    expect(screen.getByText(/Bridge is not switched on/)).toBeInTheDocument();
+    renderAt("/?do=inference");
+    expect(screen.getByText(/Inference is not switched on/)).toBeInTheDocument();
   });
 });
 
 /**
- * An amber box used to say the same eleven words for Swap, Router and Audit. All
- * three were accurate and none was actionable: they are waiting on three different
- * things, and a reader cannot tell "nobody has built this" from "this needs a
- * contract that does not exist" without being told which.
+ * An amber box used to say the same eleven words for every unbuilt window. That
+ * was accurate and not actionable: each is waiting on a different thing, and a
+ * reader cannot tell "nobody has built this" from "this needs a contract that
+ * does not exist" without being told which.
  *
  * The assertions below are therefore about the property — every window that renders
  * the notice names its blocker — rather than about the wording, for the same reason
  * the API page's tests are about `live` and not about its lede.
  */
 describe("why an unbuilt window is unbuilt", () => {
-  it("names what it is waiting on for every switched-on window with nothing behind it", () => {
-    expect(UNBUILT.map((f) => f.id)).toEqual(["swap", "router", "audit"]);
-    for (const feature of UNBUILT) {
-      expect(WAITING_ON[feature.id], feature.id).toBeTruthy();
-    }
-  });
-
   /**
-   * The inverse, and the one that would actually rot: a reason left behind for a
-   * window that now works reads as an excuse for a panel a user is looking at.
+   * Since 2026-09-30 every switched-on window is built: send, swap, bridge and launch landed
+   * in the same session. The notice machinery stays — the next feature switched on before it
+   * is built gets it — and these pin that the list of excuses is empty rather than stale.
    */
-  it("keeps no excuse for a window that is finished or switched off", () => {
-    const unbuilt = new Set(UNBUILT.map((f) => f.id));
-    for (const id of Object.keys(WAITING_ON)) {
-      expect(unbuilt.has(id as Feature["id"]), id).toBe(true);
-    }
+  it("has no switched-on window with nothing behind it, and so no excuses", () => {
+    expect(UNBUILT.map((f) => f.id)).toEqual([]);
+    expect(WAITING_ON).toEqual({});
   });
 
   it("appends the reason to the notice, and stands alone without one", () => {
-    expect(notBuiltNotice("Swap", "a deployed pool.")).toBe(
-      "Swap is switched on but not built yet. There is nothing here to click, and nothing here will move money. It is waiting on a deployed pool.",
+    expect(notBuiltNotice("Swap", "a live price.")).toBe(
+      "Swap is switched on but not built yet. There is nothing here to click, and nothing here will move money. It is waiting on a live price.",
     );
     expect(notBuiltNotice("Swap", undefined)).toBe(
       "Swap is switched on but not built yet. There is nothing here to click, and nothing here will move money.",
     );
   });
 
-  /**
-   * Audit and Router are blocked on the same missing piece, and saying so is the
-   * point — two windows waiting on one thing is a different priority from two
-   * windows waiting on two.
-   */
-  it("sends both payment windows to the same missing piece, and Swap to a contract", () => {
-    expect(WAITING_ON.router).toMatch(/wallet signing/);
-    expect(WAITING_ON.audit).toMatch(/wallet signing/);
-    expect(WAITING_ON.swap).toMatch(/CONTRACTS\.shieldedPool/);
-  });
-
-  /**
-   * `audit` would call a paid tool, and the price is the one thing this must not
-   * write down: a number frozen in a source file goes stale silently and the
-   * failure mode is agreeing to the wrong amount. It points at the live quote.
-   */
-  it("quotes no price for the paid tool audit would call", () => {
-    const audit = WAITING_ON.audit ?? "";
-    expect(audit).toContain("repo-health");
-    expect(audit).toMatch(/x402 window/);
-    expect(audit).not.toMatch(/\$\d|\d+ USDC|\d{4,}/);
-  });
-
-  it("renders the reason in the window, not just in the map", () => {
+  /** Switched off is its own state, and says so — not "not built", which would be an excuse. */
+  it("renders a switched-off window as off, with no reason attached", () => {
     renderAt("/?do=audit");
-    expect(screen.getByLabelText("Audit is not built yet")).toHaveTextContent(
-      /waiting on wallet signing.*repo-health/,
-    );
+    expect(screen.getByLabelText("Audit is off")).toHaveTextContent(/not switched on/);
+    expect(screen.queryByLabelText("Audit is not built yet")).not.toBeInTheDocument();
   });
 });

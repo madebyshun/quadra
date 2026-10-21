@@ -1,0 +1,29 @@
+{
+ "code": 3,
+ "message": "OK",
+ "result": {
+  "0xb200000000000000000000856a95738c92feed01": {
+   "buy_tax": "",
+   "holder_count": "37",
+   "holders": [
+    {
+     "address": "0x498581ff718922c3f8e6a244956af099b2652b2b",
+     "tag": "",
+     "is_contract": 1,
+     "balance": "408523506.083782848375540077",
+     "percent": "0.408523506083782848",
+     "is_locked": 0
+    }
+   ],
+   "is_in_dex": "1",
+   "is_open_source": "1",
+   "lp_holder_count": "3",
+   "lp_total_supply": "0.001340472632842622",
+   "owner_address": "",
+   "sell_tax": "",
+   "token_name": "Base Rooms",
+   "token_symbol": "BRTC",
+   "total_supply": "1000000000"
+  }
+ }
+}

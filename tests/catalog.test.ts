@@ -105,11 +105,16 @@ describe("quoting a tool", () => {
     expect(quote.price.requirements.payee.kind).toBe("known");
   });
 
-  /** Copied from upstream's live 402, not from `DEFAULT_AUTHORIZATION_SECONDS`. */
+  /**
+   * 120 is upstream's own ask (`askedSeconds`), not `DEFAULT_AUTHORIZATION_SECONDS`.
+   * `lifetimeSeconds` is the longer window this build actually signs — the ask plus
+   * `SETTLEMENT_SLACK_SECONDS` — see `lib/eip712.ts`.
+   */
   it("asks for the settlement window upstream asks for", async () => {
     const quote = await new LocalCatalog().quote(paid().id);
     if (quote.price.kind !== "paid") throw new Error("expected a paid quote");
-    expect(quote.price.requirements.lifetimeSeconds).toBe(120n);
+    expect(quote.price.requirements.askedSeconds).toBe(120n);
+    expect(quote.price.requirements.lifetimeSeconds).toBe(180n);
   });
 
   it("calls a free tool free, rather than pricing it at zero", async () => {

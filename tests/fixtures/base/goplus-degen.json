@@ -1,0 +1,53 @@
+{
+ "code": 1,
+ "message": "OK",
+ "result": {
+  "0x4ed4e862860bed51a9570b96d89af5e1b0efefed": {
+   "anti_whale_modifiable": "0",
+   "buy_tax": "0",
+   "can_take_back_ownership": "0",
+   "creator_address": "0x3C12B77aE8B7DD1FEB63D1D6a2A819AcdA0a41d2",
+   "creator_balance": "0",
+   "creator_percent": "0.000000",
+   "external_call": "0",
+   "hidden_owner": "0",
+   "holder_count": "1182677",
+   "holders": [
+    {
+     "address": "0x06a19654e0872ba71c2261ea691ecf8a0c677156",
+     "tag": "",
+     "is_contract": 1,
+     "balance": "8146548469.706150495940807558",
+     "percent": "0.225736907068913407",
+     "is_locked": 0
+    }
+   ],
+   "honeypot_with_same_creator": "0",
+   "is_anti_whale": "0",
+   "is_blacklisted": "0",
+   "is_honeypot": "0",
+   "is_in_dex": "1",
+   "is_mintable": "1",
+   "is_open_source": "1",
+   "is_proxy": "0",
+   "is_whitelisted": "0",
+   "lp_holder_count": "20",
+   "lp_total_supply": "385534.3494295002",
+   "owner_address": "0x704ec5c12ca20a293c2c0b72b22619a4231f3c0d",
+   "owner_balance": "190447086.38183916",
+   "owner_change_balance": "0",
+   "owner_percent": "0.005278",
+   "personal_slippage_modifiable": "0",
+   "selfdestruct": "0",
+   "sell_tax": "0",
+   "slippage_modifiable": "0",
+   "token_name": "Degen",
+   "token_symbol": "DEGEN",
+   "total_supply": "36088686495.643161014784780417",
+   "trading_cooldown": "0",
+   "transfer_pausable": "0",
+   "transfer_tax": "",
+   "cannot_buy": "0"
+  }
+ }
+}

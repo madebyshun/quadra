@@ -1,0 +1,107 @@
+{
+ "url": "https://api.dexscreener.com/tokens/v1/base/0xe47dd43df381f597458f017293596e32edc9e801,0x0bb9b14e5db92d581f468a23744c5b80743d1701,0x82e568c022bea04048439a7b9c4a0ffdd270c835,0x0f5abe2779ef83491ef225cbeaac4ec827c71ba3,0x664fbd1ddc4b5d6a752a8d12ba2e78aa10d3cf3f,0xc858e4439cd5f38630d03ffd1e5defa1eea72ba3,0xeb0dd678f94e9f399d830637a4035902fc0ecfe2,0xf7806c66600424676c86dbd7d78d14ee795d886e,0x6d02706a5d8da3e5e2b98ccff4c51681189a86f5,0xf19c9c0df843701af630aaec20dee85bf6c8a85f,0x863809df5228cfd900e9e54448137c0b7f886701,0xd0b28b5676a3bef2f842db7fdabfa3b9df45b4c1,0x38767d150e0f9658db79db1ca9e8e62982f7b101",
+ "body": [
+  {
+   "chainId": "base",
+   "dexId": "uniswap",
+   "url": "https://dexscreener.com/base/0x9d9e59c667af56d94879c9cf05300b3c84e8ecece92a9319d084237e07471721",
+   "pairAddress": "0x9d9e59c667af56d94879c9cf05300b3c84e8ecece92a9319d084237e07471721",
+   "labels": [
+    "v4"
+   ],
+   "baseToken": {
+    "address": "0xF7806c66600424676c86dbD7d78d14EE795d886e",
+    "name": "copy fomo",
+    "symbol": "copyfomo"
+   },
+   "quoteToken": {
+    "address": "0x0000000000000000000000000000000000000000",
+    "name": "Ether",
+    "symbol": "ETH"
+   },
+   "priceUsd": "0.0002750",
+   "txns": {
+    "m5": {
+     "buys": 25,
+     "sells": 21
+    },
+    "h1": {
+     "buys": 155,
+     "sells": 112
+    },
+    "h6": {
+     "buys": 155,
+     "sells": 112
+    },
+    "h24": {
+     "buys": 155,
+     "sells": 112
+    }
+   },
+   "volume": {
+    "h24": 95592.73,
+    "h6": 95592.73,
+    "h1": 95592.73,
+    "m5": 4416.42
+   },
+   "liquidity": {
+    "usd": 10675.21,
+    "base": 19566229,
+    "quote": 1.9678
+   },
+   "marketCap": 275056,
+   "pairCreatedAt": 1790819201000
+  },
+  {
+   "chainId": "base",
+   "dexId": "uniswap",
+   "url": "https://dexscreener.com/base/0x348375a6101f642d619aec985b206ebfa929fdffaadb1a5d2cf830fb56d1dd38",
+   "pairAddress": "0x348375a6101f642d619aec985b206ebfa929fdffaadb1a5d2cf830fb56d1dd38",
+   "labels": [
+    "v4"
+   ],
+   "baseToken": {
+    "address": "0x6d02706A5D8Da3e5e2b98ccff4c51681189a86F5",
+    "name": "Hallow Inu",
+    "symbol": "HI"
+   },
+   "quoteToken": {
+    "address": "0x0000000000000000000000000000000000000000",
+    "name": "Ether",
+    "symbol": "ETH"
+   },
+   "priceUsd": "0.0002683",
+   "txns": {
+    "m5": {
+     "buys": 0,
+     "sells": 0
+    },
+    "h1": {
+     "buys": 114,
+     "sells": 78
+    },
+    "h6": {
+     "buys": 114,
+     "sells": 78
+    },
+    "h24": {
+     "buys": 114,
+     "sells": 78
+    }
+   },
+   "volume": {
+    "h24": 70059.38,
+    "h6": 70059.38,
+    "h1": 70059.38,
+    "m5": 0
+   },
+   "liquidity": {
+    "usd": 10540.13,
+    "base": 19877696,
+    "quote": 1.9344
+   },
+   "marketCap": 268390,
+   "pairCreatedAt": 1790819201000
+  }
+ ]
+}

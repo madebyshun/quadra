@@ -1,8 +1,10 @@
-import { useCallback, useEffect } from "react";
-import { Routes, Route, useNavigate, useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { Routes, Route, useSearchParams } from "react-router-dom";
+import { OpenWindowProvider } from "@/features/openWindow";
 import { Desktop } from "@/features/Desktop";
 import { FeaturePanel } from "@/features/FeaturePanel";
-import { resolveFeature } from "@/features/registry";
+import { DocWindow } from "@/features/DocWindow";
+import { resolveDoc, resolveFeature, windowTitle, type WindowId } from "@/features/registry";
 import { Window } from "@/ui/Window";
 import { Taskbar } from "@/ui/Taskbar";
 import { Docs } from "@/pages/Docs";
@@ -10,62 +12,219 @@ import { ApiPage } from "@/pages/ApiPage";
 import { Verify } from "@/pages/Verify";
 import { NotFound } from "@/pages/NotFound";
 import { AdaptersProvider } from "@/adapters/AdaptersProvider";
+import { WalletProvider } from "@/ui/WalletProvider";
+import { MarketsProvider } from "@/features/markets/MarketsProvider";
+import { Intro } from "@/intro/Intro";
+import { Assistant } from "@/ui/Assistant";
+import { Screensaver } from "@/ui/Screensaver";
+import { hasWebGL, shouldPlayIntro } from "@/intro/timeline";
+import {
+  DEFAULT_HEIGHT,
+  EMPTY_STATE,
+  centeredOrigin,
+  pageHeight,
+  reduceWindows,
+  topWindowId,
+  type Origin,
+} from "@/lib/windowManager";
 
+/**
+ * Measuring the viewport is the only thing a window needs the DOM for, and it
+ * happens here so `windowManager` stays pure. A doc page opens at prose height,
+ * a feature panel at panel height — the same split `Page.tsx` makes for the
+ * standalone routes, through the same `pageHeight`.
+ */
+/**
+ * Panels that open at prose height too. `x402` is a workbench: a price, a payee to
+ * confirm, limits, a wallet line, a button and an output box that fills with whatever the
+ * endpoint answered. MEASURED 2026-09-29 at the panel height (client 537): with a
+ * confirmed payee the Pay button fit and the output box sat 43px below it, which is the
+ * receipt of a payment out of sight — the same defect Send had with its own button.
+ */
+const TALL_PANELS: ReadonlySet<WindowId> = new Set<WindowId>([
+  "trade",
+  "coins",
+  "profile",
+  "x402",
+  "terminal",
+  "taskmgr",
+  "trash",
+  "rugsweeper",
+  "achievements",
+  "leaderboard",
+  "research",
+  "safety",
+  "markets",
+  // a money form grows by a whole review once it is filled in (MEASURED: Swap by ~50px)
+  "send",
+  "swap",
+  "bridge",
+  "launch",
+]);
+
+function openAction(id: WindowId): { type: "open"; id: WindowId; origin: Origin; height: number } {
+  const tall = TALL_PANELS.has(id);
+  /**
+   * A tall panel never opens SHORTER than an ordinary one. `pageHeight` fits prose to the
+   * viewport (innerHeight − 120), and on a 673px viewport that is 553 — below
+   * `DEFAULT_HEIGHT`, so "tall" measured shorter than the panel height it was meant to beat.
+   * Prose may shrink to fit; a workbench keeps at least the room every panel gets.
+   */
+  const height = resolveDoc(id) !== null
+    ? pageHeight(window.innerHeight)
+    : tall
+      ? Math.max(DEFAULT_HEIGHT, pageHeight(window.innerHeight))
+      : DEFAULT_HEIGHT;
+  return { type: "open", id, origin: centeredOrigin(window.innerWidth, window.innerHeight, height), height };
+}
+
+/**
+ * The multi-window desktop. `?do=<id>` still opens a window on first load — a
+ * saved link has to keep working — but once the page is up, the URL only ever
+ * tracks whichever window is on top; every other open window lives in
+ * `windowManager` state and is lost on refresh. That split is deliberate (see
+ * `TASKS.md`): the alternative, a comma-separated `?do=`, makes every drag and
+ * every focus change a history write.
+ */
 function Home() {
-  const [params] = useSearchParams();
-  const navigate = useNavigate();
-  const feature = resolveFeature(params.get("do"));
+  const [params, setParams] = useSearchParams();
+  const [state, dispatch] = useReducer(reduceWindows, EMPTY_STATE);
+  const openedFromUrl = useRef(false);
+  // decided once, on the first render: a `?do=` link, less motion or no GPU go straight to the desktop
+  const [intro, setIntro] = useState(() =>
+    shouldPlayIntro({ search: params.toString(), matchMedia: window.matchMedia?.bind(window), webgl: () => hasWebGL(document) }),
+  );
+  const endIntro = useCallback(() => setIntro(false), []);
 
-  const close = useCallback(() => navigate("/", { replace: false }), [navigate]);
+  /** Reads `?do=` exactly once, on mount — after that, the URL follows the topmost window, not the other way round. */
+  useEffect(() => {
+    if (openedFromUrl.current) return;
+    openedFromUrl.current = true;
+    const raw = params.get("do");
+    const initial = resolveFeature(raw) ?? resolveDoc(raw);
+    if (initial) dispatch(openAction(initial.id));
+  }, [params]);
+
+  const topId = topWindowId(state);
+  /**
+   * Parameters a window was opened with, not yet in the URL. MEASURED 2026-10-02 in a real browser:
+   * the router applies a search-param change in a transition, so the `do=` sync below — which runs on
+   * the same click — wrote the URL from the OLD parameters and dropped `a=…` / `t=…`. The sync merges
+   * them instead, whichever of the two writes lands last.
+   */
+  const pending = useRef<Record<string, string>>({});
 
   useEffect(() => {
-    if (!feature) return;
+    const current = params.get("do");
+    if (topId === current && Object.keys(pending.current).length === 0) return;
+    const next = new URLSearchParams(params);
+    for (const [k, v] of Object.entries(pending.current)) next.set(k, v);
+    pending.current = {};
+    if (topId) {
+      next.set("do", topId);
+    } else {
+      next.delete("do");
+    }
+    setParams(next, { replace: true });
+  }, [topId, params, setParams]);
+
+  useEffect(() => {
+    if (!topId) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape") dispatch({ type: "close", id: topId });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [feature, close]);
+  }, [topId]);
+
+  const openFeature = useCallback((id: WindowId) => dispatch(openAction(id)), []);
+  /** Open a window with what it should show — its parameters go into the URL, where it reads them. */
+  const openWith = useCallback(
+    (id: WindowId, extra: Readonly<Record<string, string>> = {}) => {
+      if (Object.keys(extra).length) {
+        pending.current = { ...pending.current, ...extra };
+        setParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            for (const [k, v] of Object.entries(extra)) next.set(k, v);
+            return next;
+          },
+          { replace: true },
+        );
+      }
+      dispatch(openAction(id));
+    },
+    [setParams],
+  );
+  const showDesktop = useCallback(() => dispatch({ type: "minimizeAll" }), []);
+  const openMarkets = useCallback(() => dispatch(openAction("markets")), []);
 
   return (
-    <>
-      {feature ? (
-        <div className="shell">
-          <Window title={feature.window} onClose={close}>
-            <FeaturePanel feature={feature} />
+    <MarketsProvider onOpen={openMarkets}>
+      <OpenWindowProvider open={openWith}>
+      <Desktop onOpen={openFeature} />
+      {/* `w.id: WindowId` is exactly the key space the two resolvers were built from — every open window resolves to one or the other. */}
+      {state.windows.map((w) => {
+        const doc = resolveDoc(w.id);
+        return (
+          <Window
+            key={w.id}
+            title={windowTitle(w.id)}
+            onClose={() => dispatch({ type: "close", id: w.id })}
+            layout={{
+              x: w.x,
+              y: w.y,
+              width: w.width,
+              height: w.height,
+              zIndex: w.z,
+              visible: !w.minimized,
+              onFocus: () => dispatch({ type: "focus", id: w.id }),
+              onMinimize: () => dispatch({ type: "minimize", id: w.id }),
+              onMove: (x, y) => dispatch({ type: "move", id: w.id, x, y }),
+              onResize: (width, height) => dispatch({ type: "resize", id: w.id, width, height }),
+            }}
+          >
+            {doc ? <DocWindow id={doc.id} /> : <FeaturePanel feature={resolveFeature(w.id)!} />}
           </Window>
-          {/*
-            `shell__hint` and nothing else. It sits on the desktop rather than inside
-            the window, so it is the one muted line on this page that needs white and
-            a shadow instead of the grey that reads as muted on beige. It carried
-            `dim` too until it was looked at in a browser, and `dim` is declared later
-            in the stylesheet at equal specificity, so it won: dark grey on a blue
-            gradient, effectively invisible. Nothing in jsdom can see that — both
-            class names were present and the text was in the document, so 473 tests
-            agreed it was fine.
-          */}
-          <p className="shell__hint">Esc closes this.</p>
-        </div>
-      ) : (
-        <Desktop />
-      )}
-      <Taskbar openWindow={feature?.window ?? null} onStart={close} />
-    </>
+        );
+      })}
+      <Taskbar
+        windows={state.windows.map((w) => ({
+          id: w.id,
+          title: windowTitle(w.id),
+          minimized: w.minimized,
+          focused: w.id === topId,
+        }))}
+        onToggle={(id) => dispatch({ type: "toggleFromTaskbar", id: id as WindowId })}
+        onStart={showDesktop}
+        onOpenFeature={openFeature}
+      />
+      {intro ? <Intro onDone={endIntro} /> : <Assistant />}
+      {!intro && <Screensaver />}
+      </OpenWindowProvider>
+    </MarketsProvider>
   );
 }
 
 export function App() {
   return (
     <AdaptersProvider>
-      <div className="desktop">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/docs" element={<Docs />} />
-          <Route path="/api" element={<ApiPage />} />
-          <Route path="/verify" element={<Verify />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </div>
+      {/*
+        One wallet session for the page, above the router: the taskbar tray and
+        the Connect wallet window are the same session, so signing in through
+        either shows in both. See `ui/WalletProvider.tsx`.
+      */}
+      <WalletProvider>
+        <div className="desktop">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/docs" element={<Docs />} />
+            <Route path="/api" element={<ApiPage />} />
+            <Route path="/verify" element={<Verify />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </div>
+      </WalletProvider>
     </AdaptersProvider>
   );
 }

@@ -1,69 +1,41 @@
+# The launchpad's contracts. Built and tested with Base Foundry (`base-forge`), the fork of
+# Foundry that knows Base's native precompiles — the B20 factory above all. Stock `forge`
+# cannot reach 0xB20f…0000 and aborts with "call to non-contract address".
 [profile.default]
 src = "src"
 test = "test"
 out = "out"
+# v4-core and v4-periphery come from npm (`../node_modules/@uniswap/…`) and are reached through
+# the symlinks in lib/: MEASURED, forge's analyser ("solar", used by `coverage`) cannot resolve a
+# relative import inside a library that lives outside the project root, though `build` can.
 libs = ["lib"]
 
-# Base 8453 is the only target. Cancun is live there, and pinning the version
-# keeps a local run and a deploy on the same EVM rules — "it worked on my
-# machine" is not a thing a pool that holds money gets to say.
+# Uniswap v4's PoolManager is pinned to exactly 0.8.26, and the tests deploy the real one.
+solc_version = "0.8.26"
 evm_version = "cancun"
-solc_version = "0.8.28"
-
 optimizer = true
 optimizer_runs = 200
+via_ir = false
 
-# Warnings are failures here. A shadowed variable or an unused parameter in a
-# contract that holds funds is not style — it is the shape most of these bugs
-# arrive in.
-#
-# Spelled `deny = "warnings"` because the older `deny_warnings = true` is
-# deprecated and prints a warning of its own on every invocation, which trains
-# the reader to skim warnings in the one project that has decided warnings are
-# errors. It belongs in THIS section: `[lint]` looks like the natural home and
-# forge accepts it there silently while resolving `deny` back to "never", so the
-# strictness switches itself off and the build goes green for the wrong reason.
-# Verify with `forge config | grep deny`, not by whether the build passed.
+# Warnings are failures in contracts that hold other people's liquidity. See the archived
+# privacy contracts' foundry.toml for why the key lives HERE and not under [lint]:
+# `forge config | grep deny` is the check, never "the build passed".
 deny = "warnings"
 
-# The linter grades `test/` as well as `src/`, and that is the wrong trade there.
-#
-# A test writes `int256(100e8)` and `uint256(root)` constantly, and every one of
-# those is an `unsafe-typecast` by the rule's definition. Fifteen of them appeared
-# the first time the suite was built. Annotating each with a justification would put
-# fifteen "this cast is safe" comments in front of literals, which is how a warning
-# stops meaning anything: the annotation becomes a reflex and the next reader skims
-# the one that is actually load-bearing.
-#
-# The narrow claim being made here: a bad cast in a test produces a test that checks
-# something other than what it says. A bad cast in `src/` loses money. Only the
-# second one deserves a build failure. MEASURED before writing this — all fifteen
-# warnings were in `test/ShieldedPool.t.sol`, none in `src/`, so this exemption
-# hides nothing that existed at the time.
-#
-# `src/` keeps the rule, which is where `_magnitude` carries its two explicit
-# per-branch justifications. If a cast in `src/` ever needs silencing, silence it at
-# the line with a reason — never by widening this list.
-#
-# 🔴 BOTH patterns are required, and the obvious single one does NOT work.
-# MEASURED: `test/**` matches nothing at all here — it leaves every warning in place
-# while looking exactly like a working exemption. `test/*` covers the top level only;
-# `test/**/*` is what reaches `test/doubles/`. Verified by appending a deliberately
-# bad cast to `test/doubles/TestTokens.sol` and counting warnings under each pattern:
-# `test/*` alone left 3 lines, the pair left 0. A too-narrow ignore and a working one
-# are indistinguishable until some file in a subdirectory finally trips the rule.
-#
-# The general trap: an ignore list that silently matches nothing reads as success.
-# Whenever you edit this list, add a violation you expect it to swallow and confirm
-# the count goes to zero — do not infer it from a clean build.
+# LaunchFactoryV3.t.sol reads the sources it checks ("no code path removes liquidity"). Read-only,
+# and only src/.
+fs_permissions = [{ access = "read", path = "./src" }]
+
+remappings = [
+  "base-std/=lib/base-std/src/",
+  "@uniswap/v4-core/=lib/v4-core/",
+  "@uniswap/v4-periphery/=lib/v4-periphery/",
+  "forge-std/=lib/v4-core/lib/forge-std/src/",
+  "solmate/=lib/v4-core/lib/solmate/",
+]
+
 [lint]
 ignore = ["test/*", "test/**/*"]
 
-# Foundry's fuzzer is the point of writing these tests here rather than in
-# TypeScript: the double-spend and the balance arithmetic want a few hundred
-# random inputs, not three hand-picked ones.
 [fuzz]
 runs = 512
-
-[profile.ci]
-fuzz = { runs = 4096 }

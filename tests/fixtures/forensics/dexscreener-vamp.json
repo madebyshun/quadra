@@ -1,0 +1,51 @@
+[
+ {
+  "dexId": "uniswap",
+  "labels": [
+   "v4"
+  ],
+  "pairAddress": "0x0682219c877bd478941bb8600f5088a3776ff0c5618e20d2a1971d33d22a8504",
+  "pairCreatedAt": 1790936525000,
+  "baseToken": {
+   "address": "0xE51D24C8795c21D9f119A81625820a30048a3387",
+   "name": "VampCoin",
+   "symbol": "VAMP"
+  },
+  "quoteToken": {
+   "address": "0x0000000000000000000000000000000000000000",
+   "name": "Ether",
+   "symbol": "ETH"
+  },
+  "priceUsd": "0.0002745",
+  "liquidity": {
+   "usd": 10776.15,
+   "base": 19627792,
+   "quote": 1.9627
+  },
+  "volume": {
+   "h24": 97355.69,
+   "h6": 97355.69,
+   "h1": 97355.69,
+   "m5": 0
+  },
+  "txns": {
+   "m5": {
+    "buys": 0,
+    "sells": 0
+   },
+   "h1": {
+    "buys": 183,
+    "sells": 143
+   },
+   "h6": {
+    "buys": 183,
+    "sells": 143
+   },
+   "h24": {
+    "buys": 183,
+    "sells": 143
+   }
+  },
+  "url": "https://dexscreener.com/base/0x0682219c877bd478941bb8600f5088a3776ff0c5618e20d2a1971d33d22a8504"
+ }
+]

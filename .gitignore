@@ -22,3 +22,7 @@ contracts/broadcast/
 *.key
 *.pem
 notes.json
+
+# the archived pool's Foundry build output
+archive/privacy/contracts/out/
+archive/privacy/contracts/cache/

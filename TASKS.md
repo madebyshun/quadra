@@ -1,47 +1,123 @@
 # TASKS — what is left to finish Quadra
 
-Handoff document. Written 2026-09-27 for a session that has never seen this repo.
+Handoff document. Written 2026-09-27 for a session that has never seen this repo, and
+re-pointed on 2026-09-30 when the owner changed what the product is (see "The direction").
 Read `CLAUDE.md` first — it has the constraints and the rules that exist because
 something broke. This file is only the work.
 
 **Before you start anything:** `npm install`, then `npm run gate`. It must be green
-(tsc clean, **1084 tests in 30 files** as measured 2026-09-28, 100% on
+(tsc clean, **1968 tests in 97 files** as measured 2026-10-21, after wiring the app to launchpad v3 — 1945/96 on 2026-10-14 (1918/95 before the coin page, same day), 1684/76 on 2026-10-02, 1682/76 before the doc
+audit's fixes —; `npm run gate:contracts` 77 tests (v2 30 + v3 47), 100% over 3 files — 100% on
 statements/branches/functions/lines, build succeeds). If it is not green on a fresh
 checkout, fix that before touching a task — you are looking at drift, not at your own
-change.
+change. ⚠️ The count FELL on 2026-09-30, from 1353/45, deliberately: the privacy model
+was archived (its tests went with it to `archive/privacy/tests/`), then the skills added
+their own. It fell again on 2026-10-02, from 1627/68, when o1 was taken out of Launch and its
+tests archived to `archive/o1/`. A drop you cannot account for like that is still the checkout,
+not your change.
 
-If you are touching Solidity, `npm run gate:contracts` is the second, separate gate:
-`forge build` → `forge test` → 100% coverage on `contracts/src/` → the suite table in
-`contracts/README.md` matching what actually ran. It needs Foundry, which is exactly why
-it is not part of `npm run gate` — that one has to stay runnable on a bare clone with no
-network.
-
-No Solidity test count is stated here, on purpose. It lives once, per suite, in the table
-at the bottom of `contracts/README.md`, and `scripts/check-contract-tests.ts` fails if that
-table and the run disagree. The count was previously repeated in six places across four
-files and was wrong in all six — they said 90 after the real number had reached 104. The
-TypeScript figure above is still a dated measurement with nothing behind it; re-measure it
-in the same commit that changes it.
+The Solidity gate is back for the launchpad: `npm run gate:contracts` (Base Foundry). 30
+tests, 100% of `contracts/src`; not part of `npm run gate`. (The shielded pool's Foundry
+project stays in `archive/privacy/contracts/`.)
 
 **Before you report anything done:** `npm run gate` again, green, all three parts.
 Say which three. "Build is green" has been used to mean "tsc passed" and it was not.
 
 ---
 
+## The direction — decided by ShunTr on 2026-09-30
+
+**Read this before picking a task.** It replaces the 2026-09-29 direction ("private money
+for AI agents"), which is kept in the Archive at the bottom with the reasoning behind it.
+
+> **Quadra is an on-chain supercomputer for Base: look up any wallet, token or
+> transaction, scan for traps before you act, and send, swap, bridge and launch — every
+> action signed in your own wallet. It never holds your key.**
+
+The owner's words, 2026-09-30: drop the private send; reposition as an "on-chain
+supercomputer"; the server is on **Vercel**; the **o1 API key will be provided**; launch is
+**always public** and the "private" model is dropped; **build it complete locally first —
+the owner tests each feature before anything is deployed to production.**
+
+What was decided with it:
+
+| Decision | Status |
+|---|---|
+| Position as above | **done 2026-09-30** — `brand.ts`, `index.html`, Docs, every window's copy |
+| Drop the privacy model: shielded pool, notes, backups, private send, the `router` feature | **done 2026-09-30** — ARCHIVED, not deleted: `archive/privacy/` (src, tests, contracts) |
+| One skill, three ways in: a window, the Terminal, and (P4) an MCP tool | **done 2026-09-30** — `src/skills/`, see T12 |
+| Server on Vercel — the forwarder and every server-held key live there | **decided**; see T3 |
+| Launch goes through o1's public API, always public | **REPLACED 2026-10-02** by this app's own launchpad (T22), paired with ETH or a Coinbase stock; o1 taken out of Launch and archived under `archive/o1/` |
+| Send, swap (Relay), bridge to Robinhood Chain (Across) — each checked before the wallet | **built in development 2026-09-30** — T13, T14, T16 |
+| Connect any browser wallet by name (EIP-6963), remember the pick, disconnect | **built in development 2026-09-30** |
+| `inference` switched off — a stub with no enclave behind it | **done 2026-09-30** (off, not deleted) |
+| Fees: swap and bridge integrator fee (the o1 referral share was archived with o1, 2026-10-02). Every fee OFF while `CONTRACTS.treasury` is `null` | **decided**; the address and the percentages are ShunTr's — see "Decisions" |
+
+The phases. A phase does not start until the one before it is green **and the owner has
+tested it locally**:
+
+- **P0 — Foundation.** The skill shape (`Skill` → `Report`), the Terminal, and the rule
+  that every report names its sources. **Done in development 2026-09-30.** The Vercel side
+  is T3 and waits until there is something server-side to run (T17 is the first).
+- **P1 — Read skills** (no money moves). Done 2026-09-30 (T12), then replaced 2026-10-01 by
+  Token Verdict, Gate, Radar, Forensics, Launcher and Send Check (T21).
+- **P2 — Write skills** (you sign). Send (T13), swap with an integrator fee (T14), revoke
+  approvals (T15), bridge — Across to Robinhood Chain (T16), hidden since 2026-10-02.
+- **P3 — Launch** — through this app's own launchpad on Base (T22), ETH or stock pairs. o1 (T17)
+  was the first route and is archived.
+- **P4 — Agents** (T18). Every skill as an MCP tool; write skills as *prepared, unsigned*
+  transactions an agent requests and the owner approves.
+
+**What Quadra must be that Base Rooms is not** — the closest product (a desktop OS on Base
+with trade, safety, research, a terminal, MCP agents, and o1 launches). With privacy gone,
+the difference is: (1) **checked before signed** — live prices only, addresses verified,
+no guessed numbers, every report naming what it could not check; (2) **agent-first** — every
+skill an MCP tool, and paid x402 endpoints of any origin already payable (T11).
+
+### Fees, as answered to the owner on 2026-09-30
+
+| Where | Rate | Who sets it |
+|---|---|---|
+| Swap (aggregator integrator fee) | 0.1% proposed | ShunTr — confirm |
+| Bridge (Across app fee, paid on Robinhood Chain) | 0.1% | ShunTr — confirm. Bridge hidden since 2026-10-02 |
+| Launchpad | 20% of each pool's 1% fee (80% to the launcher) | the contract (T22) |
+| x402 skills over this app's API | $0.005–$0.10 per call (`SKILL_PRICES`) | ShunTr — starting figures |
+| The skills in the app and over MCP | free | — |
+
+All of them pay `CONTRACTS.treasury` — **set by ShunTr on 2026-09-30 to
+`0xD5C1dFc036F9911348EA8065F73c8123f4013FAB`** (measured: a wallet with an EIP-7702 MetaMask
+Smart Account delegation, one key on Base and on Robinhood Chain), so swap and bridge fees are
+**ON at 0.1%**. Relay's fee accrues at Relay and must be claimed there; Across's is paid on
+Robinhood Chain.
+
+---
+
 ## Where the product actually is
 
-| Panel | Flag | State |
+| Window | Flag | State |
 |---|---|---|
-| `send` | on | built, works against the local pool |
-| `inference` | on | built, works against the local enclave |
-| `x402` | on | built, **free runs work end to end against the live catalog; paid runs are quoted, priced and CHECKED but cannot be signed** (T4 step 2 done 2026-09-28) |
-| `hooks` | on | built, read-only |
-| `mcp` | on | built, read-only |
-| `swap` | on | **not built** — amber notice, waiting on a deployed pool (T7) |
-| `router` | on | **not built** — amber notice, waiting on wallet signing (T4) |
-| `audit` | on | **not built** — amber notice, waiting on wallet signing (T4) |
-| `bridge` | off | rendered dimmed |
-| `launch` | off | rendered dimmed |
+| `wallet` | on | built — every browser wallet by name and icon (EIP-6963), WalletConnect, Coinbase Smart Wallet; remembers the pick; shows which wallet and the EIP-55 address; Disconnect. **Never creates a wallet** (hard rule 5). `VITE_WALLETCONNECT_PROJECT_ID` set 2026-09-30 (valid). **Switch account** opens the wallet's account picker (`wallet_requestPermissions`); Disconnect revokes the site's access |
+| `terminal` | on | **built 2026-09-30** — every skill, typed; `help` lists them. Output is `reportText`, the same text an agent will read |
+| `research` | on | **rebuilt 2026-10-01** — Radar, Verdict, Forensics, Launcher (T21) |
+| `safety` | on | **rebuilt 2026-10-01** — Verdict (a simulated buy-and-sell, the code, the holders, the launcher, the market; three answers and a score), Gate, Send Check (T21) |
+| `markets` | on | **built 2026-09-30** — desktop gadget + window: Base tokens and Coinbase stocks on Base, prices from DexScreener, charts from GeckoTerminal, 24h change, sparkline, 1D/7D/30D chart; the Robinhood Chain half is hidden (`FLAGS.robinhood`) |
+| `trade` | on | **built 2026-09-30** — Crypto/Stocks on Base, Buy/Sell for USDC or ETH through Swap's engine (T19) |
+| `send` | on | **built 2026-09-30** — ETH or any token to an address or Basename; one signature (T13) |
+| `swap` | on | **built 2026-09-30** — Relay; exact approval + swap to pinned verified contracts; result measured afterwards (T14) |
+| `bridge` | **hidden** (2026-10-02, Base first) | **built 2026-09-30** — Across to Robinhood Chain 4663: ETH → ETH, USDC → USDG; calldata decoded and checked; arrival measured on 4663 (T16) |
+| `coins` | on | **built 2026-10-02** — the launchpad's front page, o1-style, as a window: numbers, All/Crypto/Stocks, Trending/Vol/New/Liquidity, a page per coin (`?do=coins&t=0x…`) with buy/sell, fees and a verdict |
+| `profile` | on | **built 2026-10-02** — any wallet (`?do=profile&a=`): who, holdings (launchpad coins read on chain), coins launched + Collect all, activity with address-poisoning lures named |
+| x402 tools | on | **built 2026-10-02** — gate, forensics, launcher, sendcheck, launch (prepared), radar scored; priced per skill; the x402 window sells only this app's own tools (BlueAgent and any-URL hidden, `FLAGS.x402Others`). Next: list them on the Bazaar — needs the CDP key and T3 |
+| `launch` | on | **this app's launchpad (T22)** — v1 (ETH) deployed and launched on; v2 (ETH or Coinbase stock pairs) deployed 2026-10-02 at `0xef1F…0c03`, no stock enabled yet. o1 taken out 2026-10-02 |
+| `x402` | on | built — sells this app's own tools (`X402Own`); BlueAgent and any-URL (T4, T11) are kept but hidden behind `FLAGS.x402Others = false` |
+| `mcp` | on | built, read-only: 5 own tools plus every skill as `quadra_<id>` (7) — T18 |
+| `taskmgr` `trash` `soon` `rugsweeper` `achievements` `leaderboard` | on | **built 2026-10-14** (T23) — Task Manager, Recycle Bin, Coming Soon, Rugsweeper, Achievements, Leaderboard; plus Q, block clock + sound, screensaver, easter eggs, Base card |
+| `inference` | **off** | switched off 2026-09-30 — a local stub, no enclave |
+| `audit` | **off** | switched off 2026-09-29 (T5) |
+| `hooks` | **off** | switched off 2026-09-29 — a working read-only panel, off-thesis |
+
+Flags that are not windows: `robinhood` (off — hides Bridge and Markets' Robinhood half),
+`x402Others` (off — see `x402`), `webhooks` (off, nothing reads it yet).
 
 Flags live in `src/config/chain.ts` → `FLAGS`. The "built" set is `BUILT` in
 `src/features/FeaturePanel.tsx`. A panel is honest today; the failure mode to avoid
@@ -49,14 +125,13 @@ is making one *look* finished before it is.
 
 Each amber notice names its own blocker — `WAITING_ON` in the same file, with `UNBUILT`
 derived from `FLAGS` and `BUILT` rather than typed out, and a test asserting the two
-agree in both directions. That matters for this handoff specifically: **two of the three
-are waiting on the same piece**, which the old shared wording hid, and which changes
-what to build first.
+agree in both directions. A switched-off window has no entry there on purpose: a reason
+kept for a window nobody can open is an excuse for nothing.
 
-Every contract address in `src/config/chain.ts` → `CONTRACTS` is `null`. That is
-deliberate and load-bearing. `requireContract()` throws naming the unset constant.
-**Do not put a zero address anywhere.** A zero address in a payment path looks real
-and fails silently.
+In `src/config/chain.ts` → `CONTRACTS`, `treasury`, `launchFactory` (v2) and
+`launchFactoryV1` are set and verified; `token` is `null`, deliberately — and load-bearing. `requireContract()` throws naming the unset
+constant. **Do not put a zero address anywhere.** A zero address in a payment path looks
+real and fails silently.
 
 ---
 
@@ -107,6 +182,13 @@ tool before writing the finding down.
 
 ## T3 — Decide and build the production forwarder
 
+✅ **Where: decided 2026-09-30 — Vercel.** The owner chose it along with the new direction.
+What is left is the project itself and the allowlist, and it waits until there is something
+server-side worth deploying: the first is the paid API (`server/api.ts`) with the CDP key,
+then the forwarder, charts and stocks. `api/` is already
+in `tsconfig.json`'s include list and is empty. Nothing deploys until the owner has tested
+locally. The reasoning below is kept because it is still why a server is needed at all.
+
 **Size:** medium. **Blocks: T4, and the entire x402 surface at launch.** This is the
 real architectural gap and it is currently invisible because development papers over it.
 
@@ -135,6 +217,15 @@ So the choice is:
 **(a) is the obvious one**, but it changes the deployment target, so **confirm with
 ShunTr before building it.** Do not silently convert the repo to Next.
 
+⚠️ **Widened 2026-09-29 by T11 — and half-answered.** The forwarder now EXISTS as code:
+`src/server/forward.ts`, a Fetch-API handler (`Request → Response`) that Cloudflare Workers,
+Vercel/Netlify functions and Node 18+ all run unchanged, mounted on the dev server by
+`vite.config.ts`. So this task is no longer "build a forwarder" — it is **where to run
+`forward`, and with which `allowOrigins([...])`**. Running it with `anyPublicHttps` (the dev
+policy) in production would make it an open proxy; its header explains the four limits it
+has and the one it cannot have without a resolver (a public name resolving to a private IP).
+The `/upstream` BlueAgent proxy is still separate and could be folded into it.
+
 **Done when:** a production build, served the way it will really be served, runs a
 free tool end to end — and the honest-failure path still works when the forwarder is
 absent.
@@ -158,9 +249,25 @@ code. 109 of the 115 catalog tools are paid. Making them run means:
    can only *relabel* that measurement, never replace it. See **Step 1l** under T7 for
    the near-bug this avoided (a hex string comparison against `BASE.idHex` that passes
    for Base and silently breaks for any chain id containing `a`–`f`), and for why this
-   build refuses to call `wallet_addEthereumChain`. ⚠️ **Not wired into any panel yet** —
-   measured in the bundle, not inferred: `tests/wallet.test.ts` is the only importer and
-   the bundle did not grow a byte. The next increment is the React seam.
+   build refuses to call `wallet_addEthereumChain`. **Now wired in** — `src/ui/WalletStatus.tsx`
+   is the panel; the "not wired into any panel yet" note above described an earlier point
+   in this same day and is stale (left here as the record of how it was measured, not as
+   current status — see step 6 below for the panel wiring).
+   **Two more connectors, same day** — `src/lib/connectors.ts` adds `walletConnectProvider`
+   and `coinbaseProvider`, both dynamically `import()`ed so neither SDK is in the main
+   chunk until a user clicks the button that needs it (measured: the build produces a
+   separate ~117 kB chunk, main chunk grew 256.01 → 258.01 kB). Both return a plain
+   `Eip1193Provider` and plug into the *existing* `connectWallet`/`readWallet`/
+   `requestBaseChain` unchanged — no wagmi, no React context, no new state-management
+   layer, because those three functions already took `provider` as an optional parameter.
+   `WALLETCONNECT_PROJECT_ID` in `src/config/connectors.ts` is `null` until
+   `VITE_WALLETCONNECT_PROJECT_ID` is set (see `.env.example`) — same shape as
+   `CONTRACTS.shieldedPool`, refused rather than guessed. **Still open:** ShunTr has not
+   yet supplied a real Project ID, so `walletConnectProvider()` is exercised in the live
+   preview only as far as its own refusal message; nobody has connected a real
+   WalletConnect session against this build yet. Coinbase Smart Wallet needs no Project ID
+   and is otherwise untested against a real wallet for the same reason nothing in T4 was
+   until today: there is no owner-in-the-loop way to click a real popup in this session.
 2. **Read the payment requirements off the live 402 — and CHECK them.** ✅ **DONE
    2026-09-28** — `src/lib/requirements.ts`. It did not end up being an assertion pass over
    `Price`, because measuring the live 402 proved that impossible: `Price` kept four of the
@@ -172,28 +279,52 @@ code. 109 of the 115 catalog tools are paid. Making them run means:
    real 402), and upstream asks for `maxTimeoutSeconds: 120` where this build's fallback said
    600. See **Step 1k** under T7 for the measured table, the per-field authority asymmetry,
    and why an unrecognised payee is a value rather than a throw.
-3. **Sign an EIP-3009 `TransferWithAuthorization`.** ✅ **The digest half is DONE** —
-   `src/lib/eip712.ts`, built 2026-09-28 out of order because it needed no wallet and no
-   decision. `authorizationDigest(USDC_DOMAIN, auth)` is the 32 bytes to sign, and its
-   domain separator is verified equal to the deployed contract's own
-   `DOMAIN_SEPARATOR()` on Base. See **Step 1j** under T7 for the full argument. What is
-   left here is `eth_signTypedData_v4` and the `{v,r,s}` split — and note the module holds
-   no key by design (rule 5), so if signing ever moves inside it, that is a custody change
-   and ShunTr's call. Use `validityWindow` for the window; do not hand-roll `validBefore`,
-   and read why before raising its cap.
-4. **Base64 the authorization into an `X-PAYMENT` header** and re-POST the tool.
-5. **Read the settlement back.** `Settlement` in `types.ts` has three variants and only
-   `kind: "settled"` carries a `txHash` — by design, so an unsettled run cannot render
-   as paid. Keep that property. Do not add a `paid: boolean`.
-6. **Relax `whyNot`** so a paid price is refused only when there is genuinely no wallet
-   or no chain — not unconditionally. Read the long comment on `Catalog.whyNot` before
-   you change it; it explains why this is per-price and not per-adapter. ⚠️ **Partly done
-   already, and note what it now has to keep doing:** `HttpCatalog.whyNot` composes two
-   independent reasons — the missing wallet *and* an unrecognised payee — with the wallet
-   first because it is the one that disappears when this step lands. When you delete
-   `NO_WALLET` from that string, the payee refusal must survive on its own. It is not
-   decoration: `authorizationFor` throws on it too, so removing the wrong half here means
-   the button enables and the signature still refuses.
+3. **Sign an EIP-3009 `TransferWithAuthorization`.** ✅ **DONE 2026-09-28** —
+   `src/lib/eip712.ts` has the digest half (`authorizationDigest(USDC_DOMAIN, auth)`,
+   domain separator verified equal to the deployed contract's own `DOMAIN_SEPARATOR()`
+   on Base — see **Step 1j** under T7). `src/lib/payment.ts` has the rest:
+   `signAuthorization` calls `eth_signTypedData_v4` with the `types`/`domain`/`message`
+   `typedDataFor` builds from one `Authorization`, and checks the answer is a well-formed
+   65-byte signature before returning it. **There is no `{v,r,s}` split** — measured
+   against the only client of this payee that has actually been paid (upstream's own
+   `HubView.tsx`), which passes the packed hex string straight through and lets the
+   facilitator recover the signer; see the module header in `payment.ts` for the full
+   argument. `signAuthorization` holds no key (rule 5) — it asks the wallet passed to it,
+   same boundary as `eip712.ts` and `requirements.ts`.
+   Also added, measured the same day: `SETTLEMENT_SLACK_SECONDS` in `eip712.ts` (60s,
+   copied from that same working client) and the `askedSeconds`/`lifetimeSeconds` split
+   in `PaymentRequirements` — the signed window is now the ask plus slack, capped at
+   `MAX_AUTHORIZATION_SECONDS` on the **signed** total, not the ask. Without the slack, a
+   payee asking for exactly `maxTimeoutSeconds` got a signature that could expire before
+   settlement finished.
+4. **Base64 the authorization into an `X-PAYMENT` header.** ✅ **DONE 2026-09-28** —
+   `paymentHeader` in `src/lib/payment.ts`, wire format also measured off `HubView.tsx`:
+   `accepted` mirrors the 402's `accepts[0]` field for field (including the key that was
+   missing from that format until 2026-09-26 upstream), `network` is CAIP-2, and every
+   value in the header comes from `requirements`/`auth` rather than being recomputed —
+   see the function's own comment for why re-deriving `to` from the payee a second time
+   would be the wrong call. **Re-POSTing the tool with this header is still open** — that
+   is the forwarder from T3, not this step, and nothing here calls `fetch`.
+5. **Read the settlement back.** ✅ **DONE 2026-09-28** — unchanged from the plan:
+   `Settlement`'s three variants still gate on `kind === "settled"` for a `txHash`, and
+   no `paid: boolean` was added. `X402Panel` renders whichever variant `catalog.run`
+   returns; it does not infer settlement from anything else.
+6. **Wire steps 1–4 into a panel, then relax `whyNot`.** ✅ **DONE 2026-09-28** —
+   `X402Panel.tsx`'s `go()` now signs only when `wallet.kind === "ready"`
+   (`injectedProvider` → `authorizationFor` → `signAuthorization` → `paymentHeader`),
+   and otherwise calls `catalog.run(toolId, input)` with no payment at all, trusting the
+   adapter to answer honestly either way — `LocalCatalog` runs it anyway (its documented
+   contract), `HttpCatalog` throws its own legible `NO_WALLET` message. The Run button is
+   **no longer gated on wallet state** — that was the actual bug, not a missing
+   `whyNot(wallet)` parameter: the button and `go()` were blind to which adapter was
+   behind the quote, so a wallet-less run of a *free-to-run-locally* paid stub was being
+   blocked for a reason that had nothing to do with the adapter in front of it.
+   `Catalog.whyNot` itself was **not changed** — it stayed per-price the whole time
+   (`LocalCatalog.whyNot` always returns `null`; `HttpCatalog.whyNot` reports only an
+   unrecognised payee, never a missing wallet — re-read it, it never composed a
+   `NO_WALLET` reason to begin with). The ⚠️ note above about deleting `NO_WALLET` from
+   that string described a design that was not actually in the code; the real fix lived
+   entirely in the panel.
 
 **Hard constraints:**
 - The panel must keep re-quoting on every tool change. A stale price is how someone
@@ -213,7 +344,11 @@ throwing something the user cannot read.
 
 ---
 
-## T5 — Build `audit`
+## T5 — Build `audit` — ⏸ SWITCHED OFF 2026-09-29, not planned
+
+**Not part of the product as positioned** (see "The direction" at the top). The flag is
+off, the notice is gone, and nothing here should be built unless ShunTr turns it back on.
+Kept below as a record of what was measured, because the measurements are still true.
 
 **Size:** small-to-medium. **Blocked by T4 — measured 2026-09-27, no longer a guess.**
 
@@ -246,21 +381,541 @@ absent data — never a fabricated low score.
 
 ---
 
-## T6 — Build `router`
+## T22 — This app's own launchpad on Base — v1 ✅ DEPLOYED 2026-10-02 (`0xcDb2…B8a5`); v2 (stock pairs) ✅ DEPLOYED 2026-10-02 (`0xef1F…0c03`), ⏳ no stock enabled yet; v3 (anti-sniper hook) 🔨 BUILT 2026-10-14, NOT deployed; ⚠️ NOT AUDITED
 
-**Size:** medium. **Blocked by T4.**
+**v3, 2026-10-14:** `LaunchFactoryV3.sol` + `LaunchHook.sol` — 1% or 3% chosen by the creator, an
+anti-sniper fee decaying 50% → that fee over 15 s (first buy exempt), the hook deployed by the
+factory at a mined CREATE2 salt, factory-only liquidity during the window, `beforeInitialize`
+refusing foreign pools (closes a v2 front-run gap). 47 tests at 100%. Simulated: sniper at +1 s paid
+46.7%, buyer at +20 s 1%; gas +8.5% over v2.
+- [ ] Owner: deploy (`contracts/script/DeployLaunchFactoryV3.s.sol`) — and an audit
+- [ ] Wire the app: `launch(… fee)`, pool key fee = `0x800000` (dynamic), new `LAUNCHPAD_EXPECTS`
 
-`router` — "pay any service, any token" — is the general case of what the x402 panel
-does for one catalog. Needs: an arbitrary 402 endpoint as input, a quote read off that
-endpoint's own 402, and the same signing path as T4.
+The owner, 2026-10-02, after a test launch on o1 succeeded: "not o1 as the launchpad — build our
+own on Base". Chosen: own contracts (factory + locked liquidity), 1% pool fee, 80% launcher / 20%
+this app. Built: `contracts/src/LaunchFactory.sol` (+ 21 Foundry tests at 100%, `gate:contracts`),
+`scripts/simulate-launchpad.sh` (since replaced by the `.ts`; deploy → launch → collect on real mainnet state — MEASURED,
+the launcher got 90.5M tokens for 0.5 ETH, collect paid 0.004 ETH / 0.001 ETH), the deploy script
+for the owner, and the Launch window's "Base launchpad" half. Read contracts/README.md.
 
-**Open question you must not answer alone:** "any token" implies a swap or a
-multi-asset settlement path. Today everything is USDC. Ask ShunTr what "any token"
-means here before building a swap into the payment path.
+**Deployed by the owner 2026-10-02** at `0xcDb2eC1c487fbcB6B4AF25cCD86aFf8120FaB8a5` (tx
+0xc51a517c…, block 52,066,273, 0.0000123 ETH). Checked before it went into `CONTRACTS.launchFactory`:
+fully verified on Blockscout, bytecode identical to this repo's build, every parameter read back.
+**First real launch, by the owner, 2026-10-02:** tx 0x58762159…, token `0xB200…0dF9` — read back from
+the chain: supply 1e27, no roles held, pool at tick 191200, creator = the owner's address (sent via
+MetaMask's 7702 DelegationManager); a bot bought one block later through Uniswap's UniversalRouter.
+An audit before real money at scale is advised.
+**Done after the deploy (2026-10-02):** Token Verdict recognises launchpad tokens (the contract's
+guarantees as rows, the creator from the factory — the generic path had said "through
+DelegationManager" for a MetaMask 7702 launch); the radar names this launchpad; the Launch window
+lists the wallet's own launches with the fees `collect` would pay now, one Collect each. Trading
+needed nothing: MEASURED, Relay quoted both a buy and a sell of the first launch minutes after it.
+Fixed on the way: a SELL refused by Relay as "impact too high" painted every fresh single-sided
+launch red (Relay prices the sell before the simulated buy) — now "not checked".
+**v2 — stock pairs, built 2026-10-02** (the owner: "pair with stocks on Base like o1, and take o1
+out of Launch"). `contracts/src/LaunchFactory.sol` is v2: a quote admin (the deployer, two-step to
+hand on) enables quote assets with an opening tick (`setQuote`); a launch names its quote — ETH or
+an enabled asset — and its first buy in that quote (an asset pulled by `transferFrom` after an exact
+approval); either pool orientation; fees in both currencies, anything a recipient or a stock's
+policy refuses kept in `owed` for `withdraw(currency)`. 30 Foundry tests at 100%; the mainnet
+simulation (`scripts/simulate-launchpad.ts`) ran deploy → enable NVDAc → buy NVDAc via Relay → an
+ETH launch and an NVDAc launch with first buys → collect both, every call succeeding against
+Coinbase's real NVDAc. `scripts/quote-ticks.ts` prices each stock's tick from live prices
+(8 decimals — hard rule 3). v1's source is kept byte-for-byte in `contracts/deployed/`. The app
+reads BOTH factories (`factories()` in `skills/launchpad.ts`): verdict, radar and "Your launches"
+cover v1 and v2; the Launch window offers ETH plus every stock v2 has ENABLED (re-read at Review,
+transfer-paused stocks never offered), approves exactly, and shows fees in the quote's own units.
+o1 was taken out of Launch the same day and archived (`archive/o1/`, with how to bring it back).
+**v2 deployed by the owner 2026-10-02** at `0xef1F427bB57e0ECd7BB8051cE8bC7AAb709a0c03` (tx
+0xd05554c5…, block 52,068,913, ~0.0000166 ETH): verified, bytecode identical with immutables masked,
+every value read back, set in `CONTRACTS.launchFactory`. **The owner's step left:** run the `setQuote`
+lines `npx vite-node scripts/quote-ticks.ts 0xef1F427bB57e0ECd7BB8051cE8bC7AAb709a0c03` prints. Not built: a `withdraw(currency)` button (`owed`).
+**Next, not started:** simulate the round trip for v4 pools whose key is known (a launchpad pool,
+or one found by its Initialize log) through Uniswap's UniversalRouter, so a fresh pool's sell is
+measured instead of "not checked".
 
 ---
 
-## T7 — Foundry scaffold + the shielded pool contract
+## T23 — "Make it more fun" — ✅ BUILT in development 2026-10-14
+
+The owner, 2026-10-14: "make it more fun", positioning kept. Tier A+B built (a "Base Apps"
+directory dropped by the owner; `$QUADRA` stays postponed — T9). Details in CLAUDE.md's Layout.
+- [x] Task Manager, block pulse (one poller, 4 s), tray block clock + sound (off by default)
+- [x] Recycle Bin (≥90% liquidity gone in 3 h, unread receipts counted), Coming Soon folder
+- [x] Q the assistant (real events only), Terminal easter eggs, screensaver
+- [x] Rugsweeper, Achievements, Leaderboard, Base card (Profile)
+- [x] Wallet "Your fees": Claim all + Withdraw what a factory owes; Coinbase Smart Wallet (passkey)
+      as the no-extension path (non-custodial, owner 2026-10-03)
+- [x] Trade a launchpad coin on its own v4 pool (Quoter + Universal Router + Permit2)
+- [x] Launchpad indexer (dev server only) and launchpad recognition (basepad, Feel.cash/Doppler,
+      Clanker, Zora); origin never names a 7702 relay or a bundler
+- [ ] The indexer on Vercel (T3), off Tenderly's public gateway
+- [ ] v4swap: keep revert data so "no liquidity" and "no pool" read differently
+
+## T21 — Market-grade intelligence: Token Verdict + Launch Radar — ✅ PHASE 1 DONE in development 2026-10-01
+
+The owner, 2026-10-01: Research, the x402 tools and the MCP tools must be worth paying for — not
+what Basescan already shows. The seven basic skills of T12 were **deleted outright** ("Xóa hẳn");
+their shared helpers stay as library code. Three phases, in the owner's order:
+
+1. ✅ **Token Verdict** (`verdict 0x…`) and **Launch Radar** (`radar [minutes]`) — `src/skills/
+   verdict.ts`, `simulate.ts`, `origin.ts`, `radar.ts`. Tested on real captures
+   (`tests/fixtures/verdict/`, `tests/fixtures/radar/`), checked live in the browser. In the
+   Research and Safety windows, the Terminal, the paid API and MCP (the bundle is rebuilt).
+2. **Early buyers / snipers + Holder clusters** — who bought in the first blocks, and which
+   holders share a funder. Next. The radar's busiest "no hook" launches already look like one
+   bot farm (near-identical liquidity and trade counts) — clusters should be able to say so.
+3. **Stock premium radar** (Coinbase stock tokens' DEX price vs NAV, Robinhood's quote beside it)
+   and an **x402 Inspector**.
+
+Not chosen this round: a wallet profiler / smart money. Proposed and waiting on the owner: a
+Catalyst Watch (which notable X accounts mention or follow a token) — it needs X data, a server
+key or a source bought over x402.
+
+What measuring taught, in CLAUDE.md under `src/skills/`: Blockscout's etherscan-style API is
+unusable (10 requests per ~45 min); launchpad tokens have no creator on Blockscout and are found
+through their v4 pool; publicnode refuses old logs; Relay's "impact too high" is a measurement.
+
+---
+
+## T12 — Skills, the Terminal, Research and Safety — ✅ DONE 2026-09-30, ⚠️ SKILLS DELETED 2026-10-01
+
+> The seven skills below were deleted on 2026-10-01 by the owner's decision (T21). The table is
+> kept as history; none of these commands exists any more.
+
+P0 and P1. **Built:** `src/skills/` — seven read skills, each a `Skill` that answers in a
+`Report` (rows, notes, sources), reached from a window (`SkillWindow`), from the Terminal
+(`parseLine` / `reportText`), and next from MCP (T18). Every source was measured live before
+its parser was written, and the tests run against those captures (`tests/fixtures/base/`,
+with the curl commands in its index) through a fake network (`tests/net.ts`) that fails any
+test making a call no route answered.
+
+| Skill | Terminal | Reads | Worth knowing |
+|---|---|---|---|
+| wallet | `wallet jesse` | RPC, Blockscout, DexScreener | only PRICED tokens are listed — a famous wallet had 12,737 entries, 262 priced; the rest are mostly airdropped lures |
+| token | `token 0x…` (`scan`, `safety`, `honeypot`) | GoPlus, Blockscout, DexScreener | GoPlus's field set depends on the token (BRTC: no honeypot flags at all), so every flag is yes / no / **not checked**; traps are red, owner powers amber |
+| holders | `whales 0x…` | Blockscout | holders carry no decimals; "contract" marks pools and bridges |
+| tx | `tx 0x…` (`explain`) | Blockscout | the sentence is built from the transfers; an unverified call shows its raw selector |
+| read | `read 0x… [fn] [args]` | Blockscout ABI, RPC | proxy + implementation ABIs merged, calls go to the proxy; arrays/tuples refused by name |
+| name | `name jesse` | RPC (Basenames registry) | a reverse record is a claim — only shown as verified when the name resolves back |
+| gas | `gas` | RPC, DexScreener | L2 execution fee only; the L1 data fee is not estimated, and the report says so |
+
+Two real defects the tests caught while this was written, both of the "a missing answer read
+as a negative one" kind: `deepest()` returned "no market" for a token whose only pool had no
+liquidity figure, and `summary()` compared `undefined` with `undefined` and wrote "unknown
+swapped …" about a transaction with no sender.
+
+`npm run smoke -- "gas" "wallet jesse" "token 0x…"` runs skills against the live chain — the
+hand-run measurement script, never part of the gate.
+
+**Still open inside P1:** approvals (`revoke` reads them — T15), token price history, a wallet
+risk score. None started.
+
+---
+
+## T13 — Send (public) — P2 — ✅ DONE in development 2026-09-30
+
+Built: `panels/SendPanel.tsx` over `lib/transact.ts` + `lib/erc20.ts`. Review reads the token
+from its contract, the balance, the Basename's address, and warns on a contract recipient, your
+own address, or an ETH send that leaves no gas. `eth_sendTransaction` lives in `transact.ts`,
+so `lib/wallet.ts`'s ban stayed. **Added the same day, at the owner's ask** ("show what the
+wallet holds so the user can send/swap easily, and add %"): the wallet's own assets on Base
+above the form (`WalletAssets` — ETH, then priced tokens by value; a click picks the token) and
+25% / 50% / 75% / Max, read from the chain at the click, Max on ETH keeping 0.00005 ETH for gas.
+Swap has both too. The original task text follows.
+
+**Size:** medium. Send ETH or any ERC-20 from the connected wallet to an address or a
+Basename. `resolveTarget` already turns either into a checksummed address, and the Basename
+path is forward-resolved on chain. Amounts through `parseAmount` (hard rule 7); the token's
+decimals read from the chain, never assumed (hard rule 3). Signed by the wallet with
+`eth_sendTransaction` — which `tests/wallet.test.ts` currently BANS in `lib/wallet.ts`; lifting
+that is a deliberate edit to that test, made in the same change, not a surprise.
+
+**Done when:** a send of a small amount on Base goes through the connected wallet, the
+window shows the transaction hash linked to Basescan, and a Basename recipient shows which
+address it resolved to before the wallet is asked to sign.
+
+---
+
+## T14 — Swap through an aggregator, with an integrator fee — P2 — ✅ DONE in development 2026-09-30
+
+Built on **Relay**, chosen by measurement (report in this session: KyberSwap 403s Vietnam;
+0x/1inch/Uniswap need a server-side key; LI.FI takes 0.25%; Odos was down). `checkSwap` refuses
+any step not to the pinned RelayApprovalProxyV3 / RelayRouterV3, any approval that is not EXACT,
+any wrong value; the app fee is `appFees` in bps and OFF while the treasury is null. Not checked
+before signing: the minimum inside Relay's calldata — measured afterwards instead. 🔴 **Fixed
+2026-09-30 from the owner's screenshot:** a confirmed ETH→USDC swap said "Your USDC balance rose
+by 0" in red. The after-balance was read at `latest` from a node a block behind the receipt.
+Arrival is now read from the receipt itself — Transfer logs for a token, balances pinned to the
+receipt's block for ETH — and tested against two real Relay receipts. The original task text
+follows.
+
+**Size:** large. Replaces the archived T8 (a swap from the private balance). Quote live from
+an aggregator on Base, show the route, the minimum received and the fee, and hand the wallet
+one transaction (plus an approval when needed). The fee goes to `CONTRACTS.treasury` and is
+OFF while that is `null` — a quote with the fee switched off must say so, not hide it.
+
+Before building: **measure** the aggregators' quote APIs (0x, KyberSwap, Uniswap's) the way
+T11 measured x402 servers — CORS, key requirements, how the integrator fee is expressed —
+and pick with the numbers in hand. A key, if one is needed, lives on the server (T3).
+
+**Done when:** a small swap on Base completes through the wallet at a live quote, the
+window shows what was received against what was quoted, and a stale quote refuses to sign.
+
+---
+
+## T15 — Revoke approvals — P2
+
+**Size:** small–medium. Read the connected wallet's ERC-20 allowances (Approval logs, or an
+indexer), show spender, token and amount — "unlimited" named as such — and prepare the
+`approve(spender, 0)` for the wallet to sign. The read half is a P1 skill (`approvals`) and
+belongs in the Terminal too.
+
+---
+
+## T16 — Bridge — P2 — ✅ DONE in development 2026-09-30, to Robinhood Chain (owner's choice)
+
+Built on **Across**, Base → Robinhood Chain 4663 only. CCTP was not an option: Robinhood Chain is
+not a CCTP domain and has no USDC — USDC arrives as **USDG** (Paxos, 6 decimals,
+`0x5fc5…d168`, listed in Robinhood's docs and read on chain). Across over Relay because its
+deposit calldata states the terms, so `checkBridge` decodes it with the verified ABI and checks
+recipient = you, token, amounts, chain 4663 and an empty message. Across's own approval is
+UNLIMITED and ignored. Refused from a smart-contract wallet. Tokenized stocks exist only on 4663
+and cannot be bridged from Base. The original task text follows.
+
+**Size:** large. USDC through Circle's CCTP (burn on Base, attest, mint on the destination —
+two signatures and a wait, and the window must show all three states). Other tokens through
+Li.Fi, with its integrator fee under the same `treasury` rule as T14. Every contract address
+verified on Basescan before it is written into `config/` (hard rule 1); destination chains
+named with their chain id, never by ticker (hard rule 2).
+
+---
+
+## T17 — Launch through o1 — P3 — 🗄 ARCHIVED 2026-10-02 (replaced by T22; `archive/o1/`)
+
+**Rebuilt later on 2026-09-30, Base first, from o1's "Token creation" and "Stock-paired launches"
+docs.** The pair is now a choice: ETH, USDC or cbBTC (`standard`) or any of the 10 stock tokens
+o1's catalog registers on Base (`rwa`, quote = the stock token; creator fees arrive in it).
+Profile editing (`editable_metadata`) and up to 16 extra key/value rows (`extra_metadata`) are
+in the form, validated to o1's limits; so are o1's link patterns. The window reads o1's factory
+ON BASE for the picked pair (`launchCreationEnabled`, `nativeLaunchFee`, `quoteConfig`, from its
+verified ABI) — that half works while the API is down, and did in a real render. `prepareLaunch`
+reads it again, then `checkPlan` refuses a plan for another pair/market/profile setting, a tax
+launch, or a step above the factory's fee. MEASURED at block 51,992,427: ETH, USDC, cbBTC,
+NVDA registered; WETH not; fee 0.001 ETH; catalog JSON stale (`configVersion` 12 vs 16 on chain).
+
+⚠️ **The o1 API is still down** (500 on `/health`, `/config`, `/tokens`, `/launches`, with the key,
+re-checked late on 2026-09-30). The owner launched through the o1.exchange website the same day —
+it runs on o1's own backend, not this API. A way round it exists and is the owner's call: call the factory's `createLaunch` directly. It needs what o1's prepare does
+for us — the metadata PINNED TO IPFS (a pinning service key, e.g. Pinata, server-side) and a
+salt mined so the B20 address ends in `01` — so it is a server feature plus a new custody-free
+signing path, not a panel tweak. Not started.
+
+Built: `server/o1.ts` (key server-side, one POST route, `x-quadra` header), `adapters/http/o1.ts`
+(`checkPlan`: Base only, this wallet, only o1's verified factory `0x1176…63dC`, no ETH beyond the
+declared creation fee, no Permit2 signatures, no blocking issue), `panels/LaunchPanel.tsx`. The
+key is in `.env.local` and read by the dev server; grep'd absent from the bundle. **o1's API
+answered 500 on every route all day**, so nothing here has met a live response. Two corrections
+to the plan below, from o1's own spec: there is **no referrer on a launch** (referral is per
+trade), and Dev Buy is not in the public API. The original task text follows.
+
+**Size:** medium–large. **Waiting on the o1 API key from ShunTr.** o1's public API
+validates a launch, stores its metadata, simulates it and returns **unsigned steps**; Quadra
+shows them and the wallet signs. Quadra registers as the referrer (0.2% of volume, fixed by
+o1). **Always public** — the owner's rule.
+
+- The key is **server-side only**: a Vercel function under `api/` holds it and calls o1;
+  the browser never sees it. This is the first thing that makes T3 real.
+- o1's site sits behind a Vercel security checkpoint that answers 429 to plain curl
+  (measured 2026-09-30) — so the API is measured with the key, from the server, before any
+  parser is written. Do not write the request shape from o1's docs alone.
+- Researched facts (2026-09-30, from o1's own pages): 1% trading fee split 50/30/20
+  (creator / protocol / referrer), 0.001 ETH creation fee, an anti-snipe tax falling from
+  99% to 1% over 20 seconds, pairs against ETH or tokenized stocks. Re-check each against
+  the live API; any of them may have moved.
+
+**Done when:** a launch prepared through the server is signed in the wallet on Base, the
+window tracks it to confirmation, and the referral shows Quadra.
+
+---
+
+## T19 — Trade: crypto and stocks on Base — ✅ DONE in development 2026-09-30
+
+The owner's ask: "build trade for the tokens on Base, Crypto and Stocks". `panels/TradePanel.tsx`
+— a Crypto tab (`TRADE_CRYPTO`, ten verified tokens plus ETH) and a Stocks tab (Coinbase's own
+list), prices from DexScreener, Buy/Sell for USDC or ETH, then `SwapPanel` with a `fixed` pair, so
+the quote, checks, exact approval, simulation and arrival measurement are Swap's own. Relay was
+measured quoting B20 stocks both ways first. A stock shows shares per token, paused features and
+the U.S.-eligibility line; one with transfers paused is not quoted. Not done: selling a stock by
+share count (the amount is in tokens) and a chart inside Trade (Markets has it).
+
+---
+
+## Read from docs.base.org on 2026-09-30 — what it changes for Quadra
+
+The owner asked for the "Build on Base" section to be read in full; it and the pages it links
+for the foundation (RPC, Flashblocks, fees, finality, limits, Builder Codes, native AA,
+Tokenized Stocks API) were. Most of it — issuing stablecoins and RWAs, payment escrow, Base
+Ledgers — is for issuers and merchants, not a wallet-signing app. What applied was acted on:
+
+- **Tokenized Stocks API** (`api.coinbase.com/v1/tokenized-stocks`) → the stock list in Markets,
+  Trade and Launch. Its addresses are not all valid EIP-55 (see CLAUDE.md).
+- **Simulate before every write** → `simulate` in `lib/transact.ts`.
+- **B20: multiplier, pause, policies** → shown per stock; paused transfers block a quote; a
+  policy block is caught by the simulation (the docs' own "definitive check").
+
+What is left, each the owner's decision or dependent on something the owner holds:
+
+1. **Builder Codes** (ERC-8021): register Quadra on base.dev and hand over the code; then one
+   `dataSuffix` in `lib/transact.ts` attributes every transaction to Quadra ("potential future
+   rewards"). Check first that Relay's and Across's calldata tolerate a trailing suffix.
+2. **A production RPC provider** — the public endpoints are "not suitable for production traffic".
+3. **L1 fee** via the GasPriceOracle predeploy, if a gas skill returns (verify the address on
+   chain first).
+4. **Earn (Morpho vault)** is the most natural DeFi addition (one asset, one pinned address,
+   ERC-4626). The vault address printed in the docs FAILS EIP-55 — take it from the chain.
+5. **Base Ledgers (private transfers)** need an operator holding keys and custody — hard rule 5,
+   and no mainnet Portal is published. Not buildable as a keyless app.
+
+---
+
+## T20 — This app's own API, sold over x402 — ✅ BUILT 2026-09-30, NOT YET SELLING
+
+The owner's decisions (asked, 2026-09-30): the skills over HTTP are PAID per call via x402; the
+list is free; settlement goes through Coinbase CDP's facilitator (not a server hot wallet, which
+would make the app hold a key). Built: `server/api.ts`, `server/cdp.ts`, `config/api.ts`, the x402
+window's first mode (`X402Own.tsx`) and a live-probing API page. Verified end to end in the suite
+(window → real handler → fake facilitator → report) and in the browser against the dev server.
+**Waiting on the owner:** a CDP API key (`CDP_API_KEY_ID`, `CDP_API_KEY_SECRET`) — then the first
+real sale should be measured and its responses captured as fixtures, as every other upstream was.
+And the prices: each skill is priced by `SKILL_PRICES` (verdict $0.05 … forensics $0.10;
+`API_PRICE` $0.005 is only the fallback) — starting figures the owner should set.
+
+---
+
+## T18 — Every skill as an MCP tool, and an approval queue — P4 — HALF DONE 2026-09-30
+
+✅ Every read-only skill is an MCP tool (`src/skills/mcp.ts`, bundled to `tools/quadra-mcp/skills.mjs`),
+checked live by hand (`quadra_gas`, `quadra_wallet jesse.base.eth` — both since deleted; today the skill tools are `quadra_verdict`, `_gate`, `_radar`,
+`_forensics`, `_launcher`, `_sendcheck` and `_launch` (prepared, unsigned)). ⏸ The approval queue for
+prepared transactions is deferred by the owner's decision of 2026-09-30. The original text follows.
+
+**Size:** medium. `tools/quadra-mcp/` holds no keys (hard rule 5) and stays that way: read
+skills become tools that return `reportText`; write skills become tools that PREPARE an
+unsigned transaction and put it in a queue the owner approves in the Quadra window, where
+their own wallet signs it. An agent never signs.
+
+---
+
+## T9 — Launch `$QUADRA` — ⏸ POSTPONED 2026-09-29
+
+**Postponed by ShunTr's decision on 2026-09-29.** A token attached to a privacy pool is
+the largest legal and reputational exposure this project could take on while the Tornado
+Cash retrial (Oct 2026) and the EU's AMLR (July 2027) are live, and it would arrive before
+the product has users. Revisit only after phase 2 of "The direction" is done.
+
+**Size:** large. **Blocked by T7 and by the product being finished.** **This is
+ShunTr's call to trigger, not a session's.**
+
+`CONTRACTS.token` in `src/config/chain.ts` is `null` and **no address may be guessed for
+it.** What it pairs against is undecided: the tokenized-stock pair it was planned against
+was removed from the codebase on 2026-09-29 on the owner's call, along with its config,
+its reference price and the Swap window's trade. Whatever the quote side becomes, it
+arrives verified on chain with its decimals asserted (hard rule 3), or not at all.
+
+---
+
+## T11 — Pay any x402 URL, not only one directory's catalog — ✅ DONE in development 2026-09-29
+
+**Built:** the x402 window has two halves — BlueAgent's tools, and **Any x402 URL**, pasted or
+picked from Coinbase's **x402 Bazaar** (the second directory). Live-checked in Chrome the same
+day: x402.ottoai.services quoted directly (it answers CORS), x402uselessfacts.vercel.app through
+the forwarder (it does not), the Bazaar listed 59 payable of its first 100. Nothing was paid —
+no funded wallet in the session. What it took, each measured before it was written:
+
+- **The x402 v2 transport, as the spec writes it** (`lib/x402http.ts`): `PAYMENT-REQUIRED` header
+  (base64) read first, the body as fallback — spec servers send `{}` as the body, BlueAgent sends
+  the requirements as the body. `PAYMENT-SIGNATURE` sent (`paymentSignatureHeader`, echoing the
+  server's `accepts` entry VERBATIM), `PAYMENT-RESPONSE`'s `transaction` read. BlueAgent's path is
+  unchanged: `X-Payment` out, `X-Payment-Response` in.
+- **"Exactly one SIGNABLE offer"** replaced "exactly one offer" in `lib/requirements.ts`. Real
+  servers offer several (ottoai: EIP-3009 on Base, permit2 on Base, Solana); the old rule refused
+  them all. It still never picks by position and never between two prices. `permit2` is refused by
+  name (`assertTransferMethod`).
+- **User-confirmed payees** (`lib/pins.ts`): an unpinned origin is refused until the user ticks that
+  the address was checked elsewhere and pins it. Shipped pins cannot be overridden.
+- **The forwarder** (`src/server/forward.ts`): Fetch-API `Request → Response`, mounted on the dev
+  server. Policy per target (`anyPublicHttps` in dev, `allowOrigins([...])` for production), a
+  required `x-forward: 1` header against cross-site use, x402 headers only in both directions,
+  redirects not followed.
+
+**What is left is T3:** where production runs `forward`, and which origins its allowlist names.
+The original notes follow for the reasoning behind each piece.
+
+Phase 0 of "The direction". The payee check is already per origin (`config/payees.ts`,
+2026-09-29), so `lib/requirements.ts` can check any server's 402. What was missing:
+
+1. **A forwarder for arbitrary origins.** A run is a request with an `X-PAYMENT` header,
+   which is a preflighted cross-origin request; most x402 servers do not answer the
+   preflight for a browser. The dev proxy forwards to one host. A forwarder that forwards
+   to ANY host is an open proxy — that is a decision for T3, not a config change. An
+   allowlist of origins is the safe first version.
+2. **A way to pin a payee the user has confirmed.** An unpinned origin is refused today
+   (`Payee` kind `unpinned`), which is right, and means a new URL can never be paid until
+   there is a deliberate "I have checked this address" step. Keep it deliberate: the
+   payee named by the server asking to be paid is not evidence on its own.
+3. **x402 envelope versions.** This build reads version 2 only and refuses others by name.
+   Many servers still answer version 1; supporting it is a checked mapping, not a relaxed parse.
+
+**Done when:** a pasted URL on an allowlisted origin can be quoted, its payee confirmed and
+pinned, and a free call run end to end — and an unpinned or changed payee still refuses.
+
+---
+
+## Standing, every task
+
+- **`npm run gate` green, all three parts.** Coverage thresholds are pinned at 100%
+  and a drop fails the run. New code arrives with its tests.
+- **Tests never touch the network.** `tests/setup.ts` makes `fetch` throw. Anything
+  network-facing goes in a hand-run script — `scripts/measure-catalog.ts` is the
+  pattern. That script must never invent a tool input; it measures what upstream
+  really answers.
+- **Look at visual changes in a real browser.** 473 green tests missed three real
+  defects at once because jsdom has no layout. Recipe in `CLAUDE.md`.
+- **Never edit anything in `blue-agent`.** Separate repo, separate product, owner's
+  instruction. If a tool needs a file over there to work, use a different tool.
+- **Repo stays private.** No publishing, no npm, no domain, no announcement.
+- **Do not commit unless asked.**
+
+---
+
+## Decisions that belong to ShunTr, not to a session
+
+Stop and ask rather than picking:
+
+1. **The fee rate** — 0.1% on swap and bridge is in effect (`FEE_BPS`); the recipient was set on
+   2026-09-30. Changing either is one line and the owner's call.
+2. **Claiming Relay's fees** — they accrue as a balance at Relay for the treasury, not on chain.
+3. *(Archived with o1, 2026-10-02.)* **Whether to earn the o1 referral** — per trade, not per
+   launch; moot while o1 is out of the app (`archive/o1/`).
+4. **The WalletConnect project id** — set by ShunTr on 2026-09-30 in `.env.local`; it must also be
+   set in the Vercel project at deploy.
+5. **T3** — the Vercel project itself, and the forwarder's production allowlist.
+6. **Custody** — whether Quadra ever holds a key or signs on a user's behalf. Today it does
+   not, and the MCP server holds no keys at all. Changing that is a custody decision, not a
+   refactor (hard rule 5).
+7. **Anything that moves real money in production**, and the deploy itself — the owner tests
+   each feature locally first.
+8. **T9** — `$QUADRA`, postponed.
+9. **Reviving the privacy model** — it is archived, not deleted; bringing it back is the
+   owner's call and would reopen the decisions recorded in the Archive.
+
+---
+
+## Archive — the privacy direction (2026-09-27 → 2026-09-30)
+
+Everything below was the plan while Quadra was "private money for AI agents". It was
+dropped on 2026-09-30 and its code moved to `archive/privacy/` (src, tests, contracts) and
+`archive/previews/`. Kept because the reasoning and the measurements are still true, and
+because reviving any of it should start from what was already learned, not from zero. **None
+of it is current work.**
+
+## [Archived] The direction — decided by ShunTr on 2026-09-29
+
+**Read this before picking a task.** Everything below was written for a product that
+was a hub: swaps, a router, launches, audits, hooks, all on BlueAgent's catalog. On
+2026-09-29 the owner chose a single position, and the task order follows from it.
+
+> **Quadra is private money for AI agents on Base: a USDC balance your agents spend on
+> any x402 endpoint, with nothing on chain pointing back to you, and no key ever held
+> here.**
+
+Why this and not the alternatives, in one paragraph each, so nobody re-litigates it
+without new evidence:
+
+- **Not a consumer privacy wallet.** On Base that market already has Fluidkey (stealth
+  addresses, ~24k users reported June 2026), Railgun (contracts on Base, activation
+  proposed Aug 2026, ~$92M TVL on Ethereum), and Base's own privacy work (Base Ledgers,
+  June 2026 — enterprise-only today). A new pool starting at zero users also has the
+  smallest anonymity set on the chain, which is the one number a privacy product is sold on.
+- **Agents paying x402 are unserved on exactly the axis Quadra is built for.** x402
+  settled ~160M transactions by June 2026, >90% on Base, ~$0.3 average, ~all USDC — and
+  every one of them publishes which agent bought which API. The private-x402 projects
+  that exist hide the AMOUNT (TACEO's Confidential x402, early access; Mind Network's
+  x402z, FHE, test assets) and leave the payer visible. Quadra's design hides the PAYER.
+- **"Top up once, spend in many small payments" defuses the join-split weakness in T7.**
+  A deposit of $20 and payments of $0.01 do not correlate by amount, which is the leak
+  T7's decision is about. The use case and the pool shape fit each other.
+- **The parts are already here.** `lib/requirements.ts` + `lib/eip712.ts` refuse to sign
+  what they have not checked (a spend guard, which agents need regardless of privacy);
+  `contracts/` has the pool; `tools/quadra-mcp/` is the agent surface and holds no key.
+
+What was decided with it:
+
+| Decision | Status |
+|---|---|
+| Position as above; BlueAgent is ONE directory of tools to spend on, not the platform | **done 2026-09-29** — copy, `config/upstream.ts`, `config/payees.ts` |
+| Payee checked per ORIGIN (`config/payees.ts`), not against one BlueAgent constant | **done 2026-09-29** — `lib/requirements.ts` no longer imports anything BlueAgent |
+| Switch off `audit` and `hooks` (off, not deleted — one line each to reverse) | **done 2026-09-29** |
+| `router` becomes "agents pay from the private balance" — see T6 | **rewritten, not built** |
+| Pay any x402 URL, with the Bazaar as a second directory — see T11 | **done 2026-09-29**, dev-complete; production needs T3 |
+| Spending limits the user sets, enforced where the signature is made | **done 2026-09-29** — `lib/spendGuard.ts` |
+| Evaluate Railgun on Base as the pool BEFORE finishing our own circuit — see T10 | **step 1 done 2026-09-29** (on chain: live, nearly unused); spike open |
+| Postpone `$QUADRA` — see T9 | **decided 2026-09-29** |
+
+The phases, in order. A phase does not start until the one before it is green:
+
+0. **Stand alone** (no money at risk) — **done 2026-09-29** in development: the rows above,
+   including **T11**. What is left of it is **T3**: the forwarder exists and is tested, and
+   production needs somewhere to run it and an allowlist.
+1. **Agents spend the local balance** — **T6**. Blocked on a custody decision (hard rule 5):
+   where the key lives that signs an agent's payment.
+2. **The balance becomes real** — **T10** decides Railgun vs our own pool; then T7 steps 2–3
+   (circuit, verifier, Poseidon, audit) OR the Railgun integration. Base Sepolia first.
+3. **Compliance posture** — view keys for users; an association-set or PPOI-style proof;
+   and **legal advice before this project operates any relayer or forwarder**, since the
+   one charge a jury convicted the Tornado Cash developer of (Aug 2025) was operating an
+   unlicensed money-transmitting business. The EU's AMLR bars CASPs from anonymous accounts
+   from 1 July 2027. Neither is a reason not to build; both are reasons to design it in.
+
+---
+
+## [Archived] T6 — Build `router`: agents pay from the private balance
+
+**Size:** large. **Rewritten 2026-09-29** — this is now the product's core, not "pay any
+service, any token". The "any token" question is **retired**: everything is USDC, which is
+also what ~all x402 volume settles in.
+
+What it is: an agent (through `tools/quadra-mcp/`) asks to pay an x402 endpoint; the payment
+comes out of the user's private balance through an address that has never touched the
+user's wallet, so the endpoint is paid normally and cannot see who paid. Server and
+facilitator are unchanged — that is the difference from TACEO and x402z, which need both.
+
+🔴 **Design constraint found while evaluating Railgun (T10), and it applies to our own pool
+too: do NOT withdraw once per payment.** An x402 call averages ~$0.3 and often costs $0.01.
+A withdrawal from a shielded pool costs gas plus a relayer premium (Railgun: 0.25% protocol
+fee plus ~10% of gas to its broadcaster), which is more than a $0.01 payment. The shape that
+works is a **session address**: withdraw a budget (say $5) once to a fresh address per agent
+or per session, then pay many 402s from it with ordinary EIP-3009 signatures — the path
+`lib/payment.ts` already has. Payments inside one session are linkable to each other; none
+are linkable to the user. Say exactly that in the UI.
+
+**Blocked by, in order:**
+1. 🔴 **A custody decision (hard rule 5) — ShunTr's, not a session's.** A session address
+   needs a key that signs without the user clicking each time, or the agent is not
+   autonomous. Options: (a) the browser holds a session key with a hard budget and expiry,
+   and the MCP server asks the browser to sign — the MCP server still holds nothing;
+   (b) a smart-account session key with an on-chain spend limit; (c) the user approves every
+   payment in their wallet, which is honest and not autonomous. Do not pick one alone.
+2. The pool being real — T10, then T7 or the Railgun integration.
+
+**Done when:** an agent pays a real x402 endpoint on Base Sepolia (then mainnet) from a
+private balance, the receipt names the session address and says what it does and does not
+hide, and nothing on chain links that address to the user's wallet.
+
+---
+
+## [Archived] T7 — Foundry scaffold + the shielded pool contract
 
 **Size:** large. **Blocks T8.** Independent of T3–T6 — can be done in parallel.
 
@@ -916,8 +1571,8 @@ own vectors) and meaningless for a digits-only one — both land in `unchecked`.
 address has no mixed case, …". A sentence that misdescribes what the user is looking at
 gets skipped, and this is the one line in the send flow whose entire job is to be read.
 
-**Audited every address in `src/config/` with `cast` while the oracle was open.** `0xb200…`
-(AAPLc), `0xB20f…` (B20 factory) and `0x8335…` (USDC) are mixed-case and all checksum
+**Audited every address in `src/config/` with `cast` while the oracle was open.** `0x8335…`
+(USDC) and the other mixed-case addresses then in config are mixed-case and all checksum
 correctly; `0xa3b1…` and `0x0295…` are all-lowercase so carry no checksum, digits verified
 by eye; `0x4200…0006` has no letters. **No config bug** — recorded because a mismatch there
 would have meant a shipped address that is possibly wrong, and "I checked and found
@@ -1360,15 +2015,24 @@ in a URL, never sent to a server. Test that property, don't just intend it.
 
 ---
 
-## T8 — Build `swap`
+## [Archived] T8 — Build `swap`
 
-**Size:** large. **Blocked by T7** — this is the panel that needs the pool to exist.
+**Size:** large. **Blocked by T7** — this is the panel that trades against a real venue.
 
-`swap` — "trade with nothing tying it to you" — is the product's headline claim and
-the heaviest thing left. It needs the deployed shielded pool (T7) plus a venue on
-Base to actually trade against. Until both exist the panel must keep saying it is not
-built; a swap screen that looks operational and cannot swap is the single worst thing
-this repo could ship.
+**A local-pool simulation shipped 2026-09-28 and was withdrawn 2026-09-29.** It traded a
+USDC note for a tokenized-stock note at a stale reference rate; the owner removed that pair
+from the codebase, which removed the only price the window had, so `swap` went back to an
+amber notice with an inert preview (`panels/SwapPanel.tsx`). `LocalShieldedPool.swap` is
+still there and still tested — it is pair-agnostic note mechanics and trusts the caller's
+`outAmount`, so whatever comes next needs only a token and a price source, not a new pool
+method. WETH is already verified in `config/chain.ts` and is what the preview names.
+
+**This task is still open**: `swap` — "trade with nothing tying it to you" — is the
+product's headline claim and the heaviest thing left. It needs the deployed shielded pool
+(T7) plus a venue on Base to actually trade against. Until both exist the *real* trade
+path does not exist; the local simulation must keep saying, in its own copy, that it is a
+reference price and not a market fill — a swap screen that looks like it is quoting a real
+venue is the single worst thing this repo could ship.
 
 **The pool contract existing does not unblock this.** As of 2026-09-27 `contracts/` is
 written and fully tested, but there is no verifier and no Poseidon, so nothing is
@@ -1378,55 +2042,80 @@ naming the unset constant, which is the correct behaviour and not a bug to route
 **Open question for ShunTr before building:** which venue, and whether the privacy
 claim survives it. Routing a shielded balance through a public pool can undo exactly
 the unlinkability the panel promises, and that is a product decision, not an
-implementation detail.
+implementation detail. **And a second one, new since 2026-09-29:** where a live price
+comes from. A frozen number in source is ruled out — see `WAITING_ON.swap`.
 
 ---
 
-## T9 — Launch `$QUADRA` against AAPLc
+## [Archived] T10 — Evaluate Railgun on Base as the pool, before finishing our own circuit
 
-**Size:** large. **Blocked by T7 and by the product being finished.** **This is
-ShunTr's call to trigger, not a session's.**
+**Size:** medium (an evaluation with a spike, not an integration). **Next, and blocks the
+choice between T7 steps 2–3 and an integration.** Decided 2026-09-29.
 
-`LAUNCH_TOKEN` in `src/config/pair.ts` is `null` and **no address may be guessed for
-it.** AAPLc is verified and asserted on chain — `0xb200000000000000000000C2e324d24d7eEcd1fb`,
-8 decimals not 18, a native B20 precompile with no Solidity source. Re-assert all four
-checks in that file's header before anything holds funds; the numbers in
-`AAPL_REFERENCE_POOL` are a dated measurement, not a constant.
+**Why this comes first:** our pool has contracts and tests but no circuit, no verifier and
+no Poseidon (T7 step 2 — the larger half), and at launch it would have the smallest
+anonymity set on Base. Railgun has audited circuits, years of use and ~$92M TVL. If it can
+carry the T6 flow, building our own proving stack is months of risk for a worse result.
+
+What was established 2026-09-29, from Railgun's own docs and L2BEAT — **re-check each line,
+the Base part was moving that month:**
+
+| Question | Finding |
+|---|---|
+| Live on Base? | **Yes — and nearly unused. MEASURED ON CHAIN 2026-09-29** (`cast call`, mainnet.base.org): `0x0047d1F97674614189E80566575FB615788AcF25` is a proxy (EIP-1967 implementation `0x8629b39134362fedc001636e0726570b8d2dffd1`); `getVerificationKey(1,2)` returns a populated key, so the August proposal took effect; `shieldFee()` and `unshieldFee()` are 25 bps; **`treeNumber()` 0, `nextLeafIndex()` 1** — one commitment ever. The same calls on Ethereum's proxy (`0xFA7093CD…4b9`) answer tree 4, leaf 17504. Railgun's own docs page still lists no Base address. Its Base treasury (`0x0AE354F8…69ae`) differs from Ethereum's. |
+| Fees | 0.25% on shield, 0.25% on unshield, to the treasury. Broadcaster (relayer) premium "generally ~10% of the total gas". |
+| Waiting period | 1-hour "Unshield-Only Standby Period" after a shield, during which funds can only go back to the depositing address. Fine for a top-up; fatal for pay-on-deposit. |
+| Compliance | Private Proofs of Innocence against list providers (Elliptic, ScamSniffer, PureFi, SlowMist, Chainalysis Sanctions Oracle). |
+| Browser SDK | `@railgun-community/wallet` (TypeScript, node + browsers) over the Engine; broadcasters via a Waku client with a web build. |
+| Unshield to a fresh address | Yes — an unshield names its recipient, which is what a T6 session address needs. |
+
+🔴 **What the measurement changes.** The argument for Railgun was two things: audited circuits,
+and an anonymity set our new pool would not have. On Base the second is false today — Railgun
+there holds one commitment, so it starts near zero exactly as ours would. What is left is
+the circuits, the proving tooling, PPOI and a shared pool other Railgun apps will also fill
+as they arrive on Base. That is still the larger half of T7 step 2 avoided, so the lean is
+unchanged, but "join the bigger crowd" is not a reason on this chain yet — and Quadra's agent
+traffic could be a meaningful share of the crowd that forms.
+
+### 🔴 Veil Cash — a third candidate, and the closest competitor (researched 2026-09-30)
+
+**Veil (veil.cash) already ships the product T6 describes, on Base.** A shielded pool for ETH and
+USDC built on Tornado Nova (UTXO, Groth16, Poseidon, arbitrary amounts), and its MIT-licensed
+`@veil-cash/sdk` 0.7.0 (commit 2026-06-03) adds `payX402Resource()`: pay a standard x402 v2
+Base-USDC `exact` resource from the private balance by relay-withdrawing the exact price to a
+fresh, deterministically derived payer EOA, with a `maxPayment` cap and `quoteX402Resource()` to
+price first. It ships a CLI and an agent skill (`skills/veil/SKILL.md`). Browser proof generation
+is supported.
+
+MEASURED ON CHAIN 2026-09-30 (`cast`, mainnet.base.org): USDC pool
+`0x5c50d58E49C59d112680c187De2Bf989d2a91242` `nextIndex()` **2322**, holding **2,592.45 USDC**;
+ETH pool `0x293dCda114533FF8f477271c5cA517209FFDEEe7` `nextIndex()` **6110**, holding **6.6158
+WETH**. Compare Railgun on Base: 1. Small TVL, but a real, used pool.
+
+How it differs from what Quadra would build: deposits are **gated** — EAS attestation (Coinbase
+Onchain Verification, Binance BABT, Ethos) for automatic approval, 0xbow manual review otherwise,
+deposits wait in a queue and a declined one is refunded; 0.3% deposit fee; relayer withdrawals at
+fee 0 (subsidised), minimum 0.001 USDC; a `$VEIL` token (25% of supply for incentives). Its x402
+path withdraws **once per payment**, not per session (see T6's design constraint). Not established
+here: audits of Veil's own changes (Nova's 2021 audit is not Veil's), and who ran Veil's trusted
+setup — **check both before building on it.**
+
+What it means: Quadra is no longer first to "private x402 for agents on Base". The defensible
+layer is what Veil does not ship — a GUI and desktop app, approving an agent's payments, a spend
+guard beyond a per-payment cap (daily limits, per-origin payee pins, full 402 checks), directories
+(BlueAgent, Bazaar), and pool-agnostic multi-chain later. **Recommendation for this task: add a
+Veil adapter behind `ShieldedPool` as the first candidate to spike, ahead of Railgun** — it has
+the users, the x402 flow and the licence. The choice stays ShunTr's.
+
+To finish the evaluation: (1) ~~confirm Base activation on chain~~ done, above; (2) spike: shield Sepolia
+USDC in a browser, unshield to a fresh address through a broadcaster, time it and cost it;
+(3) read the SDK and contract licences; (4) check bundle weight (the proving artifacts are
+large) against this app's load; (5) decide what "no key held here" means when the Railgun
+wallet key lives in the browser — it is the user's key in the user's browser, which fits
+hard rule 5, but say so in writing.
+
+**Done when:** a written recommendation — Railgun, our pool, or both behind the existing
+`ShieldedPool` interface — with the spike's measured cost per session top-up.
 
 ---
 
-## Standing, every task
-
-- **`npm run gate` green, all three parts.** Coverage thresholds are pinned at 100%
-  and a drop fails the run. New code arrives with its tests.
-- **Tests never touch the network.** `tests/setup.ts` makes `fetch` throw. Anything
-  network-facing goes in a hand-run script — `scripts/measure-catalog.ts` is the
-  pattern. That script must never invent a tool input; it measures what upstream
-  really answers.
-- **Look at visual changes in a real browser.** 473 green tests missed three real
-  defects at once because jsdom has no layout. Recipe in `CLAUDE.md`.
-- **Never edit anything in `blue-agent`.** Separate repo, separate product, owner's
-  instruction. If a tool needs a file over there to work, use a different tool.
-- **Repo stays private.** No publishing, no npm, no domain, no announcement.
-- **Do not commit unless asked.**
-
----
-
-## Decisions that belong to ShunTr, not to a session
-
-Stop and ask rather than picking:
-
-1. **T3** — the deployment target. Converting to Next/Workers changes what this repo is.
-2. **T4** — whether Quadra ever holds a key or signs on a user's behalf. Today it does
-   not, and the MCP server in `tools/quadra-mcp/` holds no keys at all. Changing that
-   is a custody decision, not a refactor.
-3. **T6** — what "any token" means in the router.
-4. **T7** — **join-split vs fixed denominations.** The pool as built takes arbitrary
-   amounts, which is a genuinely weaker privacy guarantee than Tornado-style fixed
-   denominations — amounts correlate deposits to withdrawals with no cryptography
-   broken. The contract is written and tested; the shape is still a product decision,
-   and the UI copy depends on the answer. Three options and their costs are in T7.
-5. **T8** — which venue `swap` trades against, and whether the privacy claim survives it.
-   Note this is the same question as item 4 arriving from the other side.
-6. **`bridge` and `launch`** — both flags are off. Whether they get built at all.
-7. **T9** — the launch itself, and anything that moves real money.

@@ -1,0 +1,53 @@
+[
+ {
+  "chainId": "base",
+  "dexId": "uniswap",
+  "url": "https://dexscreener.com/base/0xef256e214c45aab706ca54d6e2c5d0ca42b87895a43e97b382ea012d13e78e49",
+  "pairAddress": "0xef256e214c45aab706ca54d6e2c5d0ca42b87895a43e97b382ea012d13e78e49",
+  "labels": [
+   "v4"
+  ],
+  "baseToken": {
+   "address": "0x0cbf291Ba052174879d90bf781dF1A5F2BC5Bb07",
+   "name": "boar",
+   "symbol": "boar"
+  },
+  "quoteToken": {
+   "address": "0x4200000000000000000000000000000000000006",
+   "name": "Wrapped Ether",
+   "symbol": "WETH"
+  },
+  "priceUsd": "0.00001217",
+  "txns": {
+   "m5": {
+    "buys": 4,
+    "sells": 2
+   },
+   "h1": {
+    "buys": 117,
+    "sells": 87
+   },
+   "h6": {
+    "buys": 382,
+    "sells": 248
+   },
+   "h24": {
+    "buys": 1234,
+    "sells": 970
+   }
+  },
+  "volume": {
+   "h24": 511113.91,
+   "h6": 170455.4,
+   "h1": 66072.54,
+   "m5": 695.44
+  },
+  "liquidity": {
+   "usd": 335957.74,
+   "base": 14660234150,
+   "quote": 58.5083
+  },
+  "marketCap": 1205459,
+  "pairCreatedAt": 1790391481000
+ }
+]

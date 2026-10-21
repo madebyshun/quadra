@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
+  chooseAccount,
   connectWallet,
+  releaseAccounts,
   injectedProvider,
   parseChainId,
   readWallet,
@@ -500,6 +502,75 @@ describe("connecting", () => {
     if (state.kind !== "failed") throw new Error("unreachable");
     expect(state.why).toMatch(/wallet is locked/);
     expect(state.why).not.toMatch(/You declined/);
+  });
+});
+
+/**
+ * The account picker, and letting go of the site's access.
+ *
+ * MEASURED by the owner 2026-09-30: with MetaMask connected there was no way to reach a second
+ * MetaMask account — `eth_requestAccounts` answers at once with the account already granted.
+ * `wallet_requestPermissions` opens the picker every time.
+ */
+describe("choosing an account", () => {
+  it("has nothing to ask without a provider", async () => {
+    expect((await chooseAccount(null)).kind).toBe("unavailable");
+  });
+
+  it("asks for the eth_accounts permission, which opens the picker, then reads the state back", async () => {
+    const wallet = fake({ wallet_requestPermissions: [{ parentCapability: "eth_accounts" }], eth_accounts: [LOWER], eth_chainId: BASE.idHex });
+    expect(await chooseAccount(wallet.provider)).toEqual({ kind: "ready", account: LOWER });
+    expect(wallet.calls[0]).toEqual({ method: "wallet_requestPermissions", params: [{ eth_accounts: {} }] });
+  });
+
+  it.each([4200, -32601, "4200"])("falls back to eth_requestAccounts when the wallet has no picker (%s)", async (code) => {
+    const wallet = fake({
+      wallet_requestPermissions: () => {
+        throw rpcError(code);
+      },
+      eth_requestAccounts: [LOWER],
+      eth_accounts: [LOWER],
+      eth_chainId: BASE.idHex,
+    });
+    expect((await chooseAccount(wallet.provider)).kind).toBe("ready");
+    expect(wallet.methods()).toContain("eth_requestAccounts");
+  });
+
+  it("says a closed picker was the user's choice, and measures what is left", async () => {
+    const wallet = fake({
+      wallet_requestPermissions: () => {
+        throw rpcError(4001);
+      },
+      eth_accounts: [],
+    });
+    const state = await chooseAccount(wallet.provider);
+    expect(state.kind).toBe("disconnected");
+    if (state.kind !== "disconnected") throw new Error("unreachable");
+    expect(state.why).toMatch(/You declined the connection request/);
+  });
+
+  it("keeps the account already granted when the picker is closed, because that is what is true", async () => {
+    const wallet = fake({
+      wallet_requestPermissions: () => {
+        throw rpcError(4001);
+      },
+      eth_accounts: [LOWER],
+      eth_chainId: BASE.idHex,
+    });
+    expect(await chooseAccount(wallet.provider)).toEqual({ kind: "ready", account: LOWER });
+  });
+});
+
+describe("releasing the site's access", () => {
+  it("asks the wallet to revoke eth_accounts", async () => {
+    const wallet = fake({ wallet_revokePermissions: null });
+    await releaseAccounts(wallet.provider);
+    expect(wallet.calls).toEqual([{ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] }]);
+  });
+
+  it("never throws: a wallet without the method, or no wallet at all, just keeps its grant", async () => {
+    await expect(releaseAccounts(fake({}).provider)).resolves.toBeUndefined();
+    await expect(releaseAccounts(null)).resolves.toBeUndefined();
   });
 });
 

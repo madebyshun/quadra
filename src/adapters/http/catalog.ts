@@ -1,6 +1,7 @@
-import type { Catalog, Price, Quote, Tool, ToolField, ToolRun } from "@/adapters/types";
+import type { Catalog, Price, Quote, Settlement, Tool, ToolField, ToolRun } from "@/adapters/types";
 import { BLUEAGENT, FORWARD } from "@/config/upstream";
 import { checkRequirements, whyNotSign } from "@/lib/requirements";
+import { jsonFromBase64, readPaymentRequired, settledTransaction } from "@/lib/x402http";
 
 /**
  * The real upstream catalog, read over the network.
@@ -34,9 +35,14 @@ import { checkRequirements, whyNotSign } from "@/lib/requirements";
  *     POST /upstream/api/x402/hood-live   → 200, a real Hood board snapshot
  *     POST /upstream/api/x402/token-price → 402, accepts[0] with payTo + amount
  *
- * So the six free ids genuinely run, and the other 109 return a 402 this build
- * cannot answer — it has no signing code, by design. That is why `whyNot` takes a
- * price: one flag for the whole adapter had to lie about one half of the catalog.
+ * So the six free ids genuinely run through the forwarder with no header at all, and
+ * the other 109 need a `payment` header built by `lib/payment.ts` from a wallet's
+ * signature — `run`'s third parameter, attached as `X-Payment` when the caller has one.
+ * That is why `whyNot` takes a price: one flag for the whole adapter had to lie about
+ * one half of the catalog. As of the payment header landing, `whyNot` reports only a
+ * payee this build does not recognise — whether a *wallet* is ready to sign is a
+ * separate, changeable-by-the-second fact that the panel tracks itself (`lib/wallet.ts`),
+ * not something baked into a price the way a payee mismatch is.
  *
  * ── What this deliberately does not do ───────────────────────────────────────
  * It does not fall back to the local stub when the network fails. An empty panel
@@ -159,7 +165,7 @@ export function parseTools(body: unknown): Tool[] {
  * end, and worse in the same way: both copies sat on the path whose output gets
  * signed.
  */
-export function parsePrice(toolId: string, status: number, body: unknown): Price {
+export function parsePrice(toolId: string, origin: string, status: number, body: unknown): Price {
   const b = obj(body, "a quote");
 
   if (status === 501 || b.code === "TOOL_UNAVAILABLE") {
@@ -176,7 +182,7 @@ export function parsePrice(toolId: string, status: number, body: unknown): Price
     };
   }
 
-  return { kind: "paid", requirements: checkRequirements(toolId, b) };
+  return { kind: "paid", requirements: checkRequirements(toolId, origin, b) };
 }
 
 /* ── the adapter ─────────────────────────────────────────────────────────────── */
@@ -186,22 +192,24 @@ export function parsePrice(toolId: string, status: number, body: unknown): Price
  * header outside the CORS safelist turns a simple GET into a preflighted one, and
  * the preflight is the thing measured above to carry no CORS headers at all.
  */
-async function getJson(url: string): Promise<{ status: number; body: unknown }> {
+async function getJson(url: string): Promise<{ status: number; body: unknown; headers: Headers }> {
   const res = await fetch(url, { headers: { accept: "application/json" } });
-  return { status: res.status, body: await res.json() };
+  return { status: res.status, body: await res.json(), headers: res.headers };
 }
 
 /**
- * Why a paid run stops here. Named once so the panel and the thrown error cannot
- * drift apart.
+ * Why a paid run stops here when nothing was attached to pay it. Named once so the
+ * panel and the thrown error cannot drift apart.
  *
- * Not CORS — `FORWARD` settles that — and not a missing API key either. Answering a
- * 402 means signing an EIP-3009 authorization over the caller's own USDC, and this
- * build has no signing code at all. Saying that plainly matters: "payment failed"
- * invites a retry, and there is nothing here to retry.
+ * Not CORS — `FORWARD` settles that — and not a missing signing capability either, not
+ * any more: `lib/payment.ts` can sign an EIP-3009 authorization once a wallet is
+ * connected. This is what happens when `run` is called for a paid tool with no
+ * `payment` argument at all — the panel did not attach one, whether because no wallet
+ * is connected or because it is not on this code path yet.
  */
 export const NO_WALLET =
-  "This tool wants payment, and this window cannot pay it: answering upstream's 402 means signing a USDC authorization from your own wallet, and no signing code is wired up yet. Nothing was charged.";
+  "This tool wants payment, and no payment was attached to this request. Connect a wallet " +
+  "and sign the USDC authorization it asks for, then try again. Nothing was charged.";
 
 /**
  * What an absent forwarder looks like from in here.
@@ -260,19 +268,22 @@ export class HttpCatalog implements Catalog {
   readonly isLive = false;
 
   /**
-   * ⚠️ Two independent reasons, and the order outlives the current one.
+   * The one thing wrong with THIS PRICE, independent of whether a wallet happens to be
+   * connected right now. A payee this build does not recognise is such a fact — it is
+   * true about the quote itself, the same way `askedSeconds` or `value` are, and stays
+   * true no matter what the panel's wallet state does a second from now.
    *
-   * `NO_WALLET` is why nothing runs today and it goes first. An unrecognised payee is
-   * reported after it because it is the reason that will **still** be true once a
-   * wallet lands — so both get said rather than the temporary one hiding the
-   * permanent one. Suppressing the payee note while there is no wallet would mean the
-   * day signing is wired up is the day the warning first appears, which is the worst
-   * possible day to learn that upstream's payee moved.
+   * Wallet readiness used to live here too (`NO_WALLET`, unconditionally, for every
+   * paid price), back when there was no signing code to wire up. Now that
+   * `lib/payment.ts` can build a header, a missing wallet is not a fact about the
+   * *price* — it is a fact about *this moment*, which changes the instant someone
+   * clicks "Connect". Folding it into `whyNot` would mean re-deriving it on every
+   * render just to notice it went stale; the panel already holds a `Wallet` and asks
+   * it directly instead.
    */
   whyNot(price: Price): string | null {
     if (price.kind === "free") return null;
-    const payee = whyNotSign(price.requirements);
-    return payee === null ? NO_WALLET : `${NO_WALLET} There is also a second problem: ${payee}`;
+    return whyNotSign(price.requirements);
   }
 
   async tools(): Promise<Tool[]> {
@@ -284,12 +295,18 @@ export class HttpCatalog implements Catalog {
   }
 
   async quote(toolId: string): Promise<Quote> {
-    const { status, body } = await getJson(BLUEAGENT.tool(toolId));
-    return { toolId, price: parsePrice(toolId, status, body) };
+    const { status, body, headers } = await getJson(BLUEAGENT.tool(toolId));
+    /**
+     * Header first, body as the fallback — see `lib/x402http.ts`. BlueAgent sends the
+     * body only (measured), so for it this is the same read as before; the order is
+     * here so this adapter and the any-URL one agree on what a 402 says.
+     */
+    return { toolId, price: parsePrice(toolId, BLUEAGENT.origin, status, readPaymentRequired(headers, body)) };
   }
 
   /**
-   * POST the inputs through the forwarder and report what came back.
+   * POST the inputs through the forwarder, with `payment` attached as `X-Payment`
+   * when the caller has one, and report what came back.
    *
    * Every failure throws rather than returning a `ToolRun` with an apology in
    * `output`. Upstream settles only after a handler succeeds, so a throw here means
@@ -299,17 +316,31 @@ export class HttpCatalog implements Catalog {
    * The output is upstream's JSON, pretty-printed and otherwise untouched. Nothing
    * here summarises it: a summary of a tool result is a sentence this repo wrote, and
    * the whole point of paying a tool is to read what the tool said.
+   *
+   * A 402 with `payment` attached means the facilitator refused the header itself
+   * (bad signature, expired window, wrong payee) rather than "you didn't pay" — a
+   * different failure from the one `NO_WALLET` names, so it gets a different sentence.
    */
-  async run(toolId: string, input: Record<string, string>): Promise<ToolRun> {
-    const res = await fetch(FORWARD.tool(toolId), {
-      method: "POST",
-      headers: { "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify(input),
-    });
+  async run(toolId: string, input: Record<string, string>, payment?: string): Promise<ToolRun> {
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      accept: "application/json",
+    };
+    if (payment !== undefined) headers["X-Payment"] = payment;
+
+    const res = await fetch(FORWARD.tool(toolId), { method: "POST", headers, body: JSON.stringify(input) });
     const text = await res.text();
 
     if (res.status === 402) {
-      throw new Error(`${toolId} was not run. ${NO_WALLET}`);
+      if (payment === undefined) {
+        throw new Error(`${toolId} was not run. ${NO_WALLET}`);
+      }
+      const said = reasonFrom(readJson(text));
+      throw new Error(
+        said
+          ? `${toolId} was not run. Upstream refused the payment: ${said} Nothing was charged.`
+          : `${toolId} was not run. Upstream refused the payment and gave no reason. Nothing was charged.`,
+      );
     }
 
     const body = readJson(text);
@@ -328,13 +359,62 @@ export class HttpCatalog implements Catalog {
     return {
       toolId,
       output: JSON.stringify(body, null, 2),
-      /**
-       * `free`, not `settled`, and the reason is the evidence: a 200 with no
-       * `X-PAYMENT` sent means upstream chose to answer without being paid. No
-       * transaction exists, so there is no hash to carry, which is why `Settlement`
-       * has no field for one here.
-       */
-      settlement: { kind: "free", why: "upstream answered this without asking for payment" },
+      settlement: settlementFor(payment, res.headers),
     };
   }
+}
+
+/**
+ * Read back what THIS run paid, from the header this build sent — not a second source
+ * of truth, the same `accepted` block `paymentHeader` wrote a moment ago.
+ *
+ * Throws rather than guessing: reaching here with an unreadable `payment` means this
+ * adapter sent a header it cannot parse back, which is a bug in this file, not upstream's
+ * — fabricating a `payTo` or `amountBaseUnits` to paper over that would put a made-up
+ * number on a `settled` result, which is exactly what `Settlement`'s shape exists to rule
+ * out (see `adapters/types.ts`).
+ */
+function decodeSentPayment(payment: string): { payTo: string; amountBaseUnits: bigint } {
+  const decoded = jsonFromBase64(payment, "payment") as { accepted?: { payTo?: unknown; amount?: unknown } } | null;
+  const payTo = decoded?.accepted?.payTo;
+  const amount = decoded?.accepted?.amount;
+  if (typeof payTo !== "string" || typeof amount !== "string") {
+    throw new Error(
+      "Sent a payment header this build cannot read back to report what it paid. That is a " +
+        "bug in this adapter, not upstream's.",
+    );
+  }
+  return { payTo, amountBaseUnits: BigInt(amount) };
+}
+
+/**
+ * What actually happened to the money on a successful (200) response.
+ *
+ * Three real outcomes, and only one of them may claim `settled`: no `payment` sent at
+ * all is `free` (upstream chose to answer without being paid, so there is nothing to
+ * settle); `payment` sent and a legible `txHash` came back is `settled`; `payment` sent
+ * and no legible `txHash` came back is `unsettled` — the call succeeded and this build
+ * still has no proof to show, which is the honest thing to say rather than upgrading a
+ * 200 into a receipt it did not earn.
+ */
+export function settlementFor(payment: string | undefined, headers: Headers): Settlement {
+  if (payment === undefined) {
+    return { kind: "free", why: "upstream answered this without asking for payment" };
+  }
+  /**
+   * 🔴 MEASURED against the one client of BlueAgent's payee that has demonstrably been
+   * paid: its own `packages/x402-client/src/client.ts` reads `X-Payment-Response` inside a
+   * try/catch and treats a missing or unparsable header as unknown, never as a failure.
+   * So an absent header is not evidence the payment failed — only that this build was not
+   * told a hash. `settledTransaction` reads that header and the spec's `PAYMENT-RESPONSE`.
+   */
+  const txHash = settledTransaction(headers);
+  if (txHash === null) {
+    return {
+      kind: "unsettled",
+      why: "upstream accepted the payment but sent back no settlement proof, so nothing here confirms a transaction",
+    };
+  }
+  const { payTo, amountBaseUnits } = decodeSentPayment(payment);
+  return { kind: "settled", txHash, payTo, amountBaseUnits };
 }
