@@ -7,7 +7,7 @@ import { explorer, price, quoteWords, short, usd } from "@/skills/format";
 import { scan, type Flag, type Scan } from "@/skills/goplus";
 import { originOf, type Origin } from "@/skills/origin";
 import { launchpadOf, type Launchpad } from "@/skills/launchpads";
-import { isV3, launchOf, launchpadOrigin, poolValue, v3FeeOf, type CoinFee, type LaunchRecord, type PoolValue } from "@/skills/launchpad";
+import { isV3, launchOf, launchpadOrigin, poolValue, v3FeeOf, v3ReferrerOf, type CoinFee, type LaunchRecord, type PoolValue } from "@/skills/launchpad";
 import { chainToken } from "@/skills/chaintoken";
 import { BRAND } from "@/brand";
 import { feePercent, LAUNCHPAD_EXPECTS } from "@/config/launchpad";
@@ -261,7 +261,21 @@ export const LAUNCHPAD_CODE: Row = row(
   { tone: "ok" },
 );
 
-export function launchpadRows(record: LaunchRecord | null | undefined, fee?: CoinFee | null | undefined): Row[] {
+/**
+ * v3 only: the referrer recorded at launch, if any. `null` (none, or a v1/v2 coin) says nothing;
+ * `undefined` (unread, or not read at all) is amber "not checked", never "none" (hard rule 12).
+ */
+export function referrerRows(referrer: string | null | undefined): Row[] {
+  if (referrer === null) return [];
+  if (referrer === undefined) return [row("Its referrer", "not checked — the launchpad could not be read", { tone: "warn" })];
+  return [
+    row("Its referrer", `${short(referrer)} — an approved referrer; every fee splits 80% creator / 5% referrer / ~15% ${BRAND.name}`, {
+      href: explorer.address(referrer),
+    }),
+  ];
+}
+
+export function launchpadRows(record: LaunchRecord | null | undefined, fee?: CoinFee | null | undefined, referrer?: string | null): Row[] {
   if (record === null) return [];
   if (record === undefined) return [row(`${BRAND.name} launchpad`, "not checked — the launchpad could not be read", { tone: "warn" })];
   const base = "fixed supply with no admin; the liquidity is locked by the launchpad contract forever";
@@ -285,6 +299,7 @@ export function launchpadRows(record: LaunchRecord | null | undefined, fee?: Coi
       href: explorer.address(record.factory),
     }),
     ...v3Rows,
+    ...(v3 ? referrerRows(referrer) : []),
     row("Its creator", short(record.creator), { href: explorer.address(record.creator) }),
   ];
 }
@@ -378,10 +393,10 @@ export async function tokenVerdict(input: string, now: number): Promise<Report> 
     launch.then((l) => (l ? settled(poolValue(l.factory, address)) : null)),
     pad,
   ]);
-  const fee = await v3FeeOf(launchpad, address);
+  const [fee, referrer] = await Promise.all([v3FeeOf(launchpad, address), v3ReferrerOf(launchpad, address)]);
   const token = info ?? null;
   const body = [
-    ...launchpadRows(launchpad, fee),
+    ...launchpadRows(launchpad, fee, referrer),
     ...(launchpad ? [] : launchpadRow(other ?? undefined)),
     ...tradeRows(trip),
     ...(launchpad ? [LAUNCHPAD_CODE] : codeRows(security)),

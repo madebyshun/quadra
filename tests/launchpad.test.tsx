@@ -39,6 +39,10 @@ import { copy } from "./fixtures/base";
 import { LX } from "./fixtures/launchpad";
 import { MARKETS_FX } from "./fixtures/markets";
 import { BLOCKSCOUT } from "@/skills/blockscout";
+import { withoutV3 } from "./v2only";
+
+// Its fixtures are real v2/v1 captures, so it runs as the app did before v3 was set.
+withoutV3();
 
 useNet();
 

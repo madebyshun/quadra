@@ -9,7 +9,7 @@ import { Gel } from "@/ui/Gel";
 import { count } from "@/lib/achievements";
 
 /**
- * The Recycle Bin: Uniswap v4 pools emptied on Base in the last three hours, read from the chain
+ * The Trash: Uniswap v4 pools emptied on Base in the last three hours, read from the chain
  * (`skills/rugs.ts`). Each is a file you cannot restore — the joke is the format; the facts in each
  * line are exact, and each links to Token Verdict and to whoever emptied it. "Emptied" is what
  * happened, not why: a creator closing a test pool empties it too, and the window says so.
@@ -69,7 +69,7 @@ export function TrashPanel() {
         </p>
       )}
       {bin.emptied.length === 0 ? (
-        <p className="dim">The Recycle Bin is empty. Nobody emptied a pool lately — or nobody got caught doing it.</p>
+        <p className="dim">The Trash is empty. Nobody emptied a pool lately — or nobody got caught doing it.</p>
       ) : (
         <ul className="bin" aria-label="Emptied pools">
           {bin.emptied.map((e) => (
@@ -105,7 +105,7 @@ export function TrashPanel() {
             setNote("The bin cannot be emptied any further: its owners already took everything out.");
           }}
         >
-          Empty Recycle Bin
+          Empty Trash
         </Gel>
         <Gel quiet onClick={load}>
           Refresh

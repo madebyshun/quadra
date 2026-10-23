@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { renderAt, settle } from "./helpers";
 import { BRAND } from "@/brand";
 import { CONTRACTS } from "@/config/chain";
-import { visibleFeatures, FEATURES, isEnabled, desktopFeatures, comingSoon } from "@/features/registry";
+import { visibleFeatures, FEATURES, desktopItems, comingSoon, folderItems, FOLDER_IDS, entryOf } from "@/features/registry";
 
 describe("the desktop", () => {
   it("leads with the product name", () => {
@@ -30,35 +30,78 @@ describe("the desktop", () => {
     }
   });
 
-  it("puts every switched-on program on the desktop, the off ones in Coming Soon, and the Recycle Bin in its corner", () => {
+  it("puts the folders, four shortcuts and README.TXT on the desktop, and the Trash in its corner", () => {
     renderAt("/");
     const cards = within(screen.getByLabelText("What you can do")).getAllByRole("button");
-    expect(cards).toHaveLength(desktopFeatures().length);
+    expect(cards.map((c) => c.querySelector(".icon__title")!.textContent)).toEqual(desktopItems().map((e) => e.title));
+    expect(cards.map((c) => c.querySelector(".icon__title")!.textContent)).toEqual([
+      "My Computer",
+      "Research",
+      "Money",
+      "Launchpad",
+      "Games",
+      "Agents",
+      "Terminal",
+      "Launch",
+      "Coins",
+      "Wallet",
+      "README.TXT",
+    ]);
     expect(FEATURES.length - visibleFeatures().length).toBe(1);
     expect(screen.queryByRole("button", { name: /^Bridge/ })).not.toBeInTheDocument();
-    // 2026-10-14: three dimmed "not switched on yet" icons read like a settings page — they moved into a folder
-    for (const f of comingSoon()) expect(within(screen.getByLabelText("What you can do")).queryByRole("button", { name: new RegExp(`^${f.title}`) })).not.toBeInTheDocument();
-    expect(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Coming Soon/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Recycle Bin" })).toHaveClass("desk-trash");
+    expect(screen.queryByLabelText("Read about it")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Trash" })).toHaveClass("desk-trash");
+  });
+
+  it("opens a folder as an Explorer window: one click selects, a double click or Enter opens", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Money/ }));
+    const folder = screen.getByRole("list", { name: "Money" });
+    const win = windowFrame("Money");
+    expect(within(win).getByRole("status")).toHaveTextContent("4 objects");
+    const send = within(folder).getByRole("button", { name: "Send" });
+    await user.click(send);
+    expect(send).toHaveAttribute("aria-pressed", "true");
+    expect(within(win).getByRole("status")).toHaveTextContent("Send — pay any address or Basename");
+    expect(screen.queryByLabelText("Send", { selector: "section" })).not.toBeInTheDocument();
+    await user.dblClick(send);
+    expect(windowFrame("Send")).toBeInTheDocument();
+    within(folder).getByRole("button", { name: "Swap" }).focus();
+    await user.keyboard("{Enter}");
+    expect(windowFrame("Swap")).toBeInTheDocument();
+  });
+
+  it("files every folder's programs where the folder says, each one openable", async () => {
+    for (const id of FOLDER_IDS) {
+      const { unmount } = renderAt(`/?do=${id}`);
+      await settle();
+      const titles = within(screen.getByRole("list", { name: entryOf(id).title })).getAllByRole("button").map((b) => b.textContent);
+      expect(titles, id).toEqual(folderItems(id).map((e) => e.title));
+      unmount();
+    }
   });
 
   it("says plainly that an off feature is off, from the Coming Soon folder", async () => {
     const user = userEvent.setup();
     renderAt("/?do=soon");
+    await settle();
     const folder = screen.getByLabelText("Programs not switched on yet");
     const off = comingSoon();
     expect(off.length).toBeGreaterThan(0);
-    for (const f of off) expect(within(folder).getByRole("button", { name: new RegExp(`^${f.title}`) })).toHaveTextContent(f.blurb);
-    await user.click(within(folder).getByRole("button", { name: new RegExp(`^${off[0]!.title}`) }));
+    for (const f of off) expect(within(folder).getByRole("button", { name: f.title })).toHaveAttribute("title", f.blurb);
+    await user.dblClick(within(folder).getByRole("button", { name: off[0]!.title }));
     expect(screen.getByLabelText(`${off[0]!.title} is off`)).toHaveTextContent("not switched on");
   });
 
-  it("shows the real blurb for a feature that is on", () => {
+  it("shows the real blurb for each desktop icon", () => {
     renderAt("/");
-    const on = desktopFeatures();
+    const on = desktopItems();
     expect(on.length).toBeGreaterThan(0);
-    for (const f of on) {
-      const card = screen.getByRole("button", { name: new RegExp(`^${f.title}`) });
+    const cards = within(screen.getByLabelText("What you can do")).getAllByRole("button");
+    for (const [i, f] of on.entries()) {
+      const card = cards[i]!;
+      expect(card).toHaveTextContent(f.title);
       expect(card).toHaveTextContent(f.blurb);
       expect(card).not.toHaveAttribute("aria-disabled");
     }
@@ -70,23 +113,21 @@ describe("the desktop", () => {
    * a doc page now opens as a window like anything else. The routes still exist
    * for a saved link; `renderAt("/docs")` below is what covers them.
    */
-  it("offers the three doc pages as windows, not as navigation", () => {
-    renderAt("/");
-    const docs = within(screen.getByLabelText("Read about it")).getAllByRole("button");
-    expect(docs.map((b) => b.textContent)).toEqual([
-      expect.stringContaining("Docs"),
-      expect.stringContaining("API"),
-      expect.stringContaining("Verify"),
-    ]);
-    expect(within(screen.getByLabelText("Read about it")).queryAllByRole("link")).toEqual([]);
+  it("keeps the three doc pages in the Agents folder, as windows, not as navigation", async () => {
+    renderAt("/?do=folder-agents");
+    await settle();
+    const agents = screen.getByRole("list", { name: "Agents" });
+    for (const name of ["Docs", "API", "Verify"]) expect(within(agents).getByRole("button", { name })).toBeInTheDocument();
+    expect(within(agents).queryAllByRole("link")).toEqual([]);
   });
 
   it("opens a doc page in place, keeping the desktop underneath", async () => {
     const user = userEvent.setup();
-    renderAt("/");
-    await user.click(screen.getByRole("button", { name: /^Docs/ }));
+    renderAt("/?do=folder-agents");
     await settle();
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(`Docs — ${BRAND.name}`);
+    await user.dblClick(within(screen.getByRole("list", { name: "Agents" })).getByRole("button", { name: "Docs" }));
+    await settle();
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(["Agents", `Docs — ${BRAND.name}`]);
     // the header the old navigation threw away
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(BRAND.name);
   });
@@ -127,9 +168,9 @@ describe("the desktop", () => {
   it("opens a doc page from the Start menu too", async () => {
     const user = userEvent.setup();
     renderAt("/");
-    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
+    await user.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: BRAND.name }));
     await user.click(
-      within(screen.getByRole("menu", { name: "Start menu" })).getByRole("menuitem", { name: "API" }),
+      within(screen.getByRole("menu", { name: `${BRAND.name} menu` })).getByRole("menuitem", { name: "API" }),
     );
     await settle();
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("API");
@@ -139,7 +180,8 @@ describe("the desktop", () => {
     const user = userEvent.setup();
     renderAt("/?do=send");
     await settle();
-    await user.click(screen.getByRole("button", { name: /^Verify/ }));
+    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Agents/ }));
+    await user.dblClick(within(screen.getByRole("list", { name: "Agents" })).getByRole("button", { name: "Verify" }));
     await settle();
     const titles = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
     expect(titles).toContain("Send");
@@ -209,17 +251,17 @@ describe("opening a feature from the desktop icon", () => {
   it("clicking a card opens its window without a page navigation", async () => {
     const user = userEvent.setup();
     renderAt("/");
-    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Send/ }));
-    expect(windowFrame("Send")).toBeInTheDocument();
+    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Wallet/ }));
+    expect(windowFrame("Connect wallet")).toBeInTheDocument();
   });
 
   it("clicking the same card twice does not open a second window", async () => {
     const user = userEvent.setup();
     renderAt("/");
-    const card = within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Send/ });
+    const card = within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Wallet/ });
     await user.click(card);
     await user.click(card);
-    expect(screen.getAllByLabelText("Send", { selector: "section" })).toHaveLength(1);
+    expect(screen.getAllByLabelText("Connect wallet", { selector: "section" })).toHaveLength(1);
   });
 });
 
@@ -228,29 +270,33 @@ describe("multiple windows", () => {
     const user = userEvent.setup();
     renderAt("/?do=send");
     await settle();
-    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^MCP/ }));
+    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Terminal/ }));
     expect(windowFrame("Send")).toBeInTheDocument();
-    expect(windowFrame("MCP tools")).toBeInTheDocument();
+    expect(windowFrame("Terminal")).toBeInTheDocument();
   });
 
   it("closing one window leaves the other open", async () => {
     const user = userEvent.setup();
     renderAt("/?do=send");
     await settle();
-    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^MCP/ }));
+    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Terminal/ }));
     await user.click(within(windowFrame("Send")).getByRole("button", { name: "Close" }));
     expect(screen.queryByLabelText("Send", { selector: "section" })).not.toBeInTheDocument();
-    expect(windowFrame("MCP tools")).toBeInTheDocument();
+    expect(windowFrame("Terminal")).toBeInTheDocument();
   });
 
   it("clicking a background window brings it in front (its taskbar chip becomes active)", async () => {
     const user = userEvent.setup();
     renderAt("/?do=send");
     await settle();
-    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^MCP/ }));
+    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Terminal/ }));
     await user.click(windowFrame("Send"));
-    const sendChip = within(screen.getByLabelText("Taskbar")).getByRole("button", { name: "Send" });
-    expect(sendChip.className).toContain("chip--active");
+    await user.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: "Windows" }));
+    const send = within(screen.getByRole("menu", { name: "Windows menu" })).getByRole("menuitemcheckbox", { name: "Send" });
+    expect(send).toHaveAttribute("aria-checked", "true");
+    // and the window behind loses its title bar's stripes
+    expect(windowFrame("Terminal")).toHaveClass("win--inactive");
+    expect(windowFrame("Send")).not.toHaveClass("win--inactive");
   });
 });
 
@@ -283,7 +329,10 @@ describe("dragging, resizing and minimising a window", () => {
     const before = { left: win.style.left, top: win.style.top };
     await user.click(within(win).getByRole("button", { name: "Minimise" }));
     expect(win).not.toBeVisible();
-    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: "Send" }));
+    await user.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: "Windows" }));
+    const send = within(screen.getByRole("menu", { name: "Windows menu" })).getByRole("menuitemcheckbox", { name: "Send" });
+    expect(send).toHaveClass("menu__item--hidden");
+    await user.click(send);
     expect(win).toBeVisible();
     expect({ left: win.style.left, top: win.style.top }).toEqual(before);
   });
@@ -326,101 +375,116 @@ describe("closing the window", () => {
     expect(screen.getByLabelText("What you can do")).toBeInTheDocument();
   });
 
-  it("minimises every window from the taskbar start button", async () => {
+  it("puts every window away from the Windows menu's Show Desktop", async () => {
     const user = userEvent.setup();
     renderAt("/?do=mcp");
     await settle();
-    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
+    await user.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: "Windows" }));
+    await user.click(within(screen.getByRole("menu", { name: "Windows menu" })).getByRole("menuitem", { name: "Show Desktop" }));
     expect(windowFrame("MCP tools")).not.toBeVisible();
+    expect(screen.queryByRole("menu", { name: "Windows menu" })).not.toBeInTheDocument();
   });
 });
 
-describe("the taskbar", () => {
+describe("the menu bar", () => {
   it("is present on the desktop and names the product", () => {
     renderAt("/");
     expect(
-      within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }),
+      within(screen.getByLabelText("Menu bar")).getByRole("button", { name: BRAND.name }),
     ).toBeInTheDocument();
   });
 
   it("states the chain, because an address means nothing without one", () => {
     renderAt("/");
-    expect(screen.getByLabelText("Taskbar")).toHaveTextContent("Base");
+    expect(screen.getByLabelText("Menu bar")).toHaveTextContent("Base");
   });
 
   it("names the open window while one is open", async () => {
     renderAt("/?do=inference");
     await settle();
+    const bar = within(screen.getByLabelText("Menu bar"));
+    await userEvent.setup().click(bar.getByRole("button", { name: "Windows" }));
     expect(
-      within(screen.getByLabelText("Taskbar")).getByRole("button", { name: "Private inference" }),
+      within(screen.getByRole("menu", { name: "Windows menu" })).getByRole("menuitemcheckbox", { name: "Private inference" }),
     ).toBeInTheDocument();
   });
 });
 
-describe("the Start menu", () => {
+describe("the app's own menu (it holds what the Start menu held)", () => {
   it("opens on a Start click, listing every visible feature and the doc pages", async () => {
     const user = userEvent.setup();
     renderAt("/");
-    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
-    const menu = screen.getByRole("menu", { name: "Start menu" });
+    await user.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: BRAND.name }));
+    const menu = screen.getByRole("menu", { name: `${BRAND.name} menu` });
     expect(within(menu).getByRole("menuitem", { name: /Send/ })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Docs" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "API" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Verify" })).toBeInTheDocument();
   });
 
-  it("marks an off feature in the menu without hiding it", async () => {
+  it("groups the programs by the desktop's folders, the off ones waiting in Coming Soon", async () => {
     const user = userEvent.setup();
     renderAt("/");
-    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
-    const menu = screen.getByRole("menu", { name: "Start menu" });
-    const off = visibleFeatures().filter((f) => !isEnabled(f));
-    expect(off.length).toBeGreaterThan(0);
-    expect(within(menu).queryByRole("menuitem", { name: /Bridge/ })).not.toBeInTheDocument();
-    for (const f of off) {
-      const item = within(menu).getByRole("menuitem", { name: new RegExp(f.title) });
-      expect(item.className).toContain("start-menu__item--off");
+    await user.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: BRAND.name }));
+    const menu = screen.getByRole("menu", { name: `${BRAND.name} menu` });
+    for (const id of FOLDER_IDS) {
+      const group = within(menu).getByRole("group", { name: entryOf(id).title });
+      expect(within(group).getAllByRole("menuitem").map((m) => m.textContent)).toEqual([entryOf(id).title, ...folderItems(id).map((e) => e.title)]);
     }
-    const on = within(menu).getByRole("menuitem", { name: /^Send/ });
-    expect(on.className).not.toContain("start-menu__item--off");
+    expect(within(menu).getByRole("menuitem", { name: "README.TXT" })).toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: /Bridge/ })).not.toBeInTheDocument();
+    for (const f of comingSoon()) expect(within(menu).queryByRole("menuitem", { name: f.title })).not.toBeInTheDocument();
+    await user.click(within(menu).getByRole("menuitem", { name: "Games" }));
+    expect(windowFrame("Games")).toBeInTheDocument();
   });
 
   it("opens a window in place from the Home page, and closes the menu", async () => {
     const user = userEvent.setup();
     renderAt("/");
-    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
+    await user.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: BRAND.name }));
     await user.click(
-      within(screen.getByRole("menu", { name: "Start menu" })).getByRole("menuitem", { name: /^Send/ }),
+      within(screen.getByRole("menu", { name: `${BRAND.name} menu` })).getByRole("menuitem", { name: /^Send/ }),
     );
     expect(windowFrame("Send")).toBeInTheDocument();
-    expect(screen.queryByRole("menu", { name: "Start menu" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: `${BRAND.name} menu` })).not.toBeInTheDocument();
   });
 
   it("closes on an outside click", async () => {
     const user = userEvent.setup();
     renderAt("/");
-    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
-    expect(screen.getByRole("menu", { name: "Start menu" })).toBeInTheDocument();
+    await user.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: BRAND.name }));
+    expect(screen.getByRole("menu", { name: `${BRAND.name} menu` })).toBeInTheDocument();
     await user.click(screen.getByRole("heading", { level: 1 }));
-    expect(screen.queryByRole("menu", { name: "Start menu" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: `${BRAND.name} menu` })).not.toBeInTheDocument();
   });
 
   it("closes on Escape", async () => {
     const user = userEvent.setup();
     renderAt("/");
-    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
-    expect(screen.getByRole("menu", { name: "Start menu" })).toBeInTheDocument();
+    await user.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: BRAND.name }));
+    expect(screen.getByRole("menu", { name: `${BRAND.name} menu` })).toBeInTheDocument();
     await user.keyboard("{Escape}");
-    expect(screen.queryByRole("menu", { name: "Start menu" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: `${BRAND.name} menu` })).not.toBeInTheDocument();
   });
 
-  it("still minimises every window on the same click that opens the menu", async () => {
+  it("opens a window from a folder's own menu title, and moving across the bar switches menus", async () => {
     const user = userEvent.setup();
-    renderAt("/?do=mcp");
-    await settle();
-    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
-    expect(windowFrame("MCP tools")).not.toBeVisible();
-    expect(screen.getByRole("menu", { name: "Start menu" })).toBeInTheDocument();
+    renderAt("/");
+    const bar = within(screen.getByLabelText("Menu bar"));
+    await user.click(bar.getByRole("button", { name: "Money folder" }));
+    const money = screen.getByRole("menu", { name: "Money folder menu" });
+    expect(within(money).getAllByRole("menuitem").map((m) => m.textContent)).toEqual([entryOf("folder-money").title, ...folderItems("folder-money").map((e) => e.title)]);
+    // hovering another title while one is open opens that one instead
+    await user.hover(bar.getByRole("button", { name: "Games folder" }));
+    expect(screen.queryByRole("menu", { name: "Money folder menu" })).not.toBeInTheDocument();
+    await user.click(within(screen.getByRole("menu", { name: "Games folder menu" })).getByRole("menuitem", { name: /Rugsweeper/ }));
+    expect(windowFrame("Rugsweeper")).toBeInTheDocument();
+    // with no menu open, hovering opens nothing; a second click on an open title closes it
+    await user.hover(bar.getByRole("button", { name: "Money folder" }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await user.click(bar.getByRole("button", { name: "Money folder" }));
+    await user.click(bar.getByRole("button", { name: "Money folder" }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 });
 
@@ -463,10 +527,11 @@ describe("routing", () => {
     expect(screen.getByLabelText("What you can do")).toBeInTheDocument();
   });
 
-  it("goes home from the taskbar on a standalone page, not nowhere", async () => {
+  it("goes home from the menu bar's Show Desktop on a standalone page, not nowhere", async () => {
     const user = userEvent.setup();
     renderAt("/api");
-    await user.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: BRAND.name }));
+    await user.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: "Windows" }));
+    await user.click(within(screen.getByRole("menu", { name: "Windows menu" })).getByRole("menuitem", { name: "Show Desktop" }));
     expect(screen.getByLabelText("What you can do")).toBeInTheDocument();
   });
 });

@@ -10,14 +10,14 @@ import { DYNAMIC_FEE_FLAG, feePercent, LAUNCH_HOOK_ABI, LAUNCHPAD_V3_ABI, LAUNCH
 import { checkFactory, launchFactory, launchTx, LAUNCH_FEES, type Metadata, type Pair } from "@/adapters/http/launchpad";
 import { coinFeeOf, factories, isV3, launchOf, poolIdOf, v3FeeOf } from "@/skills/launchpad";
 import { NATIVE, poolKeyOf } from "@/lib/v4swap";
-import { feeOf, prepareLaunch, prepareLaunchSkill } from "@/skills/prepare";
-import { launchpadRows } from "@/skills/verdict";
-import { Disclosures, feeLine, FLAT_FEE, openingWords, TokenInfo, useCoinFee } from "@/features/panels/TokenPage";
+import { feeOf, prepareLaunch, prepareLaunchSkill, referrerArg } from "@/skills/prepare";
+import { launchpadRows, referrerRows } from "@/skills/verdict";
+import { Disclosures, feeLine, FLAT_FEE, openingWords, TokenInfo, useCoinFee, useCoinReferrer } from "@/features/panels/TokenPage";
 import { listFee, versionOf, type Listed } from "@/features/panels/CoinsPanel";
 import { BaseLaunch, openingText } from "@/features/panels/BaseLaunch";
-import { applyLaunches, applySwaps, coinDetail, emptyState, snapshot, SWAP_TOPIC, syncOnce, type Rpc } from "@/server/indexer";
+import { applyLaunches, applyReferrals, applySwaps, coinDetail, emptyState, snapshot, SWAP_TOPIC, syncOnce, type Rpc } from "@/server/indexer";
 import { parseCoinPage, parseIndex } from "@/adapters/http/indexer";
-import { LAUNCHED_TOPIC } from "@/skills/launchpad";
+import { isApprovedReferrer, LAUNCHED_TOPIC, REFERRED_TOPIC, referrerOf, v3ReferrerOf } from "@/skills/launchpad";
 import { toChecksumAddress } from "@/lib/address";
 import { BLOCKSCOUT } from "@/skills/blockscout";
 import { STOCKS_PATH } from "@/server/stocks";
@@ -49,6 +49,8 @@ const META: Metadata = { name: "Night Cat", symbol: "NCAT", description: "", ima
 const ETH_PAIR: Pair = { address: ETH_Q, symbol: "ETH", name: "Ether", decimals: 18, startTick: 191_200 };
 const KEY = { currency0: ETH_Q, currency1: TOKEN, fee: DYNAMIC_FEE_FLAG, tickSpacing: 200, hooks: HOOK };
 const RECORD = { creator: ME, creatorRecipient: ME, key: KEY };
+/** A stand-in referrer — Blue Agent's real address is the owner's to give, never guessed here. */
+const REFERRER = toChecksumAddress("0x5157000000000000000000000000000000beefca");
 
 type Saved = Pick<typeof CONTRACTS, "launchFactory" | "launchFactoryV1" | "launchFactoryV3">;
 const saved: Saved = { launchFactory: CONTRACTS.launchFactory, launchFactoryV1: CONTRACTS.launchFactoryV1, launchFactoryV3: CONTRACTS.launchFactoryV3 };
@@ -65,6 +67,9 @@ function factory(over: Record<string, unknown> = {}, record: unknown = RECORD) {
     FEE_LOW: 10_000,
     FEE_HIGH: 30_000,
     CREATOR_SHARE_BPS: 8_000,
+    REFERRER_SHARE_BPS: 500,
+    approvedReferrers: false,
+    referrerOf: ETH_Q,
     TICK_SPACING: 200,
     protocolRecipient: CONTRACTS.treasury!,
     hook: HOOK,
@@ -91,7 +96,13 @@ describe("held to the Solidity", () => {
 
   it("finds every v3 function and event the app calls, word for word, in the contract", () => {
     for (const piece of [
-      "function launch( string calldata name, string calldata symbol, string calldata contractURI, bytes32 salt, address quote, uint256 quoteIn, uint24 fee ) external payable nonReentrant returns (address token)",
+      "function launch( string calldata name, string calldata symbol, string calldata contractURI, bytes32 salt, address quote, uint256 quoteIn, uint24 fee, address referrer ) external payable nonReentrant returns (address token)",
+      "uint16 public constant REFERRER_SHARE_BPS = 500;",
+      "mapping(address referrer => bool) public approvedReferrers;",
+      "mapping(address token => address) public referrerOf;",
+      "event Referred(address indexed token, address indexed referrer);",
+      // collect: the creator's 80%, a recorded referrer's 5%, and the protocol takes the REMAINDER
+      "_send(currency, protocolRecipient, amount - toCreator - toReferrer);",
       "function collect(address token) external nonReentrant returns (uint256 amount0, uint256 amount1)",
       "function predictToken(address caller, bytes32 salt) external view returns (address)",
       "uint256 public constant TOTAL_SUPPLY = 1_000_000_000e18;",
@@ -121,6 +132,7 @@ describe("held to the Solidity", () => {
     }
     expect(DYNAMIC_FEE_FLAG).toBe(0x800000);
     expect(LAUNCH_FEES).toEqual([LAUNCHPAD_V3_EXPECTS.feeLow, LAUNCHPAD_V3_EXPECTS.feeHigh]);
+    expect(REFERRED_TOPIC).toBe(encodeEventTopics({ abi: LAUNCHPAD_V3_ABI, eventName: "Referred" })[0]);
   });
 
   it("expects the hook's opening and the fee address the deploy script deploys with", () => {
@@ -135,21 +147,26 @@ describe("held to the Solidity", () => {
 });
 
 describe("which factory new launches go to", () => {
-  it("v2 until v3 is set — today's behaviour — then v3, and every reader lists v3 first", () => {
-    expect(CONTRACTS.launchFactoryV3).toBeNull();
-    expect(launchFactory()).toEqual({ address: CONTRACTS.launchFactory, version: 2 });
-    expect(factories()).toEqual([CONTRACTS.launchFactory, CONTRACTS.launchFactoryV1]);
+  it("v3 as deployed (2026-10-22) by default, v2 while v3 is unset, and every reader lists v3 first", () => {
+    expect(CONTRACTS.launchFactoryV3).toBe("0x006Da367654a487bb277fe25ff54f0fE0f741377");
+    expect(launchFactory()).toEqual({ address: toChecksumAddress(CONTRACTS.launchFactoryV3!), version: 3 });
+    expect(factories()).toEqual([CONTRACTS.launchFactoryV3, CONTRACTS.launchFactory, CONTRACTS.launchFactoryV1]);
     expect(isV3(CONTRACTS.launchFactory!)).toBe(false);
+    pin({ launchFactoryV3: null, launchFactory: saved.launchFactory, launchFactoryV1: saved.launchFactoryV1 });
+    expect(launchFactory()).toEqual({ address: saved.launchFactory, version: 2 });
+    expect(factories()).toEqual([saved.launchFactory, saved.launchFactoryV1]);
     pin({ launchFactory: saved.launchFactory, launchFactoryV1: saved.launchFactoryV1 });
     expect(launchFactory()).toEqual({ address: V3, version: 3 });
     expect(factories()).toEqual([V3, saved.launchFactory, saved.launchFactoryV1]);
     expect(isV3(V3.toLowerCase())).toBe(true);
   });
 
-  it("builds v3's launch with the fee as its last argument, and v2's without", () => {
+  it("builds v3's launch with the fee and the referrer (none by default) as its last arguments, and v2's without", () => {
     const v3 = launchTx(V3, META, SALT, ETH_PAIR, 5n, 30_000);
     expect(v3.value).toBe(5n);
-    expect(decodeFunctionData({ abi: LAUNCHPAD_V3_ABI, data: v3.data! }).args!.slice(4)).toEqual([ETH_Q, 5n, 30_000]);
+    expect(decodeFunctionData({ abi: LAUNCHPAD_V3_ABI, data: v3.data! }).args!.slice(4)).toEqual([ETH_Q, 5n, 30_000, ETH_Q]);
+    const referred = launchTx(V3, META, SALT, ETH_PAIR, 0n, 10_000, REFERRER);
+    expect(decodeFunctionData({ abi: LAUNCHPAD_V3_ABI, data: referred.data! }).args!.at(-1)).toBe(REFERRER);
     expect(() => decodeFunctionData({ abi: LAUNCHPAD_V3_ABI, data: launchTx(V3, META, SALT, ETH_PAIR, 5n).data! })).toThrow();
   });
 });
@@ -165,6 +182,7 @@ describe("checking v3 before anything is offered", () => {
       [{ FEE_LOW: 5_000 }, {}, "its fees are 5000 and 30000, not 10000 and 30000"],
       [{ FEE_HIGH: 50_000 }, {}, "its fees are 10000 and 50000, not 10000 and 30000"],
       [{ CREATOR_SHARE_BPS: 5_000 }, {}, "its launcher share is 5000 bps, not 8000"],
+      [{ REFERRER_SHARE_BPS: 1_000 }, {}, "its referrer share is 1000 bps, not 500"],
       [{ TICK_SPACING: 60 }, {}, "its tick spacing is 60, not 200"],
       [{ protocolRecipient: other }, {}, `its protocol share goes to ${other}, not to this app's fee address`],
       [{}, { factory: other }, `its hook ${HOOK} belongs to ${other}, not to this launchpad`],
@@ -248,7 +266,8 @@ describe("Launch (prepared) on v3", () => {
     expect(() => feeOf("2%", 3)).toThrow('The fee must be 1% or 3%; "2%" is neither.');
     expect(feeOf(" ", 2)).toBeUndefined();
     expect(() => feeOf("3%", 2)).toThrow('This launchpad (version 2) has one fee, 1% — a fee of "3%" cannot be chosen until version 3 is deployed. Leave the fee out.');
-    expect(prepareLaunchSkill.args.at(-1)).toMatchObject({ name: "fee", optional: true });
+    expect(prepareLaunchSkill.args.at(-2)).toMatchObject({ name: "fee", optional: true });
+    expect(prepareLaunchSkill.args.at(-1)).toMatchObject({ name: "referrer", optional: true });
   });
 
   it("prepares a 3% launch with the opening its hook answered, and says the fee everywhere", async () => {
@@ -260,11 +279,59 @@ describe("Launch (prepared) on v3", () => {
       "for the first 15 s the fee falls from 50% to 3% — a sniper pays most of it; the creator's own first buy inside the launch pays only 3%",
     );
     expect(value(r, "Launchpad")).toBe(`${V3} (version 3) — checked: supply, 1%/3% fees, 80/20 split, fee address, its hook's opening`);
-    expect(decodeFunctionData({ abi: LAUNCHPAD_V3_ABI, data: value(r, "Step 1 data") as `0x${string}` }).args!.at(-1)).toBe(30_000);
-    expect(r.notes.join(" ")).toContain("80% of the pool's 3% fee");
+    expect(decodeFunctionData({ abi: LAUNCHPAD_V3_ABI, data: value(r, "Step 1 data") as `0x${string}` }).args!.slice(-2)).toEqual([30_000, ETH_Q]);
+    expect(r.notes.join(" ")).toContain("80% of the pool's 3% fee; Quadra 20%");
+    expect(value(r, "Referrer")).toBeUndefined();
+  });
+
+  it("takes a referrer, says whether the launchpad approves it — and an unread answer as not checked", async () => {
+    pin();
+    const run = async (approved: boolean | "down") => {
+      net({
+        rpc: (m, p) =>
+          m === "eth_getBalance"
+            ? `0x${(10n ** 17n).toString(16)}`
+            : ethCalls({
+                [V3]: (data) =>
+                  decodeFunctionData({ abi: LAUNCHPAD_V3_ABI, data }).functionName === "approvedReferrers" && approved === "down"
+                    ? (DOWN as never)
+                    : factory({ approvedReferrers: approved === true })(data),
+                [HOOK]: hook(),
+              })(m, p),
+      });
+      return prepareLaunch(["Night_Cat", "NCAT", CREATOR, "", "", "", REFERRER]);
+    };
+    const yes = await run(true);
+    expect(yes.rows.find((x) => x.label === "Referrer")).toMatchObject({
+      tone: "ok",
+      value: `${REFERRER} — approved: recorded for this coin; every fee splits 80% creator / 5% referrer / ~15% Quadra`,
+    });
+    expect(decodeFunctionData({ abi: LAUNCHPAD_V3_ABI, data: value(yes, "Step 1 data") as `0x${string}` }).args!.slice(-2)).toEqual([10_000, REFERRER]);
+    expect(yes.notes.join(" ")).toContain("the referrer 5%, Quadra the rest (~15%)");
+    const no = await run(false);
+    expect(no.rows.find((x) => x.label === "Referrer")).toMatchObject({ tone: "warn" });
+    expect(value(no, "Referrer")).toContain("NOT approved by the launchpad: the launch still goes through, recorded with no referrer");
+    expect(no.notes.join(" ")).toContain("Quadra 20%");
+    const unread = await run("down");
+    expect(unread.rows.find((x) => x.label === "Referrer")).toMatchObject({ tone: "warn", value: `${REFERRER} — not checked: whether the launchpad approves it could not be read` });
+    // the EIP-55 door: a mistyped checksum is refused, never "corrected"
+    expect(REFERRER).toMatch(/[A-F]/);
+    await expect(prepareLaunch(["Night_Cat", "NCAT", CREATOR, "", "", "", REFERRER.replace(/[A-F]/, (c) => c.toLowerCase())])).rejects.toThrow(/Referrer/);
+  });
+
+  it("refuses a referrer on v2 before reading anything", async () => {
+    // v2 behaviour: v3 unset, as before its deploy
+    pin({ launchFactoryV3: null, launchFactory: saved.launchFactory, launchFactoryV1: saved.launchFactoryV1 });
+    net({});
+    expect(referrerArg(" ", 2)).toBeNull();
+    await expect(prepareLaunch(["Night_Cat", "NCAT", CREATOR, "", "", "", REFERRER])).rejects.toThrow(
+      "This launchpad (version 2) has no referrals — a referrer can be named once version 3 is deployed. Leave the referrer out.",
+    );
   });
 
   it("refuses a fee on v2 before reading anything", async () => {
+    // v2 behaviour: v3 unset, as before its deploy
+    pin({ launchFactoryV3: null, launchFactory: saved.launchFactory, launchFactoryV1: saved.launchFactoryV1 });
     net({});
     await expect(prepareLaunch(["Night_Cat", "NCAT", CREATOR, "", "", "3%"])).rejects.toThrow("has one fee, 1%");
   });
@@ -487,13 +554,16 @@ describe("the Launch window on v3", () => {
     await waitFor(() => expect(screen.getByText(/^Live:/)).toBeInTheDocument());
     expect(sent).toHaveLength(1);
     expect(sent[0]!.to!.toLowerCase()).toBe(V3.toLowerCase());
-    expect(decodeFunctionData({ abi: LAUNCHPAD_V3_ABI, data: sent[0]!.data as `0x${string}` }).args!.at(-1)).toBe(30_000);
+    // the window names no referrer: a launch made in this app has none
+    expect(decodeFunctionData({ abi: LAUNCHPAD_V3_ABI, data: sent[0]!.data as `0x${string}` }).args!.slice(-2)).toEqual([30_000, ETH_Q]);
     // choosing a fee again throws the review away
     await userEvent.click(screen.getByRole("button", { name: "1%" }));
     expect(screen.queryByLabelText(/ready to launch on Base/)).not.toBeInTheDocument();
   });
 
   it("shows no fee choice on v2", async () => {
+    // v2 behaviour: v3 unset, as before its deploy
+    pin({ launchFactoryV3: null, launchFactory: saved.launchFactory, launchFactoryV1: saved.launchFactoryV1 });
     wallet();
     net({ get: () => DOWN, rpc: (m, p) => ethCalls({})(m, p) ?? DOWN });
     render(
@@ -504,5 +574,139 @@ describe("the Launch window on v3", () => {
     await act(async () => {});
     expect(screen.queryByRole("group", { name: "Fee" })).not.toBeInTheDocument();
     expect(screen.getByText(/You earn 80% of the 1% fee/)).toBeInTheDocument();
+  });
+});
+
+describe("a referred v3 coin", () => {
+  const v3Record = { factory: V3, creator: toChecksumAddress(ME), creatorRecipient: toChecksumAddress(ME) };
+  const referredBy = (who: string) => factory({ referrerOf: who, approvedReferrers: true });
+
+  it("reads the referrer from the factory — none as null, unread as undefined, and nothing asked for v1/v2", async () => {
+    pin({ launchFactory: saved.launchFactory });
+    net({ rpc: ethCalls({ [V3]: referredBy(REFERRER) }) });
+    expect(await referrerOf(V3, TOKEN)).toBe(REFERRER);
+    expect(await v3ReferrerOf({ factory: V3 }, TOKEN)).toBe(REFERRER);
+    expect(await isApprovedReferrer(V3, REFERRER)).toBe(true);
+    net({ rpc: ethCalls({ [V3]: factory() }) });
+    expect(await referrerOf(V3, TOKEN)).toBeNull();
+    net({ rpc: ethCalls({ [V3]: () => DOWN as never }) });
+    expect(await v3ReferrerOf({ factory: V3 }, TOKEN)).toBeUndefined();
+    net({});
+    expect(await v3ReferrerOf({ factory: saved.launchFactory! }, TOKEN)).toBeNull();
+    expect(await v3ReferrerOf(null, TOKEN)).toBeNull();
+  });
+
+  it("Token Verdict names the referrer and the 80/5/15 split — unread as not checked, none as nothing", () => {
+    pin();
+    const fee = { fee: 10_000, opening: null };
+    const labels = (ref: string | null | undefined) => launchpadRows(v3Record, fee, ref).map((r) => r.label);
+    expect(labels(REFERRER)).toEqual(["Launched on Quadra's launchpad", "Its fee", "Its referrer", "Its creator"]);
+    expect(referrerRows(REFERRER)[0]!.value).toContain("80% creator / 5% referrer / ~15% Quadra");
+    expect(referrerRows(undefined)[0]).toMatchObject({ tone: "warn", value: "not checked — the launchpad could not be read" });
+    expect(labels(null)).toEqual(["Launched on Quadra's launchpad", "Its fee", "Its creator"]);
+    expect(labels(undefined)).toContain("Its referrer");
+    // v2 has no referrals at all — nothing is said even when asked with one
+    expect(launchpadRows({ ...v3Record, factory: saved.launchFactory! }, null, REFERRER).map((r) => r.label)).toEqual(["Launched on Quadra's launchpad", "Its creator"]);
+  });
+
+  it("the coin page shows the referrer and its share, and Disclosures say the split", () => {
+    pin();
+    const page = render(<TokenInfo page="reading" creator={ME} launchedAt={null} quoteUsd={null} referrer={{ referrer: REFERRER }} />);
+    expect(page.container).toHaveTextContent("Referrer");
+    expect(page.container).toHaveTextContent("approved by the launchpad when the coin launched");
+    expect(page.container).toHaveTextContent("Referrer's sharenot read");
+    expect(page.container).toHaveTextContent("Quadra's sharenot read");
+    page.unmount();
+    for (const [ref, words] of [
+      ["reading", "Referrerreading…"],
+      [{ problem: "down" }, "Referrernot checked — down"],
+    ] as const) {
+      const r = render(<TokenInfo page="reading" creator={ME} launchedAt={null} quoteUsd={null} referrer={ref} />);
+      expect(r.container).toHaveTextContent(words);
+      r.unmount();
+    }
+    const none = render(<TokenInfo page="reading" creator={ME} launchedAt={null} quoteUsd={null} referrer={{ referrer: null }} />);
+    expect(none.container).not.toHaveTextContent("Referrer");
+    none.unmount();
+    const a = render(<Disclosures factory={V3} fee={FLAT_FEE} referrer={{ referrer: REFERRER }} />);
+    expect(a.container).toHaveTextContent("collecting pays 80% to the creator, 5% to its referrer");
+    expect(a.container).toHaveTextContent("the rest, about 15%, to Quadra");
+    a.unmount();
+    const b = render(<Disclosures factory={V3} fee={FLAT_FEE} referrer="reading" />);
+    expect(b.container).toHaveTextContent("5% of it to a referrer if one was recorded, which was not checked");
+    b.unmount();
+    const c = render(<Disclosures factory={V3} fee={FLAT_FEE} referrer={{ referrer: null }} />);
+    expect(c.container).toHaveTextContent("collecting pays 80% to the creator and 20% to Quadra");
+  });
+
+  it("the coin page splits what the index saw 80 / 5 / 15 for a referred coin", () => {
+    const coin = parseIndex({ coins: [{ token: TOKEN, factory: V3, creator: ME, launchBlock: 1, launchedAt: OPENED, quoteSymbol: "ETH", referrer: REFERRER }] }).coins[0]!;
+    expect(coin.referrer).toBe(REFERRER);
+    const page = { coin, trades: [], candles: [], points: [], feesQuote: 1, feesToken: null, feeBps: 100, maxPaidBps: null };
+    const r = render(<TokenInfo page={page as never} creator={ME} launchedAt={OPENED} quoteUsd={null} referrer={{ referrer: REFERRER }} />);
+    expect(r.container).toHaveTextContent("Creator's share80% — 0.8 ETH");
+    expect(r.container).toHaveTextContent("Referrer's share5% — 0.05 ETH");
+    expect(r.container).toHaveTextContent("Quadra's share~15% (the rest) — 0.15 ETH");
+  });
+
+  it("useCoinReferrer reads a v3 coin's referrer from the factory, and gives v1/v2 none without asking", async () => {
+    pin({ launchFactory: saved.launchFactory });
+    const Show = ({ f }: { f: string }) => {
+      const r = useCoinReferrer(f, TOKEN);
+      return <p>{r === "reading" ? "reading" : "problem" in r ? `problem ${r.problem}` : `ref ${r.referrer ?? "none"}`}</p>;
+    };
+    net({ rpc: ethCalls({ [V3]: referredBy(REFERRER) }) });
+    const a = render(<Show f={V3} />);
+    expect(a.container).toHaveTextContent("reading");
+    await waitFor(() => expect(a.container).toHaveTextContent(`ref ${REFERRER}`));
+    a.unmount();
+    net({ rpc: ethCalls({ [V3]: () => DOWN as never }) });
+    const b = render(<Show f={V3} />);
+    await waitFor(() => expect(b.container).toHaveTextContent("problem"));
+    b.rerender(<Show f={saved.launchFactory!} />);
+    await waitFor(() => expect(b.container).toHaveTextContent("ref none"));
+    // a page closed before the read lands sets nothing
+    net({ rpc: ethCalls({ [V3]: referredBy(REFERRER) }) });
+    render(<Show f={V3} />).unmount();
+    net({ rpc: ethCalls({ [V3]: () => DOWN as never }) });
+    render(<Show f={V3} />).unmount();
+    await act(async () => {});
+  });
+
+  it("the indexer records each coin's Referred log with its launch, once, and serves it", async () => {
+    pin();
+    const POOL_ID = poolIdOf(KEY);
+    const launched = {
+      address: V3,
+      blockNumber: "0x10",
+      blockTimestamp: `0x${OPENED.toString(16)}`,
+      transactionHash: `0x${"aa".repeat(32)}`,
+      topics: encodeEventTopics({ abi: LAUNCHPAD_V3_ABI, eventName: "Launched", args: { token: TOKEN, creator: ME as `0x${string}`, poolId: POOL_ID } }) as string[],
+      data: encodeAbiParameters(parseAbiParameters("uint256, uint256"), [0n, 0n]),
+    };
+    const referred = {
+      ...launched,
+      topics: encodeEventTopics({ abi: LAUNCHPAD_V3_ABI, eventName: "Referred", args: { token: TOKEN, referrer: REFERRER as `0x${string}` } }) as string[],
+      data: "0x",
+    };
+    const state = emptyState();
+    let asked: unknown = null;
+    const rpc: Rpc = async (m, p) => {
+      if (m === "eth_getLogs") {
+        asked ??= (p[0] as { topics: unknown }).topics;
+        return [referred, launched, { ...referred, topics: ["0x01"] }, 7];
+      }
+      throw new Error(`unexpected ${m}`);
+    };
+    state.syncedTo = 0x0f;
+    const r = await syncOnce(state, rpc, { number: 0x10, timestamp: OPENED }, 1);
+    expect(r.launches).toBe(1);
+    expect(asked).toEqual([[LAUNCHED_TOPIC, REFERRED_TOPIC]]);
+    expect(applyReferrals(state, [referred])).toBe(0);
+    expect(snapshot(state, OPENED).coins[0]!.referrer).toBe(REFERRER);
+    expect(parseIndex(JSON.parse(JSON.stringify(snapshot(state, OPENED)))).coins[0]!.referrer).toBe(REFERRER);
+    const plain = emptyState();
+    applyLaunches(plain, [launched], () => 0);
+    expect(snapshot(plain, OPENED).coins[0]!.referrer).toBeNull();
   });
 });

@@ -3470,12 +3470,15 @@ var CONTRACTS = {
   /**
    * The launchpad, version 3 (`contracts/src/LaunchFactoryV3.sol` + `LaunchHook.sol`: a 1% or 3% fee
    * chosen per coin, and the anti-sniper opening — the fee falls from the hook's `startFee` to the
-   * chosen one over its `window` seconds). NOT DEPLOYED: it waits on the owner's deploy
-   * (`contracts/script/DeployLaunchFactoryV3.s.sol`), its verification on Blockscout and an audit
-   * (hard rule 1 — never an address before then). The day it is set, NEW launches go here and v2
-   * becomes read-only like v1; until then everything behaves exactly as with v2.
+   * chosen one over its `window` seconds) and approved referrers (80 / 5 / 15). DEPLOYED by the owner
+   * 2026-10-22 (tx 0x151126f0…c205, block 52,929,530; hook 0x0D9DdcC907658E3C61318d0F979F978e600AA880),
+   * both verified on Sourcify with an EXACT match to this repo's source, and every expectation read
+   * back from the chain: supply 1e27, FEE_LOW/HIGH 10000/30000, share 8000, referrer share 500,
+   * spacing 200, hook.factory() = this, startFee 500000, window 15, protocolRecipient = treasury,
+   * quotes(ETH) = (true, 191200), and 8 stocks enabled by the quote admin. NEW launches go here; v2
+   * and v1 are read and collected from. NOT audited. Set back to `null` to send launches to v2.
    */
-  launchFactoryV3: null,
+  launchFactoryV3: "0x006Da367654a487bb277fe25ff54f0fE0f741377",
   /**
    * The launchpad, version 1 (`contracts/deployed/LaunchFactory.v1.sol`: ETH pairs only), DEPLOYED BY
    * THE OWNER 2026-10-02: tx 0xc51a517c…4a972764d, block 52,066,273. CHECKED before it was written
@@ -3759,7 +3762,7 @@ var tools_default = {
       treasury: "0xD5C1dFc036F9911348EA8065F73c8123f4013FAB",
       token: null,
       launchFactory: "0xef1F427bB57e0ECd7BB8051cE8bC7AAb709a0c03",
-      launchFactoryV3: null,
+      launchFactoryV3: "0x006Da367654a487bb277fe25ff54f0fE0f741377",
       launchFactoryV1: "0xcDb2eC1c487fbcB6B4AF25cCD86aFf8120FaB8a5"
     },
     limits: [
@@ -4082,7 +4085,7 @@ var LAUNCHPAD_EXPECTS = {
   startTick: 191200
 };
 var LAUNCHPAD_V3_ABI = parseAbi([
-  "function launch(string name, string symbol, string contractURI, bytes32 salt, address quote, uint256 quoteIn, uint24 fee) payable returns (address token)",
+  "function launch(string name, string symbol, string contractURI, bytes32 salt, address quote, uint256 quoteIn, uint24 fee, address referrer) payable returns (address token)",
   "function collect(address token) returns (uint256 amount0, uint256 amount1)",
   "function predictToken(address caller, bytes32 salt) view returns (address)",
   "function TOTAL_SUPPLY() view returns (uint256)",
@@ -4090,12 +4093,16 @@ var LAUNCHPAD_V3_ABI = parseAbi([
   "function FEE_HIGH() view returns (uint24)",
   "function TICK_SPACING() view returns (int24)",
   "function CREATOR_SHARE_BPS() view returns (uint16)",
+  "function REFERRER_SHARE_BPS() view returns (uint16)",
+  "function approvedReferrers(address referrer) view returns (bool)",
+  "function referrerOf(address token) view returns (address)",
   "function hook() view returns (address)",
   "function quotes(address quote) view returns (bool enabled, int24 startTick)",
   "function protocolRecipient() view returns (address)",
   "function launches(address token) view returns ((address creator, address creatorRecipient, (address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key))",
   "event Launched(address indexed token, address indexed creator, bytes32 indexed poolId, uint256 devBuyIn, uint256 devBuyTokens)",
-  "event LaunchFee(address indexed token, uint24 fee)"
+  "event LaunchFee(address indexed token, uint24 fee)",
+  "event Referred(address indexed token, address indexed referrer)"
 ]);
 var LAUNCH_HOOK_ABI = parseAbi([
   "function factory() view returns (address)",
@@ -4110,6 +4117,8 @@ var LAUNCHPAD_V3_EXPECTS = {
   feeLow: 1e4,
   feeHigh: 3e4,
   creatorShareBps: 8e3,
+  /** a recorded referrer's share, out of the protocol's 20%: 80 / 5 / 15 */
+  referrerShareBps: 500,
   tickSpacing: 200,
   /** the LP fee at the second a pool opens: 50% */
   startFee: 5e5,
@@ -4370,6 +4379,20 @@ async function coinFeeOf(factory, token) {
   if (fee === 0) throw new Error(`the hook ${key.hooks} has no fee schedule for ${token}'s pool`);
   return { fee, opening: { startFee, window, openedAt } };
 }
+var REFERRED_TOPIC = toHex(keccak256(utf8("Referred(address,address)")));
+async function referrerOf(factory, token) {
+  const data = encodeFunctionData({ abi: LAUNCHPAD_V3_ABI, functionName: "referrerOf", args: [token] });
+  const at = decodeFunctionResult({ abi: LAUNCHPAD_V3_ABI, functionName: "referrerOf", data: await ethCall(factory, data) });
+  return at.toLowerCase() === ZERO ? null : toChecksumAddress(at);
+}
+async function v3ReferrerOf(record, token) {
+  if (!record || !isV3(record.factory)) return null;
+  return referrerOf(record.factory, token).catch(() => void 0);
+}
+async function isApprovedReferrer(factory, referrer) {
+  const data = encodeFunctionData({ abi: LAUNCHPAD_V3_ABI, functionName: "approvedReferrers", args: [referrer] });
+  return decodeFunctionResult({ abi: LAUNCHPAD_V3_ABI, functionName: "approvedReferrers", data: await ethCall(factory, data) });
+}
 async function v3FeeOf(record, token) {
   if (!record || !isV3(record.factory)) return null;
   return coinFeeOf(record.factory, token).catch(() => void 0);
@@ -4475,8 +4498,22 @@ function price(value) {
   if (value >= 1) return usd(value);
   return `$${value.toLocaleString("en-US", { maximumSignificantDigits: 4 })}`;
 }
+var SUBSCRIPT = "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089";
+var SUBSCRIPT_FROM = 4;
+function compact(n, sig = 4) {
+  if (n === null || n === void 0 || !Number.isFinite(n) || n < 0) return "not read";
+  if (n === 0) return "0";
+  if (n >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const [mantissa, exp] = n.toExponential(sig + 3).split("e");
+  const zeros = -Number(exp) - 1;
+  if (zeros < 0) return `0.${"9".repeat(sig)}`;
+  const digits = mantissa.replace(".", "").slice(0, sig).replace(/0+$/, "");
+  if (zeros < SUBSCRIPT_FROM) return `0.${"0".repeat(zeros)}${digits}`;
+  const count = String(zeros).split("").map((d) => SUBSCRIPT[Number(d)]).join("");
+  return `0.0${count}${digits}`;
+}
 function quoteWords(n) {
-  return n >= 1 ? n.toLocaleString("en-US", { maximumFractionDigits: 2 }) : n.toLocaleString("en-US", { maximumSignificantDigits: 4 });
+  return compact(n);
 }
 var explorer = {
   address: (a) => `${BASE.explorer}/address/${a}`,
@@ -5121,7 +5158,16 @@ var LAUNCHPAD_CODE = row(
   "a B20 token with no admin: nobody can mint, pause, seize or set a transfer rule, ever \u2014 created that way by the launchpad",
   { tone: "ok" }
 );
-function launchpadRows(record, fee) {
+function referrerRows(referrer) {
+  if (referrer === null) return [];
+  if (referrer === void 0) return [row("Its referrer", "not checked \u2014 the launchpad could not be read", { tone: "warn" })];
+  return [
+    row("Its referrer", `${short(referrer)} \u2014 an approved referrer; every fee splits 80% creator / 5% referrer / ~15% ${BRAND.name}`, {
+      href: explorer.address(referrer)
+    })
+  ];
+}
+function launchpadRows(record, fee, referrer) {
   if (record === null) return [];
   if (record === void 0) return [row(`${BRAND.name} launchpad`, "not checked \u2014 the launchpad could not be read", { tone: "warn" })];
   const base = "fixed supply with no admin; the liquidity is locked by the launchpad contract forever";
@@ -5139,6 +5185,7 @@ function launchpadRows(record, fee) {
       href: explorer.address(record.factory)
     }),
     ...v3Rows,
+    ...v3 ? referrerRows(referrer) : [],
     row("Its creator", short(record.creator), { href: explorer.address(record.creator) })
   ];
 }
@@ -5208,10 +5255,10 @@ async function tokenVerdict(input, now) {
     launch.then((l) => l ? settled(poolValue(l.factory, address)) : null),
     pad3
   ]);
-  const fee = await v3FeeOf(launchpad, address);
+  const [fee, referrer] = await Promise.all([v3FeeOf(launchpad, address), v3ReferrerOf(launchpad, address)]);
   const token = info ?? null;
   const body = [
-    ...launchpadRows(launchpad, fee),
+    ...launchpadRows(launchpad, fee, referrer),
     ...launchpad ? [] : launchpadRow(other ?? void 0),
     ...tradeRows(trip),
     ...launchpad ? [LAUNCHPAD_CODE] : codeRows(security),
@@ -6631,12 +6678,12 @@ function launchFactory() {
 }
 var LAUNCH_FEES = [LAUNCHPAD_V3_EXPECTS.feeLow, LAUNCHPAD_V3_EXPECTS.feeHigh];
 var ETH_QUOTE2 = "0x0000000000000000000000000000000000000000";
-function launchTx2(factory, m, salt, pair, firstBuy, fee) {
+function launchTx2(factory, m, salt, pair, firstBuy, fee, referrer = ETH_QUOTE2) {
   const args = [m.name.trim(), m.symbol.trim(), contractUri(m), salt, pair.address, firstBuy];
   return {
     to: factory,
     value: pair.address === ETH_QUOTE2 ? firstBuy : 0n,
-    data: fee === void 0 ? encodeFunctionData({ abi: LAUNCHPAD_ABI, functionName: "launch", args: [...args] }) : encodeFunctionData({ abi: LAUNCHPAD_V3_ABI, functionName: "launch", args: [...args, fee] })
+    data: fee === void 0 ? encodeFunctionData({ abi: LAUNCHPAD_ABI, functionName: "launch", args: [...args] }) : encodeFunctionData({ abi: LAUNCHPAD_V3_ABI, functionName: "launch", args: [...args, fee, referrer] })
   };
 }
 async function quoteOf(factory, quote) {
@@ -6696,11 +6743,12 @@ async function readHook(hook, functionName) {
   return decodeFunctionResult({ abi: HOOK_GETTERS, functionName, data: await ethCall(hook, data) });
 }
 async function checkFactoryV3(factory) {
-  const [supply, low, high, share2, spacing, protocol, hookAt] = await Promise.all([
+  const [supply, low, high, share2, referrerShare, spacing, protocol, hookAt] = await Promise.all([
     readV3(factory, "TOTAL_SUPPLY"),
     readV3(factory, "FEE_LOW"),
     readV3(factory, "FEE_HIGH"),
     readV3(factory, "CREATOR_SHARE_BPS"),
+    readV3(factory, "REFERRER_SHARE_BPS"),
     readV3(factory, "TICK_SPACING"),
     readV3(factory, "protocolRecipient"),
     readV3(factory, "hook")
@@ -6708,7 +6756,7 @@ async function checkFactoryV3(factory) {
   const hook = toChecksumAddress(String(hookAt));
   const [owner, startFee, window] = await Promise.all([readHook(hook, "factory"), readHook(hook, "startFee"), readHook(hook, "window")]);
   const E = LAUNCHPAD_V3_EXPECTS;
-  const why = supply !== E.supply ? `its supply is ${supply}, not ${E.supply}` : low !== E.feeLow || high !== E.feeHigh ? `its fees are ${low} and ${high}, not ${E.feeLow} and ${E.feeHigh}` : share2 !== E.creatorShareBps ? `its launcher share is ${share2} bps, not ${E.creatorShareBps}` : spacing !== E.tickSpacing ? `its tick spacing is ${spacing}, not ${E.tickSpacing}` : String(protocol).toLowerCase() !== CONTRACTS.treasury?.toLowerCase() ? `its protocol share goes to ${protocol}, not to this app's fee address` : String(owner).toLowerCase() !== factory.toLowerCase() ? `its hook ${hook} belongs to ${owner}, not to this launchpad` : startFee !== E.startFee || window !== E.window ? `its hook opens at a fee of ${startFee} over ${window} s, not ${E.startFee} over ${E.window} s` : null;
+  const why = supply !== E.supply ? `its supply is ${supply}, not ${E.supply}` : low !== E.feeLow || high !== E.feeHigh ? `its fees are ${low} and ${high}, not ${E.feeLow} and ${E.feeHigh}` : share2 !== E.creatorShareBps ? `its launcher share is ${share2} bps, not ${E.creatorShareBps}` : referrerShare !== E.referrerShareBps ? `its referrer share is ${referrerShare} bps, not ${E.referrerShareBps}` : spacing !== E.tickSpacing ? `its tick spacing is ${spacing}, not ${E.tickSpacing}` : String(protocol).toLowerCase() !== CONTRACTS.treasury?.toLowerCase() ? `its protocol share goes to ${protocol}, not to this app's fee address` : String(owner).toLowerCase() !== factory.toLowerCase() ? `its hook ${hook} belongs to ${owner}, not to this launchpad` : startFee !== E.startFee || window !== E.window ? `its hook opens at a fee of ${startFee} over ${window} s, not ${E.startFee} over ${E.window} s` : null;
   return why === null ? { kind: "ok", opening: { hook, startFee: Number(startFee), window: Number(window) } } : refusal(factory, why);
 }
 async function predictToken(factory, creator, salt) {
@@ -6755,6 +6803,20 @@ function feeOf(text, version3) {
   if (found === void 0) throw new Error(`The fee must be 1% or 3%; "${text.trim()}" is neither.`);
   return found;
 }
+function referrerArg(text, version3) {
+  const t = text.trim();
+  if (t === "") return null;
+  if (version3 === 2) throw new Error(`This launchpad (version 2) has no referrals \u2014 a referrer can be named once version 3 is deployed. Leave the referrer out.`);
+  return toChecksumAddress(assertChecksummedAddress(t, "Referrer"));
+}
+function referrerRow(referrer, approved) {
+  const href = { href: explorer.address(referrer) };
+  if (approved === null) return row("Referrer", `${referrer} \u2014 not checked: whether the launchpad approves it could not be read`, { tone: "warn", ...href });
+  return approved ? row("Referrer", `${referrer} \u2014 approved: recorded for this coin; every fee splits 80% creator / 5% referrer / ~15% ${BRAND.name}`, { tone: "ok", ...href }) : row("Referrer", `${referrer} \u2014 NOT approved by the launchpad: the launch still goes through, recorded with no referrer (80% creator / 20% ${BRAND.name})`, {
+    tone: "warn",
+    ...href
+  });
+}
 function stepRows(n, what, tx) {
   return [
     row(`Step ${n}`, what),
@@ -6764,11 +6826,12 @@ function stepRows(n, what, tx) {
   ];
 }
 async function prepareLaunch(args) {
-  const [nameText = "", symbolText = "", creatorText = "", pairText = "", buyText = "", feeText = ""] = args;
+  const [nameText = "", symbolText = "", creatorText = "", pairText = "", buyText = "", feeText = "", referrerText = ""] = args;
   const pinned = launchFactory();
   if ("waiting" in pinned) throw new Error(pinned.waiting);
   const factory = pinned.address;
   const fee = feeOf(feeText, pinned.version);
+  const referrer = referrerArg(referrerText, pinned.version);
   const meta = { name: nameText.replace(/_/g, " ").trim(), symbol: symbolText.trim(), description: "", image: "", website: "" };
   const bad = metadataProblem(meta);
   if (bad) throw new Error(`${bad}.`);
@@ -6779,10 +6842,11 @@ async function prepareLaunch(args) {
   const firstBuy = buyText.trim() === "" ? 0n : parseAmount(buyText.trim(), pair.decimals);
   const stock = pair.address !== ETH_QUOTE3;
   const salt = newSalt();
-  const [token, eth, held] = await Promise.all([
+  const [token, eth, held, approved] = await Promise.all([
     predictToken(factory, creator, salt),
     balanceOf(ETH, creator).catch(() => null),
-    stock && firstBuy > 0n ? balanceOf({ kind: "erc20", address: pair.address, symbol: pair.symbol, decimals: pair.decimals }, creator).catch(() => null) : Promise.resolve(null)
+    stock && firstBuy > 0n ? balanceOf({ kind: "erc20", address: pair.address, symbol: pair.symbol, decimals: pair.decimals }, creator).catch(() => null) : Promise.resolve(null),
+    referrer === null ? Promise.resolve(null) : isApprovedReferrer(factory, referrer).catch(() => null)
   ]);
   const needEth = (stock ? 0n : firstBuy) + ETH_GAS_RESERVE;
   const funds = [
@@ -6793,7 +6857,7 @@ async function prepareLaunch(args) {
       held === null ? row(`Creator's ${pair.symbol}`, "not checked \u2014 the balance could not be read", { tone: "warn" }) : row(`Creator's ${pair.symbol}`, `${formatAmount(held, pair.decimals)}${held < firstBuy ? " \u2014 not enough for the first buy" : ""}`, { tone: held < firstBuy ? "bad" : "ok" })
     ] : []
   ];
-  const launch = launchTx2(factory, meta, salt, pair, firstBuy, fee);
+  const launch = launchTx2(factory, meta, salt, pair, firstBuy, fee, referrer ?? void 0);
   const pct4 = fee === void 0 ? "1%" : feePercent(fee);
   const v3Rows = fee !== void 0 && check.opening ? [
     row("Fee", `${pct4} of every trade, chosen for this coin (1% or 3%)`),
@@ -6824,13 +6888,14 @@ async function prepareLaunch(args) {
         { href: explorer.address(factory), tone: "ok" }
       ),
       ...v3Rows,
+      ...referrer === null ? [] : [referrerRow(referrer, approved)],
       ...funds,
       ...steps
     ],
     notes: [
       "Nothing was signed or sent. Send each step from the creator's own wallet, in order, waiting for each to confirm \u2014 and simulate it first (eth_call), as this app does before every transaction.",
       "The salt is random and binds the token's address to this creator: anyone else sending this calldata gets a different token, or none.",
-      `Public: the token, the creator's address and every trade are visible on Base. The creator earns 80% of the pool's ${pct4} fee; ${BRAND.name} 20%.`,
+      referrer !== null && approved === true ? `Public: the token, the creator's address, its referrer and every trade are visible on Base. The creator earns 80% of the pool's ${pct4} fee, the referrer 5%, ${BRAND.name} the rest (~15%).` : `Public: the token, the creator's address and every trade are visible on Base. The creator earns 80% of the pool's ${pct4} fee; ${BRAND.name} 20%.`,
       ...stock ? [`${pair.symbol} is a Coinbase stock token: Coinbase restricts who may hold it (eligible persons outside the U.S.).`] : []
     ],
     sources: [`Base (the launchpad${stock ? ", the pair's token" : ""} and the creator's balances, read directly)`],
@@ -6847,7 +6912,8 @@ var prepareLaunchSkill = {
     { name: "creator", hint: "0x\u2026 the wallet that will sign" },
     { name: "pair", hint: "ETH, a stock symbol like NVDAc, or its address", optional: true },
     { name: "first buy", hint: "0.01 \u2014 in the pair's own units", optional: true },
-    { name: "fee", hint: "1% or 3% \u2014 launchpad version 3 only; 1% if left out", optional: true }
+    { name: "fee", hint: "1% or 3% \u2014 launchpad version 3 only; 1% if left out", optional: true },
+    { name: "referrer", hint: "0x\u2026 an APPROVED referrer earns 5% of the fees \u2014 version 3 only; none if left out", optional: true }
   ],
   run: (args) => prepareLaunch(args)
 };

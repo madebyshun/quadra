@@ -23,7 +23,7 @@ export function localAchievements(c: Counts): Achievement[] {
     ACH("look", "Looked before leaping", "Run Token Verdict once.", c.verdicts >= 1 ? "earned" : "locked"),
     ACH("skeptic", "Professional skeptic", "Run Token Verdict ten times.", c.verdicts >= 10 ? "earned" : "locked", `${Math.min(c.verdicts, 10)}/10`),
     ACH("sweeper", "Rug sweeper", "Win a game of Rugsweeper.", c.sweepWins >= 1 ? "earned" : "locked"),
-    ACH("diver", "Bin diver", "Look through the Recycle Bin.", c.binVisits >= 1 ? "earned" : "locked"),
+    ACH("diver", "Bin diver", "Look through the Trash.", c.binVisits >= 1 ? "earned" : "locked"),
     ACH("sysadmin", "Sysadmin", "Open Task Manager and watch Base breathe.", c.taskmgr >= 1 ? "earned" : "locked"),
   ];
 }

@@ -24,11 +24,25 @@ export type FeatureId =
   | "rugsweeper"
   | "achievements"
   | "leaderboard"
+  | "card"
+  | "explore"
   | "x402"
   | "mcp"
   | "inference"
   | "audit"
-  | "hooks";
+  | "hooks"
+  // the desktop's folders and their programs (2026-10-21)
+  | "computer"
+  | "control"
+  | "readme"
+  | "folder-research"
+  | "folder-money"
+  | "folder-launchpad"
+  | "folder-games"
+  | "folder-agents";
+
+/** A program that is a folder: its window lists other programs, Explorer-style. */
+export type FolderId = "computer" | "folder-research" | "folder-money" | "folder-launchpad" | "folder-games" | "folder-agents";
 
 /**
  * The three prose pages. They are not features — no flag switches them on, they
@@ -61,8 +75,8 @@ export type Feature = {
   blurb: string;
   /** title bar text when the window is open */
   window: string;
-  /** which flag switches it on */
-  flag: FlagName;
+  /** which flag switches it on — absent for the desktop's own furniture (folders, Control Panel, README), always on */
+  flag?: FlagName;
   /** a feature that only works on Robinhood Chain — hidden while `FLAGS.robinhood` is off */
   robinhood?: true;
 };
@@ -188,6 +202,15 @@ export const FEATURES: readonly Feature[] = [
     flag: "leaderboard",
   },
   {
+    id: "card",
+    title: "Base card",
+    blurb: "your X profile, painted as a card",
+    window: "Make my Base card",
+    flag: "card",
+  },
+  // a directory of projects on Base, from base.org's own list (2026-10-22) — no flag: it reads nothing live
+  { id: "explore", title: "Explore Base", blurb: "projects on Base, folder by folder", window: "Explore Base" },
+  {
     id: "x402",
     title: "x402",
     blurb: "these tools, paid per call",
@@ -231,11 +254,23 @@ export const FEATURES: readonly Feature[] = [
   },
   {
     id: "trash",
-    title: "Recycle Bin",
+    title: "Trash",
     blurb: "pools emptied today",
-    window: "Recycle Bin",
+    window: "Trash",
     flag: "trash",
   },
+  /*
+    The desktop's furniture (2026-10-21, the owner: "sắp xếp lại thư mục" — put things in folders).
+    Folders hold THIS app's programs only; no flag, because a folder is never the thing that is off.
+  */
+  { id: "computer", title: "My Computer", blurb: "the machine: tasks, settings, what's next", window: "My Computer" },
+  { id: "folder-research", title: "Research", blurb: "radar, verdicts, markets, profiles", window: "Research" },
+  { id: "folder-money", title: "Money", blurb: "wallet, send, swap, trade", window: "Money" },
+  { id: "folder-launchpad", title: "Launchpad", blurb: "launch a coin, see every coin", window: "Launchpad" },
+  { id: "folder-games", title: "Games", blurb: "real mines, and trophies", window: "Games" },
+  { id: "folder-agents", title: "Agents", blurb: "tools your AI agent can use", window: "Agents" },
+  { id: "control", title: "Control Panel", blurb: "desktop pattern, sound, screen saver", window: "Control Panel" },
+  { id: "readme", title: "README.TXT", blurb: "start here", window: "README.TXT - Notepad" },
 ] as const;
 
 export const DOC_PAGES: readonly DocPage[] = [
@@ -292,7 +327,7 @@ export function hiddenChain(f: Feature): boolean {
 }
 
 export function isEnabled(f: Feature): boolean {
-  return FLAGS[f.flag] && !hiddenChain(f);
+  return (f.flag === undefined || FLAGS[f.flag]) && !hiddenChain(f);
 }
 
 /**
@@ -312,12 +347,56 @@ export function comingSoon(): readonly Feature[] {
   return visibleFeatures().filter((f) => !isEnabled(f));
 }
 
+/** What a folder holds, in the order it shows them. Ids only — a link to any of them still opens it directly. */
+export const FOLDERS: Readonly<Record<FolderId, readonly WindowId[]>> = {
+  computer: ["taskmgr", "control", "soon"],
+  "folder-research": ["research", "safety", "markets", "profile", "explore"],
+  "folder-money": ["wallet", "send", "swap", "trade", "bridge"],
+  "folder-launchpad": ["launch", "coins", "leaderboard", "card"],
+  "folder-games": ["rugsweeper", "achievements"],
+  "folder-agents": ["mcp", "x402", "api", "docs", "verify"],
+};
+
+/** The folders in desktop order. */
+export const FOLDER_IDS: readonly FolderId[] = Object.keys(FOLDERS) as FolderId[];
+
+export function isFolder(id: string): id is FolderId {
+  return Object.prototype.hasOwnProperty.call(FOLDERS, id);
+}
+
+/** One icon anywhere — a desktop, a folder, the Start menu: a feature or a doc page, by its id. */
+export type Entry = { readonly id: WindowId; readonly title: string; readonly blurb: string; readonly doc: DocPage | null };
+
+export function entryOf(id: WindowId): Entry {
+  const doc = resolveDoc(id);
+  const f = doc ? null : resolveFeature(id)!;
+  return doc ? { id, title: doc.title, blurb: doc.blurb, doc } : { id, title: f!.title, blurb: f!.blurb, doc: null };
+}
+
+/** Whether an id is worth an icon: a doc page always; a feature when it is on — Coming Soon only while it holds something. */
+function shown(id: WindowId): boolean {
+  const f = resolveFeature(id);
+  if (!f) return true;
+  if (id === "soon") return comingSoon().length > 0;
+  return isEnabled(f);
+}
+
+/** A folder's icons: its switched-on programs (off ones wait in Coming Soon; a hidden chain's not at all). */
+export function folderItems(id: FolderId): readonly Entry[] {
+  return FOLDERS[id].filter(shown).map(entryOf);
+}
+
+/** Which folder a window lives in, or null for one that sits on the desktop itself. */
+export function folderOf(id: WindowId): FolderId | null {
+  return FOLDER_IDS.find((f) => FOLDERS[f].includes(id)) ?? null;
+}
+
 /**
- * The desktop's icon grid (2026-10-14): the switched-on programs only — three dimmed "not switched on
- * yet" icons made the desktop read like a settings page — plus the Coming Soon folder while anything
- * is waiting in it. The Recycle Bin sits in its own corner.
+ * The desktop's icons since 2026-10-21: the folders, then the most-used programs as shortcuts, then
+ * README.TXT. Everything else lives in a folder. The Trash keeps its corner (`CORNER`).
  */
-export function desktopFeatures(): readonly Feature[] {
-  const waiting = comingSoon().length > 0;
-  return visibleFeatures().filter((f) => isEnabled(f) && !CORNER.has(f.id) && (f.id !== "soon" || waiting));
+export const DESKTOP: readonly WindowId[] = [...FOLDER_IDS, "terminal", "launch", "coins", "wallet", "readme"];
+
+export function desktopItems(): readonly Entry[] {
+  return DESKTOP.filter(shown).map(entryOf);
 }

@@ -1,7 +1,11 @@
 import type { FeatureId } from "@/features/registry";
 
 /**
- * One hand-written 24x24 glyph per menu entry — no icon-library dependency, so a
+ * One hand-written 24x24 glyph per menu entry, drawn in the Mac OS 8 colour icon style
+ * (2026-10-22): a crisp black outline, square joins, and a small flat palette — lavender folders,
+ * platinum machines, a gold coin. No Apple artwork: the machine is this app's own.
+ *
+ * (The notes below date from the 1-bit set this grew out of; the three paint styles still hold.) — no icon-library dependency, so a
  * bare clone with no network can still build (see CLAUDE.md's rule about
  * `npm run gate` needing no install). Purely decorative: every call site marks
  * the wrapping `<svg>` `aria-hidden`, because the visible label text is what
@@ -23,22 +27,152 @@ import type { FeatureId } from "@/features/registry";
 const BODY = {
   fill: "#fff",
   stroke: "currentColor",
-  strokeWidth: 1.7,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
+  strokeWidth: 1.4,
+  strokeLinecap: "square" as const,
+  strokeLinejoin: "miter" as const,
 };
 
-const LINE = { ...BODY, fill: "none", strokeWidth: 2 };
+const LINE = { ...BODY, fill: "none", strokeWidth: 1.6 };
 
 const INK = { fill: "currentColor", stroke: "none" };
+
+/** A Mac OS colour folder: lavender, square-cornered, its tab on the top left. */
+const LAVENDER = { ...BODY, fill: "#c4c4ff" };
+const FOLDER_PATH = "M2.5 20V5.2h6.6l1.6 2H21.5V20Z";
+
+/** A Mac OS folder with a small glyph on its face. */
+const folder = (glyph: JSX.Element) => (
+  <>
+    <g {...LAVENDER}>
+      <path d={FOLDER_PATH} />
+    </g>
+    <g {...LINE} stroke="#6a6ab0" strokeWidth={1}>
+      <path d="M3.4 9.1h17.2" />
+    </g>
+    {glyph}
+  </>
+);
 
 export type IconId = FeatureId | "docs" | "api" | "verify";
 
 const GLYPHS: Record<IconId, JSX.Element> = {
+  "folder-research": folder(
+    // a magnifying glass
+    <>
+      <g {...BODY}>
+        <circle cx="11" cy="12.6" r="3" />
+      </g>
+      <g {...LINE}>
+        <path d="m13.2 14.8 2.6 2.6" />
+      </g>
+    </>,
+  ),
+  "folder-money": folder(
+    // a coin
+    <>
+      <g {...BODY} fill="#ffcc33">
+        <circle cx="12" cy="13.4" r="3.8" />
+      </g>
+      <g {...INK}>
+        <rect x="11.2" y="11" width="1.6" height="4.8" rx="0.6" />
+      </g>
+    </>,
+  ),
+  "folder-launchpad": folder(
+    // a rocket going up
+    <>
+      <g {...BODY}>
+        <path d="M12 9.2c1.6 1.2 2.2 3 2 5.6h-4c-.2-2.6.4-4.4 2-5.6Z" />
+      </g>
+      <g {...LINE}>
+        <path d="M11 17v1.2M13 17v1.2" />
+      </g>
+    </>,
+  ),
+  "folder-games": folder(
+    // a joystick
+    <>
+      <g {...BODY}>
+        <rect x="8" y="14" width="8" height="3.6" rx="0.8" />
+        <circle cx="12" cy="10.6" r="1.6" />
+      </g>
+      <g {...LINE}>
+        <path d="M12 12.2V14" />
+      </g>
+    </>,
+  ),
+  "folder-agents": folder(
+    // a little robot
+    <>
+      <g {...BODY}>
+        <rect x="8.4" y="10.4" width="7.2" height="6.4" rx="1" />
+      </g>
+      <g {...INK}>
+        <circle cx="10.6" cy="13.2" r="0.9" />
+        <circle cx="13.4" cy="13.2" r="0.9" />
+      </g>
+      <g {...LINE}>
+        <path d="M12 10.4V8.8" />
+      </g>
+    </>,
+  ),
+  computer: (
+    <>
+      {/* this app's own machine: a platinum tower beside its monitor, a Base-blue screen */}
+      <g {...BODY} fill="#dddddd">
+        <rect x="14.5" y="4" width="7" height="17" />
+        <rect x="1.8" y="4.5" width="12" height="10.5" />
+        <path d="M5 15h5.6l.8 2.4H4.2Z" />
+      </g>
+      <g {...BODY} fill="#0052ff">
+        <rect x="3.6" y="6.2" width="8.4" height="6.6" />
+      </g>
+      <g {...INK}>
+        <rect x="16" y="6.4" width="4" height="1.2" />
+        <rect x="16" y="9" width="4" height="1.2" />
+        <rect x="16.4" y="17.6" width="1.4" height="1.4" fill="#1d7a2e" />
+      </g>
+      <g fill="#fff">
+        <rect x="6.4" y="8" width="2.6" height="2.6" />
+      </g>
+    </>
+  ),
+  control: (
+    <>
+      {/* a window with two sliders */}
+      <g {...BODY} fill="#eeeeee">
+        <rect x="3" y="3.5" width="18" height="17" rx="1.2" />
+      </g>
+      <g {...LINE}>
+        <path d="M6 10h12M6 16h12" />
+      </g>
+      <g {...INK}>
+        <rect x="3" y="3.5" width="18" height="3.2" rx="1" />
+        <rect x="8" y="8" width="2.6" height="4" rx="0.6" />
+        <rect x="13.6" y="14" width="2.6" height="4" rx="0.6" />
+      </g>
+    </>
+  ),
+  readme: (
+    <>
+      {/* a Notepad page, ruled, with its spiral */}
+      <g {...BODY} fill="#ffffcc">
+        <rect x="5" y="3.6" width="14" height="17.6" rx="0.8" />
+      </g>
+      <g {...LINE}>
+        <path d="M8 2.6v2.4M12 2.6v2.4M16 2.6v2.4" />
+      </g>
+      <g {...INK}>
+        <rect x="7.6" y="9" width="8.8" height="1.4" rx="0.5" />
+        <rect x="7.6" y="12.4" width="8.8" height="1.4" rx="0.5" />
+        <rect x="7.6" y="15.8" width="5.6" height="1.4" rx="0.5" />
+      </g>
+    </>
+  ),
   taskmgr: (
     <>
       {/* a monitor showing a heartbeat line */}
-      <g {...BODY}>
+      <g {...BODY} fill="#dfe8ff">
         <rect x="3" y="4" width="18" height="13" rx="1.5" />
       </g>
       <g {...LINE}>
@@ -49,20 +183,24 @@ const GLYPHS: Record<IconId, JSX.Element> = {
   ),
   trash: (
     <>
-      {/* a wire basket with a crumpled coin in it */}
-      <g {...BODY}>
-        <path d="M5.2 7.5h13.6l-1.5 12.6a1.2 1.2 0 0 1-1.2 1H7.9a1.2 1.2 0 0 1-1.2-1Z" />
+      {/* the Trash: a ribbed can with its lid and handle */}
+      <g {...BODY} fill="#bbbbbb">
+        <path d="M6 8.2h12l-1.2 12.6H7.2Z" />
+        <rect x="4.6" y="5.6" width="14.8" height="2.6" />
+        <path d="M9.6 5.6V3.6h4.8v2" fill="none" />
       </g>
-      <g {...LINE}>
-        <path d="M4 7.5h16M9.4 4.4h5.2M9.4 10.5l.6 8M14.6 10.5l-.6 8M12 10.5v8" />
+      <g {...LINE} strokeWidth={1.1}>
+        <path d="M9.4 10.4l.4 8.4M12 10.4v8.4M14.6 10.4l-.4 8.4" />
       </g>
     </>
   ),
   soon: (
     <>
       {/* a folder with a clock on it */}
+      <g {...LAVENDER}>
+        <path d={FOLDER_PATH} />
+      </g>
       <g {...BODY}>
-        <path d="M2.8 6.2a1.2 1.2 0 0 1 1.2-1.2h5.2l2 2.2H20a1.2 1.2 0 0 1 1.2 1.2v10.4a1.2 1.2 0 0 1-1.2 1.2H4a1.2 1.2 0 0 1-1.2-1.2Z" />
         <circle cx="12" cy="13.6" r="3.6" />
       </g>
       <g {...LINE}>
@@ -76,7 +214,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
       <g {...LINE}>
         <path d="M12 2.8v3.4M12 17.8v3.4M2.8 12h3.4M17.8 12h3.4M5.5 5.5l2.4 2.4M16.1 16.1l2.4 2.4M5.5 18.5l2.4-2.4M16.1 7.9l2.4-2.4" />
       </g>
-      <g {...BODY}>
+      <g {...BODY} fill="#ff8877">
         <circle cx="12" cy="12" r="5.6" />
       </g>
       <g {...INK}>
@@ -87,7 +225,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
   achievements: (
     <>
       {/* a trophy */}
-      <g {...BODY}>
+      <g {...BODY} fill="#ffcc33">
         <path d="M7 3.6h10v4.8a5 5 0 0 1-10 0Z" />
         <path d="M8.6 20.4h6.8l-.8-2.6H9.4Z" />
       </g>
@@ -96,10 +234,35 @@ const GLYPHS: Record<IconId, JSX.Element> = {
       </g>
     </>
   ),
+  explore: (
+    <>
+      {/* a globe: the wider Base, outside this app */}
+      <g {...BODY} fill="#66aaff">
+        <circle cx="12" cy="12" r="8.5" />
+      </g>
+      <g {...LINE} strokeWidth={1.1}>
+        <path d="M3.5 12h17M12 3.5c-3 3-3 14 0 17M12 3.5c3 3 3 14 0 17" />
+      </g>
+    </>
+  ),
+  card: (
+    <>
+      {/* a polaroid, a little tilted, with a sun over its corner */}
+      <g {...BODY}>
+        <path d="M3.4 6.6 15.6 4.4l2.3 13-12.2 2.2Z" />
+      </g>
+      <g {...INK}>
+        <path d="M5.5 8.1 14.4 6.5l1.3 7.4-8.9 1.6Z" />
+      </g>
+      <g {...BODY} fill="#ffcc33">
+        <circle cx="18.6" cy="5.6" r="2.6" />
+      </g>
+    </>
+  ),
   leaderboard: (
     <>
       {/* a podium */}
-      <g {...BODY}>
+      <g {...BODY} fill="#99ccff">
         <rect x="8.6" y="8" width="6.8" height="12.4" />
         <rect x="2.8" y="12.2" width="5.8" height="8.2" />
         <rect x="15.4" y="14.4" width="5.8" height="6" />
@@ -112,7 +275,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
   wallet: (
     <>
       {/* a billfold: body, flap across it, and the stud that reads as black at 30px */}
-      <g {...BODY}>
+      <g {...BODY} fill="#cc9966">
         <rect x="2.5" y="5.5" width="19" height="13" rx="1.4" />
         <path d="M14 9.5h7.5v5H14a2.5 2.5 0 0 1 0-5Z" />
       </g>
@@ -123,7 +286,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
   ),
   swap: (
     <>
-      <g {...BODY}>
+      <g {...BODY} fill="#99ee99">
         <path d="M3.5 6.5h10v-3l7 4.5-7 4.5v-3h-10Z" />
         <path d="M20.5 17.5h-10v3l-7-4.5 7-4.5v3h10Z" />
       </g>
@@ -132,7 +295,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
   markets: (
     <>
       {/* a chart window: a framed pane with a rising line and two candles */}
-      <g {...BODY}>
+      <g {...BODY} fill="#ccffcc">
         <rect x="3" y="4" width="18" height="16" rx="1" />
       </g>
       <g {...LINE}>
@@ -150,7 +313,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
       <g {...LINE}>
         <path d="M8 3.5v17M16 3.5v17" />
       </g>
-      <g {...BODY}>
+      <g {...BODY} fill="#ffcc66">
         <rect x="5.5" y="7" width="5" height="8" rx="0.5" />
         <rect x="13.5" y="10" width="5" height="6" rx="0.5" />
       </g>
@@ -161,7 +324,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
       <g {...LINE}>
         <path d="M9.5 6V3.5M14.5 6V3.5M9.5 20.5V18M14.5 20.5V18M6 9.5H3.5M6 14.5H3.5M20.5 9.5H18M20.5 14.5H18" />
       </g>
-      <g {...BODY}>
+      <g {...BODY} fill="#cccccc">
         <rect x="6" y="6" width="12" height="12" rx="1" />
       </g>
       <g {...INK}>
@@ -172,7 +335,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
   terminal: (
     <>
       {/* a screen with a prompt: the one icon that is a command line */}
-      <g {...BODY}>
+      <g {...BODY} fill="#ccffcc">
         <rect x="2.5" y="4" width="19" height="15" rx="1.4" />
       </g>
       <g {...LINE}>
@@ -186,7 +349,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
       <g {...LINE}>
         <path d="m15.2 15.2 5.3 5.3" strokeWidth={3} />
       </g>
-      <g {...BODY}>
+      <g {...BODY} fill="#ccffff">
         <circle cx="10" cy="10" r="6.5" />
       </g>
       <g {...INK}>
@@ -197,7 +360,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
   safety: (
     <>
       {/* a shield with a warning mark — this window finds the traps */}
-      <g {...BODY}>
+      <g {...BODY} fill="#ffcc33">
         <path d="M12 2.6 19 5.4v6.3c0 4.3-2.9 7.4-7 9.1-4.1-1.7-7-4.8-7-9.1V5.4Z" />
       </g>
       <g {...INK}>
@@ -222,7 +385,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
       <g {...LINE}>
         <path d="M9.5 8.5V3.5M14.5 8.5V3.5M12 17v3.5M9.5 20.5h5" />
       </g>
-      <g {...BODY}>
+      <g {...BODY} fill="#cccccc">
         <path d="M7.5 8.5h9v4a4.5 4.5 0 0 1-9 0Z" />
       </g>
     </>
@@ -234,7 +397,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
         <path d="M7 15.5V5M17 15.5V5" />
         <path d="M2.5 11C4 7.5 5.5 5.5 7 5.5c2.5 0 2.8 6 5 6s2.5-6 5-6c1.5 0 3 2 4.5 5.5" />
       </g>
-      <g {...BODY}>
+      <g {...BODY} fill="#cc7744">
         <rect x="2.5" y="15.2" width="19" height="3" rx="0.6" />
       </g>
     </>
@@ -244,7 +407,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
       <g {...LINE}>
         <path d="M8.5 15.5 6 18.5M15.5 15.5l2.5 3M10 19.5 9 21.5M14 19.5l1 2" />
       </g>
-      <g {...BODY}>
+      <g {...BODY} fill="#ff9988">
         <path d="M12 2.5c3.2 2.3 4.8 5.9 4.2 10.5L12 16.8l-4.2-3.8C7.2 8.4 8.8 4.8 12 2.5Z" />
       </g>
       <g {...INK}>
@@ -255,7 +418,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
   coins: (
     <>
       {/* a short stack of coins and one standing in front: what was launched here */}
-      <g {...BODY}>
+      <g {...BODY} fill="#ffcc33">
         <ellipse cx="9" cy="17" rx="6" ry="2.4" />
         <path d="M3 17v-3.2c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4V17" />
         <ellipse cx="9" cy="13.8" rx="6" ry="2.4" />
@@ -271,7 +434,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
   profile: (
     <>
       {/* a head and shoulders on an ID card: whose wallet this is */}
-      <g {...BODY}>
+      <g {...BODY} fill="#ffffcc">
         <rect x="2.5" y="4.5" width="19" height="15" rx="2" />
       </g>
       <g {...INK}>
@@ -288,7 +451,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
       <g {...LINE}>
         <path d="m15.2 15.2 4.8 4.8" />
       </g>
-      <g {...BODY}>
+      <g {...BODY} fill="#ccffff">
         <circle cx="10.2" cy="10.2" r="6.2" />
       </g>
       {/* a tick inside the lens: an empty circle is a magnifier, this one is a check */}
@@ -302,7 +465,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
       <g {...LINE}>
         <path d="M15 3.5v11a4.5 4.5 0 0 1-9 0v-1.5" />
       </g>
-      <g {...BODY}>
+      <g {...BODY} fill="#ffcc66">
         <rect x="12" y="2.5" width="6" height="2.6" rx="1.3" />
         <circle cx="6" cy="11" r="2.4" />
       </g>
@@ -313,7 +476,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
       <g {...LINE}>
         <path d="M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7" />
       </g>
-      <g {...BODY}>
+      <g {...BODY} fill="#ffcc33">
         <rect x="4.5" y="10.5" width="15" height="10" rx="1.2" />
       </g>
       <g {...INK}>
@@ -337,7 +500,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
   ),
   api: (
     <>
-      <g {...BODY}>
+      <g {...BODY} fill="#ccccff">
         <rect x="2.5" y="5" width="19" height="14" rx="1.2" />
       </g>
       <g {...LINE}>
@@ -350,7 +513,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
   ),
   verify: (
     <>
-      <g {...BODY}>
+      <g {...BODY} fill="#99ee99">
         <path d="M12 2.6 19 5.4v6.3c0 4.3-2.9 7.4-7 9.1-4.1-1.7-7-4.8-7-9.1V5.4Z" />
       </g>
       <g {...LINE}>

@@ -12,6 +12,15 @@ import { cleanup } from "@testing-library/react";
  * visible failure, and the tests that want a response stub this same global
  * themselves.
  */
+/**
+ * The Welcome screen opens on every bare desktop load; a test about something else would find a
+ * dialog over it (and Q silent). It is switched off here, as a visitor who unticked it would; the
+ * Welcome screen's own tests clear this.
+ */
+beforeEach(() => {
+  if (typeof localStorage !== "undefined") localStorage.setItem("quadra.welcome.v1", "off");
+});
+
 beforeEach(() => {
   vi.stubGlobal("fetch", () => {
     throw new Error(

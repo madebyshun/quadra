@@ -44,11 +44,15 @@ export const LAUNCHPAD_DECIMALS = 18;
 /**
  * Version 3's interface (`contracts/src/LaunchFactoryV3.sol`), held to the Solidity the same way.
  * It keeps v2's `launches`, `collect`, `predictToken`, `quotes`, `protocolRecipient` and `Launched`
- * word for word, so every reader of v1/v2 reads v3; what is new is `launch`'s last argument (the
- * coin's fee), the two fees a launcher may choose, and the hook every v3 pool uses.
+ * word for word, so every reader of v1/v2 reads v3; what is new is `launch`'s last two arguments
+ * (the coin's fee and its referrer), the two fees a launcher may choose, the hook every v3 pool uses,
+ * and APPROVED REFERRERS (owner, 2026-10-22): a referrer the protocol recipient approved, named at
+ * launch, is recorded for the coin (`referrerOf`, event `Referred`) and paid 5% of every fee out of
+ * the protocol's 20% — 80 / 5 / the remainder. An unapproved one is recorded as none
+ * (`ReferralIgnored`). Removing a referrer stops NEW referrals only; a recorded one is paid for good.
  */
 export const LAUNCHPAD_V3_ABI = parseAbi([
-  "function launch(string name, string symbol, string contractURI, bytes32 salt, address quote, uint256 quoteIn, uint24 fee) payable returns (address token)",
+  "function launch(string name, string symbol, string contractURI, bytes32 salt, address quote, uint256 quoteIn, uint24 fee, address referrer) payable returns (address token)",
   "function collect(address token) returns (uint256 amount0, uint256 amount1)",
   "function predictToken(address caller, bytes32 salt) view returns (address)",
   "function TOTAL_SUPPLY() view returns (uint256)",
@@ -56,12 +60,16 @@ export const LAUNCHPAD_V3_ABI = parseAbi([
   "function FEE_HIGH() view returns (uint24)",
   "function TICK_SPACING() view returns (int24)",
   "function CREATOR_SHARE_BPS() view returns (uint16)",
+  "function REFERRER_SHARE_BPS() view returns (uint16)",
+  "function approvedReferrers(address referrer) view returns (bool)",
+  "function referrerOf(address token) view returns (address)",
   "function hook() view returns (address)",
   "function quotes(address quote) view returns (bool enabled, int24 startTick)",
   "function protocolRecipient() view returns (address)",
   "function launches(address token) view returns ((address creator, address creatorRecipient, (address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key))",
   "event Launched(address indexed token, address indexed creator, bytes32 indexed poolId, uint256 devBuyIn, uint256 devBuyTokens)",
   "event LaunchFee(address indexed token, uint24 fee)",
+  "event Referred(address indexed token, address indexed referrer)",
 ]);
 
 /** The hook every v3 pool uses (`contracts/src/LaunchHook.sol`): the fee schedule, and nothing that moves money. */
@@ -85,6 +93,8 @@ export const LAUNCHPAD_V3_EXPECTS = {
   feeLow: 10_000,
   feeHigh: 30_000,
   creatorShareBps: 8_000,
+  /** a recorded referrer's share, out of the protocol's 20%: 80 / 5 / 15 */
+  referrerShareBps: 500,
   tickSpacing: 200,
   /** the LP fee at the second a pool opens: 50% */
   startFee: 500_000,

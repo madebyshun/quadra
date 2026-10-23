@@ -19,7 +19,6 @@ import { useWalletSession } from "@/ui/WalletProvider";
 import { useOpenWindow, useRunCommand } from "@/features/openWindow";
 import { feesText, valueText } from "@/features/panels/BaseLaunch";
 import { TxStepList, useTxSteps } from "@/features/panels/TxSteps";
-import { BaseCard } from "@/features/panels/BaseCard";
 
 /**
  * Profile — a wallet as a person sees it (owner, 2026-10-02: "there is no page for the user"). The
@@ -113,7 +112,7 @@ type Holdings = { readonly eth: bigint; readonly ethUsd: number | null; readonly
 /** Coins launched here whose balance is read from the chain — at most this many, newest first. */
 export const COINS_CHECKED = 30;
 
-async function readHoldings(address: string, coins: Coins): Promise<Holdings> {
+export async function readHoldings(address: string, coins: Coins): Promise<Holdings> {
   const [eth, price, indexed] = await Promise.all([balanceOf(ETH, address), ethUsd(), tokenBalances(address)]);
   // MEASURED 2026-10-02: Blockscout's balance list did not yet have a launchpad coin bought minutes
   // earlier — so a coin launched here is read from the CHAIN, and valued from its own pool
@@ -304,16 +303,12 @@ export function ProfilePanel() {
               }
             </ReadLine>
           ) : tab === "card" ? (
-            <BaseCard
-              facts={{
-                address: target.address,
-                name: done(name)?.kind === "verified" ? nameText(done(name)).text : null,
-                launched: read ? read.mine.length : null,
-                feesWaiting: read ? waiting.length : null,
-                holdings: done(holdings) ? `ETH and ${done(holdings)!.shown.length} priced tokens` : null,
-                lures: done(activity) ? done(activity)!.items.filter((i) => i.tone === "bad").length : null,
-              }}
-            />
+            <div className="stack">
+              <p className="dim">A painted card of your X profile — type your handle and share it.</p>
+              <Gel type="button" disabled={!openWindow} onClick={() => openWindow?.("card")}>
+                Make my Base card
+              </Gel>
+            </div>
           ) : (
             <ReadLine state={activity} what="the activity">
               {({ items }: { items: ActivityItem[] }) =>

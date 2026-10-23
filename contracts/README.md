@@ -13,8 +13,11 @@ reads both factories. **v2 is deployed** (owner, 2026-10-02) at
 `0xef1F427bB57e0ECd7BB8051cE8bC7AAb709a0c03`, block 52,068,913 — verified on Blockscout, bytecode
 identical to this build with immutables masked. New launches go to it.
 
-**v3 is built and NOT deployed** (2026-10-14): `src/LaunchFactoryV3.sol` + `src/LaunchHook.sol` —
-v2 plus a fee the launcher chooses and an anti-sniper opening. Its section is below
+**v3 is DEPLOYED** by the owner 2026-10-22 at `0x006Da367654a487bb277fe25ff54f0fE0f741377` (hook `0x0D9DdcC907658E3C61318d0F979F978e600AA880`, tx 0x151126f0…, block 52,929,530): verified on Sourcify (exact match), read back and checked by the app's own `checkFactory` (ok), 8 stocks enabled (CRCLc, GOOGLc, INTCc, MSTRc, NVDAc, SNDKc, SPCXc, TSLAc). Blue Agent's referrer `0x884fbdd5cf193e7f87cba76419e526d8f4df7a9b` is NOT yet approved — the owner must send `setReferrer` from the treasury `0xD5C1…3FAB`. Still NOT audited.
+
+**v3** (built 2026-10-14): `src/LaunchFactoryV3.sol` + `src/LaunchHook.sol` —
+v2 plus a fee the launcher chooses, an anti-sniper opening and (2026-10-22) APPROVED REFERRERS
+paid 5% of the fees out of the protocol's share — 80 / 5 / 15. Its section is below
 ("v3 — the chosen fee and the anti-sniper opening"); everything v2 guarantees, v3 keeps.
 
 ## What one `launch(name, symbol, contractURI, salt, quote, quoteIn)` does, in one transaction
@@ -111,7 +114,8 @@ Decided by the owner after measuring two competitors: basepad.si lets a creator 
 of its launches chose 3%); feel.cash charges a falling anti-sniper fee (50% → the normal fee over
 15 s). v3 = v2 + both, with nothing of v2 given up.
 
-`launch(name, symbol, contractURI, salt, quote, quoteIn, fee)` — v2's call plus `fee`:
+`launch(name, symbol, contractURI, salt, quote, quoteIn, fee, referrer)` — v2's call plus `fee` (and
+`referrer`, see Referrals below):
 `FEE_LOW` = 10,000 (1%) or `FEE_HIGH` = 30,000 (3%). Anything else reverts `BadFee()` (tested over
 every other uint24 by fuzzing). ⚠️ A different selector from v1/v2's `launch`: the Launch window
 needs the new ABI before it can send to v3.
@@ -158,13 +162,47 @@ deploying wallet's next CREATE address (`script/HookSalt.sol`: v4-periphery's Ho
 with the init-code hash computed once instead of per salt). A salt that gives any other bits makes
 the constructor revert `HookAddressNotValid` (tested).
 
+**Referrals** (owner, 2026-10-22, before v3 is deployed). An app that builds a launch for its user —
+Blue Agent first, whose chat will build launch calldata for this factory — names itself as the
+launch's referrer and earns 5% of the coin's fees, out of the protocol's 20%:
+
+    launch(name, symbol, contractURI, salt, quote, quoteIn, fee, address referrer)   // address(0) = none
+
+- **Only APPROVED referrers count.** `approvedReferrers[referrer]` must be true at the moment of the
+  launch. `setReferrer(address, bool)` (event `ReferrerSet(address indexed referrer, bool approved)`)
+  is callable by the **protocol recipient** only — not the quote admin: a referrer is paid out of
+  the protocol's share, so the party that gives the money up decides, and the role follows
+  `proposeProtocolRecipient`/`acceptProtocolRecipient` (tested). It refuses `address(0)`.
+- **An unapproved non-zero referrer is treated as none, never a revert** — a stale or mistyped
+  referral must not block somebody's launch. It is announced: `ReferralIgnored(token, referrer)`.
+  A counted one: `Referred(address indexed token, address indexed referrer)`, before `Launched`.
+- **Recorded for good, in a separate mapping** `referrerOf(token)` — `launches(token)`'s ABI is
+  unchanged, so every v1/v2/v3 reader of it still decodes. No function changes a recorded referrer.
+- **Removal stops NEW referrals only.** `setReferrer(r, false)` means later launches naming `r` are
+  recorded with none; launches already recorded keep paying `r`, because `collect` never reads the
+  list. It is the simplest honest rule: what a coin pays was fixed, publicly, when it launched.
+- **A creator may name themselves** — only if approved, like anyone else (tested both ways).
+- **The split.** With a referrer: creator `amount × 8000 / 10000`, referrer `amount × 500 / 10000`,
+  protocol the REMAINDER (≈15%, plus at most a couple of wei of rounding) — no wei is lost (fuzzed to
+  the wei). Without: 80 / 20 exactly as before. Both currencies. A referrer whose payout is refused
+  (a contract that rejects ETH, a quote's transfer policy) is kept in `owed` for `withdraw(currency)`,
+  exactly like the creator; everyone else is still paid.
+- **The hook is unaffected** — it sets the LP fee and nothing else, so the opening window's fees
+  (the sniper's 50%) are split 80 / 5 / 15 like any other (tested).
+
 **Events.** `Launched` keeps v1/v2's exact signature (`Launched(address,address,bytes32,uint256,uint256)`
 — topic0, the indexed token, creator and poolId all in the same places, tested), so one log reader still
 serves every factory. New: `LaunchFee(address indexed token, uint24 fee)`, emitted just before it.
 
 ### Measured
 
-- **Tests:** 47 in `test/LaunchFactoryV3.t.sol` (v2's 30 ported, plus the fee and the hook), against the
+- **Tests:** 59 in `test/LaunchFactoryV3.t.sol` (v2's 30 ported, plus the fee and the hook; 12 for
+  referrals added 2026-10-22: only the protocol recipient approves, and it follows a handover; an
+  approved referrer is recorded and `Referred` precedes the unchanged `Launched`; an unapproved one
+  is none with `ReferralIgnored`; a self-referral only when approved; removal keeps paying recorded
+  coins and stops new ones; 80/5/remainder on ETH and in the coin, on a stock pair on either side, in
+  the opening window; a fuzzed split to the wei; a refused ETH payout and a refused asset payout →
+  `owed` → `withdraw`), against the
   real B20 precompile and a real v4 PoolManager, the hook at a mined address exactly as on mainnet:
   fee at 0 s = 50%, at half the window exactly halfway (a 20 s window: 25.5% at 10 s), every second of
   the default window on the line, the chosen fee from `window` on; the launcher's first buy paying 1%
@@ -174,18 +212,29 @@ serves every factory. New: `LaunchFee(address indexed token, uint24 fee)`, emitt
   factory reaches `modifyLiquidity` exactly twice (the supply in, a zero poke) and the hook never calls
   the pool manager (needs `fs_permissions` read on `./src`, in foundry.toml). Three mutants of the hook
   — no first-buy exemption, no factory check at initialize, no decay — each fail named tests.
-  `npm run gate:contracts`: 77 tests (30 v2 + 47 v3), 100% lines/functions/branches of all three files
-  in `src/`.
+  `npm run gate:contracts`: 89 tests (30 v2 + 59 v3), 100% lines/functions/branches of all three files
+  in `src/` (2026-10-22; 77 = 30 + 47 before referrals).
 - **Mainnet simulation** (`scripts/simulate-launchpad-v3.ts`, hand-run, 2026-10-14): one
   `eth_simulateV1` call, three blocks (the fee depends on the block's time, so the clock must move):
   deploy v3 (hook salt mined in the script) → launch a 1% and a 3% coin with 0.01 ETH first buys →
   collect: **1.000% and 3.000%** → at T+1 s a sniper buys 0.1 ETH of the 1% coin → collect:
   **46.733%** (0.0467333 ETH) → at T+20 s 0.1 ETH buys of each → **1.000% and 3.000%**. The sniper got
   10.55M tokens for 0.1 ETH; the buyer at T+20 s 19.03M for the same 0.1 ETH.
+  **Referrals, re-run 2026-10-22 (Base block 52,928,096):** the treasury approves a keyless referrer,
+  the app's own `launchTx(…, referrer)` launches a referred 1% coin, `referrerOf` reads it back, and
+  two collections pay, read from the ETH transfers out of the factory:
+  `99999999999999 wei → creator 79999999999999 · referrer 4999999999999 · protocol 15000000000001` and
+  `999999999999999 wei → creator 799999999999999 · referrer 49999999999999 · protocol 150000000000001`
+  — each summing to what was collected, to the wei, EXACTLY 80 / 5 / the remainder.
 - **Gas, mainnet state, same block:** launch with a 0.01 ETH first buy — v2 631,478, v3 685,443
   (+53,965, +8.5%: the hook's schedule slot, four calls into it — register, initialize, add liquidity, the first buy — and the extra event). A 0.1 ETH buy through
   a router — v2 121,207, v3 129,358 (+8.2k a swap, the `beforeSwap` call). Deploy: v3 + hook
   3,644,963 (v2: 2,918,088). Runtime size: factory 13,251 B, hook 2,691 B.
+  **With referrals (2026-10-22, same script):** a launch naming no referrer 796,014 (+353 over the
+  795,661 measured just before the change, same block), a referred launch 822,036 (+26.4k: the
+  `referrerOf` slot and `Referred`); `collect` with no referrer +2,274 (114,278 → 116,552: one cold
+  `referrerOf` read), a referred collect 128,403 (a third payout), 170,503 the first time (the
+  referrer's account cold). Deploy v3 + hook 3,805,361. Runtime: factory 13,992 B (+741), under 24,576.
 
 ### Deploying v3 — the owner's step, with the owner's key
 
@@ -213,9 +262,22 @@ npx vite-node scripts/quote-ticks.ts <v3 factory address>
 
 Then read back before pointing the app at it: `hook()` and its `factory()` (= the factory),
 `startFee()` = 500000, `window()` = 15, the hook address ending in bits `0x2880`, `FEE_LOW` /
-`FEE_HIGH`, `quotes(0x0…0)` = (true, 191200), `protocolRecipient` = treasury. The app's
-`LAUNCHPAD_EXPECTS`, the Launch window's ABI (`launch` takes `fee`), and anything reading `key.fee`
-need v3 changes first — not made here.
+`FEE_HIGH`, `REFERRER_SHARE_BPS` = 500, `quotes(0x0…0)` = (true, 191200), `protocolRecipient` =
+treasury, and no referrer approved. The app checks the same numbers (`LAUNCHPAD_V3_EXPECTS`) before
+offering a launch.
+
+**Approving a referrer — the owner's step, from the TREASURY wallet** (the protocol recipient, not
+the deployer): once ShunTr supplies Blue Agent's referrer address — never guessed or hard-coded here:
+
+```
+cast send <v3 factory address> "setReferrer(address,bool)" <Blue Agent address> true \
+  --rpc-url https://mainnet.base.org --account <the treasury's keystore>
+cast call <v3 factory address> "approvedReferrers(address)(bool)" <Blue Agent address> --rpc-url https://mainnet.base.org
+```
+
+(The treasury `0xD5C1…3FAB` is a wallet with an EIP-7702 delegation; sending from it through its
+own wallet app works the same — the call is `setReferrer(<address>, true)`.) Removing:
+`setReferrer(<address>, false)` — coins already referred keep paying it.
 
 ⚠️ v3 is not audited either, and it adds the first hook this launchpad has used.
 

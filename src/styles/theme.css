@@ -1,72 +1,126 @@
 /*
- * Quadra's look is three eras fused on purpose — the name is a 1991 Macintosh,
- * so the Apple half carries it:
- *   window chrome  → Windows XP "Luna"   (blue title bars, #ece9d8 bodies, Trebuchet titles)
- *   controls       → Mac OS X "Aqua"     (gel lozenges, pinstripes, traffic lights)
- *   proof panels   → CRT phosphor        (green glow, scanlines)
+ * Quadra is named after the 1991 Macintosh Quadra, and since 2026-10-22 the whole app is dressed as
+ * the Macintosh software of the Quadra's later years: Mac OS 8/9 "Platinum". (A System 7 pass came
+ * first the same day; the owner found its bitmap font childish and chose Platinum instead.)
+ *   window chrome  → Platinum document windows: a light grey bevelled frame, a title bar of fine
+ *                    grey lines with the title on a plain plate, the close box left, zoom and
+ *                    collapse boxes right (each bevelled), a grow box, a soft shadow; a window
+ *                    behind another goes flat and loses its lines
+ *   controls       → Platinum push buttons (grey gradient, 5px corners, a top highlight); the
+ *                    DEFAULT button wears the thick dark ring; bevelled checkboxes, radios, popups
+ *   the desktop    → a calm blue-grey desktop (patterns are Control Panel choices), icons down the
+ *                    RIGHT edge, the Trash bottom-right, a Platinum menu bar across the top
+ *   proof panels   → a CRT monitor (green phosphor), kept: a terminal is still a terminal
  *
- * Every value here is a token. Components never hardcode a colour.
+ * Every value here is a token. Components never hardcode a colour. The `--xp-*` and `--aqua-*`
+ * NAMES are kept from the XP/Aqua era on purpose — other stylesheets read them — and now carry
+ * Platinum values; new code should prefer the `--pt-*` names.
+ *
+ * Type: Inter (Google Fonts, SIL Open Font License 1.1) — 600/700 for chrome in the spirit of
+ * Charcoal, 400/500 for text, tabular figures for amounts; JetBrains Mono (OFL 1.1) for addresses.
+ * No Apple font is loaded or named, and no pixel font sits in the chrome.
  */
 
 :root {
-  /* ---- XP Luna ---- */
-  --xp-title-a: #0058e6;
-  --xp-title-b: #3f8cf3;
-  --xp-title-c: #0054e3;
-  --xp-title-edge: #0831d9;
-  --xp-frame: #0054e3;
-  --xp-face: #ece9d8;
-  --xp-face-lit: #fffffe;
-  --xp-face-dim: #d4d0c8;
-  --xp-sunken: #ffffff;
-  --xp-border-dark: #716f64;
-  --xp-border-mid: #aca899;
-  --xp-btn-edge: #003c74;
-  --xp-hot: #ff9c00;
-  --xp-start-a: #379937;
-  --xp-start-b: #3faf3f;
-  --xp-ink: #000000;
-  --xp-ink-soft: #3a3a3a;
-  --xp-ink-dim: #6d6a5f;
+  /* ---- Platinum ---- */
+  --pt-ink: #000000;
+  --pt-paper: #ffffff;
+  --pt-face: #dddddd;
+  --pt-face-lit: #eeeeee;
+  --pt-face-dim: #cccccc;
+  --pt-shade: #999999;
+  --pt-shade-dark: #555555;
+  --pt-line: #bbbbbb;
+  --pt-select: #3366cc;
+  --pt-select-ink: #ffffff;
+  --pt-select-soft: #ccd9f2;
+  --pt-accent: #1a3fa6;
+  --pt-ring: #2c3a55;
 
-  /* ---- Aqua ---- */
-  --aqua-blue-a: #a8d0f7;
-  --aqua-blue-b: #4e8fe0;
-  --aqua-blue-c: #2f6cbe;
-  --aqua-graphite-a: #f4f4f4;
-  --aqua-graphite-b: #cfcfcf;
-  --aqua-graphite-c: #a9a9a9;
-  --aqua-gloss: rgba(255, 255, 255, 0.85);
-  --aqua-red: #ff5f57;
-  --aqua-yellow: #ffbd2e;
-  --aqua-green: #28c840;
-  --aqua-stripe: rgba(255, 255, 255, 0.55);
+  /* aliases from the System 7 pass, same day — kept so nothing that read them goes blank */
+  --s7-ink: var(--pt-ink);
+  --s7-paper: var(--pt-paper);
+  --s7-platinum: var(--pt-face);
+  --s7-platinum-lit: var(--pt-face-lit);
+  --s7-platinum-dim: var(--pt-face-dim);
+  --s7-shade: var(--pt-shade);
+  --s7-shade-dark: var(--pt-shade-dark);
+  --s7-face: var(--pt-face-lit);
+  --s7-hilite: var(--pt-select);
+  --s7-hilite-ink: var(--pt-select-ink);
+  --s7-accent: var(--pt-accent);
+  --s7-select: var(--pt-select-soft);
+  --s7-stripe: var(--pt-line);
+
+  /* ---- the XP names, carrying Platinum values (kept so every stylesheet that reads them renders) ---- */
+  --xp-title-a: #1a3fa6;
+  --xp-title-b: #3366cc;
+  --xp-title-c: #1a3fa6;
+  --xp-title-edge: #555555;
+  --xp-frame: var(--pt-face);
+  --xp-face: var(--pt-face-lit);
+  --xp-face-lit: #ffffff;
+  --xp-face-dim: #cccccc;
+  --xp-sunken: #ffffff;
+  --xp-border-dark: #555555;
+  --xp-border-mid: #a0a0a0;
+  --xp-btn-edge: #555555;
+  --xp-hot: #3366cc;
+  --xp-start-a: #dddddd;
+  --xp-start-b: #eeeeee;
+  --xp-ink: #000000;
+  --xp-ink-soft: #333333;
+  --xp-ink-dim: #595959;
+
+  /* ---- the Aqua names, Platinum values ---- */
+  --aqua-blue-a: #ffffff;
+  --aqua-blue-b: #e8eefa;
+  --aqua-blue-c: #3366cc;
+  --aqua-graphite-a: #f6f6f6;
+  --aqua-graphite-b: #dddddd;
+  --aqua-graphite-c: #555555;
+  --aqua-gloss: transparent;
+  --aqua-red: #555555;
+  --aqua-yellow: #555555;
+  --aqua-green: #555555;
+  --aqua-stripe: transparent;
 
   /* ---- CRT phosphor ---- */
   --crt-bg: #06120b;
   --crt-ink: #7fff9a;
-  --crt-ink-dim: #3f8f56;
-  --crt-glow: rgba(127, 255, 154, 0.35);
+  --crt-ink-dim: #4fae6a;
+  --crt-glow: rgba(127, 255, 154, 0.25);
   --crt-scan: rgba(0, 0, 0, 0.22);
   --crt-amber: #ffb642;
 
   /* ---- semantic ---- */
   --ok: #1d7a2e;
-  --warn: #9a6300;
+  --warn: #8a5800;
   --bad: #b3261e;
 
   /* ---- type ---- */
-  --font-title: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif;
-  --font-ui: Tahoma, Verdana, "Segoe UI", sans-serif;
-  --font-mac: "Lucida Grande", Geneva, Verdana, sans-serif;
-  --font-mono: "Andale Mono", Monaco, Consolas, "Courier New", monospace;
+  --font-chrome: "Inter", system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-title: var(--font-chrome);
+  --font-ui: "Inter", system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mac: var(--font-ui);
+  --font-mono: "JetBrains Mono", ui-monospace, Consolas, "DejaVu Sans Mono", "Courier New", monospace;
 
   /* ---- metrics ---- */
-  --radius-window: 8px;
-  --radius-control: 3px;
-  --radius-gel: 999px;
-  --shadow-window: 0 6px 22px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
-  --taskbar-h: 30px;
+  --radius-window: 0;
+  --radius-control: 0;
+  --radius-gel: 5px;
+  --shadow-window: 0 1px 0 rgba(0, 0, 0, 0.25), 0 6px 18px rgba(0, 0, 0, 0.28);
+  --menubar-h: 22px;
+  /* nothing sits along the bottom any more; kept for the stylesheets that reserve it */
+  --taskbar-h: 0px;
+
+  /* ---- the desktop (the Control Panel's choices set these) ---- */
+  --pattern-a: #5f7d9c;
+  --pattern-b: #63819f;
+
+  /* the bevel every Platinum surface wears: light top-left, dark bottom-right */
+  --bevel: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #999999;
+  --bevel-in: inset 1px 1px 0 #999999, inset -1px -1px 0 #ffffff;
 }
 
 /* ===================================================================
@@ -75,28 +129,20 @@
 
 .desktop {
   min-height: 100vh;
-  padding: 22px 18px calc(var(--taskbar-h) + 28px);
+  padding: calc(var(--menubar-h) + 14px) 16px 28px;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--xp-ink);
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
-}
-
-/* Aqua's pinstripe wash, laid over the XP sky. Two eras, one surface. */
-.desktop::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    180deg,
-    var(--aqua-stripe) 0px,
-    var(--aqua-stripe) 1px,
-    transparent 1px,
-    transparent 4px
+  background-color: var(--pattern-a);
+  background-image: conic-gradient(
+    var(--pattern-b) 0 25%,
+    var(--pattern-a) 0 50%,
+    var(--pattern-b) 0 75%,
+    var(--pattern-a) 0
   );
-  opacity: 0.16;
-  z-index: 0;
+  background-size: 4px 4px;
 }
 
 .desktop > * {
@@ -105,25 +151,24 @@
 }
 
 /* ===================================================================
-   XP window
+   Platinum window
    =================================================================== */
 
 .win {
-  background: var(--xp-frame);
-  border-radius: var(--radius-window) var(--radius-window) 0 0;
+  background: var(--pt-face);
+  border: 1px solid #444;
   padding: 0 3px 3px;
-  box-shadow: var(--shadow-window);
+  box-shadow: var(--bevel), var(--shadow-window);
   box-sizing: border-box;
 }
 
 /*
  * A window on the multi-window desktop, positioned and sized by inline style
  * (React owns x/y/width/height as state — this only supplies the mechanics).
- * Selector carries two classes on purpose: `.desktop > *` two blocks up sets
+ * Selector carries two classes on purpose: `.desktop > *` sets
  * `position: relative` on every direct child at equal (0,1,0) specificity, and
- * source order alone is exactly the trap this file's own header warns about
- * (see CLAUDE.md, "CSS cascade order beats intent"). `.win.win--floating` is
- * (0,2,0) and wins regardless of where either rule sits.
+ * source order alone is exactly the trap CLAUDE.md warns about ("CSS cascade
+ * order beats intent"). `.win.win--floating` is (0,2,0) and wins regardless.
  */
 .win.win--floating {
   position: fixed;
@@ -132,83 +177,124 @@
   overflow: hidden;
 }
 
+/* The title bar: fine grey lines, the title on a plain plate over them. */
 .win__bar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 27px;
-  padding: 0 4px 0 6px;
-  border-radius: 6px 6px 0 0;
-  background: linear-gradient(
+  flex: none;
+  height: 22px;
+  padding: 0 4px;
+  background-color: var(--pt-face);
+  background-image: repeating-linear-gradient(
     180deg,
-    var(--xp-title-b) 0%,
-    var(--xp-title-a) 8%,
-    var(--xp-title-c) 42%,
-    var(--xp-title-edge) 90%,
-    var(--xp-title-a) 100%
+    #a8a8a8 0 1px,
+    #f4f4f4 1px 2px
   );
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  background-size: calc(100% - 8px) 12px;
+  background-position: 4px 5px;
+  background-repeat: no-repeat;
 }
 
 .win--floating .win__bar {
-  cursor: move;
+  cursor: default;
+}
+
+/* A window behind another goes flat: no lines, grey title, its boxes withdrawn. */
+.win--inactive .win__bar {
+  background-image: none;
+}
+.win--inactive .win__title {
+  color: #777;
+}
+.win--inactive .light {
+  visibility: hidden;
 }
 
 .win__title {
   flex: 1;
   min-width: 0;
-  font-family: var(--font-title);
-  font-size: 13px;
+  display: flex;
+  justify-content: center;
+  font-family: var(--font-chrome);
+  font-size: 12.5px;
   font-weight: 700;
-  color: #fff;
-  text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.55);
+  line-height: 1;
+  color: #000;
+}
+
+.win__title > span {
+  min-width: 0;
+  padding: 3px 9px;
+  background: var(--pt-face);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Aqua traffic lights, sitting in an XP title bar. Deliberate. */
+/* The zoom and collapse boxes, on the right. */
 .win__lights {
   display: flex;
-  gap: 5px;
+  gap: 4px;
   align-items: center;
 }
 
+/* Every box: a small bevelled square on a plate knocked out of the lines. */
 .light {
-  width: 12px;
-  height: 12px;
+  position: relative;
+  flex: none;
+  width: 13px;
+  height: 13px;
   padding: 0;
-  border: 1px solid rgba(0, 0, 0, 0.32);
-  border-radius: 50%;
+  border: 1px solid #555;
+  border-radius: 0;
+  background: linear-gradient(135deg, #f4f4f4, #c4c4c4);
+  box-shadow: 0 0 0 2px var(--pt-face), inset 1px 1px 0 #fff;
   cursor: pointer;
-  background-repeat: no-repeat;
 }
 
-.light--close {
-  background:
-    radial-gradient(circle at 50% 22%, var(--aqua-gloss) 0 22%, transparent 55%),
-    var(--aqua-red);
+.light:active:not(:disabled) {
+  background: linear-gradient(135deg, #9a9a9a, #c8c8c8);
 }
-.light--min {
-  background:
-    radial-gradient(circle at 50% 22%, var(--aqua-gloss) 0 22%, transparent 55%),
-    var(--aqua-yellow);
+
+/* the zoom box: a small square inside the big one */
+.light--max::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 1px;
+  width: 5px;
+  height: 5px;
+  border: 1px solid #555;
 }
-.light--max {
-  background:
-    radial-gradient(circle at 50% 22%, var(--aqua-gloss) 0 22%, transparent 55%),
-    var(--aqua-green);
+
+/* the collapse box (the windowshade): two lines across it */
+.light--min::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  top: 3px;
+  height: 2px;
+  border-top: 1px solid #555;
+  border-bottom: 1px solid #555;
+}
+
+/* A box that does nothing here is drawn, not offered: no pointer and no pressed state. */
+.light:disabled {
+  cursor: default;
 }
 
 .light:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 1px;
+  outline: 2px solid var(--xp-hot);
+  outline-offset: 2px;
 }
 
 .win__body {
   background: var(--xp-face);
-  border: 1px solid var(--xp-border-mid);
-  border-top: none;
+  border: 1px solid #777;
+  box-shadow: inset 1px 1px 0 #fff;
   padding: 14px;
 }
 
@@ -217,25 +303,58 @@
   overflow: auto;
 }
 
-/* the diagonal grip at the bottom-right corner — the only resize handle, no edges */
+/* the grow box at the bottom-right corner — the only resize handle, no edges */
 .win__resize {
   position: absolute;
-  right: 2px;
-  bottom: 2px;
-  width: 14px;
-  height: 14px;
+  right: 4px;
+  bottom: 4px;
+  width: 13px;
+  height: 13px;
   cursor: nwse-resize;
   background: repeating-linear-gradient(
     135deg,
-    var(--xp-border-mid) 0px,
-    var(--xp-border-mid) 1px,
-    transparent 1px,
-    transparent 3px
+    transparent 0 2px,
+    #888 2px 3px,
+    #fff 3px 4px
   );
 }
 
+/* Platinum scroll bars, where the browser lets a page draw them: a grooved track, a bevelled thumb. */
+.win__body,
+.menu,
+.gadget {
+  scrollbar-color: #c8c8c8 #e6e6e6;
+}
+.win__body::-webkit-scrollbar,
+.menu::-webkit-scrollbar,
+.gadget::-webkit-scrollbar {
+  width: 15px;
+  height: 15px;
+}
+.win__body::-webkit-scrollbar-track,
+.menu::-webkit-scrollbar-track,
+.gadget::-webkit-scrollbar-track {
+  border-left: 1px solid #888;
+  background: #e2e2e2;
+  box-shadow: inset 1px 1px 0 #bbb;
+}
+.win__body::-webkit-scrollbar-thumb,
+.menu::-webkit-scrollbar-thumb,
+.gadget::-webkit-scrollbar-thumb {
+  border: 1px solid #666;
+  background: linear-gradient(90deg, #f2f2f2, #cfcfcf);
+  box-shadow: inset 1px 1px 0 #fff;
+}
+.win__body::-webkit-scrollbar-corner {
+  background: var(--pt-face);
+}
+
 /* ===================================================================
-   Aqua gel button
+   Platinum push button (`Gel` — the name survives from the Aqua era)
+
+   `.gel` is the DEFAULT button: the one Return would press, wearing the thick
+   dark ring. `.gel--quiet` is an ordinary push button. Both are a light grey
+   gradient with a top highlight; pressing one darkens it.
    =================================================================== */
 
 .gel {
@@ -244,139 +363,117 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 24px;
-  padding: 4px 16px;
-  border: 1px solid var(--aqua-blue-c);
+  min-height: 22px;
+  /* room for the ring above and below; sideways it stays inside the row's own gap */
+  margin: 4px 0;
+  padding: 2px 14px;
+  border: 1px solid #555;
   border-radius: var(--radius-gel);
-  font-family: var(--font-mac);
-  font-size: 12px;
-  font-weight: 500;
-  color: #fff;
-  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.3);
+  font-family: var(--font-chrome);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: #000;
   cursor: pointer;
-  background: linear-gradient(
-    180deg,
-    var(--aqua-blue-a) 0%,
-    var(--aqua-blue-b) 48%,
-    var(--aqua-blue-c) 52%,
-    var(--aqua-blue-b) 100%
-  );
+  background: linear-gradient(180deg, #fafafa 0%, #e6e6e6 55%, #d4d4d4 100%);
+  /* the ring: a face-coloured gap, then three pixels of dark blue-grey */
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.7),
-    0 1px 2px rgba(0, 0, 0, 0.25);
-}
-
-/* the gloss highlight that makes Aqua look wet */
-.gel::after {
-  content: "";
-  position: absolute;
-  inset: 1px 3px auto;
-  height: 45%;
-  border-radius: var(--radius-gel);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0));
-  pointer-events: none;
+    inset 0 1px 0 #fff,
+    0 0 0 1px var(--xp-face),
+    0 0 0 4px var(--pt-ring);
 }
 
 .gel:hover {
-  filter: brightness(1.08);
+  background: linear-gradient(180deg, #ffffff 0%, #ececec 55%, #dadada 100%);
 }
 .gel:active {
-  filter: brightness(0.92);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(180deg, #a9a9a9 0%, #bdbdbd 100%);
+  box-shadow:
+    inset 1px 1px 2px rgba(0, 0, 0, 0.35),
+    0 0 0 1px var(--xp-face),
+    0 0 0 4px var(--pt-ring);
 }
 /*
   🔴 A `filter` CANNOT express "disabled", because it moves the label and the
-  background it sits on by the SAME amount. This was `grayscale(1)
-  brightness(1.15)` with `color: var(--xp-ink-dim)` and it made the primary
-  button's text INVISIBLE: greyscaling `--aqua-blue-b` lands on ~#9b9b9b and
-  lifting it gives ~#b3b3b3, while the dim ink greyscales to ~#7b7b7b — about
-  1.6:1, which is not a contrast, it is a blank lozenge. It went unseen for as
-  long as it did because `.gel--quiet` is already light, so the quiet disabled
-  buttons next to it stayed perfectly readable and the row looked deliberate.
-  A disabled button therefore gets its own flat palette rather than a
-  transform of the enabled one, and the gloss is dimmed rather than lifted.
+  background it sits on by the SAME amount (MEASURED 2026-09-28 on the Aqua gel:
+  `grayscale(1) brightness(1.15)` left the primary label at ~1.6:1). A disabled
+  button therefore gets its own flat palette, never a transform of the enabled
+  one: a flat light face, grey frame and ring, grey label at ~5:1.
 */
 .gel:disabled {
   cursor: not-allowed;
   filter: none;
-  color: var(--xp-ink-dim);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
-  border-color: #b9b6ad;
-  background: linear-gradient(180deg, #fbfbfa 0%, #e7e5de 48%, #dcd9d1 52%, #eae8e1 100%);
+  color: #5c5c5c;
+  border-color: #9a9a9a;
+  background: #efefef;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 1px 1px rgba(0, 0, 0, 0.12);
-}
-.gel:disabled::after {
-  opacity: 0.35;
+    0 0 0 1px var(--xp-face),
+    0 0 0 4px #a8a8a8;
 }
 .gel:focus-visible {
   outline: 2px solid var(--xp-hot);
-  outline-offset: 2px;
+  outline-offset: 6px;
 }
 
 .gel--quiet {
-  border-color: var(--aqua-graphite-c);
-  color: var(--xp-ink);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
-  background: linear-gradient(
-    180deg,
-    #fff 0%,
-    var(--aqua-graphite-a) 48%,
-    var(--aqua-graphite-b) 52%,
-    var(--aqua-graphite-a) 100%
-  );
+  margin: 0;
+  color: #000;
+  box-shadow: inset 0 1px 0 #fff;
+}
+.gel--quiet:active {
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.35);
+}
+.gel--quiet:disabled {
+  box-shadow: none;
+}
+.gel--quiet:focus-visible {
+  outline-offset: 2px;
 }
 
 /* ===================================================================
-   XP push button, sunken field, group box
+   Push button, text field, group box
    =================================================================== */
 
 .btn {
-  min-height: 23px;
-  padding: 3px 12px;
-  border: 1px solid var(--xp-btn-edge);
-  border-radius: var(--radius-control);
-  font-family: var(--font-ui);
-  font-size: 11px;
-  color: var(--xp-ink);
+  min-height: 20px;
+  padding: 1px 12px;
+  border: 1px solid #555;
+  border-radius: var(--radius-gel);
+  font-family: var(--font-chrome);
+  font-size: 12px;
+  font-weight: 600;
+  color: #000;
   cursor: pointer;
-  background: linear-gradient(
-    180deg,
-    var(--xp-face-lit) 0%,
-    var(--xp-face) 48%,
-    var(--xp-face-dim) 100%
-  );
+  background: linear-gradient(180deg, #fafafa 0%, #e6e6e6 55%, #d4d4d4 100%);
+  box-shadow: inset 0 1px 0 #fff;
 }
 
-.btn:hover {
-  border-color: var(--xp-hot);
-}
 .btn:active {
-  background: linear-gradient(180deg, var(--xp-face-dim) 0%, var(--xp-face) 100%);
+  background: linear-gradient(180deg, #a9a9a9 0%, #bdbdbd 100%);
 }
 .btn:disabled {
-  color: var(--xp-ink-dim);
-  border-color: var(--xp-border-mid);
+  color: #5c5c5c;
+  border-color: #9a9a9a;
+  background: #efefef;
   cursor: not-allowed;
 }
 
 .field {
   width: 100%;
   box-sizing: border-box;
-  padding: 4px 6px;
-  border: 1px solid var(--xp-border-dark);
+  padding: 3px 6px;
+  border: 1px solid #777;
   border-radius: 0;
   background: var(--xp-sunken);
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--xp-ink);
-  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.18);
+  box-shadow: inset 1px 1px 0 #bdbdbd, 1px 1px 0 #fff;
 }
 
 .field:focus {
-  outline: 1px solid var(--xp-title-a);
-  outline-offset: -2px;
+  outline: 2px solid #8fa8dc;
+  outline-offset: 0;
 }
 
 .field::placeholder {
@@ -384,25 +481,92 @@
 }
 
 .group {
-  border: 1px solid var(--xp-border-mid);
+  border: 1px solid #a0a0a0;
+  box-shadow: 1px 1px 0 #fff, inset 1px 1px 0 #fff;
   padding: 12px 12px 14px;
   margin: 0;
-  background: rgba(255, 255, 255, 0.35);
+  background: transparent;
 }
 
 .group > legend {
   padding: 0 5px;
-  font-family: var(--font-ui);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--xp-title-c);
+  font-family: var(--font-chrome);
+  font-size: 12px;
+  font-weight: 600;
+  color: #000;
 }
 
 .label {
   display: block;
   margin-bottom: 3px;
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--xp-ink-soft);
+}
+
+/*
+ * Platinum's own controls, everywhere on the desktop: a bevelled box with a check, a bevelled
+ * round radio with a dot, and a bevelled popup menu with its arrows. Scoped to `.desktop` so the
+ * intro and anything outside the machine keep the browser's own.
+ */
+.desktop input[type="checkbox"],
+.desktop input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 13px;
+  height: 13px;
+  margin: 0 5px 0 0;
+  border: 1px solid #555;
+  border-radius: 2px;
+  background: linear-gradient(135deg, #ffffff, #dcdcdc);
+  box-shadow: inset 1px 1px 0 #fff;
+  vertical-align: -2px;
+  cursor: pointer;
+}
+.desktop input[type="radio"] {
+  border-radius: 50%;
+}
+.desktop input[type="checkbox"]:checked {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 13'%3E%3Cpath d='M2.5 6.5l3 3 5.5-7' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E") center / 11px 11px no-repeat,
+    linear-gradient(135deg, #ffffff, #dcdcdc);
+}
+.desktop input[type="radio"]:checked {
+  background: radial-gradient(circle, #000 0 2.5px, transparent 3px), linear-gradient(135deg, #ffffff, #dcdcdc);
+}
+.desktop input[type="checkbox"]:disabled,
+.desktop input[type="radio"]:disabled {
+  border-color: #9a9a9a;
+  background: #efefef;
+  cursor: not-allowed;
+}
+.desktop input[type="checkbox"]:focus-visible,
+.desktop input[type="radio"]:focus-visible {
+  outline: 2px solid var(--xp-hot);
+  outline-offset: 1px;
+}
+.desktop select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 20px;
+  padding: 1px 24px 1px 7px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  color: #000;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='10'%3E%3Cpath d='M0 4h7L3.5 0zM0 6h7L3.5 10z'/%3E%3C/svg%3E") right 7px center / 7px 10px no-repeat,
+    linear-gradient(180deg, #fafafa 0%, #e6e6e6 55%, #d4d4d4 100%);
+  box-shadow: inset 0 1px 0 #fff;
+  cursor: pointer;
+}
+.desktop select:disabled {
+  color: #5c5c5c;
+  border-color: #9a9a9a;
+  background: #efefef;
+  cursor: not-allowed;
 }
 
 /* ===================================================================
@@ -666,13 +830,15 @@
 }
 
 .chip--pct:hover:not(:disabled) {
-  background: linear-gradient(180deg, #fff, #e8eef8);
-  border-color: var(--aqua-blue-c);
+  background: var(--pt-select);
+  border-color: var(--pt-select);
+  color: #fff;
 }
 
 .chip--pct:disabled {
   cursor: not-allowed;
-  color: var(--xp-border-mid);
+  color: #6a6a6a;
+  background: #f0f0f0;
 }
 
 .mf__cta {
@@ -756,372 +922,367 @@
 }
 
 /* ===================================================================
-   The desktop's own furniture: brand, cards
+   The desktop's own furniture: the name, the icons down the right edge
    =================================================================== */
 
 .home {
   max-width: 900px;
-  gap: 18px;
+  gap: 14px;
 }
 
 .home__head {
   display: grid;
   gap: 8px;
   justify-items: start;
-  max-width: 640px;
-  padding: 10px 2px 0;
+  max-width: 520px;
+  padding: 4px 2px 0;
 }
 
 .home__brand {
-  font-family: var(--font-title);
-  font-size: clamp(38px, 8vw, 66px);
-  font-weight: 700;
-  line-height: 0.95;
+  font-family: var(--font-chrome);
+  font-size: clamp(34px, 7vw, 54px);
+  font-weight: 800;
   letter-spacing: -0.02em;
+  line-height: 1;
   color: #fff;
-  text-shadow:
-    0 0 24px var(--crt-glow),
-    2px 2px 2px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35), 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
+/* the tagline on a Platinum card lying on the desktop: dark on light, never text on the desktop */
 .home__tagline {
-  max-width: 54ch;
-  font-family: var(--font-mac);
+  max-width: 52ch;
+  padding: 9px 12px;
+  border: 1px solid #555;
+  box-shadow: var(--bevel), 0 3px 10px rgba(0, 0, 0, 0.22);
+  background: var(--pt-face-lit);
+  font-family: var(--font-ui);
   font-size: 13px;
-  line-height: 1.55;
-  color: #fff;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.55);
+  line-height: 1.5;
+  color: #000;
 }
 
 /*
- * The icon field: left-anchored, like the icons on a real desktop — fills
- * downward first and only starts a second column once a column is full,
- * rather than the old edge-to-edge card grid. `flex-flow: column wrap` (not
- * a grid with a guessed row count) is what makes that adapt to the actual
- * rendered height of a tile instead of overflowing past the taskbar when a
- * blurb wraps to an extra line — see the max-height note below.
+ * The icon field: down the RIGHT edge, the way the Finder lines up disks — fills
+ * downward first and only starts a second column (to the LEFT) once a column is
+ * full. `column wrap-reverse` is what grows the columns leftwards. The bottom is
+ * reserved for the Trash.
  */
 .icon-field {
+  position: fixed;
+  top: calc(var(--menubar-h) + 10px);
+  right: 8px;
   display: flex;
-  flex-flow: column wrap;
+  flex-flow: column wrap-reverse;
   align-content: flex-start;
-  gap: 2px 4px;
-  /* leaves room for `.home__head` above and the taskbar below without scrolling */
-  max-height: calc(100vh - 250px);
+  gap: 4px 2px;
+  max-height: calc(100vh - var(--menubar-h) - 120px);
 }
 
 /*
  * `display: contents` hands each list's `<li>`s to `.icon-field`'s flex
  * layout directly — the `<ul>` keeps its `aria-label` and list role for
- * screen readers and for `getAllByRole`, but renders no box of its own, so
- * the two lists cascade into shared columns instead of stacking as separate
- * blocks (which is what pushed "Read about it" below the fold before this).
+ * screen readers and for `getAllByRole`, but renders no box of its own.
  */
 .icons {
   display: contents;
 }
 
-.icons--docs .icon {
-  opacity: 0.95;
-}
-
 /*
- * A desktop icon. Most are `<button>` (opening a window is not navigation any
- * more — see `Desktop.tsx`); the three doc links stay `<a>`, because those
- * really do go to another route. Unlike the old card, there is no panel
- * background and (since the tile came off) no chrome at all, same as a real
- * OS desktop —
- * so `font: inherit` and `text-align: center` exist purely to undo the
- * `<button>` UA defaults that would otherwise fight the centred label.
+ * A desktop icon. Most are `<button>`; on the standalone pages they are `<a>`.
+ * No chrome at all, as on a Finder desktop: the glyph, and the name in a white
+ * name under it, on a white highlight once selected (as the Mac OS 8 Finder does). A
+ * selected — here: hovered or focused — icon inverts its name.
  */
 .icon {
   display: grid;
   justify-items: center;
-  gap: 4px;
-  width: 108px;
-  padding: 6px 4px 8px;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  gap: 3px;
+  width: 92px;
+  padding: 4px 2px 6px;
+  border: none;
   background: transparent;
-  color: #fff;
+  color: #000;
   text-decoration: none;
   font: inherit;
   text-align: center;
   cursor: pointer;
 }
 
-.icon:hover {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.35);
-}
-
 .icon:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 1px;
+  outline: none;
 }
 
-/*
- * The glyph, and nothing behind it.
- *
- * This was a 40px rounded Aqua tile with a 22px line drawing on top of it, which
- * reads as two objects — a shape, and an icon inside the shape — where a desktop
- * icon should read as one. With the tile gone, `currentColor` is the OUTLINE of a
- * 1-bit icon rather than the whole drawing (see `ui/icons.tsx`), so it is near
- * black: the white body of each glyph is what separates it from the wallpaper,
- * exactly as it did on a Macintosh desktop. The box keeps its 40px so no grid
- * row moves.
- */
 .icon__glyph {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  color: #10161f;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
+  width: 36px;
+  height: 36px;
+  color: #000;
 }
 
 .icon__title {
-  font-family: var(--font-title);
+  max-width: 100%;
+  padding: 0 4px;
+  border-radius: 2px;
+  font-family: var(--font-chrome);
   font-size: 12px;
-  font-weight: 700;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+  font-weight: 600;
+  line-height: 16px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+  overflow-wrap: anywhere;
 }
 
+/* selected (here: hovered or focused): the name on a white highlight */
+.icon:hover .icon__title,
+.icon:focus-visible .icon__title {
+  background: #fff;
+  color: #000;
+  text-shadow: none;
+}
+.icon:hover .icon__glyph,
+.icon:focus-visible .icon__glyph {
+  filter: brightness(0.6);
+}
+
+/* The Finder shows a name, not a sentence: the blurb is the icon's tooltip in a folder, hidden here. */
 .icon__blurb {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  font-family: var(--font-mac);
-  font-size: 10.5px;
-  line-height: 1.3;
-  /*
-   * Every blurb reserves both of its clamped lines, even the one-liners.
-   * `.icon-field` wraps in columns, so an icon that is one line shorter than
-   * its neighbour offsets every icon below it in that column and the rows stop
-   * lining up — a ragged desktop, visible in a screenshot and invisible to the
-   * suite, which can only see that the text is present.
-   */
-  min-height: 2.6em;
-  color: rgba(255, 255, 255, 0.9);
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+  display: none;
 }
 
 .icon--off {
   cursor: not-allowed;
 }
 
-/* No tile to grey out any more: a switched-off icon is a faded one, whole. */
+/* A switched-off icon is a faded one, whole — its name stays on its white box, readable. */
 .icon--off .icon__glyph {
   opacity: 0.45;
 }
 
-.icon--off .icon__title,
-.icon--off .icon__blurb {
-  opacity: 0.7;
-}
-
-/*
- * The doc icons used to carry a green tile. Nothing tints them now — a 1-bit
- * icon set has no second colour, and the label already says which is which.
- */
-
 /* ===================================================================
-   Taskbar
+   The menu bar — Mac OS 8 Platinum, across the top (it replaced the XP taskbar)
    =================================================================== */
 
-.taskbar {
+.menubar {
   position: fixed;
-  inset: auto 0 0 0;
-  z-index: 40;
+  inset: 0 0 auto 0;
+  /* above every window (whose z-order counts up from 1), below Q (9000) and the Welcome screen */
+  z-index: 8000;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  height: var(--taskbar-h);
-  padding: 0 8px 0 0;
-  background: linear-gradient(180deg, #245edb 0%, #1941a5 9%, #2f6ee8 18%, #245edb 92%, #1941a5 100%);
-  box-shadow: 0 -1px 0 #0831d9 inset;
-  font-family: var(--font-ui);
-  color: #fff;
+  align-items: stretch;
+  height: var(--menubar-h);
+  padding: 0 6px;
+  border-bottom: 1px solid #555;
+  background: linear-gradient(180deg, #f2f2f2, #dcdcdc);
+  box-shadow: inset 0 1px 0 #fff, 0 1px 3px rgba(0, 0, 0, 0.2);
+  font-family: var(--font-chrome);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #000;
 }
 
-.taskbar__start {
+.menubar__menu {
+  position: relative;
+  display: flex;
+}
+
+.menubar__title {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   height: 100%;
-  padding: 0 18px 0 10px;
+  padding: 0 9px;
   border: none;
-  border-radius: 0 9px 9px 0;
-  font-family: var(--font-title);
-  font-size: 14px;
-  font-style: italic;
-  font-weight: 700;
-  color: #fff;
-  text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.5);
-  cursor: pointer;
-  background: linear-gradient(180deg, var(--xp-start-b) 0%, var(--xp-start-a) 55%, #2b7a2b 100%);
-}
-
-.taskbar__start:hover {
-  filter: brightness(1.12);
-}
-
-.taskbar__start-wrap {
-  position: relative;
-  height: 100%;
-}
-
-/*
- * The Start menu pops up from the taskbar, so it anchors to the bottom of
- * `.taskbar__start-wrap` rather than the viewport — it has to move if the
- * button ever does.
- */
-.start-menu {
-  position: absolute;
-  bottom: calc(var(--taskbar-h) + 4px);
-  left: 4px;
-  z-index: 50;
-  display: grid;
-  gap: 2px;
-  min-width: 190px;
-  padding: 4px;
-  border: 1px solid var(--xp-border-dark);
-  border-radius: 6px;
-  background: var(--xp-face);
-  box-shadow: var(--shadow-window);
-}
-
-.start-menu__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 1px;
-}
-
-.start-menu__list--docs {
-  padding-top: 4px;
-  border-top: 1px solid var(--xp-border-mid);
-}
-
-.start-menu__item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 5px 8px;
-  border: none;
-  border-radius: var(--radius-control);
   background: transparent;
   font: inherit;
-  font-size: 11px;
-  color: var(--xp-ink);
-  text-decoration: none;
-  text-align: left;
-  cursor: pointer;
-}
-
-.start-menu__item:hover {
-  background: var(--aqua-blue-c);
-  color: #fff;
-}
-
-.start-menu__item--off {
-  color: var(--xp-ink-dim);
-}
-
-.taskbar__windows {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 100%;
-  overflow-x: auto;
-}
-
-/*
- * A taskbar chip is a `<button>` now (one per open window, clicking toggles
- * minimize/restore/focus — see `Taskbar.tsx`), so it needs the same UA-default
- * reset `.card` needed: no border-family font, a pointer cursor, and a visible
- * focus ring since `.chip`'s own border is too faint on the blue taskbar.
- */
-.chip--task {
-  border: none;
-  font-family: inherit;
-  cursor: pointer;
-  max-width: 160px;
-  overflow: hidden;
+  color: #000;
+  cursor: default;
   white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
-.chip--task:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 1px;
+.menubar__title[aria-expanded="true"] {
+  background: var(--s7-hilite);
+  color: var(--s7-hilite-ink);
 }
 
-.chip--task.chip--active {
-  background: linear-gradient(180deg, var(--aqua-graphite-a), #fff);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
-  color: var(--xp-ink);
+
+.menubar__title:focus-visible {
+  outline: 2px solid var(--xp-hot);
+  outline-offset: -2px;
 }
 
-.taskbar__tray {
+.menubar__menu--app .menubar__title {
+  padding: 0 10px;
+}
+
+.menubar__tray {
   margin-left: auto;
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 100%;
-  padding: 0 10px;
-  font-size: 11px;
-  background: linear-gradient(180deg, #1290e9 0%, #0d73c8 50%, #1290e9 100%);
-  box-shadow: inset 1px 0 0 #0e5cad;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+.menubar__tray > .menubar__menu {
+  align-self: stretch;
+}
+
+.menubar__switch {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+}
+.menubar__switch svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* A pulled-down menu: a Platinum panel, a bevel, a soft shadow; the picked item in selection blue. */
+.menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 8001;
+  display: grid;
+  min-width: 200px;
+  max-height: calc(100vh - var(--menubar-h) - 8px);
+  overflow-y: auto;
+  padding: 3px 0;
+  border: 1px solid #555;
+  background: var(--pt-face-lit);
+  box-shadow: var(--bevel), 0 6px 16px rgba(0, 0, 0, 0.3);
+  font-family: var(--font-chrome);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.menubar__menu--windows .menu {
+  left: auto;
+  right: 0;
+}
+
+.menu__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.menu__group {
+  margin-top: 2px;
+  padding-top: 2px;
+  border-top: 1px solid #bdbdbd;
+}
+
+.menu__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 20px;
+  padding: 1px 16px 1px 10px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: #000;
+  text-decoration: none;
+  text-align: left;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.menu__item:hover,
+.menu__item:focus-visible {
+  outline: none;
+  background: var(--s7-hilite);
+  color: var(--s7-hilite-ink);
+  text-decoration: none;
+}
+
+.menu__item svg {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+}
+
+.menu__item--folder {
+  font-weight: 700;
+}
+
+.menu__list--sub .menu__item {
+  padding-left: 26px;
+}
+
+.menu__list--windows {
+  margin-top: 2px;
+  padding-top: 2px;
+  border-top: 1px solid #bdbdbd;
+}
+
+.menu__check {
+  width: 10px;
+  flex: none;
+}
+
+/* a window put away: its name dimmed, as the Mac OS dims a hidden application */
+.menu__item--hidden span:last-child {
+  color: var(--xp-ink-dim);
+}
+.menu__item--hidden:hover span:last-child {
+  color: #ccc;
 }
 
 .taskbar__wallet {
-  border: none;
-  border-radius: var(--radius-control);
-  padding: 2px 8px;
+  border: 1px solid #666;
+  border-radius: 4px;
+  padding: 0 8px;
   font: inherit;
-  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  color: #000;
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, #fafafa, #dadada);
+  box-shadow: inset 0 1px 0 #fff;
 }
 
 .taskbar__wallet:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.26);
+  background: var(--pt-select);
+  border-color: var(--pt-select);
+  color: #fff;
 }
 
 .taskbar__wallet:disabled {
   cursor: not-allowed;
-  opacity: 0.6;
+  color: #5c5c5c;
+  border-color: #8a8a8a;
+  background: #f0f0f0;
 }
 
 /*
- * A tray balloon: anchored bottom-RIGHT, over the tray button that opens it, and
- * narrow. It used to be a centred banner up to 92vw wide that opened on every load,
- * and MEASURED 2026-09-29 at 1120×760 it covered the bottom of a centred window —
- * the Send button included. Centred put it exactly where windows open; the right
- * edge is where the tray is, so the balloon now sits beside the thing it belongs
- * to and off the middle of the screen. When it opens by itself is
+ * The wallet balloon: anchored top-RIGHT, under the menu bar's wallet control
+ * that opens it, and narrow — Mac OS balloon help. MEASURED 2026-09-29 (as a
+ * centred banner) it covered a window's Send button; beside the control it
+ * belongs to, it stays off the middle of the screen. When it opens by itself is
  * `WalletStatus.tsx`'s `opensItself`.
  */
 .wallet-banner {
   position: fixed;
   right: 8px;
-  bottom: calc(var(--taskbar-h) + 8px);
-  z-index: 60;
+  top: calc(var(--menubar-h) + 8px);
+  z-index: 8002;
   display: grid;
   gap: 8px;
   width: min(330px, calc(100vw - 16px));
   padding: 8px 10px;
-  border: 1px solid var(--xp-border-dark);
-  border-radius: 6px;
-  background: var(--xp-face);
-  box-shadow: var(--shadow-window);
+  border: 1px solid #555;
+  border-radius: 8px;
+  background: #ffffe1;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--xp-ink);
 }
 
@@ -1161,9 +1322,8 @@
    =================================================================== */
 
 /*
- * The standalone pages (`/docs`, `/api`, `/verify`) get the same left-hand
- * icon menu the desktop has, so `.page` reuses `.icon-field` as a fixed-width
- * column beside the single-window `.shell` rather than stacking them.
+ * The standalone pages (`/docs`, `/api`, `/verify`) get the same icons the desktop has, down the
+ * right edge (`.icon-field` is fixed there), beside the single-window `.shell`.
  */
 .page {
   display: flex;
@@ -1174,40 +1334,14 @@
 }
 
 /*
- * 🔴 `max-height: none` lived here and turned the field into ONE column of all
- * thirteen icons — 1393px tall, so `/docs` scrolled to 1473px with the window
- * pinned at the top and the icons trailing two screens below it. The page has
- * no `.home__head`, so it gets a smaller reserve than the desktop's 250px, but
- * it still needs a cap: without one the icon column, not the content, decides
- * how tall the page is.
- */
-.page .icon-field {
-  flex: 0 0 auto;
-  max-height: calc(100vh - 60px);
-}
-
-/*
- * On a phone the icon field fills ROWS, not columns. `column wrap` under a
- * height cap starts a new 108px column every few icons, and a short or narrow
- * screen runs out of width first: MEASURED 2026-10-02 over CDP with true
- * device metrics, `/` laid out 462px wide at 390×844 and 2030px wide at
- * 844×390 (one icon per column, thirteen columns). Rows wrap at the viewport
- * edge by construction, so the page scrolls down — which a phone expects —
- * instead of sideways.
- *
- * The thresholds come from the measured 105px tile, not taste. Under 570px
- * tall the field holds two icons a column, so thirteen need seven columns
- * (816px) and more below that; under 600px wide even five a column needs
- * three (368px) with nothing to spare. Above both, the column layout fits and
- * is left exactly as it was — the desktop does not move.
- *
- * This block sits AFTER `.page .icon-field` on purpose: that rule is (0,2,0)
- * and would keep its `max-height` over a bare `.icon-field` here, so the page
- * variant is overridden by name. `.page` itself stacks, because a row-wrapping
- * field beside the shell sizes to max-content — all thirteen in one line.
+ * On a phone, or a screen too short for a column, the icon field joins the page flow and fills
+ * ROWS. MEASURED 2026-10-02 over CDP with true device metrics: a height-capped column field laid
+ * `/` out 462px wide at 390×844 and 2030px wide at 844×390 (one icon per column). Rows wrap at the
+ * viewport edge by construction, so the page scrolls down — which a phone expects — not sideways.
  */
 @media (max-width: 600px), (max-height: 570px) {
   .icon-field {
+    position: static;
     flex-flow: row wrap;
     max-height: none;
   }
@@ -1219,7 +1353,6 @@
 
   .page .icon-field {
     align-self: stretch;
-    max-height: none;
   }
 }
 
@@ -1232,14 +1365,16 @@
 }
 
 .shell__hint {
-  padding-left: 4px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.85);
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+  justify-self: start;
+  padding: 1px 6px;
+  border: 1px solid #555;
+  background: #fff;
+  font-size: 12px;
+  color: #000;
 }
 
 .shell__hint a {
-  color: #fff;
+  color: var(--s7-accent);
 }
 
 .panel__lede {
@@ -1258,11 +1393,11 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
+  padding: 1px 7px;
   border: 1px solid var(--xp-border-mid);
-  border-radius: var(--radius-gel);
-  background: linear-gradient(180deg, #fff, var(--aqua-graphite-a));
-  font-size: 10.5px;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 11px;
   color: var(--xp-ink-soft);
 }
 
@@ -1290,14 +1425,13 @@
   font-family: var(--font-ui);
 }
 .chip--mode:hover {
-  border-color: var(--aqua-blue-c);
+  border-color: var(--pt-select);
   color: var(--xp-ink);
 }
 .chip--mode[aria-pressed="true"] {
-  background: linear-gradient(180deg, var(--aqua-graphite-a), #fff);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
-  border-color: var(--aqua-blue-c);
-  color: var(--xp-ink);
+  background: var(--pt-select);
+  border-color: var(--pt-select);
+  color: #fff;
 }
 
 /*
@@ -1490,29 +1624,45 @@
    and the Markets window's list and chart.
    =================================================================== */
 
+/*
+ * The desk accessory: a Platinum floating palette — a thin lined title bar, a bevelled frame, a
+ * white body, black text. It floats on the left under the name, clear of the icons on the right.
+ */
 .gadget {
   position: fixed;
-  top: 22px;
-  right: 18px;
+  top: calc(var(--menubar-h) + 200px);
+  left: 16px;
   width: 300px;
-  max-height: calc(100vh - var(--taskbar-h) - 44px);
+  max-height: calc(100vh - var(--menubar-h) - 216px);
   overflow: auto;
-  padding: 8px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(8, 28, 68, 0.58);
-  box-shadow:
-    0 6px 18px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
-  backdrop-filter: blur(6px);
-  color: #fff;
+  padding: 0 0 6px;
+  border: 1px solid #555;
+  background: var(--pt-face-lit);
+  box-shadow: var(--bevel), var(--shadow-window);
+  color: #000;
 }
 
 .gadget__title {
-  margin: 0 2px 6px;
-  font-size: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0 0 4px;
+  padding: 0 0 1px;
+  border-bottom: 1px solid #888;
+  background-color: var(--pt-face);
+  background-image: repeating-linear-gradient(180deg, #a8a8a8 0 1px, #f4f4f4 1px 2px);
+  background-size: calc(100% - 6px) 8px;
+  background-position: 3px 4px;
+  background-repeat: no-repeat;
+  font-family: var(--font-chrome);
+  font-size: 11px;
   font-weight: 700;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  line-height: 16px;
+  text-align: center;
+}
+.gadget__title > span {
+  padding: 0 6px;
+  background: var(--s7-platinum);
 }
 
 .gadget__rows,
@@ -1532,8 +1682,8 @@
   width: 100%;
   padding: 4px 6px;
   border: 1px solid transparent;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.06);
+  border-radius: 0;
+  background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
@@ -1542,8 +1692,8 @@
 
 .gadget__row:hover,
 .gadget__row[aria-pressed="true"] {
-  border-color: rgba(255, 255, 255, 0.45);
-  background: rgba(255, 255, 255, 0.16);
+  border-color: var(--pt-select);
+  background: var(--s7-select);
 }
 
 .gadget__sym {
@@ -1569,10 +1719,10 @@
 }
 
 .gadget .gadget__chg.up {
-  color: #7cf09a;
+  color: var(--ok);
 }
 .gadget .gadget__chg.down {
-  color: #ff8f86;
+  color: var(--bad);
 }
 
 .spark {
@@ -1584,21 +1734,25 @@
   opacity: 0.7;
 }
 .gadget .spark--up polyline {
-  stroke: #7cf09a;
+  stroke: var(--ok);
 }
 .gadget .spark--down polyline {
-  stroke: #ff8f86;
+  stroke: var(--bad);
+}
+
+.gadget__rows {
+  padding: 0 4px;
 }
 
 .gadget__foot {
-  margin-top: 6px;
+  margin: 6px 6px 0;
   font-size: 10px;
   line-height: 1.4;
-  opacity: 0.85;
+  color: var(--xp-ink-dim);
 }
 
 /* On a narrow screen the gadget joins the page flow under the icons instead of covering them. */
-@media (max-width: 1180px) {
+@media (max-width: 600px), (max-height: 570px) {
   .gadget {
     position: static;
     width: auto;
@@ -2041,7 +2195,10 @@
   display: grid;
   place-items: start;
   padding: 26px 22px;
-  background: linear-gradient(180deg, #1a5fc4 0%, #3c87dc 38%, #6fb0e8 52%, #79a83c 62%, #4f7c28 100%);
+  /* the default desktop, the same the real page has behind it */
+  background-color: var(--pattern-a);
+  background-image: conic-gradient(var(--pattern-b) 0 25%, var(--pattern-a) 0 50%, var(--pattern-b) 0 75%, var(--pattern-a) 0);
+  background-size: 2px 2px;
   animation: boot-desk 450ms ease-out both;
 }
 
@@ -2050,7 +2207,7 @@
 .boot__desk span {
   font: 700 40px var(--font-title);
   color: #fff;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  text-shadow: 2px 0 0 #000, -2px 0 0 #000, 0 2px 0 #000, 0 -2px 0 #000;
   animation: boot-name 1500ms ease-in both;
 }
 
@@ -2085,8 +2242,7 @@
   gap: 4px;
   padding: 10px 12px;
   border: 1px solid var(--xp-border-mid);
-  border-radius: 4px;
-  background: linear-gradient(180deg, var(--xp-face-lit), var(--xp-face));
+  background: #fff;
 }
 .coins__hero p {
   margin: 0;
@@ -2213,57 +2369,98 @@
 
 /* ── The machine's own programs (2026-10-14: "make it more fun") ─────────────────────────────── */
 
-/* the block clock: the supercomputer's heartbeat, in the tray */
+/* the block clock: the supercomputer's heartbeat, in the menu bar */
 .tray__clock {
-  display: grid;
-  justify-items: end;
-  line-height: 1.15;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
   padding: 0 4px;
   border: none;
   background: none;
-  color: #fff;
+  color: #000;
   font: inherit;
-  cursor: pointer;
+  white-space: nowrap;
+  cursor: default;
+}
+.tray__clock:hover {
+  background: var(--pt-select);
+  color: #fff;
 }
 .tray__clock--stale .tray__block {
+  color: var(--warn);
+}
+.tray__clock--stale:hover .tray__block {
   color: #ffd27a;
 }
 .tray__block {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 10px;
-  opacity: 0.92;
+  font-size: 11px;
+}
+.tray__time {
+  font-family: var(--font-chrome);
+  font-size: 12.5px;
+  font-weight: 600;
 }
 .tray__beat {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
-  background: #8aa;
+  border: 1px solid #000;
+  background: #fff;
 }
 .tray__beat--live {
-  background: #6dff6d;
-  animation: beat 1.2s ease-out;
+  background: #1d7a2e;
+  animation: beat 1.2s steps(2) 1;
 }
 @keyframes beat {
-  0% { box-shadow: 0 0 0 0 rgba(109, 255, 109, 0.9); }
-  100% { box-shadow: 0 0 0 7px rgba(109, 255, 109, 0); }
+  0% { background: #6dff6d; }
+  100% { background: #1d7a2e; }
 }
 .tray__sound {
   border: none;
   background: none;
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   padding: 0 2px;
 }
+.menubar__chain {
+  font-family: var(--font-chrome);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.menubar__nokey {
+  font-size: 11px;
+  color: var(--xp-ink-dim);
+}
 
-/* the Recycle Bin keeps its corner, above the taskbar */
+/* the Trash keeps its corner, bottom-right, as on every Macintosh desktop */
 .desk-trash {
   position: fixed;
-  right: 18px;
-  bottom: 52px;
-  width: 96px;
+  right: 8px;
+  bottom: 12px;
   z-index: 1;
+}
+
+/* a narrow menu bar keeps the app menu, the wallet, the clock and the Windows menu */
+@media (max-width: 900px) {
+  .menubar__menu--folder,
+  .menubar__nokey {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .menubar__chain,
+  .tray__block {
+    display: none;
+  }
+  .menubar__tray {
+    gap: 4px;
+  }
+  .desk-trash {
+    position: static;
+  }
 }
 
 /* Task Manager */
@@ -2371,15 +2568,16 @@
   text-align: center;
 }
 .folder__item .icon__blurb {
+  display: block;
   color: var(--xp-ink-dim);
   font-size: 11px;
 }
 
-/* Q, the assistant */
+/* Q, the assistant — speaks in Mac OS balloon help: a rounded balloon */
 .q {
   position: fixed;
-  right: 16px;
-  bottom: 120px;
+  right: 112px;
+  bottom: 24px;
   z-index: 9000;
   display: flex;
   align-items: flex-end;
@@ -2389,12 +2587,26 @@
 .q__bubble {
   position: relative;
   padding: 10px 12px;
-  background: #ffffe1;
+  background: #fff;
   color: var(--xp-ink);
-  border: 1px solid #000;
-  border-radius: 8px;
-  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.25);
+  border: 1px solid #555;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  font-family: var(--font-ui);
   font-size: 13px;
+}
+/* the balloon's tail, pointing at Q */
+.q__bubble::after {
+  content: "";
+  position: absolute;
+  left: -9px;
+  bottom: 14px;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border-left: 1px solid #555;
+  border-bottom: 1px solid #555;
+  transform: skewY(-35deg);
 }
 .q__bubble p {
   margin: 0 0 8px;
@@ -2403,17 +2615,33 @@
   border-color: var(--bad);
 }
 .q__go,
-.q__close,
-.q__off {
-  font: inherit;
+.q__close {
+  min-height: 20px;
+  padding: 1px 10px;
+  border: 1px solid #555;
+  border-radius: var(--radius-gel);
+  background: linear-gradient(180deg, #fafafa 0%, #e6e6e6 55%, #d4d4d4 100%);
+  font-family: var(--font-chrome);
   font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
+}
+.q__go {
+  box-shadow: 0 0 0 1px #fff, 0 0 0 3px var(--pt-ring);
+  margin: 0 3px;
+}
+.q__go:active,
+.q__close:active {
+  background: linear-gradient(180deg, #a9a9a9 0%, #bdbdbd 100%);
 }
 .q__off {
   border: none;
   background: none;
+  font: inherit;
+  font-size: 12px;
   text-decoration: underline;
   color: var(--xp-ink-dim);
+  cursor: pointer;
 }
 
 /* Achievements and the Leaderboard */
@@ -2654,4 +2882,342 @@
   margin: 0;
   padding-left: 22px;
   font-size: 12px;
+}
+
+/* ===================================================================
+   The Welcome screen (src/ui/Welcome.tsx) — Windows 95's welcome in
+   XP/Aqua chrome. Above every window and Q (9000); below the intro and
+   the screensaver (10000).
+   =================================================================== */
+
+.welcome {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  background: transparent;
+  font-family: var(--font-ui);
+}
+
+.welcome__win {
+  width: min(560px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.welcome__body {
+  overflow: auto;
+}
+
+.welcome__head {
+  margin: 0 0 12px;
+  font-family: var(--font-chrome);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--xp-ink);
+}
+
+.welcome__main {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.welcome__tip {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  min-height: 150px;
+  padding: 12px;
+  background: #ffffe1;
+  border: 1px solid #888;
+  box-shadow: var(--bevel-in);
+  color: var(--xp-ink);
+}
+
+.welcome__tip svg {
+  flex: none;
+}
+
+.welcome__did {
+  margin: 0 0 6px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.welcome__text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.welcome__buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 150px;
+  flex: none;
+}
+
+.welcome__buttons .gel {
+  width: calc(100% - 8px);
+  margin: 4px;
+}
+
+.welcome__again {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--xp-ink);
+}
+
+.welcome__news {
+  position: absolute;
+  width: min(400px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  display: flex;
+  flex-direction: column;
+}
+
+.welcome__news .win__body {
+  overflow: auto;
+}
+
+.welcome__list {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--xp-ink);
+}
+
+.welcome__row {
+  justify-content: flex-end;
+}
+
+@media (max-width: 520px) {
+  .welcome__main {
+    flex-direction: column;
+  }
+  .welcome__buttons {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .welcome__tip {
+    min-height: 0;
+  }
+  .welcome__head {
+    font-size: 20px;
+  }
+}
+
+/* ── Base card from an X handle (2026-10-21): the wizard's "@ yourhandle" box ─────────────── */
+.handle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.handle > span {
+  font-weight: bold;
+  font-size: 15px;
+}
+.handle .field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Folders, Control Panel, README.TXT (2026-10-21, desktop reorganised into folders) ─────────
+   A Finder window (Mac OS 8 Platinum since 2026-10-22): an info line, a grid of icons, a status line.
+   The class names stay `explorer__*` from the XP era. */
+.explorer,
+.notepad {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--xp-border-mid);
+  background: var(--xp-sunken);
+  min-width: 0;
+}
+.explorer__menu {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 2px 8px;
+  background: var(--pt-face);
+  border-bottom: 1px solid #888;
+  box-shadow: inset 0 1px 0 #fff;
+  font-size: 12px;
+  color: var(--xp-ink);
+}
+.explorer__grid {
+  list-style: none;
+  margin: 0;
+  padding: 10px 6px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 6px 2px;
+  min-height: 140px;
+  align-content: start;
+}
+.explorer__item {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  width: 100%;
+  padding: 4px 2px;
+  border: 1px dotted transparent;
+  background: transparent;
+  color: var(--xp-ink);
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
+}
+.explorer__item .icon__glyph {
+  filter: none;
+}
+.explorer__item[aria-pressed="true"] .explorer__label {
+  background: var(--pt-select);
+  color: #fff;
+}
+.explorer__item[aria-pressed="true"] .icon__glyph {
+  filter: brightness(0.6);
+}
+.explorer__item:focus-visible {
+  outline: none;
+  border-color: var(--xp-ink);
+}
+.explorer__label {
+  padding: 0 2px;
+  overflow-wrap: anywhere;
+}
+.explorer__empty {
+  margin: 0;
+  padding: 24px 12px;
+  color: var(--xp-ink-dim);
+}
+.explorer__status {
+  display: flex;
+  gap: 6px;
+  padding: 2px 4px;
+  background: var(--pt-face);
+  border-top: 1px solid #888;
+  font-size: 11px;
+}
+.explorer__status > span {
+  padding: 0 6px;
+  white-space: nowrap;
+}
+.explorer__status .explorer__blurb {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notepad__text {
+  margin: 0;
+  padding: 8px 10px;
+  max-height: none;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre;
+  color: #000;
+}
+
+/* the Control Panel */
+.control__group {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 10px 10px;
+  border: 1px solid #a0a0a0;
+  box-shadow: 1px 1px 0 #fff, inset 1px 1px 0 #fff;
+  font-size: 12px;
+}
+.control__group legend {
+  padding: 0 4px;
+  font-family: var(--font-chrome);
+  font-size: 12px;
+  font-weight: 600;
+}
+.control__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.control__papers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+.control__paper {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  text-align: center;
+  cursor: pointer;
+}
+.control__swatch {
+  display: block;
+  width: 72px;
+  height: 46px;
+  border: 1px solid #555;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/*
+ * The desktops (the Control Panel's Appearance). The ids are the ones browsers already hold under
+ * `quadra.wallpaper.v1` from the XP era, so a saved choice keeps working — each now names a Mac OS 8
+ * style desktop: `bliss` (the old default) is the calm blue-grey default. Two colours a breath apart
+ * in a fine checker read as a quiet texture; the louder patterns are choices, never the default.
+ */
+.wallpaper--bliss {
+  --pattern-a: #5f7d9c;
+  --pattern-b: #63819f;
+}
+.wallpaper--platinum {
+  --pattern-a: #9a9a9a;
+  --pattern-b: #a3a3a3;
+}
+.wallpaper--teal {
+  --pattern-a: #2f6f73;
+  --pattern-b: #357a7e;
+}
+.wallpaper--dither {
+  --pattern-a: #1f4fbf;
+  --pattern-b: #2a5bcc;
+}
+.wallpaper--dark {
+  --pattern-a: #2c2f36;
+  --pattern-b: #32353d;
+}
+.wallpaper--bricks {
+  --pattern-a: #9c5a48;
+  --pattern-b: #a8644f;
+}
+.control__swatch {
+  background-color: var(--pattern-a);
+  background-image: conic-gradient(var(--pattern-b) 0 25%, var(--pattern-a) 0 50%, var(--pattern-b) 0 75%, var(--pattern-a) 0);
+  background-size: 4px 4px;
+}
+/* bricks: courses of bricks, every other one offset by half */
+.desktop.wallpaper--bricks,
+.control__swatch.wallpaper--bricks {
+  background-image:
+    linear-gradient(#6e3a2c 0 1px, transparent 1px),
+    linear-gradient(90deg, #6e3a2c 0 1px, transparent 1px),
+    linear-gradient(90deg, transparent 0 8px, #6e3a2c 8px 9px, transparent 9px);
+  background-size: 16px 8px, 16px 16px, 16px 16px;
+  background-position: 0 0, 0 0, 0 8px;
 }

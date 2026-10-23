@@ -1,7 +1,7 @@
 import { BRAND } from "@/brand";
 import { findSkill } from "@/skills";
 import type { Skill } from "@/skills/types";
-import { isEnabled, resolveDoc, resolveFeature, visibleFeatures, type WindowId } from "@/features/registry";
+import { DESKTOP, FOLDER_IDS, entryOf, folderItems, isEnabled, isFolder, resolveFeature, visibleFeatures, type WindowId } from "@/features/registry";
 
 /**
  * One language for the whole app (2026-10-02, the owner: "link everything together — the Terminal
@@ -73,6 +73,28 @@ export const SHORTCUTS: Readonly<Record<string, Shortcut>> = {
   sweep: { window: "rugsweeper", usage: "sweep" },
   achievements: { window: "achievements", usage: "achievements" },
   leaderboard: { window: "leaderboard", usage: "leaderboard" },
+  card: { window: "card", param: "c", usage: "card [@handle]" },
+  // the desktop's folders and furniture (2026-10-21)
+  computer: { window: "computer", usage: "computer" },
+  money: { window: "folder-money", usage: "money" },
+  launchpad: { window: "folder-launchpad", usage: "launchpad" },
+  games: { window: "folder-games", usage: "games" },
+  agents: { window: "folder-agents", usage: "agents" },
+  control: { window: "control", usage: "control" },
+  readme: { window: "readme", usage: "readme" },
+};
+
+/**
+ * `open <folder>` opens the FOLDER: `open research` is the Research folder, while a bare `research`
+ * stays the Research window it always was — a command somebody learnt keeps doing what it did.
+ */
+export const FOLDER_WORDS: Readonly<Record<string, WindowId>> = {
+  research: "folder-research",
+  money: "folder-money",
+  launchpad: "folder-launchpad",
+  games: "folder-games",
+  agents: "folder-agents",
+  computer: "computer",
 };
 
 /**
@@ -83,12 +105,12 @@ export const EASTER: Readonly<Record<string, string>> = {
   ver: `${BRAND.name} OS 1.0 for Base 8453 · 2 s blocks · 0 keys held · an on-chain supercomputer`,
   about: `${BRAND.name}: a Base supercomputer named after a 1991 Macintosh. It reads the chain, checks before you sign, and never holds your key.`,
   sudo: "Nice try. There is no root here: nobody holds a key on this computer, not even me.",
-  rm: "Deleting is for pools. See the Recycle Bin — type `trash`.",
+  rm: "Deleting is for pools. See the Trash — type `trash`.",
   hello: "Hello. Type `radar` to see what launched on Base in the last hour.",
   hi: "Hi. Type `help` for everything I can do.",
   gm: "gm. Base made about 43,000 blocks while you slept.",
   whoami: "You are whoever your wallet says — and only your wallet can say it. Type `me` for your profile.",
-  date: "It is always block time here. Click the clock on the taskbar for the latest block.",
+  date: "It is always block time here. Click the clock in the menu bar for the latest block.",
   exit: "There is no exit. Only Base.",
   fortune: "A token whose sell is simulated is worth two in the honeypot. — run `verdict 0x…` before you buy",
   wen: "Soon. Everything in the Coming Soon folder is waiting on something real.",
@@ -98,6 +120,8 @@ export const EASTER: Readonly<Record<string, string>> = {
 /** A window by a shortcut, its id, or its title — `open Markets`, `open coins`. */
 function windowNamed(name: string): Shortcut | null {
   const word = name.toLowerCase();
+  const folder = FOLDER_WORDS[word];
+  if (folder) return { window: folder, usage: `open ${word}` };
   if (SHORTCUTS[word]) return SHORTCUTS[word];
   const f = resolveFeature(word) ?? [...visibleFeatures()].find((x) => x.title.toLowerCase() === word) ?? null;
   // the doc pages (docs, api, verify) are shortcuts by their own names, so a feature is all that is left
@@ -139,18 +163,21 @@ export function skillOpening(skill: Skill, args: readonly string[]): Opening {
   return { window, params: { [runKey(window)]: [skill.id, ...args].join(" ") } };
 }
 
-/** `windows`, as text: every window a command opens, and how. */
+/** How a window is opened by name: its own shortcut word (with its argument), else `open <id>`. */
+function usageOf(id: WindowId): string {
+  const own = Object.entries(SHORTCUTS).find(([word, sc]) => sc.window === id && word === sc.usage.split(" ")[0]);
+  const folder = Object.entries(FOLDER_WORDS).find(([, w]) => w === id);
+  return folder ? `open ${folder[0]}` : own ? own[1].usage : `open ${id}`;
+}
+
+function line(id: WindowId): string {
+  const e = entryOf(id);
+  return `  ${usageOf(id).padEnd(38)} ${e.title} — ${e.blurb}`;
+}
+
+/** `windows`, as text: the desktop, then each folder and what is in it — the same tree the screen shows. */
 export function windowsText(): string {
-  const lines = Object.entries(SHORTCUTS)
-    .filter(([word, s]) => word === s.usage.split(" ")[0])
-    .filter(([, s]) => {
-      const f = resolveFeature(s.window);
-      return !f || isEnabled(f);
-    })
-    .map(([, s]) => {
-      const f = resolveFeature(s.window);
-      const d = resolveDoc(s.window);
-      return `${s.usage.padEnd(40)} ${f ? `${f.title} — ${f.blurb}` : `${d!.title} — ${d!.blurb}`}`;
-    });
-  return [...lines, "", "open <window>                            any window by its name"].join("\n");
+  const desk = DESKTOP.filter((id) => !isFolder(id)).map(line);
+  const folders = FOLDER_IDS.flatMap((f) => ["", line(f), ...folderItems(f).map((e) => `  ${line(e.id)}`)]);
+  return ["On the desktop:", ...desk, line("trash"), "", "Folders:", ...folders.slice(1), "", "open <window>                            any window by its name"].join("\n");
 }

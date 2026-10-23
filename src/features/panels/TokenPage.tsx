@@ -4,8 +4,8 @@ import { CONTRACTS, UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
 import { launchpadCoin, launchpadCoins, type IndexedCoin, type IndexedCoinPage, type IndexedTrade } from "@/adapters/http/indexer";
 import { messageOf } from "@/lib/errors";
 import { topHolders, type Holding } from "@/skills/blockscout";
-import { explorer, price as usdPrice, short, usd } from "@/skills/format";
-import { coinFeeOf, isV3, type CoinFee, type PoolValue } from "@/skills/launchpad";
+import { compact, explorer, quoteAmountText, quoteWithUsd, short, tinyPrice, usd } from "@/skills/format";
+import { coinFeeOf, isV3, referrerOf, type CoinFee, type PoolValue } from "@/skills/launchpad";
 import { feePercent, LAUNCHPAD_EXPECTS } from "@/config/launchpad";
 import { PriceChart } from "@/features/markets/Chart";
 
@@ -59,6 +59,29 @@ export function useCoinFee(factory: string, token: string): Read<CoinFee> {
   return fee;
 }
 
+/** A coin's referrer: `null` for none — every v1/v2 coin, known without asking. */
+export type CoinReferrer = { readonly referrer: string | null };
+export const NO_REFERRER: CoinReferrer = { referrer: null };
+
+/** A v3 coin's referrer, READ from the factory (`referrerOf`) — the chain, not the index, which may lag. */
+export function useCoinReferrer(factory: string, token: string): Read<CoinReferrer> {
+  const v3 = isV3(factory);
+  const [ref, setRef] = useState<Read<CoinReferrer>>(v3 ? "reading" : NO_REFERRER);
+  useEffect(() => {
+    if (!v3) return setRef(NO_REFERRER);
+    let live = true;
+    setRef("reading");
+    referrerOf(factory, token).then(
+      (referrer) => live && setRef({ referrer }),
+      (e: unknown) => live && setRef({ problem: messageOf(e) }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [factory, token, v3]);
+  return ref;
+}
+
 /** "for the first 15 seconds the fee fell from 50% to 1%" — a v3 coin's opening, in the hook's own numbers. */
 export function openingWords(fee: CoinFee): string | null {
   return fee.opening ? `for the first ${fee.opening.window} seconds the fee fell from ${feePercent(fee.opening.startFee)} to ${feePercent(fee.fee)}` : null;
@@ -73,11 +96,12 @@ export function feeLine(fee: Read<CoinFee>, maxPaidBps: number | null): string {
   return `${feePercent(fee.fee)} of every trade, paid to the pool${opening ? ` — ${opening}${paid}` : ""}`;
 }
 
-/** A number in the quote with its dollar value beside it, when the quote's price was read. */
+/**
+ * A number in the quote with its dollar value beside it, when the quote's price was read — the dollar
+ * half dropped under a cent, and dust in subscript zeros (`quoteWithUsd`, skills/format.ts).
+ */
 export function inBoth(amount: number | null, quoteSymbol: string, quoteUsd: number | null): string {
-  if (amount === null) return "not read";
-  const q = `${amount < 0.0001 && amount > 0 ? amount.toExponential(2) : amount.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${quoteSymbol}`;
-  return quoteUsd === null ? q : `${usd(amount * quoteUsd)} · ${q}`;
+  return quoteWithUsd(amount, quoteSymbol, quoteUsd);
 }
 
 export function ago(at: number, now: number): string {
@@ -140,8 +164,8 @@ export function TokenStats({ page, value, holders }: { page: Read<IndexedCoinPag
   const mcap = p?.mcapInQuote ?? value?.supplyInQuote ?? null;
   return (
     <div className="token__cards" aria-label="Numbers">
-      <Card label="Market cap" value={mcap === null ? "not read" : qUsd === null ? `${mcap.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${qs}` : usd(mcap * qUsd)} sub={mcap !== null && qUsd !== null ? `${mcap.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${qs}` : undefined} />
-      <Card label="Price" value={p?.price != null && qUsd !== null ? usdPrice(p.price * qUsd) : p?.price != null ? `${p.price.toExponential(3)} ${qs}` : "no trade yet"} sub={p?.price != null ? `${p.price.toExponential(3)} ${qs}` : undefined} />
+      <Card label="Market cap" value={mcap === null ? "not read" : qUsd === null ? quoteAmountText(mcap, qs) : usd(mcap * qUsd)} sub={mcap !== null && qUsd !== null ? quoteAmountText(mcap, qs) : undefined} />
+      <Card label="Price" value={p?.price != null && qUsd !== null ? tinyPrice(p.price * qUsd) : p?.price != null ? quoteAmountText(p.price, qs) : "no trade yet"} sub={p?.price != null && qUsd !== null ? quoteAmountText(p.price, qs) : undefined} />
       <Card label="Volume 24h" value={p ? inBoth(p.volume24h, qs, qUsd) : "not read"} sub={p ? trades(p.trades24h) : undefined} />
       <Card label="Lifetime volume" value={p ? inBoth(p.volume, qs, qUsd) : "not read"} sub={p ? trades(p.trades) : undefined} />
       <Card label="Total supply" value="1B" sub="fixed — nobody can mint" />
@@ -200,7 +224,7 @@ export function TokenChart({ page }: { page: Read<IndexedCoinPage> }) {
       {bars.length < 2 ? (
         <p className="dim">Every trade so far falls in one {frame} candle — pick a finer frame.</p>
       ) : (
-        <PriceChart series={bars} label={`${page.coin.symbol ?? "Coin"} price in ${qs}, from its pool's opening price and trades`} format={(n) => `${n.toExponential(3)} ${qs}`} />
+        <PriceChart series={bars} label={`${page.coin.symbol ?? "Coin"} price in ${qs}, from its pool's opening price and trades`} format={(n) => quoteAmountText(n, qs)} />
       )}
     </div>
   );
@@ -213,16 +237,21 @@ export function TokenInfo({
   launchedAt,
   quoteUsd,
   fee = FLAT_FEE,
+  referrer = NO_REFERRER,
 }: {
   page: Read<IndexedCoinPage>;
   creator: string;
   launchedAt: number | null;
   quoteUsd: number | null;
   fee?: Read<CoinFee>;
+  referrer?: Read<CoinReferrer>;
 }) {
   const p = isDone(page) ? page : null;
   const qs = p?.coin.quoteSymbol ?? "";
   const earned = p?.feesQuote ?? null;
+  const ref = isDone(referrer) ? referrer.referrer : null;
+  // a referred coin: 80 / 5 / the remainder (~15) — the protocol's share is what is left after both
+  const ours = ref ? 0.15 : 0.2;
   return (
     <dl className="token__info" aria-label="Info">
       <dt>Creator</dt>
@@ -239,12 +268,35 @@ export function TokenInfo({
       <dd>{earned === null ? "not read" : inBoth(earned, qs, quoteUsd)}</dd>
       <dt>Creator's share</dt>
       <dd>{earned === null ? "not read" : `80% — ${inBoth(earned * 0.8, qs, quoteUsd)}`}</dd>
+      {referrer === "reading" ? (
+        <>
+          <dt>Referrer</dt>
+          <dd>reading…</dd>
+        </>
+      ) : !isDone(referrer) ? (
+        <>
+          <dt>Referrer</dt>
+          <dd className="caution">not checked — {referrer.problem}</dd>
+        </>
+      ) : ref ? (
+        <>
+          <dt>Referrer</dt>
+          <dd>
+            <a href={explorer.address(ref)} target="_blank" rel="noreferrer">
+              {short(ref)}
+            </a>{" "}
+            — approved by the launchpad when the coin launched
+          </dd>
+          <dt>Referrer's share</dt>
+          <dd>{earned === null ? "not read" : `5% — ${inBoth(earned * 0.05, qs, quoteUsd)}`}</dd>
+        </>
+      ) : null}
       <dt>{BRAND.name}'s share</dt>
-      <dd>{earned === null ? "not read" : `20% — ${inBoth(earned * 0.2, qs, quoteUsd)}`}</dd>
+      <dd>{earned === null ? "not read" : `${ref ? "~15% (the rest)" : "20%"} — ${inBoth(earned * ours, qs, quoteUsd)}`}</dd>
       {p && p.feesToken ? (
         <>
           <dt>Fees earned (in the coin)</dt>
-          <dd>{p.feesToken.toLocaleString("en-US", { maximumFractionDigits: 2 })} — from sells, split the same way</dd>
+          <dd>{compact(p.feesToken)} — from sells, split the same way</dd>
         </>
       ) : null}
     </dl>
@@ -291,10 +343,10 @@ function Trades({ page, now }: { page: IndexedCoinPage; now: number }) {
                   </a>
                 </td>
                 <td className={t.side === "buy" ? "tone-ok" : "tone-bad"}>{t.side === "buy" ? "Buy" : "Sell"}</td>
-                <td className="mono">{t.tokens.toLocaleString("en-US", { maximumFractionDigits: 2 })}</td>
-                <td className="mono">{t.quote.toLocaleString("en-US", { maximumSignificantDigits: 4 })}</td>
+                <td className="mono">{compact(t.tokens)}</td>
+                <td className="mono">{compact(t.quote)}</td>
                 <td className="mono">
-                  {t.fee.toLocaleString("en-US", { maximumSignificantDigits: 3 })} {t.feeIn === "quote" ? qs : sym}
+                  {compact(t.fee, 3)} {t.feeIn === "quote" ? qs : sym}
                 </td>
                 <td className="mono">{t.trader ? short(t.trader) : "—"}</td>
               </tr>
@@ -364,7 +416,8 @@ export function TokenTabs({ token, page, now }: { token: string; page: Read<Inde
  * promise: v1 and v2 have no opening protection, so none is claimed; v3's is said in the numbers its
  * hook holds for this coin, read — never the deploy script's defaults assumed.
  */
-export function Disclosures({ factory, fee = FLAT_FEE }: { factory: string; fee?: Read<CoinFee> }) {
+export function Disclosures({ factory, fee = FLAT_FEE, referrer = NO_REFERRER }: { factory: string; fee?: Read<CoinFee>; referrer?: Read<CoinReferrer> }) {
+  const ref = isDone(referrer) ? referrer.referrer : null;
   const v1 = factory.toLowerCase() === CONTRACTS.launchFactoryV1?.toLowerCase();
   const v3 = isV3(factory);
   const known = isDone(fee) ? fee : null;
@@ -397,7 +450,13 @@ export function Disclosures({ factory, fee = FLAT_FEE }: { factory: string; fee?
         )}
         <li className="notes__why">
           <strong>Fee split.</strong> {known ? `${pct} of every trade` : "The coin's fee on every trade"}
-          {v3 ? ` (the creator chose 1% or 3%)` : ""}, in whatever was paid in; collecting pays 80% to the creator and 20% to {BRAND.name}. Anyone may call it.
+          {v3 ? ` (the creator chose 1% or 3%)` : ""}, in whatever was paid in;{" "}
+          {ref
+            ? `collecting pays 80% to the creator, 5% to its referrer ${short(ref)} (an app the launchpad approved, recorded at launch and paid for good) and the rest, about 15%, to ${BRAND.name}.`
+            : isDone(referrer)
+              ? `collecting pays 80% to the creator and 20% to ${BRAND.name}.`
+              : `collecting pays 80% to the creator and the rest to ${BRAND.name} — and 5% of it to a referrer if one was recorded, which was not checked.`}{" "}
+          Anyone may call it.
         </li>
         <li className="notes__why">
           <strong>Not audited.</strong> The launchpad contract is verified on Blockscout and tested, but no audit has been done.

@@ -25,6 +25,10 @@ import { LAUNCHPAD, LX } from "./fixtures/launchpad";
 import { LAUNCHED_TOPIC } from "@/skills/launchpad";
 import { DOWN, net, useNet, type Answer } from "./net";
 import { PX } from "./fixtures/launchpads";
+import { withoutV3 } from "./v2only";
+
+// Its fixtures are real v2/v1 captures, so it runs as the app did before v3 was set.
+withoutV3();
 
 useNet();
 

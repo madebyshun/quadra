@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Icon } from "@/ui/icons";
-import { DOC_PAGES, desktopFeatures, type WindowId } from "@/features/registry";
+import { desktopItems, type WindowId } from "@/features/registry";
 
 export type IconMenuProps = {
   /**
@@ -11,68 +11,32 @@ export type IconMenuProps = {
   onOpen?: (id: WindowId) => void;
 };
 
-/** The left-hand icon column: every feature, plus the three doc pages. */
+/**
+ * The left-hand icon column (2026-10-21): the folders, the four most-used programs and README.TXT.
+ * Everything else lives in a folder — the desktop of ~20 icons read like a settings page.
+ */
 export function IconMenu({ onOpen }: IconMenuProps) {
   return (
     <div className="icon-field">
       <ul className="icons" aria-label="What you can do">
-        {desktopFeatures().map((f) => {
+        {desktopItems().map((e) => {
           const body = (
             <>
               <span className="icon__glyph">
-                <Icon id={f.id} />
+                <Icon id={e.id} />
               </span>
-              <span className="icon__title">{f.title}</span>
-              <span className="icon__blurb">{f.blurb}</span>
+              <span className="icon__title">{e.title}</span>
+              <span className="icon__blurb">{e.blurb}</span>
             </>
           );
           return (
-            <li key={f.id}>
+            <li key={e.id}>
               {onOpen ? (
-                <button
-                  type="button"
-                  onClick={() => onOpen(f.id)}
-                  className="icon"
-                >
+                <button type="button" onClick={() => onOpen(e.id)} className="icon">
                   {body}
                 </button>
               ) : (
-                <Link
-                  to={`/?do=${f.id}`}
-                  className="icon"
-                >
-                  {body}
-                </Link>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-
-      {/*
-        On the desktop these open a window like any other icon: following the
-        route instead threw away the header, the badges and every other open
-        window, which is a whole-page navigation dressed as a window.
-      */}
-      <ul className="icons icons--docs" aria-label="Read about it">
-        {DOC_PAGES.map((d) => {
-          const body = (
-            <>
-              <span className="icon__glyph">
-                <Icon id={d.id} />
-              </span>
-              <span className="icon__title">{d.title}</span>
-              <span className="icon__blurb">{d.blurb}</span>
-            </>
-          );
-          return (
-            <li key={d.id}>
-              {onOpen ? (
-                <button type="button" onClick={() => onOpen(d.id)} className="icon icon--doc">
-                  {body}
-                </button>
-              ) : (
-                <Link to={d.path} className="icon icon--doc">
+                <Link to={`/?do=${e.id}`} className="icon">
                   {body}
                 </Link>
               )}

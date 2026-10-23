@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { quoteSwap, type SwapQuote } from "@/adapters/http/relay";
+import { quoteSwap, isRelayNoRoute, type SwapQuote } from "@/adapters/http/relay";
+import { launchOf } from "@/skills/launchpad";
 import { BASE } from "@/config/chain";
 import { BRAND } from "@/brand";
 import { FEE_BPS, RELAY } from "@/config/routes";
@@ -15,7 +16,7 @@ import { useWalletSession } from "@/ui/WalletProvider";
 import { ReportView } from "@/features/panels/ReportView";
 import { TxStepList, useTxSteps } from "@/features/panels/TxSteps";
 import { amountFor, assetFor, choiceFor, PercentButtons, TokenPicker, type Choice } from "@/features/panels/TokenPicker";
-import { useInbox } from "@/features/openWindow";
+import { useInbox, useOpenWindow } from "@/features/openWindow";
 import { WalletAssets } from "@/features/panels/WalletAssets";
 
 /**
@@ -92,6 +93,7 @@ export type Picked = { readonly choice: Choice; readonly address: string; readon
  */
 export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked; readonly buy: Picked } } = {}) {
   const { wallet, signingProvider } = useWalletSession();
+  const openWindow = useOpenWindow();
   const [sellChoice, setSellChoice] = useState<Choice>(fixed?.sell.choice ?? "USDC");
   const [sellAddress, setSellAddress] = useState(fixed?.sell.address ?? "");
   const [buyChoice, setBuyChoice] = useState<Choice>(fixed?.buy.choice ?? "ETH");
@@ -100,6 +102,7 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
   const [slippage, setSlippage] = useState(SLIPPAGE[0]!);
   const [review, setReview] = useState<(Review & { balance: bigint }) | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [noRouteToken, setNoRouteToken] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
   /** what the swap delivered — `amount: null` when it could not be measured */
   const [received, setReceived] = useState<{ amount: bigint | null } | null>(null);
@@ -127,6 +130,7 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
   const onReview = async () => {
     setReading(true);
     setError(null);
+    setNoRouteToken(null);
     try {
       const account = ready!.account;
       const [sell, buy] = await Promise.all([
@@ -142,6 +146,14 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
       setReview({ sell, buy, amount: value, quote, quotedAt: Date.now(), balance, short: balance < value });
     } catch (e) {
       setError(messageOf(e));
+      if (isRelayNoRoute(e) && buyChoice === "other" && buyAddress.trim() !== "") {
+        try {
+          const target = await launchOf(buyAddress.trim());
+          if (target !== null) setNoRouteToken(buyAddress.trim());
+        } catch {
+          // The fallback is advisory; keep Relay's measured refusal when the launchpad cannot be read.
+        }
+      }
     }
     setReading(false);
   };
@@ -249,6 +261,16 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
         <Crt label="Swap error">
           <span className="crt__amber">{error}</span>
         </Crt>
+      ) : null}
+      {noRouteToken !== null ? (
+        <div className="notes__row swap__fallback">
+          <span>Relay has no route for this launchpad coin yet.</span>
+          {openWindow ? (
+            <Gel className="gel--quiet" onClick={() => openWindow("coins", { t: noRouteToken })}>
+              Trade through its pool
+            </Gel>
+          ) : null}
+        </div>
       ) : null}
       <TxStepList states={steps.states} label="Swap progress" />
       {received === null || review === null ? null : received.amount === null ? (

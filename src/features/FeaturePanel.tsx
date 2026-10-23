@@ -19,22 +19,27 @@ import { BridgePanel } from "@/features/panels/BridgePanel";
 import { TerminalPanel } from "@/features/panels/TerminalPanel";
 import { TaskManagerPanel } from "@/features/panels/TaskManagerPanel";
 import { TrashPanel } from "@/features/panels/TrashPanel";
-import { SoonPanel } from "@/features/panels/SoonPanel";
+import { FolderPanel, SoonPanel } from "@/features/panels/FolderPanel";
+import { ControlPanel } from "@/features/panels/ControlPanel";
+import { ReadmePanel } from "@/features/panels/ReadmePanel";
 import { RugsweeperPanel } from "@/features/panels/RugsweeperPanel";
 import { AchievementsPanel } from "@/features/panels/AchievementsPanel";
 import { LeaderboardPanel } from "@/features/panels/LeaderboardPanel";
+import { CardPanel } from "@/features/panels/BaseCard";
 import { radarSkill } from "@/skills/radar";
 import { verdictSkill } from "@/skills/verdict";
 import { gateSkill } from "@/skills/gate";
 import { forensicsSkill } from "@/skills/forensics";
 import { launcherSkill } from "@/skills/launcher";
 import { sendCheckSkill } from "@/skills/sendcheck";
+import { ExplorePanel } from "@/features/panels/ExplorePanel";
 
 /**
  * How each window explains itself before you touch anything. Second person,
- * no jargon, and it says what the thing actually does rather than what it is.
+ * no jargon, and it says what the thing actually does rather than what it is. A folder, the Control
+ * Panel and README.TXT have none: like the era's, they are the window and nothing else.
  */
-const EXPLAIN: Record<Feature["id"], string> = {
+const EXPLAIN: Partial<Record<Feature["id"], string>> = {
   wallet:
     "Connect a wallet you control. Nothing here ever holds a key: anything that moves money is signed in your own wallet. Looking things up needs no wallet at all.",
   terminal: "Type a command, get an answer read straight from Base. `help` lists every skill.",
@@ -56,10 +61,11 @@ const EXPLAIN: Record<Feature["id"], string> = {
     "Your wallet as you would want to read it — or anybody's: what it holds, the coins it launched here and the fees waiting, and what moved through it, with fake look-alike tokens called out.",
   taskmgr: "This computer's CPU is Base. Watch it work: every block, how full it is, what gas costs, and which launchpads are busiest right now.",
   trash: "Pools on Base that lost almost all their liquidity in the last three hours. You cannot restore them. You can find out why.",
-  soon: "Programs still in the box. They are switched off, so nothing in them runs.",
   rugsweeper: "Minesweeper on the newest launches on Base. The mines are real: launches the radar flags red.",
   achievements: "What you have earned here — some read from your wallet on Base, some counted on this computer.",
   leaderboard: "The busiest launchers and coins on this computer's own launchpad.",
+  explore: "Projects building on Base, in folders. Double-click one to see what it is and where its link goes — nothing opens until you say so.",
+  card: "Your X profile painted as a card, for sharing: your picture, a title and a quote, all drawn from your handle and bio.",
   x402:
     "This app's own tools, sold per call over x402 — the way an agent pays for them. Pick one, see its price, pay in USDC from your wallet, and get the report and the receipt. The same tools are free in the windows.",
   mcp: "Plug all of this into your own AI agent. It runs on your computer, and your agent never holds your keys.",
@@ -93,11 +99,21 @@ const BUILT: Partial<Record<Feature["id"], () => ReactNode>> = {
   rugsweeper: () => <RugsweeperPanel />,
   achievements: () => <AchievementsPanel />,
   leaderboard: () => <LeaderboardPanel />,
+  card: () => <CardPanel />,
+  explore: () => <ExplorePanel />,
   profile: () => <ProfilePanel />,
   inference: () => <InferencePanel />,
   x402: () => <X402Panel />,
   hooks: () => <HooksPanel />,
   mcp: () => <McpPanel />,
+  computer: () => <FolderPanel id="computer" />,
+  "folder-research": () => <FolderPanel id="folder-research" />,
+  "folder-money": () => <FolderPanel id="folder-money" />,
+  "folder-launchpad": () => <FolderPanel id="folder-launchpad" />,
+  "folder-games": () => <FolderPanel id="folder-games" />,
+  "folder-agents": () => <FolderPanel id="folder-agents" />,
+  control: () => <ControlPanel />,
+  readme: () => <ReadmePanel />,
 };
 
 /**
@@ -146,10 +162,11 @@ export function notBuiltNotice(title: string, waitingOn: string | undefined): st
 export function FeaturePanel({ feature }: { feature: Feature }) {
   const on = isEnabled(feature);
   const built = BUILT[feature.id];
+  const lede = EXPLAIN[feature.id];
 
   return (
     <div className="stack">
-      <p className="panel__lede">{EXPLAIN[feature.id]}</p>
+      {lede ? <p className="panel__lede">{lede}</p> : null}
 
       {!on ? (
         <Crt label={`${feature.title} is off`}>

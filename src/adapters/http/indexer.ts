@@ -36,6 +36,8 @@ export type IndexedCoin = {
   readonly feeBps: number | null;
   /** a v3 coin's anti-sniper opening: the fee at its first second, in basis points, and how long it fell — `null` on v1/v2 */
   readonly opening: { readonly fromBps: number; readonly seconds: number } | null;
+  /** a v3 coin's approved referrer (its fees split 80 / 5 / ~15) — `null` for none, and on v1/v2 */
+  readonly referrer: string | null;
   /** whole quote units per whole token at the last trade — `null` before the first one */
   readonly price: number | null;
   readonly mcapInQuote: number | null;
@@ -100,6 +102,7 @@ function coinOf(v: unknown): IndexedCoin | null {
     quoteDecimals: numOf(v.quoteDecimals),
     feeBps: numOf(v.feeBps),
     opening: openingOf(v.opening),
+    referrer: addr(v.referrer),
     price: numOf(v.price),
     mcapInQuote: numOf(v.mcapInQuote),
     trades: count(v.trades),

@@ -1,5 +1,20 @@
 import { describe, it, expect, vi } from "vitest";
-import { CORNER, FEATURES, comingSoon, desktopFeatures, visibleFeatures, resolveFeature, isEnabled } from "@/features/registry";
+import {
+  CORNER,
+  DESKTOP,
+  FEATURES,
+  FOLDERS,
+  FOLDER_IDS,
+  comingSoon,
+  desktopItems,
+  entryOf,
+  folderItems,
+  folderOf,
+  isFolder,
+  visibleFeatures,
+  resolveFeature,
+  isEnabled,
+} from "@/features/registry";
 import { FLAGS } from "@/config/chain";
 
 const flags = vi.hoisted(() => ({ robinhood: false, allOn: false }));
@@ -35,6 +50,9 @@ const SHIPPED_IDS = [
   "rugsweeper",
   "achievements",
   "leaderboard",
+  "card",
+  // a directory of projects on Base, 2026-10-22
+  "explore",
   "x402",
   "mcp",
   "inference",
@@ -42,6 +60,15 @@ const SHIPPED_IDS = [
   "hooks",
   "soon",
   "trash",
+  // the desktop reorganised into folders, 2026-10-21
+  "computer",
+  "folder-research",
+  "folder-money",
+  "folder-launchpad",
+  "folder-games",
+  "folder-agents",
+  "control",
+  "readme",
 ] as const;
 
 describe("the feature registry", () => {
@@ -64,13 +91,16 @@ describe("the feature registry", () => {
 
   it("points every feature at a flag that exists", () => {
     for (const f of FEATURES) {
-      expect(Object.keys(FLAGS), f.id).toContain(f.flag);
+      if (f.flag !== undefined) expect(Object.keys(FLAGS), f.id).toContain(f.flag);
     }
+    // only the desktop's furniture goes without one: a folder is never the thing that is off — and
+    // Explore Base, a fixed directory that reads nothing live
+    expect(FEATURES.filter((f) => f.flag === undefined).map((f) => f.id)).toEqual(["explore", ...FOLDER_IDS, "control", "readme"]);
   });
 
   it("keeps ids url-safe, since they go in a query string", () => {
     for (const f of FEATURES) {
-      expect(f.id).toMatch(/^[a-z0-9]+$/);
+      expect(f.id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)?$/);
       expect(encodeURIComponent(f.id)).toBe(f.id);
     }
   });
@@ -109,7 +139,7 @@ describe("resolveFeature", () => {
 describe("isEnabled", () => {
   it("reads the flag table, not a field on the feature", () => {
     for (const f of FEATURES) {
-      expect(isEnabled(f), f.id).toBe(FLAGS[f.flag] && (f.id !== "bridge" || FLAGS.robinhood));
+      expect(isEnabled(f), f.id).toBe((f.flag === undefined || FLAGS[f.flag]) && (f.id !== "bridge" || FLAGS.robinhood));
     }
   });
 
@@ -145,26 +175,64 @@ describe("visibleFeatures", () => {
   });
 });
 
-describe("the desktop's icons (2026-10-14)", () => {
+describe("the desktop's folders (2026-10-21)", () => {
+  const ids = () => desktopItems().map((e) => e.id);
+
+  it("keeps only the folders, four shortcuts and README.TXT on the desktop", () => {
+    expect(ids()).toEqual([
+      "computer",
+      "folder-research",
+      "folder-money",
+      "folder-launchpad",
+      "folder-games",
+      "folder-agents",
+      "terminal",
+      "launch",
+      "coins",
+      "wallet",
+      "readme",
+    ]);
+    expect(DESKTOP).toEqual(ids());
+  });
+
+  it("files every switched-on program somewhere: a folder, the desktop, or the Trash's corner", () => {
+    const filed = new Set([...DESKTOP, ...CORNER, ...FOLDER_IDS.flatMap((f) => FOLDERS[f])]);
+    for (const f of FEATURES.filter(isEnabled)) expect(filed.has(f.id), f.id).toBe(true);
+    for (const d of ["docs", "api", "verify"] as const) expect(folderOf(d)).toBe("folder-agents");
+    expect(folderOf("terminal")).toBeNull();
+    expect(folderOf("safety")).toBe("folder-research");
+  });
+
+  it("lists a folder's switched-on programs only, and Coming Soon while it holds something", () => {
+    expect(folderItems("folder-money").map((e) => e.id)).toEqual(["wallet", "send", "swap", "trade"]);
+    expect(folderItems("computer").map((e) => e.id)).toEqual(["taskmgr", "control", "soon"]);
+    expect(folderItems("folder-agents").map((e) => e.title)).toEqual(["MCP", "x402", "API", "Docs", "Verify"]);
+    expect(entryOf("docs").doc?.path).toBe("/docs");
+    expect(entryOf("wallet").doc).toBeNull();
+  });
+
+  it("tells a folder from anything else, inherited keys included", () => {
+    expect(isFolder("folder-games")).toBe(true);
+    expect(isFolder("games")).toBe(false);
+    expect(isFolder("constructor")).toBe(false);
+  });
+
   it("puts the switched-off programs in Coming Soon, not on the desktop", () => {
     expect(comingSoon().map((f) => f.id)).toEqual(["inference", "audit", "hooks"]);
-    const desk = desktopFeatures().map((f) => f.id);
-    for (const id of ["inference", "audit", "hooks", "bridge"]) expect(desk).not.toContain(id);
-    expect(desk).toContain("soon");
+    for (const id of ["inference", "audit", "hooks", "bridge"]) expect(ids()).not.toContain(id);
   });
 
-  it("keeps the Recycle Bin in its own corner", () => {
+  it("keeps the Trash in its own corner", () => {
     expect([...CORNER]).toEqual(["trash"]);
-    expect(desktopFeatures().map((f) => f.id)).not.toContain("trash");
+    expect(ids()).not.toContain("trash");
   });
 
-  it("hides the Coming Soon folder when nothing is waiting in it", () => {
+  it("hides the Coming Soon folder when nothing is waiting in it, and shows Bridge in Money", () => {
     flags.allOn = true;
     try {
       expect(comingSoon()).toEqual([]);
-      const desk = desktopFeatures().map((f) => f.id);
-      expect(desk).not.toContain("soon");
-      expect(desk).toContain("bridge");
+      expect(folderItems("computer").map((e) => e.id)).not.toContain("soon");
+      expect(folderItems("folder-money").map((e) => e.id)).toContain("bridge");
     } finally {
       flags.allOn = false;
     }

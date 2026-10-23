@@ -26,6 +26,10 @@ import { VX } from "./fixtures/verdict";
 import { MARKETS_FX } from "./fixtures/markets";
 import { toChecksumAddress } from "@/lib/address";
 import { DOWN, json, net, useNet, type Answer } from "./net";
+import { withoutV3 } from "./v2only";
+
+// Its fixtures are real v2/v1 captures, so it runs as the app did before v3 was set.
+withoutV3();
 
 useNet();
 

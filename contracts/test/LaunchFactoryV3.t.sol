@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {IB20} from "base-std/interfaces/IB20.sol";
 import {IB20Factory} from "base-std/interfaces/IB20Factory.sol";
 import {B20Constants} from "base-std/lib/B20Constants.sol";
@@ -146,6 +147,9 @@ contract LaunchFactoryV3Test is Test {
     event Launched(address indexed token, address indexed creator, PoolId indexed poolId, uint256 devBuyIn, uint256 devBuyTokens);
     event LaunchFee(address indexed token, uint24 fee);
     event QuoteSet(address indexed quote, bool enabled, int24 startTick);
+    event ReferrerSet(address indexed referrer, bool approved);
+    event Referred(address indexed token, address indexed referrer);
+    event ReferralIgnored(address indexed token, address indexed referrer);
 
     function setUp() public {
         vm.warp(1_760_000_000);
@@ -181,7 +185,7 @@ contract LaunchFactoryV3Test is Test {
 
     function _launchFee(LaunchFactoryV3 f, address who, uint256 eth, bytes32 salt, uint24 fee) internal returns (address token) {
         vm.prank(who);
-        token = f.launch{value: eth}("Moon Cat", "MCAT", "data:application/json,{\"name\":\"Moon Cat\"}", salt, address(0), eth, fee);
+        token = f.launch{value: eth}("Moon Cat", "MCAT", "data:application/json,{\"name\":\"Moon Cat\"}", salt, address(0), eth, fee, address(0));
     }
 
     function _launch(address who, uint256 eth, bytes32 salt) internal returns (address) {
@@ -199,7 +203,7 @@ contract LaunchFactoryV3Test is Test {
         bytes32 salt = _saltFor(who, address(stock), tokenAbove);
         vm.startPrank(who);
         stock.approve(address(factory), shares);
-        token = factory.launch("Stock Cat", "SCAT", "", salt, address(stock), shares, fee);
+        token = factory.launch("Stock Cat", "SCAT", "", salt, address(stock), shares, fee, address(0));
         vm.stopPrank();
     }
 
@@ -389,13 +393,13 @@ contract LaunchFactoryV3Test is Test {
     function test_refusesAQuoteThatIsNotEnabledAndAValueThatDoesNotMatch() public {
         vm.prank(alice);
         vm.expectRevert(LaunchFactoryV3.QuoteNotEnabled.selector);
-        factory.launch("X", "X", "", bytes32(uint256(1)), address(0xbeef), 0, ONE);
+        factory.launch("X", "X", "", bytes32(uint256(1)), address(0xbeef), 0, ONE, address(0));
         vm.prank(alice);
         vm.expectRevert(LaunchFactoryV3.WrongValue.selector);
-        factory.launch{value: 1 ether}("X", "X", "", bytes32(uint256(1)), address(0), 2 ether, ONE);
+        factory.launch{value: 1 ether}("X", "X", "", bytes32(uint256(1)), address(0), 2 ether, ONE, address(0));
         vm.prank(alice);
         vm.expectRevert(LaunchFactoryV3.WrongValue.selector);
-        factory.launch{value: 1}("X", "X", "", bytes32(uint256(1)), address(stock), 0, ONE);
+        factory.launch{value: 1}("X", "X", "", bytes32(uint256(1)), address(stock), 0, ONE, address(0));
     }
 
     // ───────────────────────────────────────────── the fee: 1% or 3%, nothing else
@@ -405,7 +409,7 @@ contract LaunchFactoryV3Test is Test {
         for (uint256 i; i < bad.length; i++) {
             vm.prank(alice);
             vm.expectRevert(LaunchFactoryV3.BadFee.selector);
-            factory.launch("X", "X", "", bytes32(uint256(1)), address(0), 0, bad[i]);
+            factory.launch("X", "X", "", bytes32(uint256(1)), address(0), 0, bad[i], address(0));
         }
         address one = _launchFee(factory, alice, 0, bytes32(uint256(1)), ONE);
         address three = _launchFee(factory, alice, 0, bytes32(uint256(2)), THREE);
@@ -419,7 +423,7 @@ contract LaunchFactoryV3Test is Test {
         vm.assume(fee != ONE && fee != THREE);
         vm.prank(alice);
         vm.expectRevert(LaunchFactoryV3.BadFee.selector);
-        factory.launch("X", "X", "", bytes32(uint256(1)), address(0), 0, fee);
+        factory.launch("X", "X", "", bytes32(uint256(1)), address(0), 0, fee, address(0));
     }
 
     function test_chargesTheChosenFeeOnceTheOpeningIsOver() public {
@@ -640,7 +644,7 @@ contract LaunchFactoryV3Test is Test {
         assertEq(factory.launchSalt(alice, salt), keccak256(abi.encode(alice, salt)));
         vm.prank(alice);
         vm.expectRevert();
-        factory.launch("Again", "AGN", "", salt, address(0), 0, ONE);
+        factory.launch("Again", "AGN", "", salt, address(0), 0, ONE, address(0));
     }
 
     function test_letsTheLauncherBuyFirstWithETH() public {
@@ -689,7 +693,7 @@ contract LaunchFactoryV3Test is Test {
         bytes32 salt = _saltFor(alice, address(stock), true);
         vm.prank(alice);
         vm.expectRevert(LaunchFactoryV3.TransferFailed.selector);
-        factory.launch("No Approval", "NA", "", salt, address(stock), 1e8, ONE);
+        factory.launch("No Approval", "NA", "", salt, address(stock), 1e8, ONE, address(0));
 
         OddToken3 odd = new OddToken3();
         odd.mint(alice, 10e18);
@@ -699,7 +703,7 @@ contract LaunchFactoryV3Test is Test {
         vm.startPrank(alice);
         odd.approve(address(factory), 1e18);
         vm.expectRevert(LaunchFactoryV3.TransferFailed.selector);
-        factory.launch("False", "F", "", bytes32(uint256(3)), address(odd), 1e18, ONE);
+        factory.launch("False", "F", "", bytes32(uint256(3)), address(odd), 1e18, ONE, address(0));
         vm.stopPrank();
     }
 
@@ -711,7 +715,7 @@ contract LaunchFactoryV3Test is Test {
         factory.setQuote(address(odd), true, START);
         vm.startPrank(alice);
         odd.approve(address(factory), 1e18);
-        address token = factory.launch("Quiet", "Q", "", bytes32(uint256(3)), address(odd), 1e18, ONE);
+        address token = factory.launch("Quiet", "Q", "", bytes32(uint256(3)), address(odd), 1e18, ONE, address(0));
         vm.stopPrank();
         assertEq(odd.balanceOf(alice), 9e18);
         assertGt(IB20(token).balanceOf(alice), 0);
@@ -916,7 +920,7 @@ contract LaunchFactoryV3Test is Test {
         vm.prank(admin);
         factory.setQuote(address(odd), true, START);
         vm.prank(alice);
-        address token = factory.launch("Odd", "ODD", "", bytes32(uint256(5)), address(odd), 0, ONE);
+        address token = factory.launch("Odd", "ODD", "", bytes32(uint256(5)), address(odd), 0, ONE, address(0));
         _buy(bob, token, 10e18);
         odd.refuse(alice, true);
         (uint256 amount0, uint256 amount1) = factory.collect(token);
@@ -970,7 +974,7 @@ contract LaunchFactoryV3Test is Test {
         vm.expectRevert(LaunchFactoryV3.Reentrancy.selector);
         factory.withdraw(Currency.wrap(address(0)));
         vm.expectRevert(LaunchFactoryV3.Reentrancy.selector);
-        factory.launch("X", "X", "", bytes32(uint256(2)), address(0), 0, ONE);
+        factory.launch("X", "X", "", bytes32(uint256(2)), address(0), 0, ONE, address(0));
     }
 
     function test_acceptsCallbacksAndETHOnlyFromThePoolManager() public {
@@ -979,5 +983,254 @@ contract LaunchFactoryV3Test is Test {
         vm.prank(alice);
         (bool ok,) = address(factory).call{value: 1}("");
         assertFalse(ok);
+    }
+
+    // ───────────────────────────────────────────── referrers
+
+    address internal referrer = makeAddr("referrer");
+
+    function _approve(address who, bool yes) internal {
+        vm.prank(protocol);
+        factory.setReferrer(who, yes);
+    }
+
+    function _launchReferred(address who, uint256 eth, bytes32 salt, address ref) internal returns (address token) {
+        vm.prank(who);
+        token = factory.launch{value: eth}("Ref Cat", "RCAT", "", salt, address(0), eth, ONE, ref);
+    }
+
+    function _shares(uint256 amount) internal pure returns (uint256 c, uint256 r, uint256 p) {
+        c = amount * 8_000 / 10_000;
+        r = amount * 500 / 10_000;
+        p = amount - c - r;
+    }
+
+    function test_letsOnlyTheProtocolRecipientApproveAReferrer() public {
+        assertEq(factory.REFERRER_SHARE_BPS(), 500);
+        assertFalse(factory.approvedReferrers(referrer));
+        address[3] memory others = [admin, alice, referrer];
+        for (uint256 i; i < others.length; i++) {
+            vm.prank(others[i]);
+            vm.expectRevert(LaunchFactoryV3.NotAllowed.selector);
+            factory.setReferrer(referrer, true);
+        }
+        vm.prank(protocol);
+        vm.expectRevert(LaunchFactoryV3.ZeroAddress.selector);
+        factory.setReferrer(address(0), true);
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit ReferrerSet(referrer, true);
+        _approve(referrer, true);
+        assertTrue(factory.approvedReferrers(referrer));
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit ReferrerSet(referrer, false);
+        _approve(referrer, false);
+        assertFalse(factory.approvedReferrers(referrer));
+    }
+
+    function test_followsTheProtocolRecipientWhenItMoves() public {
+        address next = makeAddr("next");
+        vm.prank(protocol);
+        factory.proposeProtocolRecipient(next);
+        vm.prank(next);
+        factory.acceptProtocolRecipient();
+        vm.prank(protocol);
+        vm.expectRevert(LaunchFactoryV3.NotAllowed.selector);
+        factory.setReferrer(referrer, true);
+        vm.prank(next);
+        factory.setReferrer(referrer, true);
+        assertTrue(factory.approvedReferrers(referrer));
+    }
+
+    function test_recordsAnApprovedReferrerAndAnnouncesIt() public {
+        _approve(referrer, true);
+        bytes32 salt = bytes32(uint256(9));
+        address predicted = factory.predictToken(alice, salt);
+        vm.recordLogs();
+        address token = _launchReferred(alice, 0, salt, referrer);
+        assertEq(token, predicted);
+        assertEq(factory.referrerOf(token), referrer);
+        // Launched keeps its exact v1/v2 signature; Referred comes before it
+        bytes32[] memory topics;
+        uint256 referred;
+        uint256 launched;
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; i++) {
+            if (logs[i].emitter != address(factory)) continue;
+            topics = logs[i].topics;
+            if (topics[0] == Referred.selector) {
+                referred = i + 1;
+                assertEq(address(uint160(uint256(topics[1]))), token);
+                assertEq(address(uint160(uint256(topics[2]))), referrer);
+            }
+            if (topics[0] == Launched.selector) launched = i + 1;
+            assertTrue(topics[0] != ReferralIgnored.selector);
+        }
+        assertGt(referred, 0);
+        assertGt(launched, referred);
+        assertEq(Launched.selector, keccak256("Launched(address,address,bytes32,uint256,uint256)"));
+        // the launch record's shape is unchanged
+        assertEq(factory.launches(token).creator, alice);
+    }
+
+    function test_treatsAnUnapprovedReferrerAsNoneWithoutRefusingTheLaunch() public {
+        address token0 = _launchReferred(alice, 0, bytes32(uint256(1)), address(0));
+        assertEq(factory.referrerOf(token0), address(0));
+        vm.expectEmit(true, true, false, false, address(factory));
+        emit ReferralIgnored(factory.predictToken(alice, bytes32(uint256(2))), referrer);
+        address token = _launchReferred(alice, 1 ether, bytes32(uint256(2)), referrer);
+        assertEq(factory.referrerOf(token), address(0));
+        _buy(bob, token, 1 ether);
+        uint256 a = alice.balance;
+        (uint256 eth,) = factory.collect(token);
+        assertEq(alice.balance - a, eth * 8_000 / 10_000);
+        assertEq(protocol.balance, eth - eth * 8_000 / 10_000);
+        assertEq(referrer.balance, 0, "an unapproved referrer is paid nothing");
+    }
+
+    function test_letsACreatorReferThemselvesOnlyWhenApproved() public {
+        address own = _launchReferred(alice, 0, bytes32(uint256(1)), alice);
+        assertEq(factory.referrerOf(own), address(0), "not approved: none");
+        _approve(alice, true);
+        address token = _launchReferred(alice, 0, bytes32(uint256(2)), alice);
+        assertEq(factory.referrerOf(token), alice);
+        _buy(bob, token, 1 ether);
+        uint256 a = alice.balance;
+        (uint256 eth,) = factory.collect(token);
+        (uint256 c, uint256 r, uint256 p) = _shares(eth);
+        assertEq(alice.balance - a, c + r, "80% as the launcher plus 5% as the referrer");
+        assertEq(protocol.balance, p);
+    }
+
+    function test_keepsPayingARecordedReferrerAfterItIsRemoved() public {
+        _approve(referrer, true);
+        address token = _launchReferred(alice, 0, bytes32(uint256(1)), referrer);
+        _approve(referrer, false);
+        address later = _launchReferred(alice, 0, bytes32(uint256(2)), referrer);
+        assertEq(factory.referrerOf(token), referrer, "recorded for good");
+        assertEq(factory.referrerOf(later), address(0), "removed: no longer counts for new launches");
+        _buy(bob, token, 1 ether);
+        (uint256 eth,) = factory.collect(token);
+        (, uint256 r,) = _shares(eth);
+        assertEq(referrer.balance, r);
+    }
+
+    function test_paysAReferredLaunchEightyFiveAndTheRemainder() public {
+        _approve(referrer, true);
+        address token = _launchReferred(alice, 0, bytes32(uint256(1)), referrer);
+        vm.warp(block.timestamp + WINDOW);
+        uint256 got = _buy(bob, token, 10 ether);
+        _sell(bob, token, got / 2);
+        uint256 a = alice.balance;
+        (uint256 eth, uint256 tokens) = factory.collect(token);
+        (uint256 c, uint256 r, uint256 p) = _shares(eth);
+        assertEq(alice.balance - a, c);
+        assertEq(referrer.balance, r);
+        assertEq(protocol.balance, p);
+        assertEq(c + r + p, eth);
+        (c, r, p) = _shares(tokens);
+        assertGt(tokens, 0);
+        assertEq(IB20(token).balanceOf(referrer), r);
+        assertEq(IB20(token).balanceOf(protocol), p);
+        assertEq(address(factory).balance, 0);
+        assertEq(IB20(token).balanceOf(address(factory)), 0);
+    }
+
+    function test_splitsTheOpeningWindowsFeeTheSameWay() public {
+        _approve(referrer, true);
+        address token = _launchReferred(alice, 0, bytes32(uint256(1)), referrer);
+        _buy(bob, token, 2 ether);
+        uint256 a = alice.balance;
+        (uint256 eth,) = factory.collect(token);
+        assertApproxEqAbs(eth, 1 ether, 4, "the sniper's 50%");
+        (uint256 c, uint256 r, uint256 p) = _shares(eth);
+        assertEq(alice.balance - a, c);
+        assertEq(referrer.balance, r);
+        assertEq(protocol.balance, p);
+    }
+
+    function test_paysAReferredStockPairInBothCurrenciesOnEitherSide() public {
+        _approve(referrer, true);
+        for (uint256 side; side < 2; side++) {
+            bytes32 salt = _saltFor(alice, address(stock), side == 0);
+            vm.prank(alice);
+            address token = factory.launch("Stock Cat", "SCAT", "", salt, address(stock), 0, THREE, referrer);
+            vm.warp(block.timestamp + WINDOW);
+            PoolKey memory key = _key(token);
+            uint256 got = _buy(bob, token, 10e8);
+            _sell(bob, token, got / 2);
+            uint256 rs = stock.balanceOf(referrer);
+            uint256 ps = stock.balanceOf(protocol);
+            (uint256 amount0, uint256 amount1) = factory.collect(token);
+            bool stockIs0 = Currency.unwrap(key.currency0) == address(stock);
+            (uint256 inStock, uint256 inToken) = stockIs0 ? (amount0, amount1) : (amount1, amount0);
+            (, uint256 r, uint256 p) = _shares(inStock);
+            assertEq(stock.balanceOf(referrer) - rs, r);
+            assertEq(stock.balanceOf(protocol) - ps, p);
+            (, r,) = _shares(inToken);
+            assertEq(IB20(token).balanceOf(referrer), r);
+            assertEq(stock.balanceOf(address(factory)), 0);
+        }
+    }
+
+    function testFuzz_splitsAReferredCollectionToTheWei(uint96 buyIn, uint8 secondsIn) public {
+        _approve(referrer, true);
+        uint256 eth = bound(uint256(buyIn), 1, 50 ether);
+        address token = _launchReferred(alice, 0, bytes32(uint256(1)), referrer);
+        vm.warp(block.timestamp + bound(uint256(secondsIn), 0, 40));
+        vm.deal(bob, eth);
+        _buy(bob, token, eth);
+        uint256 a = alice.balance;
+        uint256 rr = referrer.balance;
+        uint256 p = protocol.balance;
+        (uint256 fee,) = factory.collect(token);
+        (uint256 c, uint256 r, uint256 q) = _shares(fee);
+        assertEq(alice.balance - a, c);
+        assertEq(referrer.balance - rr, r);
+        assertEq(protocol.balance - p, q);
+        assertEq(c + r + q, fee, "no wei lost");
+        assertEq(address(factory).balance, 0);
+    }
+
+
+    function test_keepsAReferrersRefusedPayoutUntilItCanTakeIt() public {
+        LateTaker3 late = new LateTaker3();
+        _approve(address(late), true);
+        address token = _launchReferred(alice, 0, bytes32(uint256(1)), address(late));
+        _buy(bob, token, 1 ether);
+        uint256 a = alice.balance;
+        (uint256 eth,) = factory.collect(token);
+        (uint256 c, uint256 r, uint256 p) = _shares(eth);
+        Currency e = Currency.wrap(address(0));
+        assertEq(factory.owed(address(late), e), r);
+        assertEq(alice.balance - a, c, "everyone else is still paid");
+        assertEq(protocol.balance, p);
+        vm.expectRevert(LaunchFactoryV3.TransferFailed.selector);
+        late.withdrawFrom(factory, e);
+        late.openUp();
+        late.withdrawFrom(factory, e);
+        assertEq(address(late).balance, r);
+        assertEq(factory.owed(address(late), e), 0);
+    }
+
+    function test_keepsAReferrersAssetTheQuoteRefusesToMove() public {
+        OddToken3 odd = new OddToken3();
+        odd.mint(bob, 100e18);
+        vm.prank(admin);
+        factory.setQuote(address(odd), true, START);
+        _approve(referrer, true);
+        vm.prank(alice);
+        address token = factory.launch("Odd", "ODD", "", bytes32(uint256(5)), address(odd), 0, ONE, referrer);
+        _buy(bob, token, 10e18);
+        odd.refuse(referrer, true);
+        (uint256 amount0, uint256 amount1) = factory.collect(token);
+        uint256 inOdd = Currency.unwrap(_key(token).currency0) == address(odd) ? amount0 : amount1;
+        (uint256 c, uint256 r, uint256 p) = _shares(inOdd);
+        assertEq(factory.owed(referrer, Currency.wrap(address(odd))), r);
+        assertEq(odd.balanceOf(alice), c);
+        assertEq(odd.balanceOf(protocol), p);
+        odd.refuse(referrer, false);
+        vm.prank(referrer);
+        factory.withdraw(Currency.wrap(address(odd)));
+        assertEq(odd.balanceOf(referrer), r);
     }
 }

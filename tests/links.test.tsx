@@ -72,17 +72,23 @@ describe("the Terminal reaches every window", () => {
     expect(screen.getByLabelText("Terminal output")).toHaveTextContent("There is no root here");
   });
 
+  /** The menu bar's Windows menu brings the Terminal back to the front, as a taskbar chip did. */
+  async function frontTerminal() {
+    await userEvent.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: "Windows" }));
+    await userEvent.click(within(screen.getByRole("menu", { name: "Windows menu" })).getByRole("menuitemcheckbox", { name: "Terminal" }));
+  }
+
   it("opens Send with the recipient filled in, and Swap with the token to get", async () => {
     offline();
     renderAt("/?do=terminal");
     await settle();
     await type(`send ${WHO}`);
     expect(within(win("Send")!).getByLabelText("Recipient")).toHaveValue(WHO);
-    await userEvent.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: "Terminal" }));
+    await frontTerminal();
     await type(`swap ${TOKEN}`);
     expect(within(win("Swap")!).getByDisplayValue(TOKEN)).toBeInTheDocument();
     // a token the picker knows by name is picked by name
-    await userEvent.click(within(screen.getByLabelText("Taskbar")).getByRole("button", { name: "Terminal" }));
+    await frontTerminal();
     await type(`swap ${USDC.address}`);
     expect(within(win("Swap")!).queryByDisplayValue(TOKEN)).not.toBeInTheDocument();
   });

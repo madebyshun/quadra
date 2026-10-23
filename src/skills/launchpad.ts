@@ -1,6 +1,6 @@
 import { decodeFunctionResult, encodeAbiParameters, encodeFunctionData, erc20Abi, keccak256 as hash, parseAbi, parseAbiParameters } from "viem";
 import { CONTRACTS, UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
-import { DYNAMIC_FEE_FLAG, LAUNCH_HOOK_ABI, LAUNCHPAD_ABI, LAUNCHPAD_EXPECTS } from "@/config/launchpad";
+import { DYNAMIC_FEE_FLAG, LAUNCH_HOOK_ABI, LAUNCHPAD_ABI, LAUNCHPAD_EXPECTS, LAUNCHPAD_V3_ABI } from "@/config/launchpad";
 import { toChecksumAddress } from "@/lib/address";
 import { keccak256, toHex, utf8 } from "@/lib/keccak";
 import { BLOCKSCOUT } from "@/skills/blockscout";
@@ -216,6 +216,32 @@ export async function coinFeeOf(factory: string, token: string): Promise<CoinFee
   const window = decodeFunctionResult({ abi: LAUNCH_HOOK_ABI, functionName: "window", data: span });
   if (fee === 0) throw new Error(`the hook ${key.hooks} has no fee schedule for ${token}'s pool`);
   return { fee, opening: { startFee, window, openedAt } };
+}
+
+/** v3's `Referred` event's topic — a coin's referrer, recorded at launch (hashed here, not copied). */
+export const REFERRED_TOPIC = toHex(keccak256(utf8("Referred(address,address)")));
+
+/** The referrer a v3 factory recorded for a coin, or `null` for none. Throws when it cannot be read. */
+export async function referrerOf(factory: string, token: string): Promise<string | null> {
+  const data = encodeFunctionData({ abi: LAUNCHPAD_V3_ABI, functionName: "referrerOf", args: [token as `0x${string}`] });
+  const at = decodeFunctionResult({ abi: LAUNCHPAD_V3_ABI, functionName: "referrerOf", data: await ethCall(factory, data) });
+  return at.toLowerCase() === ZERO ? null : toChecksumAddress(at);
+}
+
+/**
+ * A coin's referrer for a report: `null` when there is none (every v1/v2 coin — they have no
+ * referrals), the address when v3 recorded one, `undefined` when it could not be read — "not
+ * checked", never "none" (hard rule 12).
+ */
+export async function v3ReferrerOf(record: { readonly factory: string } | null | undefined, token: string): Promise<string | null | undefined> {
+  if (!record || !isV3(record.factory)) return null;
+  return referrerOf(record.factory, token).catch(() => undefined);
+}
+
+/** Whether a v3 factory approves `referrer` right now — only an approved one counts at launch. */
+export async function isApprovedReferrer(factory: string, referrer: string): Promise<boolean> {
+  const data = encodeFunctionData({ abi: LAUNCHPAD_V3_ABI, functionName: "approvedReferrers", args: [referrer as `0x${string}`] });
+  return decodeFunctionResult({ abi: LAUNCHPAD_V3_ABI, functionName: "approvedReferrers", data: await ethCall(factory, data) });
 }
 
 /**

@@ -47,6 +47,12 @@ export type SwapQuote = {
   readonly feeOn: boolean;
 };
 
+/** Relay's refusal when it has not indexed or cannot fill a market. */
+export function isRelayNoRoute(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /relay:\s+no routes? found?\.?$/i.test(message) || /relay:\s+no route\.?$/i.test(message);
+}
+
 const tokenOf = (a: Asset): string => (a.kind === "native" ? NATIVE : a.address);
 
 function refuse(why: string): never {

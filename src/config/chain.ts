@@ -98,12 +98,15 @@ export const CONTRACTS = {
   /**
    * The launchpad, version 3 (`contracts/src/LaunchFactoryV3.sol` + `LaunchHook.sol`: a 1% or 3% fee
    * chosen per coin, and the anti-sniper opening — the fee falls from the hook's `startFee` to the
-   * chosen one over its `window` seconds). NOT DEPLOYED: it waits on the owner's deploy
-   * (`contracts/script/DeployLaunchFactoryV3.s.sol`), its verification on Blockscout and an audit
-   * (hard rule 1 — never an address before then). The day it is set, NEW launches go here and v2
-   * becomes read-only like v1; until then everything behaves exactly as with v2.
+   * chosen one over its `window` seconds) and approved referrers (80 / 5 / 15). DEPLOYED by the owner
+   * 2026-10-22 (tx 0x151126f0…c205, block 52,929,530; hook 0x0D9DdcC907658E3C61318d0F979F978e600AA880),
+   * both verified on Sourcify with an EXACT match to this repo's source, and every expectation read
+   * back from the chain: supply 1e27, FEE_LOW/HIGH 10000/30000, share 8000, referrer share 500,
+   * spacing 200, hook.factory() = this, startFee 500000, window 15, protocolRecipient = treasury,
+   * quotes(ETH) = (true, 191200), and 8 stocks enabled by the quote admin. NEW launches go here; v2
+   * and v1 are read and collected from. NOT audited. Set back to `null` to send launches to v2.
    */
-  launchFactoryV3: null as string | null,
+  launchFactoryV3: "0x006Da367654a487bb277fe25ff54f0fE0f741377" as string | null,
   /**
    * The launchpad, version 1 (`contracts/deployed/LaunchFactory.v1.sol`: ETH pairs only), DEPLOYED BY
    * THE OWNER 2026-10-02: tx 0xc51a517c…4a972764d, block 52,066,273. CHECKED before it was written
@@ -171,6 +174,8 @@ export const FLAGS = {
   rugsweeper: true,
   achievements: true,
   leaderboard: true,
+  /** "Make my Base card" — a 1995 Paint card of a wallet, drawn from the chain (2026-10-21) */
+  card: true,
   /**
    * Robinhood Chain (4663), HIDDEN on the owner's call of 2026-10-02: "build on Base first, Robinhood
    * Chain after". Off hides every surface that needs it — the Bridge window and the Robinhood Chain

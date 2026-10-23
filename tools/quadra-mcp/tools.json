@@ -109,7 +109,7 @@
       "treasury": "0xD5C1dFc036F9911348EA8065F73c8123f4013FAB",
       "token": null,
       "launchFactory": "0xef1F427bB57e0ECd7BB8051cE8bC7AAb709a0c03",
-      "launchFactoryV3": null,
+      "launchFactoryV3": "0x006Da367654a487bb277fe25ff54f0fE0f741377",
       "launchFactoryV1": "0xcDb2eC1c487fbcB6B4AF25cCD86aFf8120FaB8a5"
     },
     "limits": [

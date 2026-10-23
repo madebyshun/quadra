@@ -8,6 +8,10 @@ import { prepareLaunch, prepareLaunchSkill, stepRows } from "@/skills/prepare";
 import { row } from "@/skills/types";
 import { MARKETS_FX } from "./fixtures/markets";
 import { DOWN, contractAt, net, useNet, type Answer } from "./net";
+import { withoutV3 } from "./v2only";
+
+// Its fixtures are real v2/v1 captures, so it runs as the app did before v3 was set.
+withoutV3();
 
 useNet();
 

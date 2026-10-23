@@ -24,6 +24,10 @@ import {
 } from "@/lib/v4swap";
 import { COINS, REQUESTS, V4, type RpcBody } from "./fixtures/v4swap";
 import { DOWN, net, RpcError, useNet, type Answer } from "./net";
+import { withoutV3 } from "./v2only";
+
+// Its fixtures are real v2/v1 captures, so it runs as the app did before v3 was set.
+withoutV3();
 
 useNet();
 

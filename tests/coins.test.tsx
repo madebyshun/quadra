@@ -17,6 +17,10 @@ import { LAUNCHPAD, LX, NO_LOGS } from "./fixtures/launchpad";
 import { DOWN, net, useNet } from "./net";
 import { served } from "./indexerPage";
 import { chainRoutes, getRoutes, HASH, marketsOf, ME, T, V1_LOGS, wallet } from "./launchpadChain";
+import { withoutV3 } from "./v2only";
+
+// Its fixtures are real v2/v1 captures, so it runs as the app did before v3 was set.
+withoutV3();
 
 useNet();
 

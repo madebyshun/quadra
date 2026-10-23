@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { decodeAbiParameters, encodeAbiParameters, keccak256, parseAbiParameters, toBytes } from "viem";
-import { LAUNCHED_TOPIC } from "@/skills/launchpad";
+import { LAUNCHED_TOPIC, REFERRED_TOPIC } from "@/skills/launchpad";
 import {
   applyLaunches,
   applySwaps,
@@ -36,6 +36,10 @@ import {
 import { INDEXER_ABSENT, launchpadCoin, launchpadCoins, parseCoinPage, parseIndex } from "@/adapters/http/indexer";
 import { COINS, IX } from "./fixtures/indexer";
 import { json, net, useNet } from "./net";
+import { withoutV3 } from "./v2only";
+
+// Its fixtures are real v2/v1 captures, so it runs as the app did before v3 was set.
+withoutV3();
 
 useNet();
 afterEach(() => vi.useRealTimers());
@@ -81,7 +85,7 @@ function fakeNode(over: { fail?: (method: string, params: readonly unknown[]) =>
       const inRange = (l: Log) => Number(l.blockNumber) >= Number(f.fromBlock) && Number(l.blockNumber) <= Number(f.toBlock);
       if (Array.isArray(f.address)) {
         expect(f.address.map((a) => a.toLowerCase()).sort()).toEqual([COINS.v1, COINS.v2].map((a) => a.toLowerCase()).sort());
-        expect(f.topics).toEqual([LAUNCHED_TOPIC]);
+        expect(f.topics).toEqual([[LAUNCHED_TOPIC, REFERRED_TOPIC]]);
         return LAUNCH_LOGS.filter(inRange);
       }
       expect(f.address.toLowerCase()).toBe(PM);

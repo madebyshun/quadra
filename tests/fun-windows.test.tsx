@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { OpenWindowProvider } from "@/features/openWindow";
-import { SoonPanel } from "@/features/panels/SoonPanel";
+import { SoonPanel } from "@/features/panels/FolderPanel";
 import { RugsweeperPanel, SIZE } from "@/features/panels/RugsweeperPanel";
 import { AchievementsPanel, localAchievements, walletAchievements, walletFacts, type WalletFacts } from "@/features/panels/AchievementsPanel";
 import { LeaderboardPanel, fromLogs, rank, rankIndexed, TOP } from "@/features/panels/LeaderboardPanel";
@@ -55,16 +55,25 @@ describe("SoonPanel", () => {
     const items = screen.getAllByRole("button");
     expect(items.length).toBe(registry.comingSoon().length);
     fireEvent.click(items[0]!);
+    expect(open).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent(`${registry.comingSoon()[0]!.title} — ${registry.comingSoon()[0]!.blurb}`);
+    fireEvent.doubleClick(items[0]!);
     expect(open).toHaveBeenCalledWith(registry.comingSoon()[0]!.id);
+    fireEvent.keyDown(items[1]!, { key: "a" });
+    expect(open).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(items[1]!, { key: "Enter" });
+    expect(open).toHaveBeenLastCalledWith(registry.comingSoon()[1]!.id);
   });
   it("opens nothing outside the desktop", () => {
     render(<SoonPanel />);
-    fireEvent.click(screen.getAllByRole("button")[0]!);
+    fireEvent.doubleClick(screen.getAllByRole("button")[0]!);
+    fireEvent.keyDown(screen.getAllByRole("button")[0]!, { key: "Enter" });
   });
   it("says nothing is waiting when every flag is on", () => {
     vi.mocked(registry.comingSoon).mockReturnValueOnce([]);
     render(<SoonPanel />);
     expect(screen.getByText("Everything is out of the box. Nothing is waiting.")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("0 objects");
   });
 });
 

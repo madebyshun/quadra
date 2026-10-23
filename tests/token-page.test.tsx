@@ -25,9 +25,11 @@ const pageOf = (withMore = false): IndexedCoinPage => parseCoinPage(served(withM
 const value = (over: Partial<PoolValue> = {}): PoolValue => ({ quote: "0x0000000000000000000000000000000000000000", quoteSymbol: "ETH", quoteDecimals: 18, supplyInQuote: 5, quoteUsd: 2000, ...over });
 
 describe("the small helpers", () => {
-  it("inBoth: not read, a tiny amount in exponent form, with and without a dollar price", () => {
+  it("inBoth: not read, a tiny amount in subscript zeros (never exponent form), with and without a dollar price", () => {
     expect(inBoth(null, "ETH", 2000)).toBe("not read");
-    expect(inBoth(0.00001, "ETH", null)).toBe("1.00e-5 ETH");
+    expect(inBoth(0.00001, "ETH", null)).toBe("0.0₄1 ETH");
+    // under a cent, the dollar half is dropped rather than printed as "<$0.01" beside the amount
+    expect(inBoth(0.00000299, "AAPLc", 331)).toBe("0.0₅299 AAPLc");
     expect(inBoth(0, "ETH", null)).toBe("0 ETH");
     expect(inBoth(1.5, "ETH", 2000)).toBe("$3,000.00 · 1.5 ETH");
   });
@@ -91,7 +93,8 @@ describe("the page's cards and facts", () => {
     render(<TokenStats page={pageOf()} value={value()} holders={1234} />);
     const cards = screen.getByLabelText("Numbers");
     expect(cards).toHaveTextContent(/Market cap\$[\d,.]+[\d.]+ ETH/);
-    expect(cards).toHaveTextContent(/Price\$0\.0000\d+[\d.]+e-9 ETH/);
+    expect(cards).toHaveTextContent(/Price\$0\.0₅\d+0\.0₈\d+ ETH/);
+    expect(cards).not.toHaveTextContent(/e-\d/);
     expect(cards).toHaveTextContent("Volume 24h");
     expect(cards).toHaveTextContent("1 trade");
     expect(cards).toHaveTextContent("Holders1,234");
@@ -113,7 +116,7 @@ describe("the page's cards and facts", () => {
   it("TokenStats: a price without a dollar figure, and several trades", () => {
     render(<TokenStats page={pageOf(true)} value={null} holders={0} />);
     const cards = screen.getByLabelText("Numbers");
-    expect(cards).toHaveTextContent(/Price[\d.]+e-9 ETH/);
+    expect(cards).toHaveTextContent(/Price0\.0₈\d+ ETH/);
     expect(cards).toHaveTextContent("3 trades");
   });
 
@@ -170,7 +173,8 @@ describe("the page's cards and facts", () => {
     const a = render(<TokenInfo page={pageOf(true)} creator={COINS.owner} launchedAt={AT} quoteUsd={2000} />);
     const info = screen.getByLabelText("Info");
     expect(info).toHaveTextContent("Fees earned (in ETH)");
-    expect(info).toHaveTextContent(/Creator's share80% — <\$0\.01 · /);
+    expect(info).toHaveTextContent(/Creator's share80% — 0\.0₇\d+ ETH/);
+    expect(info).not.toHaveTextContent("<$0.01");
     expect(info).toHaveTextContent("Fees earned (in the coin)");
     expect(info).not.toHaveTextContent("not read");
     a.unmount();

@@ -48,5 +48,8 @@ contract DeployLaunchFactoryV3 is Script {
         console.log("hook salt");
         console.logBytes32(salt);
         console.log("quote admin", admin);
+        // referrers: none is approved at deploy. The PROTOCOL RECIPIENT (the treasury wallet, not this
+        // deployer) approves one with setReferrer(<referrer>, true) - see contracts/README.md
+        console.log("referrers approved: none; the treasury calls setReferrer");
     }
 }

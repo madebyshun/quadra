@@ -44,7 +44,7 @@ describe("TrashPanel", () => {
     expect(screen.getByText("Not checked — the pools could not be read: logs refused")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await settle();
-    expect(screen.getByText(/The Recycle Bin is empty/)).toBeInTheDocument();
+    expect(screen.getByText(/The Trash is empty/)).toBeInTheDocument();
     expect(screen.getByText(/items — pools on Uniswap v4/)).toBeInTheDocument();
   });
 
@@ -58,7 +58,7 @@ describe("TrashPanel", () => {
     expect(document.querySelector(".bin__why")!.textContent).toMatch(/traded \$1,234(\.00)? in 24h/);
     fireEvent.click(screen.getByRole("button", { name: "Why?" }));
     expect(screen.getByRole("status")).toHaveTextContent("Windows open from the desktop.");
-    fireEvent.click(screen.getByRole("button", { name: "Empty Recycle Bin" }));
+    fireEvent.click(screen.getByRole("button", { name: "Empty Trash" }));
     expect(screen.getByRole("status")).toHaveTextContent(/cannot be emptied any further/);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await settle();
@@ -82,12 +82,12 @@ describe("TrashPanel", () => {
     expect(open.mock.calls[1]![0]).toBe("profile");
   });
 
-  it("opens from the Recycle Bin in the desktop's corner", async () => {
+  it("opens from the Trash in the desktop's corner", async () => {
     recycleBin.mockResolvedValue(bin());
     renderAt("/");
     await settle();
-    fireEvent.click(screen.getByRole("button", { name: "Recycle Bin" }));
+    fireEvent.click(screen.getByRole("button", { name: "Trash" }));
     await settle();
-    expect(screen.getByText(/The Recycle Bin is empty/)).toBeInTheDocument();
+    expect(screen.getByText(/The Trash is empty/)).toBeInTheDocument();
   });
 });

@@ -13,7 +13,12 @@ export type WindowLayout = {
   onMinimize: () => void;
   onMove: (x: number, y: number) => void;
   onResize: (width: number, height: number) => void;
+  /** false for a window behind another: Platinum draws it flat, without title-bar lines. Omitted = active. */
+  active?: boolean;
 };
+
+/** The menu bar's height: no window may be dragged up under it, so a title bar is always reachable. */
+export const MENUBAR_H = 22;
 
 export type WindowProps = {
   title: string;
@@ -26,7 +31,11 @@ export type WindowProps = {
 type DragOrigin = { mouseX: number; mouseY: number; startX: number; startY: number };
 
 /**
- * An XP Luna window frame wearing Aqua traffic lights.
+ * A Mac OS 8 "Platinum" document window (2026-10-22, replacing the XP Luna frame): a bevelled
+ * light grey frame, a title bar of fine lines with the title centred in a plain box, the close box on the left, the zoom and
+ * collapse boxes on the right, and a grow box in the bottom-right corner. A window behind another
+ * loses its stripes. The `light--*` class names are kept from the XP frame so every test that finds
+ * a box by them still does.
  *
  * With no `layout`, this is the static single-window frame `Page.tsx` uses for
  * `/docs`, `/api`, `/verify` and 404 — centred by the caller's `.shell`, minimise
@@ -68,7 +77,7 @@ export function Window({ title, children, onClose, layout }: WindowProps) {
     const onMouseMove = (e: globalThis.MouseEvent) => {
       if (drag.current) {
         const { mouseX, mouseY, startX, startY } = drag.current;
-        onMove(startX + (e.clientX - mouseX), Math.max(0, startY + (e.clientY - mouseY)));
+        onMove(startX + (e.clientX - mouseX), Math.max(MENUBAR_H, startY + (e.clientY - mouseY)));
       }
       if (resize.current) {
         const { mouseX, mouseY, startX, startY } = resize.current;
@@ -100,30 +109,24 @@ export function Window({ title, children, onClose, layout }: WindowProps) {
 
   return (
     <section
-      className={layout ? "win win--floating" : "win"}
+      className={["win", layout ? "win--floating" : "", layout?.active === false ? "win--inactive" : ""].filter(Boolean).join(" ")}
       aria-label={title}
       style={style}
       onMouseDown={layout?.onFocus}
     >
       <div className="win__bar" onMouseDown={beginDrag}>
+        <button
+          type="button"
+          className="light light--close"
+          onClick={onClose}
+          disabled={!onClose}
+          aria-label="Close"
+          title="Close"
+        />
+        <h2 className="win__title">
+          <span>{title}</span>
+        </h2>
         <div className="win__lights">
-          <button
-            type="button"
-            className="light light--close"
-            onClick={onClose}
-            disabled={!onClose}
-            aria-label="Close"
-            title="Close"
-          />
-          <button
-            type="button"
-            className="light light--min"
-            onClick={layout?.onMinimize}
-            disabled={!layout}
-            aria-label={layout ? "Minimise" : "Minimise (not available)"}
-            title={layout ? "Minimise" : undefined}
-            tabIndex={layout ? undefined : -1}
-          />
           <button
             type="button"
             className="light light--max"
@@ -131,8 +134,16 @@ export function Window({ title, children, onClose, layout }: WindowProps) {
             aria-label="Zoom (not available)"
             tabIndex={-1}
           />
+          <button
+            type="button"
+            className="light light--min"
+            onClick={layout?.onMinimize}
+            disabled={!layout}
+            aria-label={layout ? "Minimise" : "Minimise (not available)"}
+            title={layout ? "Collapse" : undefined}
+            tabIndex={layout ? undefined : -1}
+          />
         </div>
-        <h2 className="win__title">{title}</h2>
       </div>
       <div className="win__body">{children}</div>
       {layout ? (

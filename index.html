@@ -23,31 +23,27 @@
 
     <link rel="icon" type="image/svg+xml" href="/brand/icon.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#0a3c8c" />
+    <meta name="theme-color" content="#5f7d9c" />
+    <!-- Inter (chrome and text) and JetBrains Mono (addresses): both SIL Open Font License 1.1, Google Fonts. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=JetBrains+Mono:wght@400;500&display=swap" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Quadra" />
 
-    <!-- The desktop, before any script has loaded. Without this the page opens
-         white and jumps to blue once the bundle arrives. -->
+    <!-- The desktop, before any script has loaded: the default Platinum desktop. Without this the
+         page opens white and jumps to it once the bundle arrives. -->
     <style>
       html,
       body {
         margin: 0;
-        background: #0a3c8c;
+        background-color: #5f7d9c;
       }
       body {
         min-height: 100vh;
-        background:
-          linear-gradient(
-            180deg,
-            #1a5fc4 0%,
-            #3c87dc 38%,
-            #6fb0e8 52%,
-            #79a83c 62%,
-            #4f7c28 100%
-          )
-          fixed;
+        background-image: conic-gradient(#63819f 0 25%, #5f7d9c 0 50%, #63819f 0 75%, #5f7d9c 0);
+        background-size: 4px 4px;
       }
     </style>
     <script type="module" src="/src/main.tsx"></script>

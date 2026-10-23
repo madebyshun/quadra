@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Window, type WindowLayout } from "@/ui/Window";
+import { MENUBAR_H, Window, type WindowLayout } from "@/ui/Window";
 import { Crt } from "@/ui/Crt";
 import { Gel } from "@/ui/Gel";
 
@@ -162,7 +162,7 @@ describe("Window with layout (the floating, multi-window desktop)", () => {
     expect(onMove).not.toHaveBeenCalled();
   });
 
-  it("never moves a dragged window above the top of the screen", () => {
+  it("never moves a dragged window up under the menu bar", () => {
     const onMove = vi.fn();
     render(
       <Window title="Send" layout={makeLayout({ x: 10, y: 20, onMove })}>
@@ -171,7 +171,7 @@ describe("Window with layout (the floating, multi-window desktop)", () => {
     );
     const bar = screen.getByLabelText("Send").querySelector(".win__bar")!;
     fireDrag(bar, 100, 100, 100, -500);
-    expect(onMove).toHaveBeenCalledWith(10, 0);
+    expect(onMove).toHaveBeenCalledWith(10, MENUBAR_H);
   });
 
   it("resizes from the corner grip, growing by the mouse delta", () => {

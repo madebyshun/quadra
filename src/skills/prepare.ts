@@ -15,6 +15,7 @@ import {
   type Pair,
 } from "@/adapters/http/launchpad";
 import { feePercent } from "@/config/launchpad";
+import { isApprovedReferrer } from "@/skills/launchpad";
 import { assertChecksummedAddress, hasAddressShape, toChecksumAddress } from "@/lib/address";
 import { formatAmount, parseAmount } from "@/lib/amount";
 import { approveData, balanceOf, ETH, ETH_GAS_RESERVE } from "@/lib/erc20";
@@ -76,6 +77,30 @@ export function feeOf(text: string, version: 2 | 3): LaunchFee | undefined {
   return found;
 }
 
+/**
+ * The referrer asked for (v3 only): an address, checked by the EIP-55 door; blank is none. An app that
+ * builds launches for its users (Blue Agent, owner 2026-10-22) names itself here to earn 5% of the
+ * coin's fees — counted by the factory only if its protocol recipient APPROVED it.
+ */
+export function referrerArg(text: string, version: 2 | 3): string | null {
+  const t = text.trim();
+  if (t === "") return null;
+  if (version === 2) throw new Error(`This launchpad (version 2) has no referrals — a referrer can be named once version 3 is deployed. Leave the referrer out.`);
+  return toChecksumAddress(assertChecksummedAddress(t, "Referrer"));
+}
+
+/** The referrer row: approved (counts), not approved (recorded as none), or not checked (unread — amber, never "no"). */
+export function referrerRow(referrer: string, approved: boolean | null): Row {
+  const href = { href: explorer.address(referrer) };
+  if (approved === null) return row("Referrer", `${referrer} — not checked: whether the launchpad approves it could not be read`, { tone: "warn", ...href });
+  return approved
+    ? row("Referrer", `${referrer} — approved: recorded for this coin; every fee splits 80% creator / 5% referrer / ~15% ${BRAND.name}`, { tone: "ok", ...href })
+    : row("Referrer", `${referrer} — NOT approved by the launchpad: the launch still goes through, recorded with no referrer (80% creator / 20% ${BRAND.name})`, {
+        tone: "warn",
+        ...href,
+      });
+}
+
 /** The transaction rows for one step: where it goes, the ETH it carries, and its calldata. */
 export function stepRows(n: number, what: string, tx: { to: string; value?: bigint; data?: string }): Row[] {
   return [
@@ -87,11 +112,12 @@ export function stepRows(n: number, what: string, tx: { to: string; value?: bigi
 }
 
 export async function prepareLaunch(args: readonly string[]): Promise<Report> {
-  const [nameText = "", symbolText = "", creatorText = "", pairText = "", buyText = "", feeText = ""] = args;
+  const [nameText = "", symbolText = "", creatorText = "", pairText = "", buyText = "", feeText = "", referrerText = ""] = args;
   const pinned = launchFactory();
   if ("waiting" in pinned) throw new Error(pinned.waiting);
   const factory = pinned.address;
   const fee = feeOf(feeText, pinned.version);
+  const referrer = referrerArg(referrerText, pinned.version);
   // a name with spaces arrives joined by underscores — a Terminal line splits on spaces
   const meta: Metadata = { name: nameText.replace(/_/g, " ").trim(), symbol: symbolText.trim(), description: "", image: "", website: "" };
   const bad = metadataProblem(meta);
@@ -105,10 +131,11 @@ export async function prepareLaunch(args: readonly string[]): Promise<Report> {
   const stock = pair.address !== ETH_QUOTE;
 
   const salt = newSalt();
-  const [token, eth, held] = await Promise.all([
+  const [token, eth, held, approved] = await Promise.all([
     predictToken(factory, creator, salt),
     balanceOf(ETH, creator).catch(() => null),
     stock && firstBuy > 0n ? balanceOf({ kind: "erc20", address: pair.address, symbol: pair.symbol, decimals: pair.decimals }, creator).catch(() => null) : Promise.resolve(null),
+    referrer === null ? Promise.resolve(null) : isApprovedReferrer(factory, referrer).catch(() => null),
   ]);
   const needEth = (stock ? 0n : firstBuy) + ETH_GAS_RESERVE;
   const funds: Row[] = [
@@ -126,7 +153,7 @@ export async function prepareLaunch(args: readonly string[]): Promise<Report> {
       : []),
   ];
 
-  const launch = launchTx(factory, meta, salt, pair, firstBuy, fee);
+  const launch = launchTx(factory, meta, salt, pair, firstBuy, fee, referrer ?? undefined);
   const pct = fee === undefined ? "1%" : feePercent(fee);
   // v3: the opening as its hook answered at the check — the numbers, not the deploy script's defaults
   const v3Rows =
@@ -167,13 +194,16 @@ export async function prepareLaunch(args: readonly string[]): Promise<Report> {
         { href: explorer.address(factory), tone: "ok" },
       ),
       ...v3Rows,
+      ...(referrer === null ? [] : [referrerRow(referrer, approved)]),
       ...funds,
       ...steps,
     ],
     notes: [
       "Nothing was signed or sent. Send each step from the creator's own wallet, in order, waiting for each to confirm — and simulate it first (eth_call), as this app does before every transaction.",
       "The salt is random and binds the token's address to this creator: anyone else sending this calldata gets a different token, or none.",
-      `Public: the token, the creator's address and every trade are visible on Base. The creator earns 80% of the pool's ${pct} fee; ${BRAND.name} 20%.`,
+      referrer !== null && approved === true
+        ? `Public: the token, the creator's address, its referrer and every trade are visible on Base. The creator earns 80% of the pool's ${pct} fee, the referrer 5%, ${BRAND.name} the rest (~15%).`
+        : `Public: the token, the creator's address and every trade are visible on Base. The creator earns 80% of the pool's ${pct} fee; ${BRAND.name} 20%.`,
       ...(stock ? [`${pair.symbol} is a Coinbase stock token: Coinbase restricts who may hold it (eligible persons outside the U.S.).`] : []),
     ],
     sources: [`Base (the launchpad${stock ? ", the pair's token" : ""} and the creator's balances, read directly)`],
@@ -192,6 +222,7 @@ export const prepareLaunchSkill: Skill = {
     { name: "pair", hint: "ETH, a stock symbol like NVDAc, or its address", optional: true },
     { name: "first buy", hint: "0.01 — in the pair's own units", optional: true },
     { name: "fee", hint: "1% or 3% — launchpad version 3 only; 1% if left out", optional: true },
+    { name: "referrer", hint: "0x… an APPROVED referrer earns 5% of the fees — version 3 only; none if left out", optional: true },
   ],
   run: (args) => prepareLaunch(args),
 };

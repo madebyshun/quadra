@@ -88,15 +88,45 @@ describe("a skill run from a window", () => {
     expect(Object.keys(SHORTCUTS)).not.toContain("bridge");
     // a window with a shortcut, switched off, leaves the list — and says it is off when asked for
     flags.x402 = false;
-    expect(windowsText()).not.toMatch(/^x402 /m);
+    expect(windowsText()).not.toMatch(/^ +x402 /m);
     expect(parseCommand("x402")).toEqual({ kind: "off", title: "x402" });
     flags.x402 = true;
-    expect(windowsText()).toMatch(/^x402 /m);
+    expect(windowsText()).toMatch(/^ +x402 /m);
+  });
+});
+
+describe("the desktop's folders (2026-10-21)", () => {
+  it("opens a folder by its word; a bare `research` stays the Research window", () => {
+    expect(opened("open research")).toEqual({ window: "folder-research", params: {} });
+    expect(opened("open Money")).toEqual({ window: "folder-money", params: {} });
+    expect(opened("money")).toEqual({ window: "folder-money", params: {} });
+    expect(opened("launchpad")).toEqual({ window: "folder-launchpad", params: {} });
+    expect(opened("games")).toEqual({ window: "folder-games", params: {} });
+    expect(opened("agents")).toEqual({ window: "folder-agents", params: {} });
+    expect(opened("computer")).toEqual({ window: "computer", params: {} });
+    expect(opened("open computer")).toEqual({ window: "computer", params: {} });
+    expect(opened("control")).toEqual({ window: "control", params: {} });
+    expect(opened("readme")).toEqual({ window: "readme", params: {} });
+    expect(opened("open folder-games")).toEqual({ window: "folder-games", params: {} });
+    expect(opened("research")).toEqual({ window: "research", params: {} });
+  });
+
+  it("lists the windows by folder, the way the desktop shows them", () => {
+    const lines = windowsText().split("\n");
+    expect(lines[0]).toBe("On the desktop:");
+    expect(lines).toContain("Folders:");
+    const money = lines.findIndex((l) => l.startsWith("  open money"));
+    expect(lines[money]).toContain("Money — wallet, send, swap, trade");
+    expect(lines[money + 1]).toMatch(/^ {4}wallet +Wallet — connect one you control$/);
+    expect(windowsText()).toMatch(/^ {2}readme +README\.TXT — start here$/m);
+    expect(windowsText()).toMatch(/^ {2}trash +Trash/m);
+    // a program with no shortcut word of its own is opened by id
+    expect(windowsText()).toMatch(/^ {4}open soon +Coming Soon/m);
   });
 });
 
 describe("the new windows' shortcuts (2026-10-14)", () => {
-  it("open Task Manager, the Recycle Bin, Rugsweeper, Achievements and the Leaderboard", () => {
+  it("open Task Manager, the Trash, Rugsweeper, Achievements and the Leaderboard", () => {
     expect(opened("taskmgr")).toEqual({ window: "taskmgr", params: {} });
     expect(opened("top")).toEqual({ window: "taskmgr", params: {} });
     expect(opened("trash")).toEqual({ window: "trash", params: {} });

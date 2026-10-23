@@ -205,6 +205,11 @@ describe("the strings a rename must NOT touch stay literal", () => {
       literal: '"quadra.watch.v1"',
       what: "the localStorage key the Markets watchlist is kept under",
     },
+    {
+      file: "src/lib/welcome.ts",
+      literal: '"quadra.welcome.v1"',
+      what: "the localStorage key the Welcome screen's \"show next time\" is kept under",
+    },
     // `quadra.pools.v1` (remembered chart pools) was RETIRED on 2026-09-30, when DexScreener
     // began naming each token's pool. Browsers may still hold it: never reuse that key for
     // another shape — pick a new one.

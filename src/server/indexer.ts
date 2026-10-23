@@ -4,7 +4,7 @@ import { DYNAMIC_FEE_FLAG, LAUNCH_HOOK_ABI, LAUNCHPAD_ABI, LAUNCHPAD_EXPECTS } f
 import { toChecksumAddress } from "@/lib/address";
 import { messageOf } from "@/lib/errors";
 import { keccak256, toHex, utf8 } from "@/lib/keccak";
-import { factories, isV3, LAUNCHED_TOPIC, poolIdOf, quotePerToken } from "@/skills/launchpad";
+import { factories, isV3, LAUNCHED_TOPIC, poolIdOf, quotePerToken, REFERRED_TOPIC } from "@/skills/launchpad";
 import { rpcOn } from "@/skills/http";
 import { isObj, listOf, strOf } from "@/skills/json";
 import { ARCHIVE_RPC } from "@/skills/origin";
@@ -117,10 +117,12 @@ export type IndexState = {
   /** transaction hash → its sender, for the swaps whose trader was looked up */
   readonly traders: Map<string, string>;
   readonly quotes: Map<string, { readonly symbol: string; readonly decimals: number }>;
+  /** token (lowercase) → its referrer, from v3's `Referred` logs (read with the launches) */
+  readonly referrers: Map<string, string>;
 };
 
 export function emptyState(): IndexState {
-  return { syncedTo: FIRST_BLOCK - 1, coins: new Map(), swaps: new Map(), traders: new Map(), quotes: new Map() };
+  return { syncedTo: FIRST_BLOCK - 1, coins: new Map(), swaps: new Map(), traders: new Map(), quotes: new Map(), referrers: new Map() };
 }
 
 const address = (topic: string) => toChecksumAddress(`0x${topic.slice(-40)}`);
@@ -151,6 +153,25 @@ export function applyLaunches(state: IndexState, logs: unknown, clock: Clock): n
       devBuyTokens,
       detail: null,
     });
+    added++;
+  }
+  return added;
+}
+
+/**
+ * v3's `Referred` logs into each coin's referrer. Only the factories' own logs are asked for, and only
+ * an APPROVED referrer is ever announced by one (an unapproved one is `ReferralIgnored`), so a log
+ * here IS the referrer the coin's fees are split with. Anything else in the list is skipped.
+ */
+export function applyReferrals(state: IndexState, logs: unknown): number {
+  let added = 0;
+  for (const log of listOf(logs)) {
+    if (!isObj(log)) continue;
+    const topics = topicsOf(log);
+    if (topics[0] !== REFERRED_TOPIC || topics.length !== 3) continue;
+    const token = address(topics[1]!).toLowerCase();
+    if (state.referrers.has(token)) continue;
+    state.referrers.set(token, address(topics[2]!));
     added++;
   }
   return added;
@@ -204,6 +225,8 @@ export type CoinRow = {
   readonly feeBps: number | null;
   /** v3's opening: the fee at the pool's first second in basis points, and how long it took to fall — `null` on v1/v2 */
   readonly opening: { readonly fromBps: number; readonly seconds: number } | null;
+  /** v3: the approved referrer recorded at launch (fees split 80 / 5 / ~15) — `null` for none, and on v1/v2 */
+  readonly referrer: string | null;
   /** whole quote units per whole token, at the LAST trade — null before the first one or the details */
   readonly price: number | null;
   readonly tick: number | null;
@@ -269,6 +292,7 @@ function rowOf(state: IndexState, coin: Coin, now: number): CoinRow {
     quoteDecimals: d?.quoteDecimals ?? null,
     feeBps: d ? d.fee / 100 : isV3(coin.factory) ? null : LAUNCHPAD_EXPECTS.lpFee / 100,
     opening: d?.opening ? { fromBps: d.opening.startFee / 100, seconds: d.opening.window } : null,
+    referrer: state.referrers.get(coin.token.toLowerCase()) ?? null,
     price,
     tick: last?.tick ?? null,
     mcapInQuote: price === null ? null : price * Number(LAUNCHPAD_EXPECTS.supply / 10n ** 18n),
@@ -398,7 +422,7 @@ export function snapshot(state: IndexState, now: number, head: number | null = n
   }
   const creators = [...byCreator.values()].sort((a, b) => b.launches - a.launches || b.lastLaunchAt - a.lastLaunchAt);
   return {
-    source: "Base: the launchpad factories' Launched logs and the v4 PoolManager's Swap logs for their pools",
+    source: "Base: the launchpad factories' Launched and Referred logs and the v4 PoolManager's Swap logs for their pools",
     syncedTo: state.syncedTo,
     head,
     behind: head === null ? null : Math.max(0, head - state.syncedTo),
@@ -499,7 +523,10 @@ export async function syncOnce(state: IndexState, rpc: Rpc, head: Head, maxChunk
       const from = state.syncedTo + 1;
       const to = Math.min(from + CHUNK - 1, head.number);
       const range = { fromBlock: hex(from), toBlock: hex(to) };
-      launches += applyLaunches(state, await rpc("eth_getLogs", [{ address: factories(), topics: [LAUNCHED_TOPIC], ...range }]), clock);
+      // launches and v3's referrals in one request (topic0 an OR-list); a referral is in its launch's tx, so the same chunk
+      const logs = await rpc("eth_getLogs", [{ address: factories(), topics: [[LAUNCHED_TOPIC, REFERRED_TOPIC]], ...range }]);
+      launches += applyLaunches(state, logs, clock);
+      applyReferrals(state, logs);
       const ids = [...state.coins.keys()];
       for (let i = 0; i < ids.length; i += ID_BATCH) {
         const logs = await rpc("eth_getLogs", [{ address: UNISWAP_V4_POOL_MANAGER, topics: [SWAP_TOPIC, ids.slice(i, i + ID_BATCH)], ...range }]);

@@ -17,6 +17,11 @@
  *   block T+20  quote → a buyer buys 0.1 ETH of each coin → collect; then the buyer SELLS 1,000,000 of
  *               the 1% coin: approve Permit2, Permit2-approve the router, quote, swap
  *
+ * REFERRALS (2026-10-22): in block T the protocol recipient (the treasury — an eth_simulateV1 call may
+ * come from any address) approves a keyless REFERRER, and the app launches a REFERRED 1% coin through
+ * `launchTx(…, referrer)`; its first buy's fee and, at T+20, a 0.1 ETH buy's are collected, and each
+ * collection's ETH payouts (traceTransfers) are printed per recipient: 80 / 5 / the remainder, to the wei.
+ *
  * Against the real Uniswap v4 PoolManager, Quoter, Universal Router, Permit2 and the real B20
  * precompile. mainnet.base.org first, Tenderly's public gateway on a 429 (the indexer's endpoints).
  * Hand-run; never broadcasts, holds no key:
@@ -54,6 +59,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SIM = "0x5157000000000000000000000000000000005157";
 const SNIPER = "0x5157000000000000000000000000000000005158";
 const BUYER = "0x5157000000000000000000000000000000005159";
+const REFERRER = "0x515700000000000000000000000000000000515A";
 const B20_FACTORY = "0xB20f000000000000000000000000000000000000";
 const ETH = "0x0000000000000000000000000000000000000000";
 const ETH_START = 191_200;
@@ -71,6 +77,8 @@ const FACTORY_ABI = parseAbi([
   "function launch(string name, string symbol, string contractURI, bytes32 salt, address quote, uint256 quoteIn) payable returns (address)",
   "function collect(address token) returns (uint256, uint256)",
   "function hook() view returns (address)",
+  "function setReferrer(address referrer, bool approved)",
+  "function referrerOf(address token) view returns (address)",
 ]);
 const ERC20 = parseAbi(["function balanceOf(address) view returns (uint256)"]);
 const TRANSFER = keccak256(toHex("Transfer(address,address,uint256)"));
@@ -123,7 +131,8 @@ const predict = async (at: Hex, salt: Hex) => {
   return `0x${((await rpc("eth_call", [{ to: B20_FACTORY, data }, AT])) as string).slice(-40)}` as Hex;
 };
 const [oneSalt, threeSalt] = [toHex(1, { size: 32 }), toHex(2, { size: 32 })];
-const [one, three] = [await predict(factory, oneSalt), await predict(factory, threeSalt)];
+const refSalt = toHex(3, { size: 32 });
+const [one, three, referred] = [await predict(factory, oneSalt), await predict(factory, threeSalt), await predict(factory, refSalt)];
 
 const FIRST_BUY = 10n ** 16n;
 const BUY = 10n ** 17n;
@@ -138,8 +147,8 @@ const call = (from: string, to: string | undefined, data: Hex, value = 0n) => ({
 const ETH_PAIR: Pair = { address: ETH, symbol: "ETH", name: "Ether", decimals: 18, startTick: ETH_START };
 const meta = { name: "Sim Cat", symbol: "SCAT", description: "simulated", image: "", website: "" };
 // THE APP'S OWN LAUNCH TRANSACTION — what the Launch window and the `launch` skill send
-const appLaunch = (salt: Hex, fee: 10_000 | 30_000) => {
-  const tx = launchTx(factory, meta, salt, ETH_PAIR, FIRST_BUY, fee);
+const appLaunch = (salt: Hex, fee: 10_000 | 30_000, referrer?: string) => {
+  const tx = launchTx(factory, meta, salt, ETH_PAIR, FIRST_BUY, fee, referrer);
   return call(SIM, tx.to, tx.data as Hex, tx.value);
 };
 const collect = (token: Hex) => call(SIM, factory, encodeFunctionData({ abi: FACTORY_ABI, functionName: "collect", args: [token] }));
@@ -180,6 +189,10 @@ const blocks: { blockOverrides: { time: string }; stateOverrides?: Record<string
       ["APP launchTx: 3% coin, 0.01 ETH first buy", appLaunch(threeSalt, 30_000)],
       ["collect 1% coin (the first buy's fee)", collect(one)],
       ["collect 3% coin (the first buy's fee)", collect(three)],
+      ["treasury: setReferrer(REFERRER, true)", call(CONTRACTS.treasury as Hex, factory, encodeFunctionData({ abi: FACTORY_ABI, functionName: "setReferrer", args: [REFERRER, true] }))],
+      ["APP launchTx: REFERRED 1% coin, 0.01 ETH", appLaunch(refSalt, 10_000, REFERRER)],
+      ["factory.referrerOf(referred coin)", call(SIM, factory, encodeFunctionData({ abi: FACTORY_ABI, functionName: "referrerOf", args: [referred] }))],
+      ["collect REFERRED coin (the first buy's fee)", collect(referred)],
       ["v2 launch, 0.01 ETH first buy", call(SIM, v2, encodeFunctionData({ abi: FACTORY_ABI, functionName: "launch", args: ["Sim Cat", "SCAT", "", oneSalt, ETH, FIRST_BUY] }), FIRST_BUY)],
     ],
   },
@@ -206,6 +219,8 @@ const blocks: { blockOverrides: { time: string }; stateOverrides?: Record<string
       ["T+20s: APP buildSwap, buyer buys 0.1 ETH (3%)", swap(BUYER, three, "buy", BUY)],
       ["T+20s: 3% coin held by the buyer", balance(three, BUYER)],
       ["collect 3% coin (the buyer's fee)", collect(three)],
+      ["T+20s: APP buildSwap, buyer buys 0.1 ETH (referred)", swap(BUYER, referred, "buy", BUY)],
+      ["collect REFERRED coin (the buyer's fee)", collect(referred)],
       ["APP approveData: 1% coin → Permit2, exact", call(BUYER, one, approveData(UNISWAP_V4.permit2, SELL))],
       ["APP permit2ApproveData: router, exact", call(BUYER, UNISWAP_V4.permit2, permit2ApproveData(one, UNISWAP_V4.universalRouter, SELL, deadline))],
       ["T+20s: Quoter, sell 1,000,000 of 1% coin", quote(BUYER, one, "sell", SELL)],
@@ -221,7 +236,24 @@ const result = (await rpc("eth_simulateV1", [
 ])) as { timestamp: string; calls: { status: string; gasUsed: string; returnData: string; logs: { address: string; topics: string[]; data: string }[]; error?: { message: string } }[] }[];
 
 let lastQuote = 0n;
-const paidFor: Record<string, bigint> = { "collect 1% coin (the first buy's fee)": FIRST_BUY, "collect 3% coin (the first buy's fee)": FIRST_BUY };
+const paidFor: Record<string, bigint> = {
+  "collect 1% coin (the first buy's fee)": FIRST_BUY,
+  "collect 3% coin (the first buy's fee)": FIRST_BUY,
+  "collect REFERRED coin (the first buy's fee)": FIRST_BUY,
+};
+const splits: string[] = [];
+/** A referred collection's ETH payouts, read from the native transfers traceTransfers reports out of the factory. */
+const splitOf = (name: string, eth: bigint, logs: { address: string; topics: string[]; data: string }[]) => {
+  const to = (who: string) =>
+    logs
+      .filter((l) => l.address.toLowerCase() === NATIVE_LOGS && l.topics[0] === TRANSFER && `0x${l.topics[1]!.slice(-40)}` === factory.toLowerCase() && `0x${l.topics[2]!.slice(-40)}` === who.toLowerCase())
+      .reduce((sum, l) => sum + BigInt(l.data), 0n);
+  const [c, r, p] = [to(SIM), to(REFERRER), to(CONTRACTS.treasury as string)];
+  const exact = c === (eth * 8000n) / 10000n && r === (eth * 500n) / 10000n && p === eth - c - r;
+  splits.push(
+    `${name}: ${eth} wei → creator ${c} (${((Number(c) / Number(eth)) * 100).toFixed(3)}%) · referrer ${r} (${((Number(r) / Number(eth)) * 100).toFixed(3)}%) · protocol ${p} (${((Number(p) / Number(eth)) * 100).toFixed(3)}%) · sum ${c + r + p === eth ? "= collected, to the wei" : `≠ collected (${c + r + p})`} · ${exact ? "EXACTLY 80/5/remainder" : "NOT 80/5/remainder"}`,
+  );
+};
 console.log(`pinned on Base block ${Number(AT)} (time ${Number(pinned.timestamp)})`);
 result.forEach((block, b) => {
   console.log(`— block at T+${BigInt(block.timestamp) - T}s`);
@@ -235,6 +267,7 @@ result.forEach((block, b) => {
       else {
         const paid = paidFor[name] ?? BUY;
         value = `${eth} wei ETH (${((Number(eth) / Number(paid)) * 100).toFixed(3)}% of ${Number(paid) / 1e18} ETH) / ${tokens} token`;
+        if (name.includes("REFERRED")) splitOf(name, eth, c.logs);
       }
     } else if (ok && name.includes("currentFee")) {
       value = `${Number(BigInt(c.returnData))} (${(Number(BigInt(c.returnData)) / 1e4).toFixed(2)}%)`;
@@ -251,10 +284,11 @@ result.forEach((block, b) => {
         .filter((l) => l.address.toLowerCase() === NATIVE_LOGS && l.topics[0] === TRANSFER && `0x${l.topics[2]!.slice(-40)}`.toLowerCase() === BUYER.toLowerCase())
         .reduce((sum, l) => sum + BigInt(l.data), 0n);
       value = `delivered ${got} wei ETH; quote ${lastQuote}; ${got === lastQuote ? "EXACTLY the quote" : `differs by ${got - lastQuote}`}`;
-    } else if (ok && (name.includes("launch") || name === "factory.hook()")) {
+    } else if (ok && (name.includes("launch") || name === "factory.hook()" || name.includes("referrerOf"))) {
       value = `0x${c.returnData.slice(-40)}`;
     }
     console.log(`${ok ? "✓" : "✗"} ${name.padEnd(48)} gas ${String(Number(BigInt(c.gasUsed))).padStart(9)}  ${ok ? value : c.error?.message}`);
   });
 });
-console.log(`factory ${factory} · hook ${hook} (salt ${BigInt(hookSalt)}) · 1% coin ${one} · 3% coin ${three}`);
+for (const line of splits) console.log(line);
+console.log(`factory ${factory} · hook ${hook} (salt ${BigInt(hookSalt)}) · 1% coin ${one} · 3% coin ${three} · referred coin ${referred} (referrer ${REFERRER})`);

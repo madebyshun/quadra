@@ -17,6 +17,10 @@ import { LOG_PAGES } from "@/skills/launchpad";
 import { FAKE_ETH, OWNER, PX } from "./fixtures/profile";
 import { DOWN, basenames, ethCalls, net, useNet, type Answer } from "./net";
 import { chainRoutes, getRoutes, T, V1_LOGS, wallet } from "./launchpadChain";
+import { withoutV3 } from "./v2only";
+
+// Its fixtures are real v2/v1 captures, so it runs as the app did before v3 was set.
+withoutV3();
 
 useNet();
 vi.mock("@/lib/connectors", () => ({ walletConnectProvider: vi.fn(), coinbaseProvider: vi.fn() }));
@@ -227,33 +231,15 @@ describe("the Profile window", () => {
     expect(who).toHaveTextContent("Accountnot read");
   });
 
-  it("draws the Base card from what was read — a verified Basename by name", async () => {
+  it("opens the Base card program, which asks for an X handle — no address is passed", async () => {
     wallet(null);
-    const own = ethCalls(basenames({ resolver: RESOLVER, reverse: { [OWNER]: "shun.base.eth" }, forward: { "shun.base.eth": OWNER } }));
-    net({ rpc: chainRoutes({ code: DELEGATED, holding: 5n * 10n ** 24n, calls: own }), get: routes().get });
-    mount(`/?do=profile&a=${OWNER}`);
-    const who = await screen.findByLabelText("Who");
-    await waitFor(() => expect(who).toHaveTextContent("Launched here1 coin"));
+    net(routes());
+    const open = vi.fn();
+    mount(`/?do=profile&a=${OWNER}`, open);
     await screen.findByLabelText("Holdings");
-    await userEvent.click(screen.getByRole("button", { name: "Activity" }));
-    await screen.findByLabelText("Activity", { selector: "ul" });
     await userEvent.click(screen.getByRole("button", { name: "Base card" }));
-    const card = screen.getByRole("img", { name: "Base card for shun.base.eth" });
-    expect(card).toHaveTextContent("Coins launched here: 1 coin");
-    expect(card).toHaveTextContent(/Holdings: ETH and \d+ priced tokens/);
-    expect(card).toHaveTextContent(/Fake look-alike tokens dodged: [1-9]/);
-  });
-
-  it("says 'not read' on the Base card for every fact that could not be", async () => {
-    wallet(null);
-    net({ rpc: routes().rpc, get: () => DOWN });
-    mount(`/?do=profile&a=${OWNER}`);
-    const who = await screen.findByLabelText("Who");
-    await waitFor(() => expect(who).toHaveTextContent("Launched herenot read"));
-    await userEvent.click(screen.getByRole("button", { name: "Base card" }));
-    const card = screen.getByRole("img", { name: `Base card for ${OWNER}` });
-    expect(card).toHaveTextContent("Coins launched here: not read");
-    expect(card).toHaveTextContent("Holdings: not read");
+    await userEvent.click(screen.getByRole("button", { name: "Make my Base card" }));
+    expect(open).toHaveBeenCalledWith("card");
   });
 
   it("says when the launchpad's index ran out of pages, and shows an undated, unlinked movement plainly", async () => {

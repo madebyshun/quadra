@@ -31,7 +31,16 @@ import {LaunchHook} from "./LaunchHook.sol";
 ///         - only this factory can open a pool with its hook, so nobody can open a coin's pool first
 ///           at another price — not even for a token address `predictToken` has made public.
 ///         Every fee the pool charges is an LP fee earned by the factory's locked position, and
-///         `collect` splits it 80% to the launcher and 20% to the protocol, in both currencies.
+///         `collect` splits it 80% to the launcher and 20% to the protocol, in both currencies;
+///         - REFERRALS (owner, 2026-10-22): a launch may name a referrer — an app that built the launch
+///           for its user. It counts only if the protocol recipient has APPROVED it (`setReferrer`) at
+///           the moment of the launch; an unapproved one is recorded as none and announced as ignored
+///           (`ReferralIgnored`), never a revert, so a stale referral cannot block a launch. A counted
+///           referrer is fixed for the coin's life (`referrerOf`, announced by `Referred`) and takes 5%
+///           out of the protocol's 20%: launcher 80%, referrer 5%, protocol the remainder (~15%), so no
+///           wei is lost. Removing a referrer from the list stops it counting for NEW launches only —
+///           a referral already recorded keeps being paid, because `collect` never reads the list.
+///           A creator may name themselves only if they are approved, like anyone else.
 ///
 /// @dev The pool's key carries LPFeeLibrary.DYNAMIC_FEE_FLAG as its fee and `hook` as its hooks: the
 ///      hook sets every swap's fee. The hook is deployed BY this factory's constructor with a mined
@@ -54,6 +63,8 @@ contract LaunchFactoryV3 is IUnlockCallback {
     int24 public constant TICK_SPACING = 200;
     /// @notice The launcher's share of every fee collected, in basis points; the rest is the protocol's.
     uint16 public constant CREATOR_SHARE_BPS = 8_000;
+    /// @notice A recorded referrer's share of every fee collected, in basis points, taken out of the protocol's.
+    uint16 public constant REFERRER_SHARE_BPS = 500;
     /// @notice Where the rounding dust of the opening liquidity goes: out of circulation.
     address public constant DEAD = 0x000000000000000000000000000000000000dEaD;
 
@@ -97,6 +108,11 @@ contract LaunchFactoryV3 is IUnlockCallback {
 
     uint256 private _locked = 1;
 
+    /// @notice Referrers the protocol recipient approved; only these count when a launch names one.
+    mapping(address referrer => bool) public approvedReferrers;
+    /// @notice The referrer recorded for a coin at its launch (zero: none). Never changes afterwards.
+    mapping(address token => address) public referrerOf;
+
     enum Op {
         Open,
         Collect
@@ -117,6 +133,13 @@ contract LaunchFactoryV3 is IUnlockCallback {
     /// @dev New in v3, emitted just before `Launched` (which keeps v1/v2's exact signature, so one
     ///      reader still serves every factory): the coin's chosen fee.
     event LaunchFee(address indexed token, uint24 fee);
+    /// @dev New in v3: the approved list changed (only the protocol recipient changes it).
+    event ReferrerSet(address indexed referrer, bool approved);
+    /// @dev New in v3, emitted before `Launched`: this coin's referrer, recorded for good.
+    event Referred(address indexed token, address indexed referrer);
+    /// @dev New in v3, emitted before `Launched`: the launch named a referrer that was not approved,
+    ///      so it was recorded as none.
+    event ReferralIgnored(address indexed token, address indexed referrer);
 
     error NotPoolManager();
     error NotLaunched();
@@ -174,6 +197,7 @@ contract LaunchFactoryV3 is IUnlockCallback {
     /// @param name the token's name
     /// @param symbol the token's symbol
     /// @param contractURI ERC-7572 metadata (a URL or a data: URI); fixed forever
+    /// @param referrer who brought this launch (`address(0)` = none); counted only if approved now
     /// @param salt any value; the token's address is derived from it AND the caller
     /// @param quote what the token trades against: `address(0)` for ETH, or an enabled asset
     /// @param quoteIn the first buy, in the quote's raw units — sent as `msg.value` for ETH, or
@@ -186,7 +210,8 @@ contract LaunchFactoryV3 is IUnlockCallback {
         bytes32 salt,
         address quote,
         uint256 quoteIn,
-        uint24 fee
+        uint24 fee,
+        address referrer
     ) external payable nonReentrant returns (address token) {
         Quote memory q = quotes[quote];
         if (!q.enabled) revert QuoteNotEnabled();
@@ -198,6 +223,14 @@ contract LaunchFactoryV3 is IUnlockCallback {
         // the hook learns the coin's fee and its opening second before the pool exists
         hook.register(key.toId(), fee);
         emit LaunchFee(token, fee);
+        if (referrer != address(0)) {
+            if (approvedReferrers[referrer]) {
+                referrerOf[token] = referrer;
+                emit Referred(token, referrer);
+            } else {
+                emit ReferralIgnored(token, referrer);
+            }
+        }
 
         // An exact-input buy spends all of `quoteIn`: the range runs to the far end of the prices v4
         // allows, so no buy can exhaust it and stop early at the price limit with some left over.
@@ -273,17 +306,31 @@ contract LaunchFactoryV3 is IUnlockCallback {
         emit QuoteAdminChanged(msg.sender);
     }
 
+    // ───────────────────────────────────────────────────────────── referrers
+
+    /// @notice Approve (or stop approving) a referrer for NEW launches. Only the protocol recipient may:
+    ///         a referrer is paid out of the protocol's share, so the party that gives it up decides.
+    ///         Launches already recorded keep their referrer either way.
+    function setReferrer(address referrer, bool approved) external {
+        if (msg.sender != protocolRecipient) revert NotAllowed();
+        if (referrer == address(0)) revert ZeroAddress();
+        approvedReferrers[referrer] = approved;
+        emit ReferrerSet(referrer, approved);
+    }
+
     // ───────────────────────────────────────────────────────────── fees
 
     /// @notice Collect a token's pool fees and pay them out: 80% to the launcher's recipient, 20% to
-    ///         the protocol, in both of the pool's currencies. Anyone may call it.
+    ///         the protocol — or, for a referred coin, 80% / 5% to its referrer / the remainder to the
+    ///         protocol — in both of the pool's currencies. Anyone may call it.
     function collect(address token) external nonReentrant returns (uint256 amount0, uint256 amount1) {
         Launch storage l = _launches[token];
         if (l.creator == address(0)) revert NotLaunched();
         (amount0, amount1) = abi.decode(poolManager.unlock(abi.encode(Op.Collect, token, uint256(0), address(0))), (uint256, uint256));
         emit FeesCollected(token, amount0, amount1);
-        _split(l.key.currency0, amount0, l.creatorRecipient);
-        _split(l.key.currency1, amount1, l.creatorRecipient);
+        address referrer = referrerOf[token];
+        _split(l.key.currency0, amount0, l.creatorRecipient, referrer);
+        _split(l.key.currency1, amount1, l.creatorRecipient, referrer);
     }
 
     /// @notice Hand the launcher's share on to another address. Only the current recipient may.
@@ -416,11 +463,17 @@ contract LaunchFactoryV3 is IUnlockCallback {
         if (!ok || (answer.length > 0 && !abi.decode(answer, (bool)))) revert TransferFailed();
     }
 
-    function _split(Currency currency, uint256 amount, address creatorRecipient) private {
+    function _split(Currency currency, uint256 amount, address creatorRecipient, address referrer) private {
         if (amount == 0) return;
         uint256 toCreator = amount * CREATOR_SHARE_BPS / 10_000;
         _send(currency, creatorRecipient, toCreator);
-        _send(currency, protocolRecipient, amount - toCreator);
+        uint256 toReferrer;
+        if (referrer != address(0)) {
+            toReferrer = amount * REFERRER_SHARE_BPS / 10_000;
+            _send(currency, referrer, toReferrer);
+        }
+        // the protocol takes the remainder, so the rounding of both shares stays in the split
+        _send(currency, protocolRecipient, amount - toCreator - toReferrer);
     }
 
     /// @dev Pushes, and keeps as `owed` whatever the recipient — or the asset's own transfer policy —

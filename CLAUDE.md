@@ -3,7 +3,7 @@
 An on-chain supercomputer for Base 8453: look up any token or wallet, scan for traps before
 you act, then send, swap or launch a coin — every action signed in the user's
 own wallet, no key ever held here. Named after the 1991 Macintosh Quadra and dressed like
-the software of that era. One page, Windows-XP chrome, `?do=<id>` opens a window, and every
+the software of that era. One page, Mac OS 8 "Platinum" chrome (since 2026-10-22; Windows XP before), `?do=<id>` opens a window, and every
 skill is also a line in the Terminal. It reads BlueAgent's x402 catalog as **one directory
 of tools to spend on** — not a platform it is built on — and it is a separate product in a
 separate repo and must stay that way.
@@ -55,7 +55,7 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. **1971 tests in 97 files**, 100% on all four metrics, measured 2026-10-21 after the coin chart's frames and opening price (1968/97 earlier that day, after the app was wired to launchpad v3; 1945/96 on 2026-10-14; 1918/95 before the coin page, same day) (1684/76 on 2026-10-02, before the "more fun" programs, the wallet's fees,
+in one go. Do not report "done" on a subset. **2081 tests in 105 files**, 100% on all four metrics, measured 2026-10-22 after Explore Base, the coin page's CA, the compact small-number format and the Mac OS 8 "Platinum" redesign (2049/102 earlier that day, after v3's approved referrers reached the app, and re-measured the same day after v3's deploy, when v2-fixture test files were pinned to `launchFactoryV3: null` (`tests/v2only.ts`); 2041/102 earlier that day, after the desktop was reorganised into folders; 2017/101 on 2026-10-21, with the Base card program (`card`) and the Welcome screen in the tree; 1971/97 earlier that day, after the coin chart's frames and opening price; 1968/97 earlier that day, after the app was wired to launchpad v3; 1945/96 on 2026-10-14; 1918/95 before the coin page, same day) (1684/76 on 2026-10-02, before the "more fun" programs, the wallet's fees,
 pool trading, the indexer and launchpad recognition; 1682/76 before the doc audit's fixes) — it FELL from 1627/68 the same day, deliberately: o1 was taken out
 of Launch and `tests/launch.test.tsx` went with it to `archive/o1/` (1608/67 before the verdict, radar and Launch window read the
 launchpad; 1585/66 before the launchpad's window; 1548/60 on 2026-10-01 before the 3D intro; 1547/59 on 2026-09-30, before the seven basic skills were deleted
@@ -82,9 +82,9 @@ commit.**
 `base-forge build` → `base-forge test` → `scripts/check-contract-coverage.ts` (100% of
 `contracts/src`, or it fails — `forge coverage` has no `--fail-under`). It needs **Base Foundry**
 (`base-foundryup --install v1.1.1`), because stock Foundry cannot reach the B20 precompile; it is
-not part of `npm run gate`, which must run on a bare clone. 77 tests (v2 30 + v3 47), 100% over 3
-files in `contracts/src` (`LaunchFactory.sol` v2, `LaunchFactoryV3.sol`, `LaunchHook.sol`), measured 2026-10-14
-(30 tests, 1 contract on 2026-10-02; 21 for v1, whose exact source is in `contracts/deployed/`). Run it whenever `contracts/` changes. The shielded pool's Foundry project stays in
+not part of `npm run gate`, which must run on a bare clone. 89 tests (v2 30 + v3 59), 100% over 3
+files in `contracts/src` (`LaunchFactory.sol` v2, `LaunchFactoryV3.sol`, `LaunchHook.sol`), measured 2026-10-22
+with v3's approved referrers (77 = 30 + 47 on 2026-10-14; 30 tests, 1 contract on 2026-10-02; 21 for v1, whose exact source is in `contracts/deployed/`). Run it whenever `contracts/` changes. The shielded pool's Foundry project stays in
 `archive/privacy/`; the Foundry lessons below apply to the launchpad.
 
 Dev server is `npm run dev` on **port 5273**.
@@ -227,7 +227,7 @@ Dev server is `npm run dev` on **port 5273**.
   grep the slug, template what turns up. Four strings are identifiers in data that already
   exists and must keep their shipped value forever: today `PINS_KEY`, `SPEND_KEY`, `WALLET_KEY`
   and `WATCH_KEY` (`quadra.pins.v1`, `quadra.spend.v1`, `quadra.wallet.v1`, `quadra.watch.v1`), plus since 2026-10-14 `SOUND_KEY`, `Q_KEY` and
-  `ACHIEVEMENTS_KEY` (`quadra.sound.v1`, `quadra.q.v1`, `quadra.achievements.v1`); until 2026-09-30 also `STORE_KEY`, the hash domain tag,
+  `ACHIEVEMENTS_KEY` (`quadra.sound.v1`, `quadra.q.v1`, `quadra.achievements.v1`), and since 2026-10-22 `WALLPAPER_KEY`, `SAVER_KEY`, `SAVER_MINUTES_KEY` (`quadra.wallpaper.v1`, `quadra.saver.v1`, `quadra.saver-minutes.v1`); until 2026-09-30 also `STORE_KEY`, the hash domain tag,
   `BACKUP_FORMAT` and the empty-leaf preimage, archived with the pool. A name shown to a person may change; a name
   some byte on a disk or on chain is already keyed to may not. `backupFilename` is the
   counter-example — derived from the slug, because nothing reads it back.
@@ -423,6 +423,13 @@ src/
                                amounts TRUNCATE, never round up; dust is "<0.0001", not 0;
                                a sub-cent price keeps four significant digits in positional
                                notation, because "$2.74e-8" reads as 2.74 dollars
+                               🔴 Since 2026-10-22 a coin's small numbers go through `compact`:
+                               subscript zeros from four zeros after the point, as DEX screens
+                               write them — 0.00000299 is "0.0₅299", 4.09e-8 is "0.0₇409" —
+                               never "e-6"; truncated; null/NaN/negative = "not read".
+                               `quoteWithUsd` DROPS the dollar half under a cent instead of
+                               printing "<$0.01 ·" beside it; `tinyPrice` for a coin's $ price.
+                               TokenPage (cards, info, trades, chart) and `quoteWords` use them
                    blockscout.ts / dexscreener.ts / goplus.ts — one module per source,
                                each a `parse*` (pure, tested on captures) plus a fetch. All
                                three answer CORS, measured. 🔴 GoPlus's field set depends
@@ -539,14 +546,37 @@ src/
                                exactly 0 and 95 ≥90%, and one hour held none at exactly 0 — hence
                                the threshold. Receipts read ONE AT A TIME; an unreadable one is
                                counted as `unread`, never dropped. A coin `lureOf` flags is named FAKE-
-                   Coming Soon — the off programs moved off the desktop into a folder
-                               (`desktopFeatures`, `comingSoon`, `CORNER` in registry.ts)
+                   Coming Soon — the off programs wait in a folder inside My Computer
+                               (`comingSoon`, `CORNER` in registry.ts)
+                   🔴 THE DESKTOP IN FOLDERS (owner, 2026-10-21, after solana95.com: "sắp xếp lại
+                               thư mục"; NO external-links directory — folders hold this app's programs
+                               only). registry.ts `FOLDERS`/`DESKTOP`/`folderItems`/`desktopItems`: the
+                               desktop is My Computer (`computer`: taskmgr, control, soon), Research
+                               (`folder-research`: research, safety, markets, profile), Money
+                               (`folder-money`: wallet, send, swap, trade, bridge when on), Launchpad
+                               (`folder-launchpad`: launch, coins, leaderboard, card), Games
+                               (`folder-games`), Agents (`folder-agents`: mcp, x402, api, docs, verify),
+                               then shortcuts Terminal, Launch, Coins, Wallet and README.TXT (`readme`);
+                               the Recycle Bin keeps its corner. Every old `?do=` id still opens its
+                               window directly. A folder is an Explorer window (panels/FolderPanel.tsx:
+                               inert File/Edit/View/Help, click selects, double-click or Enter opens,
+                               status bar "N objects" + the selection's blurb); folders, Control Panel
+                               and README have no flag (`Feature.flag` is optional = always on). The
+                               Start menu groups by folder; `windows` lists by folder; `open research`
+                               opens the FOLDER while a bare `research` stays the window
+                   panels/ControlPanel.tsx + lib/settings.ts + ui/useSettings.ts — wallpaper
+                               (Bliss / Windows 95 teal / Base blue dither / plain dark, a class on
+                               `.desktop`), sound (lib/sound.ts), screen saver on/off + idle minutes,
+                               Welcome at startup (lib/welcome.ts). NEW frozen keys
+                               `quadra.wallpaper.v1`, `quadra.saver.v1`, `quadra.saver-minutes.v1`;
+                               unreadable or unknown = the default
+                   panels/ReadmePanel.tsx — README.TXT in Notepad, prose via BRAND
                    lib/assistant.ts + ui/Assistant.tsx — Q (`quadra.q.v1`, frozen). Speaks only on
                                a REAL event: a red Verdict/Decision (ReportView `tipFor`), fees
                                waiting, a Rugsweeper win; the greeting once
                    features/commands.ts `EASTER` — Terminal easter eggs (kind "say"); never
                                shadow a skill or a shortcut
-                   ui/Screensaver.tsx — after 2 min idle, real blocks; off for reduced motion
+                   ui/Screensaver.tsx — after 2 min idle (Control Panel sets it), real blocks; off for reduced motion
                    lib/rugsweeper.ts (pure rules) + panels/RugsweeperPanel.tsx — mines are launches
                                Radar's quick checks flag red. 🔴 A hook whose Blockscout record could
                                not be read is NOT a mine
@@ -554,8 +584,27 @@ src/
                                wallet achievements read from the chain; unreadable = "not checked",
                                never "locked"
                    panels/LeaderboardPanel.tsx — indexer first, factory logs + DexScreener fallback
-                   panels/BaseCard.tsx — Profile tab: SVG → PNG in the browser, Share on X
-                               intent; nothing leaves unless the user sends it
+                   panels/BaseCard.tsx — the `card` program (2026-10-21, after Solana 95's card):
+                               Card Wizard → "Imaging" viewer → 1995 Paint around ONE 1600×900 SVG
+                               (Download = exactly what is shown). Picture: the VERIFIED Basename's
+                               own `avatar` record as a data: URL (untainted canvas), else a pixel
+                               face from the address (lib/cardArt.ts). Title + quote: lib/cardWords.ts,
+                               seeded by (address, roll); each has a `when` and a null fact satisfies
+                               none. Facts: lib/cardFacts.ts via Profile's own readers; `textOf` in
+                               skills/names.ts (MEASURED on jesse.base.eth). Profile's tab opens it
+                   config/baseApps.ts + panels/ExplorePanel.tsx — `explore`, "Explore Base" (2026-10-22,
+                               after solana95.com's directory): 12 folders, 82 projects as `<name>.exe`;
+                               a double click opens ONLY a dialog naming the domain, whose Open is a
+                               target=_blank, rel=noopener noreferrer link. 🔴 Data is base.org's OWN
+                               list (github.com/base/web `apps/web/src/data/ecosystem.json`, 598
+                               entries, read 2026-10-22): name, https URL and logo (base.org's image)
+                               copied and tested against `tests/fixtures/ecosystem/`; only the folder
+                               and the one-line description are ours. http-only entries (Aerodrome,
+                               Uniswap) are left out. "Add yours.exe" points to base/web and BRAND.x,
+                               sends nothing. No flag: it reads nothing live. In the Research folder
+                   panels/ContractAddress.tsx — a coin's CA in full near its name, Copy (Clipboard
+                               API, else the text is selected and the note says Ctrl+C), Basescan and
+                               Blockscout; `CopyCa` on each Coins row
                    panels/FeesWaiting.tsx — "Your fees" in the Wallet window: every coin the wallet
                                launched with fees waiting, "Claim all" (each collect its own
                                signature through TxSteps), and payouts a factory OWES
@@ -633,7 +682,7 @@ src/
                    `scripts/simulate-launchpad.ts` runs deploy v2 → enable NVDAc → buy NVDAc via
                    Relay → launch an ETH pair and an NVDAc pair, each with a first buy → collect
                    both, in one `eth_simulateV1` block on REAL mainnet state (hand-run).
-                   🔴 v3 (2026-10-14, NOT deployed, NOT audited, the app NOT wired to it):
+                   🔴 v3 (built 2026-10-14; DEPLOYED 2026-10-22 at `0x006d…1377`, Sourcify exact match, NOT audited; the app launches on it):
                    `LaunchFactoryV3.sol` + `LaunchHook.sol` — the creator picks 1% or 3%; an
                    anti-sniper fee decays 50% → that fee over 15 s through a dynamic-fee hook (the
                    in-launch first buy exempt); the factory's constructor deploys the hook at a
@@ -642,6 +691,14 @@ src/
                    the factory did not open (which also closes a v2 front-run gap).
                    `scripts/simulate-launchpad-v3.ts`: a sniper at +1 s paid 46.7%, a buyer at +20 s
                    1%; launch gas +8.5% over v2
+                   🔴 REFERRALS in v3 (owner, 2026-10-22, before the deploy): `launch(…, fee,
+                   address referrer)`; a referrer counts only if the PROTOCOL RECIPIENT approved it
+                   (`setReferrer`, `approvedReferrers`) at launch — an unapproved one is recorded as
+                   none (`ReferralIgnored`), never a revert. Recorded for good in `referrerOf(token)`
+                   (event `Referred`; `launches` and `Launched` unchanged). `collect`: creator 80% /
+                   referrer 5% / protocol the REMAINDER; 80/20 without. Removing a referrer stops NEW
+                   referrals only — `collect` never reads the list. A refused referrer payout goes
+                   to `owed`. Blue Agent is the first referrer; its address is the owner's to give
                    `scripts/quote-ticks.ts` prints each stock's opening tick from live prices and
                    the `setQuote` line for it — 🔴 stocks have 8 decimals, so a tick means ten
                    orders of magnitude less in a stock than in ETH (hard rule 3)
@@ -675,7 +732,7 @@ src/
                                OLD params and dropped `a=`/`t=`; App now merges pending params into it.
                                Send runs Send Check's history test in its review and REFUSES an address
                                a fake transfer planted (address poisoning)
-                   registry.ts (the 17 feature ?do= ids, plus DOC_PAGES — docs/api/
+                   registry.ts (the feature ?do= ids, the folders, plus DOC_PAGES — docs/api/
                    verify are windows on the desktop as well as routes, because
                    navigating to one threw away the header and every other open
                    window) + panels/ + DocWindow.tsx. `router` was REMOVED as an id on
@@ -893,7 +950,12 @@ src/
   pages/           /docs /api /verify /404. Each of the three exports a *Body
                    component as well as its route component; the body is what a
                    desktop window renders, so the two can never show different prose
-  ui/              Window, Taskbar, Gel (button), Crt (output box)
+  ui/              Window (Platinum: close box left, zoom + collapse right, grow box; `win--inactive`
+                   goes flat; no drag above `MENUBAR_H`), Taskbar (since 2026-10-22 the Mac OS MENU BAR
+                   across the top — the app's own menu holds every program by folder, each folder is
+                   its own menu on a wide screen, the Windows menu at the right lists open windows and
+                   "Show Desktop"; the name `Taskbar` and `toggleFromTaskbar` stayed), Gel (Platinum push
+                   button; `.gel` is the DEFAULT button with the ring), Crt (output box)
                    WalletProvider.tsx — 🔴 ONE wallet session for the whole page,
                                and the reason it is a provider rather than state in
                                a component: the tray and the Connect-wallet window
@@ -912,14 +974,29 @@ src/
                                covered the Send window's Send button — for "no wallet",
                                which is not a problem here: research needs no wallet at
                                all. An absence waits to be asked
-  styles/          reset.css + theme.css — the XP/Aqua design system.
+  styles/          reset.css + theme.css — the Mac OS 8 "Platinum" design system (2026-10-22, the
+                   owner: "toàn bộ app sang System 7", then — after a System 7 pass with a pixel
+                   font he found childish — Platinum). Inter (OFL) for chrome 600/700 and text,
+                   tabular figures; JetBrains Mono (OFL) for addresses; both from Google Fonts in
+                   index.html. NO pixel font in chrome, NO Apple font or artwork. The `--xp-*`,
+                   `--aqua-*` and `--s7-*` token NAMES are kept as aliases carrying Platinum values,
+                   because other stylesheets (BaseCard.css, ExplorePanel.css, ContractAddress.css)
+                   read them; new code uses `--pt-*`. Desktop: icons fixed down the RIGHT edge
+                   (`column wrap-reverse`), the Trash bottom-right, Markets as a floating palette on
+                   the left; rows in normal flow at ≤600px wide or ≤570px tall. Wallpaper ids in
+                   `quadra.wallpaper.v1` are the XP-era ids (`bliss` = the blue-grey default) so a
+                   saved choice never breaks; each is a pair of `--pattern-a/b` values.
+                   Measured over CDP (`Emulation.setDeviceMetricsOverride`, true 390px layout) on
+                   2026-10-22: every `?do=` window, 1280×760 and 390×844 — no horizontal overflow,
+                   every money CTA (Send, Swap, Trade, Launch, the coin page's trade, Wallet) above
+                   its window's fold, no title bar under the menu bar.
                    🔴 `.gel:disabled` may NOT be a `filter` on the enabled style: a
                    filter moves the label and the background it sits on by the same
                    amount, so `grayscale(1) brightness(1.15)` over the blue gradient
                    made the primary button's text invisible at ~1.6:1 while the
                    quiet buttons beside it stayed readable and the row looked
                    deliberate. Disabled has its own flat palette
-tests/             97 files, mirrors src/. keccak.test.ts's nine digests come from an
+tests/             105 files, mirrors src/. keccak.test.ts's nine digests come from an
                    EXTERNAL oracle (`cast keccak`, commands in its header). Regenerate a
                    doubted vector with cast — never by running our code and pasting the
                    answer back, which converts the test into a tautology
@@ -1009,6 +1086,7 @@ is Coinbase's own; each stock is asked `quotes(address)` and offered only if the
 at the factory's tick — re-read at Review). A stock first buy is two signatures: an EXACT approval,
 then the launch. The review shows the opening value in the pair's own units and, for a stock,
 that Coinbase restricts holders (eligible persons outside the U.S.).
+**v3 is DEPLOYED** by the owner 2026-10-22 at `0x006Da367654a487bb277fe25ff54f0fE0f741377` (hook `0x0D9DdcC907658E3C61318d0F979F978e600AA880`, tx 0x151126f0…, block 52,929,530): verified on Sourcify (exact match), read back and checked by the app's own `checkFactory` (ok), 8 stocks enabled (CRCLc, GOOGLc, INTCc, MSTRc, NVDAc, SNDKc, SPCXc, TSLAc). Blue Agent's referrer `0x884fbdd5cf193e7f87cba76419e526d8f4df7a9b` is NOT yet approved — the owner must send `setReferrer` from the treasury `0xD5C1…3FAB`. Still NOT audited. New launches go to v3; v2 and v1 stay read and collected from. Tests whose fixtures are v2/v1 captures run with v3 unset through `withoutV3()` in `tests/v2only.ts`.
 **v2 is DEPLOYED** by the owner 2026-10-02 (`CONTRACTS.launchFactory` =
 `0xef1F427bB57e0ECd7BB8051cE8bC7AAb709a0c03`, tx 0xd05554c5…, block 52,068,913, quote admin = the
 deployer `0x00FD…746F`): fully verified on Blockscout, runtime bytecode identical to this repo's
@@ -1184,13 +1262,18 @@ archived, not by being solved; they are in `TASKS.md`'s Archive.)*
   run the `setQuote` lines `scripts/quote-ticks.ts` prints (contracts/README.md). v1 (`0xcDb2…B8a5`) stays deployed and read. No stock-paired
   launch has been made with real money; that is the owner's test. Both former gaps are built (2026-10-14):
   Withdraw for what a factory `owed`s (Wallet → Your fees) and trading a coin on its own pool (PoolTrade).
-- **The app is wired to launchpad v3 (2026-10-21), and v3 is NOT deployed or audited.** Setting
+- **Launchpad v3 is DEPLOYED (2026-10-22) and NOT audited.** **v3 is DEPLOYED** by the owner 2026-10-22 at `0x006Da367654a487bb277fe25ff54f0fE0f741377` (hook `0x0D9DdcC907658E3C61318d0F979F978e600AA880`, tx 0x151126f0…, block 52,929,530): verified on Sourcify (exact match), read back and checked by the app's own `checkFactory` (ok), 8 stocks enabled (CRCLc, GOOGLc, INTCc, MSTRc, NVDAc, SNDKc, SPCXc, TSLAc). Blue Agent's referrer `0x884fbdd5cf193e7f87cba76419e526d8f4df7a9b` is NOT yet approved — the owner must send `setReferrer` from the treasury `0xD5C1…3FAB`. Still NOT audited. Setting
   `CONTRACTS.launchFactoryV3` (src/config/chain.ts) to the verified address sends NEW launches there
   (1%/3% fee choice, the opening read from the hook), lists v3 first everywhere, and leaves v2/v1 read
   and collected from; until then the app behaves exactly as with v2. `LAUNCHPAD_V3_ABI`/`LAUNCH_HOOK_ABI`
   are held to the Solidity, `LAUNCHPAD_V3_EXPECTS` to the deploy script (tests/launchpad-v3.test.tsx);
   `scripts/simulate-launchpad-v3.ts` runs the app's own `launchTx` and `v4swap` against v3 on mainnet
-  state (quotes delivered to the wei). Waits on: the owner's deploy, Blockscout verification, an audit.
+  state (quotes delivered to the wei). Waits on: the referrer approval, an audit.
+  **v3 now includes APPROVED REFERRERS (2026-10-22): 80% creator / 5% referrer / ~15% protocol.** The
+  `launch` skill takes an optional referrer and says whether it is approved; the indexer records
+  `Referred`; the coin page and Token Verdict show it. After the deploy the OWNER must call
+  `setReferrer(<Blue Agent's address>, true)` FROM THE TREASURY (the protocol recipient) — the address
+  is ShunTr's to supply, never guessed (contracts/README.md). Until then no referral counts.
 - **The launchpad indexer is dev-only and leans on a public endpoint.** It runs in `vite.config.ts`
   (T3 for Vercel) and falls back to Tenderly's public gateway (`gateway.tenderly.co/public/base`) on a
   429 — a third-party endpoint new on 2026-10-14, not production-grade.

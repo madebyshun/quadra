@@ -17,6 +17,10 @@ import { MarketsProvider } from "@/features/markets/MarketsProvider";
 import { Intro } from "@/intro/Intro";
 import { Assistant } from "@/ui/Assistant";
 import { Screensaver } from "@/ui/Screensaver";
+import { Welcome } from "@/ui/Welcome";
+import { showWelcome } from "@/lib/welcome";
+import { wallpaper } from "@/lib/settings";
+import { useSetting } from "@/ui/useSettings";
 import { hasWebGL, shouldPlayIntro } from "@/intro/timeline";
 import {
   DEFAULT_HEIGHT,
@@ -60,7 +64,17 @@ const TALL_PANELS: ReadonlySet<WindowId> = new Set<WindowId>([
   "swap",
   "bridge",
   "launch",
+  "control",
+  "readme",
 ]);
+
+/**
+ * Windows that open wider than a panel: a picture or a page that reads better at size (2026-10-21 —
+ * the Base card measured 452px wide at the default width, the card itself a thumbnail). Still never
+ * wider than the viewport allows.
+ */
+export const WIDE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["card", "coins"]);
+export const WIDE_WIDTH = 760;
 
 function openAction(id: WindowId): { type: "open"; id: WindowId; origin: Origin; height: number } {
   const tall = TALL_PANELS.has(id);
@@ -75,7 +89,12 @@ function openAction(id: WindowId): { type: "open"; id: WindowId; origin: Origin;
     : tall
       ? Math.max(DEFAULT_HEIGHT, pageHeight(window.innerHeight))
       : DEFAULT_HEIGHT;
-  return { type: "open", id, origin: centeredOrigin(window.innerWidth, window.innerHeight, height), height };
+  const origin = centeredOrigin(window.innerWidth, window.innerHeight, height);
+  if (!WIDE_PANELS.has(id)) return { type: "open", id, origin, height };
+  // centeredOrigin always fits a width to the viewport; a wide window takes more of it, never less
+  const width = Math.max(origin.width!, Math.min(WIDE_WIDTH, window.innerWidth - 16));
+  const x = Math.max(8, Math.round((window.innerWidth - width) / 2));
+  return { type: "open", id, origin: { ...origin, x, width, maxX: Math.max(x, window.innerWidth - 8 - width) }, height };
 }
 
 /**
@@ -95,6 +114,10 @@ function Home() {
     shouldPlayIntro({ search: params.toString(), matchMedia: window.matchMedia?.bind(window), webgl: () => hasWebGL(document) }),
   );
   const endIntro = useCallback(() => setIntro(false), []);
+  // decided once too: the Welcome screen follows the intro (or a bare load), never a `?do=` link
+  const [welcomeAtStart] = useState(() => showWelcome(params.toString()));
+  const [welcome, setWelcome] = useState(welcomeAtStart);
+  const closeWelcome = useCallback(() => setWelcome(false), []);
 
   /** Reads `?do=` exactly once, on mount — after that, the URL follows the topmost window, not the other way round. */
   useEffect(() => {
@@ -178,6 +201,7 @@ function Home() {
               height: w.height,
               zIndex: w.z,
               visible: !w.minimized,
+              active: w.id === topId,
               onFocus: () => dispatch({ type: "focus", id: w.id }),
               onMinimize: () => dispatch({ type: "minimize", id: w.id }),
               onMove: (x, y) => dispatch({ type: "move", id: w.id, x, y }),
@@ -199,7 +223,9 @@ function Home() {
         onStart={showDesktop}
         onOpenFeature={openFeature}
       />
-      {intro ? <Intro onDone={endIntro} /> : <Assistant />}
+      {/* Q keeps its hello to itself while the Welcome screen says it — two hellos at once is one too many */}
+      {intro ? <Intro onDone={endIntro} /> : <Assistant greet={!welcomeAtStart} />}
+      {!intro && welcome && <Welcome onClose={closeWelcome} />}
       {!intro && <Screensaver />}
       </OpenWindowProvider>
     </MarketsProvider>
@@ -207,6 +233,8 @@ function Home() {
 }
 
 export function App() {
+  // the Control Panel's wallpaper, applied to the whole page the moment it is picked
+  const paper = useSetting(wallpaper);
   return (
     <AdaptersProvider>
       {/*
@@ -215,7 +243,7 @@ export function App() {
         either shows in both. See `ui/WalletProvider.tsx`.
       */}
       <WalletProvider>
-        <div className="desktop">
+        <div className={`desktop wallpaper--${paper}`}>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/docs" element={<Docs />} />

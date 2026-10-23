@@ -21,6 +21,10 @@ import { factoryCalls, LAUNCHPAD, LX } from "./fixtures/launchpad";
 import { padCalls, PADS_TOKENS as T, PX } from "./fixtures/launchpads";
 import { LAUNCHERS, TOKENS, VX } from "./fixtures/verdict";
 import { DOWN, net, useNet, type Answer } from "./net";
+import { withoutV3 } from "./v2only";
+
+// Its fixtures are real v2/v1 captures, so it runs as the app did before v3 was set.
+withoutV3();
 
 useNet();
 

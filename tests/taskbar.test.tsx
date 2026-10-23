@@ -29,12 +29,12 @@ function renderTaskbar(onOpenFeature?: (id: WindowId) => void) {
   return { onStart, onToggle };
 }
 
-describe("Taskbar's Start menu, without a window manager to open into", () => {
+describe("the menu bar's app menu, without a window manager to open into", () => {
   it("renders every feature as a link to /?do=<id> rather than a button", async () => {
     const user = userEvent.setup();
     renderTaskbar();
     await user.click(screen.getByRole("button", { name: BRAND.name }));
-    const item = within(screen.getByRole("menu", { name: "Start menu" })).getByRole("menuitem", {
+    const item = within(screen.getByRole("menu", { name: `${BRAND.name} menu` })).getByRole("menuitem", {
       name: /^Send/,
     });
     expect(item.tagName).toBe("A");
@@ -46,9 +46,9 @@ describe("Taskbar's Start menu, without a window manager to open into", () => {
     renderTaskbar();
     await user.click(screen.getByRole("button", { name: BRAND.name }));
     await user.click(
-      within(screen.getByRole("menu", { name: "Start menu" })).getByRole("menuitem", { name: /^Send/ }),
+      within(screen.getByRole("menu", { name: `${BRAND.name} menu` })).getByRole("menuitem", { name: /^Send/ }),
     );
-    expect(screen.queryByRole("menu", { name: "Start menu" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: `${BRAND.name} menu` })).not.toBeInTheDocument();
   });
 
   it("closes the menu when a doc-page link item is clicked", async () => {
@@ -56,15 +56,54 @@ describe("Taskbar's Start menu, without a window manager to open into", () => {
     renderTaskbar();
     await user.click(screen.getByRole("button", { name: BRAND.name }));
     await user.click(
-      within(screen.getByRole("menu", { name: "Start menu" })).getByRole("menuitem", { name: "Docs" }),
+      within(screen.getByRole("menu", { name: `${BRAND.name} menu` })).getByRole("menuitem", { name: "Docs" }),
     );
-    expect(screen.queryByRole("menu", { name: "Start menu" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: `${BRAND.name} menu` })).not.toBeInTheDocument();
   });
 
-  it("still calls onStart on every click, same as before the menu existed", async () => {
+  it("calls onStart from the Windows menu's Show Desktop, and closes the menu", async () => {
     const user = userEvent.setup();
     const { onStart } = renderTaskbar();
-    await user.click(screen.getByRole("button", { name: BRAND.name }));
+    await user.click(screen.getByRole("button", { name: "Windows" }));
+    await user.click(screen.getByRole("menuitem", { name: "Show Desktop" }));
     expect(onStart).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("links a folder's own menu back to the desktop too", async () => {
+    const user = userEvent.setup();
+    renderTaskbar();
+    await user.click(screen.getByRole("button", { name: "Money folder" }));
+    expect(screen.getByRole("menuitem", { name: /^Send/ })).toHaveAttribute("href", "/?do=send");
+  });
+});
+
+describe("the Windows menu", () => {
+  it("lists every open window, checks the one in front, dims a hidden one, and toggles the picked one", async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+    render(
+      <MemoryRouter>
+        <WalletProvider>
+          <Taskbar
+            windows={[
+              { id: "send", title: "Send", minimized: false, focused: true },
+              { id: "swap", title: "Swap", minimized: true, focused: false },
+            ]}
+            onToggle={onToggle}
+            onStart={() => {}}
+          />
+        </WalletProvider>
+      </MemoryRouter>,
+    );
+    await user.click(screen.getByRole("button", { name: "Windows" }));
+    const send = screen.getByRole("menuitemcheckbox", { name: "Send" });
+    const swap = screen.getByRole("menuitemcheckbox", { name: "Swap" });
+    expect(send).toHaveAttribute("aria-checked", "true");
+    expect(swap).toHaveAttribute("aria-checked", "false");
+    expect(swap).toHaveClass("menu__item--hidden");
+    await user.click(swap);
+    expect(onToggle).toHaveBeenCalledWith("swap");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 });

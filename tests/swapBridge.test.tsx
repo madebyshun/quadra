@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { decodeFunctionData, erc20Abi } from "viem";
 import { BASE, USDC, WETH } from "@/config/chain";
 import { ACROSS, RELAY, ROBINHOOD } from "@/config/routes";
 import { SwapPanel, impactTone, QUOTE_TTL_MS } from "@/features/panels/SwapPanel";
+import { OpenWindowProvider } from "@/features/openWindow";
 import { BridgePanel } from "@/features/panels/BridgePanel";
 import { WalletProvider } from "@/ui/WalletProvider";
 import type { Eip1193Provider, Eip1193Request } from "@/lib/wallet";
@@ -12,6 +13,9 @@ import { copy, walletReads } from "./fixtures/base";
 import { ROUTES_FX, SWAPPER, USDC_ETH, USER } from "./fixtures/routes";
 import { TRANSFER_TOPIC } from "@/lib/transact";
 import { contractAt, ethCalls, json, net, simulated, useNet } from "./net";
+
+const launchOf = vi.fn();
+vi.mock("@/skills/launchpad", () => ({ launchOf: (token: string) => launchOf(token) }));
 
 useNet();
 
@@ -111,8 +115,9 @@ function ethOutQuote(): Json {
   return q;
 }
 
-function mount(node: React.ReactNode) {
-  return render(<WalletProvider>{node}</WalletProvider>);
+function mount(node: React.ReactNode, open?: (id: string, params?: Readonly<Record<string, string>>) => void) {
+  const inWallet = <WalletProvider>{node}</WalletProvider>;
+  return render(open ? <OpenWindowProvider open={open as never}>{inWallet}</OpenWindowProvider> : inWallet);
 }
 
 const cta = () => screen.getByRole("button", { name: /Connect|Enter|Get a quote|Quoting|in wallet|Not enough|Swapped|Bridged/ });
@@ -120,6 +125,7 @@ const cta = () => screen.getByRole("button", { name: /Connect|Enter|Get a quote|
 // ── Swap ─────────────────────────────────────────────────────────────────────
 
 describe("SwapPanel", () => {
+  beforeEach(() => launchOf.mockReset());
   it("rates a price impact by size, and an unreported one as worth a look", () => {
     expect(impactTone("-0.11")).toBe("ok");
     expect(impactTone("-2")).toBe("warn");
@@ -328,6 +334,27 @@ describe("SwapPanel", () => {
     await userEvent.type(screen.getByLabelText("Amount"), "1");
     await userEvent.click(cta());
     expect(await screen.findByLabelText("Swap error")).toHaveTextContent("Pick two different tokens.");
+  });
+
+  it("offers a Quadra coin's own pool when Relay has no route", async () => {
+    const token = OTHER_TOKEN;
+    const opened: Array<{ id: string; params?: Readonly<Record<string, string>> }> = [];
+    const open = (id: string, params?: Readonly<Record<string, string>>) => {
+      if (params === undefined) opened.push({ id });
+      else opened.push({ id, params });
+    };
+    wallet();
+    launchOf.mockResolvedValue({ factory: "0x3333333333333333333333333333333333333333", creator: USER, creatorRecipient: USER });
+    world({ quote: () => json({ message: "No routes found" }, 400) });
+    mount(<SwapPanel />, open);
+    await settle();
+    await userEvent.selectOptions(screen.getByLabelText("You get"), "other");
+    await userEvent.type(screen.getByLabelText("You get address"), token);
+    await userEvent.type(screen.getByLabelText("Amount"), "1");
+    await userEvent.click(cta());
+    expect(await screen.findByLabelText("Swap error")).toHaveTextContent("Relay: No routes found.");
+    await userEvent.click(screen.getByRole("button", { name: "Trade through its pool" }));
+    expect(opened).toEqual([{ id: "coins", params: { t: token } }]);
   });
 
   it("reads a pasted token from its contract for either side", async () => {

@@ -106,7 +106,20 @@ export type Pair = {
  * The launch transaction: to the pinned factory; ETH's first buy rides as `value`, a stock's is pulled.
  * With a `fee` it is v3's `launch` (the coin's fee its last argument); without, v1/v2's.
  */
-export function launchTx(factory: string, m: Metadata, salt: `0x${string}`, pair: Pair, firstBuy: bigint, fee?: LaunchFee): TxRequest {
+/**
+ * The launch transaction. v2 when `fee` is left out; v3 with the fee and a referrer — `ETH_QUOTE`'s
+ * zero address (none) unless one is given. The factory counts a referrer only if it is APPROVED at
+ * launch; an unapproved one is recorded as none, never a revert.
+ */
+export function launchTx(
+  factory: string,
+  m: Metadata,
+  salt: `0x${string}`,
+  pair: Pair,
+  firstBuy: bigint,
+  fee?: LaunchFee,
+  referrer: string = ETH_QUOTE,
+): TxRequest {
   const args = [m.name.trim(), m.symbol.trim(), contractUri(m), salt, pair.address as `0x${string}`, firstBuy] as const;
   return {
     to: factory,
@@ -114,7 +127,7 @@ export function launchTx(factory: string, m: Metadata, salt: `0x${string}`, pair
     data:
       fee === undefined
         ? encodeFunctionData({ abi: LAUNCHPAD_ABI, functionName: "launch", args: [...args] })
-        : encodeFunctionData({ abi: LAUNCHPAD_V3_ABI, functionName: "launch", args: [...args, fee] }),
+        : encodeFunctionData({ abi: LAUNCHPAD_V3_ABI, functionName: "launch", args: [...args, fee, referrer as `0x${string}`] }),
   };
 }
 
@@ -221,11 +234,12 @@ async function readHook(hook: string, functionName: (typeof HOOK_GETTERS)[number
  * No opening tick is pinned (the quote admin may re-price a pair; the review shows the tick read now).
  */
 async function checkFactoryV3(factory: string): Promise<FactoryCheck> {
-  const [supply, low, high, share, spacing, protocol, hookAt] = await Promise.all([
+  const [supply, low, high, share, referrerShare, spacing, protocol, hookAt] = await Promise.all([
     readV3(factory, "TOTAL_SUPPLY"),
     readV3(factory, "FEE_LOW"),
     readV3(factory, "FEE_HIGH"),
     readV3(factory, "CREATOR_SHARE_BPS"),
+    readV3(factory, "REFERRER_SHARE_BPS"),
     readV3(factory, "TICK_SPACING"),
     readV3(factory, "protocolRecipient"),
     readV3(factory, "hook"),
@@ -240,6 +254,8 @@ async function checkFactoryV3(factory: string): Promise<FactoryCheck> {
         ? `its fees are ${low} and ${high}, not ${E.feeLow} and ${E.feeHigh}`
         : share !== E.creatorShareBps
           ? `its launcher share is ${share} bps, not ${E.creatorShareBps}`
+          : referrerShare !== E.referrerShareBps
+            ? `its referrer share is ${referrerShare} bps, not ${E.referrerShareBps}`
           : spacing !== E.tickSpacing
             ? `its tick spacing is ${spacing}, not ${E.tickSpacing}`
             : String(protocol).toLowerCase() !== CONTRACTS.treasury?.toLowerCase()

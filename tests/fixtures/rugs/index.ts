@@ -1,5 +1,5 @@
 /**
- * Real answers behind the Recycle Bin (`skills/rugs.ts`), captured 2026-10-14 at block 0x3226b08 and
+ * Real answers behind the Trash (`skills/rugs.ts`), captured 2026-10-14 at block 0x3226b08 and
  * trimmed. Nothing was typed: logs are cut to address/blockNumber/topics/data/transactionHash,
  * receipts to from/to/hash/block and each log's address + topics, DexScreener pairs to the fields parsed.
  *

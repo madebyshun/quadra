@@ -4,7 +4,7 @@
   "description": "An on-chain supercomputer for Base.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a3c8c",
-  "theme_color": "#0a3c8c",
+  "background_color": "#5f7d9c",
+  "theme_color": "#5f7d9c",
   "icons": [{ "src": "/brand/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
 }

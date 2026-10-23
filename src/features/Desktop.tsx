@@ -26,12 +26,12 @@ export function Desktop({ onOpen }: DesktopProps) {
 
       <IconMenu onOpen={onOpen} />
       <MarketsGadget />
-      {/* the Recycle Bin keeps its own corner, the way it always has */}
+      {/* the Trash keeps its own corner, the way it always has */}
       <button type="button" className="icon desk-trash" onClick={() => onOpen("trash")}>
         <span className="icon__glyph">
           <Icon id="trash" />
         </span>
-        <span className="icon__title">Recycle Bin</span>
+        <span className="icon__title">Trash</span>
       </button>
     </div>
   );

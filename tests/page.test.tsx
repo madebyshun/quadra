@@ -41,13 +41,14 @@ describe("Page: the standalone window now behaves like any other", () => {
     expect(win.style.height).toBe("200px");
   });
 
-  it("minimises to the taskbar on the light, and restores from the taskbar chip", async () => {
+  it("collapses on its box, and comes back from the menu bar's Windows menu", async () => {
     const user = userEvent.setup();
     renderAt("/verify");
     const win = screen.getByLabelText(/^Verify/);
     await user.click(screen.getByRole("button", { name: "Minimise" }));
     expect(win).not.toBeVisible();
-    await user.click(screen.getByRole("button", { name: /^Verify/ }));
+    await user.click(screen.getByRole("button", { name: "Windows" }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: /^Verify/ }));
     expect(win).toBeVisible();
   });
 });

@@ -30,10 +30,11 @@ import { ReportView } from "@/features/panels/ReportView";
 import { SwapPanel, type Picked } from "@/features/panels/SwapPanel";
 import { PoolTrade } from "@/features/panels/PoolTrade";
 import { TxStepList, useTxSteps } from "@/features/panels/TxSteps";
-import { Disclosures, NewLaunches, TokenChart, TokenInfo, TokenStats, TokenTabs, TokenWarning, useCoinFee, useCoinPage } from "@/features/panels/TokenPage";
+import { Disclosures, NewLaunches, TokenChart, TokenInfo, TokenStats, TokenTabs, TokenWarning, useCoinFee, useCoinPage, useCoinReferrer } from "@/features/panels/TokenPage";
 import { feePercent } from "@/config/launchpad";
 import { tokenInfo } from "@/skills/blockscout";
 import { feesText, valueText } from "@/features/panels/BaseLaunch";
+import { ContractAddress, CopyCa } from "@/features/panels/ContractAddress";
 
 /**
  * Coins — this app's launchpad as one window, laid out like a launchpad site (owner, 2026-10-02:
@@ -203,6 +204,7 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
   const collecting = useTxSteps();
   const page = useCoinPage(token, fresh);
   const fee = useCoinFee(record !== null && typeof record === "object" && "factory" in record ? record.factory : "", token);
+  const referrer = useCoinReferrer(record !== null && typeof record === "object" && "factory" in record ? record.factory : "", token);
   const [holders, setHolders] = useState<number | null>(null);
   const [now] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
@@ -311,6 +313,7 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
           short(record.creator)
         )}
       </p>
+      <ContractAddress address={token} />
       <TokenStats page={page} value={value} holders={holders} />
 
       <fieldset className="group">
@@ -338,9 +341,9 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
       </fieldset>
 
       <TokenChart page={page} />
-      <TokenInfo page={page} creator={record.creator} launchedAt={launchedAt} quoteUsd={value?.quoteUsd ?? null} fee={fee} />
+      <TokenInfo page={page} creator={record.creator} launchedAt={launchedAt} quoteUsd={value?.quoteUsd ?? null} fee={fee} referrer={referrer} />
       <TokenTabs token={token} page={page} now={now} />
-      <Disclosures factory={record.factory} fee={fee} />
+      <Disclosures factory={record.factory} fee={fee} referrer={referrer} />
 
       <details className="trade__more">
         <summary>Everything about {symbol}, with sources</summary>
@@ -502,6 +505,7 @@ export function CoinsPanel() {
                 <button type="button" className="chip" aria-label={`Open ${c.token}`} onClick={() => open(c.token)}>
                   {c.facts ? `${c.facts.name} (${c.facts.symbol})` : short(c.token)}
                 </button>
+                <CopyCa address={c.token} />
                 <span className="notes__id">{c.value === undefined ? "…" : c.value === null ? "pair not read" : `vs ${c.value.quoteSymbol}`}</span>
               </span>
               <span className="notes__why">

@@ -44,9 +44,64 @@ export function price(value: number): string {
   return `$${value.toLocaleString("en-US", { maximumSignificantDigits: 4 })}`;
 }
 
-/** A quote amount for prose: two decimals from 1 up, four significant digits below. */
+const SUBSCRIPT = "₀₁₂₃₄₅₆₇₈₉";
+
+/** At this many zeros after the point (0.0000x) a small number switches to the subscript form. */
+export const SUBSCRIPT_FROM = 4;
+
+/**
+ * A small-or-large positive number the way a DEX screen writes it (2026-10-22, the owner): grouped with
+ * two decimals from 1 up; below 1, `sig` significant digits, TRUNCATED; and from four zeros after the
+ * point, the zeros are COUNTED in a subscript — 0.00000299 is "0.0₅299", 4.09e-8 is "0.0₇409".
+ * Never exponent form: "2.99e-6" reads as 2.99 to most people. A missing, non-finite or negative
+ * number is "not read" — an amount on this page is never negative, so a negative one is a misread,
+ * and printing it would be the misread as fact.
+ */
+export function compact(n: number | null | undefined, sig = 4): string {
+  if (n === null || n === undefined || !Number.isFinite(n) || n < 0) return "not read";
+  if (n === 0) return "0";
+  if (n >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  // "2.99000000e-6": the mantissa's digits, and how many zeros sit between the point and them
+  const [mantissa, exp] = n.toExponential(sig + 3).split("e") as [string, string];
+  const zeros = -Number(exp) - 1;
+  // 0.99999999… rounds to "1.000…e+0" at this precision; truncated, it is still under one
+  if (zeros < 0) return `0.${"9".repeat(sig)}`;
+  const digits = mantissa.replace(".", "").slice(0, sig).replace(/0+$/, "");
+  if (zeros < SUBSCRIPT_FROM) return `0.${"0".repeat(zeros)}${digits}`;
+  const count = String(zeros)
+    .split("")
+    .map((d) => SUBSCRIPT[Number(d)])
+    .join("");
+  return `0.0${count}${digits}`;
+}
+
+/** An amount in a quote currency, "0.0₅299 AAPLc" — or "not read". */
+export function quoteAmountText(n: number | null | undefined, symbol: string): string {
+  const c = compact(n);
+  return c === "not read" ? c : `${c} ${symbol}`.trim();
+}
+
+/**
+ * An amount in the quote with its dollar value in front — and the dollar half DROPPED when it is under
+ * a cent (zero included), so a line never reads "<$0.01" next to a number that already says how small it is.
+ */
+export function quoteWithUsd(n: number | null | undefined, symbol: string, quoteUsd: number | null): string {
+  const q = quoteAmountText(n, symbol);
+  if (q === "not read" || quoteUsd === null || !Number.isFinite(quoteUsd)) return q;
+  const dollars = n! * quoteUsd;
+  return dollars < 0.01 ? q : `${usd(dollars)} · ${q}`;
+}
+
+/** A unit price in dollars on a coin's page: `usd` from $1, the compact form below — "$0.0₇409". */
+export function tinyPrice(value: number | null | undefined): string {
+  const c = compact(value);
+  if (c === "not read") return c;
+  return value! >= 1 ? usd(value!) : `$${c}`;
+}
+
+/** A quote amount for prose: the same compact form (two decimals from 1 up, subscript zeros for dust). */
 export function quoteWords(n: number): string {
-  return n >= 1 ? n.toLocaleString("en-US", { maximumFractionDigits: 2 }) : n.toLocaleString("en-US", { maximumSignificantDigits: 4 });
+  return compact(n);
 }
 
 export const explorer = {
@@ -54,3 +109,6 @@ export const explorer = {
   token: (a: string) => `${BASE.explorer}/token/${a}`,
   tx: (h: string) => `${BASE.explorer}/tx/${h}`,
 };
+
+/** Blockscout's own site for Base (the API in blockscout.ts lives under it) — a second explorer to check against. */
+export const BLOCKSCOUT_SITE = "https://base.blockscout.com";
