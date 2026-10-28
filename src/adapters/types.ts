@@ -1,10 +1,10 @@
 /**
- * The seam between the UI and the two things this product does not have yet:
- * a deployed shielded pool, and a real TEE.
+ * The seam between the UI and the services it reads through: a paid-tool catalog
+ * (x402) and an inference enclave. (The shielded pool that used to sit here was
+ * archived on 2026-09-30 with the rest of the privacy model — see `archive/privacy/`.)
  *
- * The UI is built against these interfaces only. A local implementation makes
- * the whole app runnable and testable now; the on-chain implementation drops in
- * later without the UI changing.
+ * The UI is built against these interfaces only, so a local implementation keeps
+ * the app runnable and testable and a live one drops in without the UI changing.
  *
  * ── The one rule that shapes every type below ──────────────────────────────
  * A stub that emits a plausible-looking proof is WORSE than no stub, because it
@@ -14,54 +14,13 @@
  * developer must remember not to do — it does not typecheck.
  */
 
+import type { PaymentRequirements } from "@/lib/requirements";
+
 export type TokenRef = {
   address: string;
   symbol: string;
   decimals: number;
 };
-
-/** Where a fact was anchored, if anywhere. */
-export type Anchoring =
-  | { kind: "onchain"; txHash: string; block: number }
-  | { kind: "local"; why: string };
-
-/**
- * A note is the money. The secret lives in the browser and nowhere else: losing
- * it loses the funds, and leaking it hands them over. Never log a whole note,
- * never put one in a url, never send one to a server.
- */
-export type Note = {
-  id: string;
-  /** public: what goes on chain */
-  commitment: string;
-  /** PRIVATE: never leaves the browser */
-  secret: string;
-  token: TokenRef;
-  /** base units, per token.decimals */
-  amount: bigint;
-  createdAt: string;
-  spentAt: string | null;
-  anchoring: Anchoring;
-};
-
-export type Receipt = {
-  /** what happened, in the second person, for the CRT panel */
-  summary: string;
-  anchoring: Anchoring;
-};
-
-export interface ShieldedPool {
-  /** Put money in. Returns the note you must keep. */
-  deposit(token: TokenRef, amount: bigint): Promise<Note>;
-  /** Notes this browser is holding, newest first. Unspent only unless asked. */
-  notes(opts?: { includeSpent?: boolean }): Promise<Note[]>;
-  /** Spend a note to pay an address. The pool pays, not you. */
-  send(noteId: string, to: string, amount: bigint): Promise<Receipt>;
-  /** Take money back out to an address you control. */
-  withdraw(noteId: string, to: string): Promise<Receipt>;
-  /** True when this is backed by a deployed pool rather than local state. */
-  readonly isLive: boolean;
-}
 
 /**
  * Proof that inference ran inside an enclave.
@@ -123,9 +82,23 @@ export type Tool = {
  * `free` is a real case, not an absence: some ids answer 200 with no payment at
  * all, and a `price: 0n` would have let the router build an authorization for
  * zero and charge gas to prove nothing.
+ *
+ * ── 🔴 Why `paid` carries a checked struct and not four loose fields ──────────
+ * It was `{ payTo, amountBaseUnits, asset, network }` — the four fields the panel
+ * happens to render. The 402 it came from carries three more: `scheme`,
+ * `extra.{name,version}` and `maxTimeoutSeconds`, which are precisely the ones a
+ * signature's safety rests on. Dropping them at parse time did not defer the check,
+ * it **destroyed the evidence for it**: no later stage could verify a domain or a
+ * settlement scheme that no longer existed in any value.
+ *
+ * So the paid variant carries `PaymentRequirements`, which only exists once
+ * `checkRequirements` has agreed to it. There is now no way to construct a displayed
+ * price that was not checked — not because a developer must remember to check, but
+ * because the type of a price is the output of the checker. Same device as
+ * `Attestation` and `Anchoring` above: the shape enforces the discipline.
  */
 export type Price =
-  | { kind: "paid"; payTo: string; amountBaseUnits: bigint; asset: TokenRef; network: string }
+  | { kind: "paid"; requirements: PaymentRequirements }
   | { kind: "free"; why: string };
 
 export type Quote = {
@@ -153,7 +126,14 @@ export interface Catalog {
   tools(): Promise<Tool[]>;
   /** Read the price without paying it. Free upstream, so free here too. */
   quote(toolId: string): Promise<Quote>;
-  run(toolId: string, input: Record<string, string>): Promise<ToolRun>;
+  /**
+   * `payment` is the base64 `X-PAYMENT` header `lib/payment.ts` built from a signed
+   * authorization, or `undefined` for a free tool. It is a parameter rather than
+   * something `run` builds itself, because building it needs a connected wallet and a
+   * signature — steps the panel owns, not the adapter (hard rule 5: nothing under
+   * `adapters/` may hold a key or ask one to sign).
+   */
+  run(toolId: string, input: Record<string, string>, payment?: string): Promise<ToolRun>;
   /**
    * Why THIS price cannot be run, or `null` when it can.
    *
@@ -177,7 +157,6 @@ export interface Catalog {
 }
 
 export type Adapters = {
-  pool: ShieldedPool;
   enclave: Enclave;
   catalog: Catalog;
 };

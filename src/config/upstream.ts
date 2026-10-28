@@ -1,7 +1,10 @@
 /**
- * This product is built on BlueAgent: BlueAgent supplies tools and compute,
- * this side supplies the privacy layer, the payment router and the agent
- * surface. (Deliberately no brand name in this file — see brand.ts.)
+ * The paid-tool directories this app can read. There is one today, BlueAgent,
+ * and it is a DIRECTORY this app reads and pays — not a platform the product is
+ * built on. That distinction was decided by the owner on 2026-09-29: this product
+ * is private money for agents, and a catalog of tools to spend it on is an input,
+ * the same way any x402 endpoint is. Nothing about who gets paid is decided here —
+ * see `config/payees.ts`. (Deliberately no brand name in this file — see brand.ts.)
  *
  * Measured against production on 2026-09-27 — re-measure, do not trust a number
  * written here:
@@ -34,6 +37,14 @@ export const FORWARD = {
 } as const;
 
 export const BLUEAGENT = {
+  /** Directory name, as a person reads it. */
+  name: "BlueAgent",
+  /**
+   * The origin its 402s come from — what `config/payees.ts` pins a payee against.
+   * `tests/upstream.test.ts` asserts it is `new URL(base).origin`, so the two cannot
+   * drift into a pin keyed by a host that never answers.
+   */
+  origin: "https://blueagent.dev",
   base: "https://blueagent.dev",
   catalog: "https://blueagent.dev/api/catalog",
   tool: (id: string) => `https://blueagent.dev/api/x402/${id}`,

@@ -1,187 +1,220 @@
-import { useCallback, useEffect, useState } from "react";
-import { useAdapters } from "@/adapters/AdaptersProvider";
-import type { Note, Receipt } from "@/adapters/types";
+import { useState } from "react";
+import { useInbox } from "@/features/openWindow";
+import { transfersOf } from "@/skills/profile";
+import { historyOf, historyRow } from "@/skills/sendcheck";
+import { BASE } from "@/config/chain";
+import { sameAddress } from "@/lib/address";
 import { formatAmount, parseAmount } from "@/lib/amount";
-import { USDC } from "@/config/chain";
+import { accountKind, balanceOf, transferData } from "@/lib/erc20";
+import { messageOf } from "@/lib/errors";
+import type { TxRequest } from "@/lib/transact";
+import { explorer } from "@/skills/format";
+import { resolveTarget, type Target } from "@/skills/target";
+import { row, type Report, type Row } from "@/skills/types";
 import { Crt } from "@/ui/Crt";
 import { Gel } from "@/ui/Gel";
-import { Anchor } from "@/features/panels/Anchor";
+import { useWalletSession } from "@/ui/WalletProvider";
+import { ReportView } from "@/features/panels/ReportView";
+import { TxStepList, useTxSteps } from "@/features/panels/TxSteps";
+import { amountFor, assetFor, choiceFor, PercentButtons, TokenPicker, type Choice } from "@/features/panels/TokenPicker";
+import { WalletAssets } from "@/features/panels/WalletAssets";
 
 /**
- * Put money in, pay someone out of it, or take it back.
+ * Send ETH or any token on Base from the connected wallet, to an address or a Basename.
  *
- * Every amount here goes through parseAmount, so the input is either an exact
- * base-unit bigint or a thrown error the user reads — there is no path where a
- * typo becomes a silently rounded number. USDC is the only token for now because
- * it is the one the router pays in; the token is in the state so adding AAPLc is
- * a select, not a rewrite.
+ * Two clicks on purpose. **Review** reads everything the wallet will not show clearly —
+ * which address a Basename resolves to, what the token contract says it is, whether the
+ * balance covers it, whether the recipient is a contract — and lays it out as a report.
+ * **Send** hands exactly that transaction to the wallet. Changing any field throws the
+ * review away, so what was reviewed is always what gets signed.
+ *
+ * Public: this is an ordinary transfer, visible on Basescan like any other. (The private
+ * send that used to live in this window was archived with the privacy model, 2026-09-30.)
  */
 
-const TOKEN = { address: USDC.address, symbol: USDC.symbol, decimals: USDC.decimals };
+type Review = {
+  readonly report: Report;
+  readonly tx: TxRequest;
+  readonly label: string;
+  /** a reason the send cannot go ahead, worn by the button */
+  readonly blocked: string | null;
+};
 
-const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+/** Below this much ETH left over, a native send leaves too little to pay for the next transaction. */
+const GAS_RESERVE = 10n ** 13n;
+
+async function buildReview(from: string, choice: Choice, typedToken: string, typedTo: string, typedAmount: string): Promise<Review> {
+  const [asset, target] = await Promise.all([assetFor(choice, typedToken, "Token address"), resolveTarget(typedTo, "Recipient")]);
+  const amount = parseAmount(typedAmount, asset.decimals);
+  if (amount === 0n) throw new Error("Enter an amount above zero.");
+  // the sender's own history, for Send Check's look-alike test: a failed read is a row, never a pass
+  const [balance, kind, moved] = await Promise.all([balanceOf(asset, from), accountKind(target.address), transfersOf(from).catch(() => null)]);
+  const history = sameAddress(target.address, from)
+    ? null
+    : moved === null
+      ? row("Your history", "not checked — your token history could not be read; compare the address with where you got it", { tone: "warn" })
+      : historyRow(target.address, historyOf(from, moved));
+  /** a fake transfer named this address as if you had paid it: address poisoning, and the send is refused */
+  const planted = history?.tone === "bad" && history.value.includes("PLANTED");
+  /** a wallet with an EIP-7702 delegation is still a wallet: only real contracts get the warning */
+  const contract = kind.kind === "contract";
+
+  const shown = `${formatAmount(amount, asset.decimals)} ${asset.symbol}`;
+  const short = balance < amount;
+  const rows: Row[] = [
+    row("You send", shown),
+    asset.kind === "native"
+      ? row("Token", "ETH, Base's own currency")
+      : row("Token", `${asset.symbol} · ${asset.address}`, { href: explorer.token(asset.address) }),
+    row("To", target.via ? `${target.via} → ${target.address}` : target.address, { href: explorer.address(target.address) }),
+    row("Your balance", `${formatAmount(balance, asset.decimals)} ${asset.symbol}`, short ? { tone: "bad" } : {}),
+    row("Network", `${BASE.name} (${BASE.id})`),
+    ...recipientWarnings(target, from, contract),
+    ...(history && history.tone !== undefined ? [history] : []),
+    ...(asset.kind === "native" && !short && balance - amount < GAS_RESERVE
+      ? [row("Gas", "This leaves almost no ETH to pay for the next transaction.", { tone: "warn" })]
+      : []),
+  ];
+  const tx: TxRequest =
+    asset.kind === "native"
+      ? { to: target.address, value: amount }
+      : { to: asset.address, data: transferData(target.address, amount) };
+  return {
+    report: {
+      title: "Review",
+      rows,
+      notes: ["Your wallet shows this again before anything is sent. Nothing moves until you approve it there."],
+      sources: ["Base RPC", ...(target.via ? ["Basenames"] : []), "Blockscout (your token transfers)"],
+    },
+    tx,
+    label: `Send ${shown} to ${target.via ?? target.address}`,
+    blocked: planted ? "Refused: a planted address" : short ? `Not enough ${asset.symbol}` : null,
+  };
+}
+
+function recipientWarnings(target: Target, from: string, contract: boolean): Row[] {
+  return [
+    ...(sameAddress(target.address, from) ? [row("Recipient", "That is your own address.", { tone: "warn" })] : []),
+    ...(contract
+      ? [row("Recipient", "This address is a contract. Tokens sent to a contract that cannot handle them are lost for good.", { tone: "warn" })]
+      : []),
+  ];
+}
 
 export function SendPanel() {
-  const { pool } = useAdapters();
-
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [depositText, setDepositText] = useState("10");
+  const { wallet, signingProvider } = useWalletSession();
+  const [choice, setChoice] = useState<Choice>("ETH");
+  const [token, setToken] = useState("");
   const [to, setTo] = useState("");
-  const [sendText, setSendText] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
-  const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [amount, setAmount] = useState("");
+  const [review, setReview] = useState<Review | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reading, setReading] = useState(false);
+  const steps = useTxSteps();
 
-  const refresh = useCallback(async () => {
-    setNotes(await pool.notes());
-  }, [pool]);
+  /** Any edit throws the review away: what was reviewed is what gets signed. */
+  const edit = (set: (v: string) => void) => (v: string) => {
+    set(v);
+    setReview(null);
+    setError(null);
+    steps.reset();
+  };
 
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  // `send 0x…` from anywhere in the app — a Send Check's "Send to it", a profile — fills the recipient
+  useInbox("to", edit(setTo));
 
-  /**
-   * One place where every action's failure becomes a message. Each handler below
-   * throws a real Error, so the UI never has to invent wording for a failure it
-   * does not understand.
-   */
-  const run = useCallback(
-    async (action: () => Promise<Receipt | null>) => {
-      setError(null);
-      try {
-        setReceipt(await action());
-      } catch (e) {
-        setReceipt(null);
-        setError(e instanceof Error ? e.message : String(e));
-      }
-      await refresh();
-    },
-    [refresh],
-  );
+  const ready = wallet?.kind === "ready" ? wallet : null;
+  const blocker = !ready
+    ? "Connect a wallet first"
+    : choice === "other" && token.trim() === ""
+      ? "Enter the token address"
+      : to.trim() === ""
+        ? "Enter a recipient"
+        : amount.trim() === ""
+          ? "Enter an amount"
+          : null;
 
-  const deposit = () =>
-    run(async () => {
-      const note = await pool.deposit(TOKEN, parseAmount(depositText, TOKEN.decimals));
-      setSelected(note.id);
-      return {
-        summary: `You put ${formatAmount(note.amount, TOKEN.decimals)} ${TOKEN.symbol} in. Keep this note: it is the money.`,
-        anchoring: note.anchoring,
-      };
-    });
+  const onReview = async () => {
+    setReading(true);
+    setError(null);
+    try {
+      setReview(await buildReview(ready!.account, choice, token, to, amount));
+    } catch (e) {
+      setError(messageOf(e));
+    }
+    setReading(false);
+  };
 
-  const send = () =>
-    run(async () => {
-      if (!selected) throw new Error("Pick a note to spend.");
-      if (!ADDRESS.test(to.trim())) {
-        throw new Error("That is not an address. Paste a 20-byte 0x… address.");
-      }
-      return pool.send(selected, to.trim(), parseAmount(sendText, TOKEN.decimals));
-    });
+  /** A token picked from the wallet list: the known ones by name, anything else by address. */
+  const pick = (address: string | null) => {
+    const c = choiceFor(address);
+    edit((v) => setChoice(v as Choice))(c);
+    setToken(c === "other" ? address! : "");
+    // an amount typed for the old token means nothing for the new one
+    setAmount("");
+  };
 
-  const withdraw = () =>
-    run(async () => {
-      if (!selected) throw new Error("Pick a note to withdraw.");
-      if (!ADDRESS.test(to.trim())) {
-        throw new Error("That is not an address. Paste a 20-byte 0x… address.");
-      }
-      return pool.withdraw(selected, to.trim());
-    });
+  /** the % button being read, so the click shows at once */
+  const [pending, setPending] = useState<number | null>(null);
+  const fill = async (pct: number) => {
+    setPending(pct);
+    try {
+      edit(setAmount)(await amountFor(choice, token, "Token address", ready!.account, pct));
+    } catch (e) {
+      setError(messageOf(e));
+    }
+    setPending(null);
+  };
 
-  const total = notes.reduce((sum, n) => sum + n.amount, 0n);
+  const onSend = async () => {
+    const r = review!;
+    await steps.run(signingProvider(), ready!.account, [{ label: r.label, build: () => r.tx }]);
+  };
+
+  const done = steps.states.length > 0;
 
   return (
     <div className="stack">
+      {ready ? <WalletAssets account={ready.account} label={`Your assets on ${BASE.name} — pick one to send`} onPick={pick} /> : null}
       <fieldset className="group">
-        <legend>Put money in</legend>
-        <label className="group__row">
-          <span>Amount</span>
-          <input
-            className="field"
-            value={depositText}
-            onChange={(e) => setDepositText(e.target.value)}
-            aria-label="Amount to deposit"
-            inputMode="decimal"
-          />
-          <span className="group__unit">{TOKEN.symbol}</span>
-        </label>
-        <Gel onClick={deposit}>Deposit</Gel>
-      </fieldset>
-
-      <fieldset className="group">
-        <legend>
-          Your notes — {formatAmount(total, TOKEN.decimals)} {TOKEN.symbol} in {notes.length}
-        </legend>
-        {notes.length === 0 ? (
-          <p className="dim">No notes yet. Put something in above.</p>
-        ) : (
-          <ul className="notes notes--scroll" aria-label="Your notes">
-            {notes.map((n) => (
-              <li key={n.id}>
-                <label className="notes__row">
-                  <input
-                    type="radio"
-                    name="note"
-                    checked={selected === n.id}
-                    onChange={() => setSelected(n.id)}
-                    aria-label={`Note ${n.id}, ${formatAmount(n.amount, n.token.decimals)} ${n.token.symbol}`}
-                  />
-                  <code className="notes__amount">
-                    {formatAmount(n.amount, n.token.decimals)} {n.token.symbol}
-                  </code>
-                  <code className="notes__id dim">{n.id}</code>
-                </label>
-              </li>
-            ))}
-          </ul>
-        )}
-      </fieldset>
-
-      <fieldset className="group">
-        <legend>Pay out of a note</legend>
+        <legend>Send on {BASE.name}</legend>
+        <TokenPicker
+          label="Token"
+          choice={choice}
+          address={token}
+          onChoice={(c) => edit((v) => setChoice(v as Choice))(c)}
+          onAddress={edit(setToken)}
+        />
         <label className="group__row">
           <span>To</span>
-          <input
-            className="field"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            placeholder="0x…"
-            aria-label="Address to pay"
-            spellCheck={false}
-          />
+          <input className="field" aria-label="Recipient" placeholder="0x… or name.base.eth" spellCheck={false} value={to} onChange={(e) => edit(setTo)(e.target.value)} />
         </label>
         <label className="group__row">
           <span>Amount</span>
-          <input
-            className="field"
-            value={sendText}
-            onChange={(e) => setSendText(e.target.value)}
-            aria-label="Amount to send"
-            inputMode="decimal"
-          />
-          <span className="group__unit">{TOKEN.symbol}</span>
+          <input className="field" aria-label="Amount" placeholder="0.0" inputMode="decimal" value={amount} onChange={(e) => edit(setAmount)(e.target.value)} />
         </label>
-        <div className="row">
-          <Gel onClick={send} disabled={notes.length === 0}>
-            Send
-          </Gel>
-          <Gel quiet onClick={withdraw} disabled={notes.length === 0}>
-            Withdraw all of it
-          </Gel>
-        </div>
+        <PercentButtons onPick={(p) => void fill(p)} pending={pending} disabled={!ready || (choice === "other" && token.trim() === "")} />
       </fieldset>
 
-      <Crt label="Send output">
-        {error ? (
+      {review === null ? (
+        <Gel className="mf__cta" onClick={() => void onReview()} disabled={blocker !== null || reading}>
+          {reading ? "Reading…" : (blocker ?? "Review")}
+        </Gel>
+      ) : (
+        <>
+          <ReportView report={review.report} />
+          <Gel className="mf__cta" onClick={() => void onSend()} disabled={review.blocked !== null || steps.running || done}>
+            {review.blocked ?? (done ? "Sent — edit a field to send again" : "Send in wallet")}
+          </Gel>
+        </>
+      )}
+
+      {error ? (
+        <Crt label="Send error">
           <span className="crt__amber">{error}</span>
-        ) : receipt ? (
-          <>
-            <span>{receipt.summary}</span>
-            <Anchor anchoring={receipt.anchoring} />
-          </>
-        ) : (
-          <span className="crt__dim">{"// nothing run yet"}</span>
-        )}
-      </Crt>
+        </Crt>
+      ) : null}
+      <TxStepList states={steps.states} label="Send progress" />
     </div>
   );
 }

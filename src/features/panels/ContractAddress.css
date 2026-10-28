@@ -1,0 +1,30 @@
+/* The coin's contract address (CA) — its own file so the app chrome's stylesheet stays one owner's.
+   Colours come from theme.css's custom properties, with plain fallbacks. */
+.ca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 0;
+  font-size: 12px;
+}
+.ca__label {
+  font-weight: bold;
+}
+.ca__value {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  background: var(--xp-sunken, #fff);
+  border: 1px solid var(--xp-border-mid, #aca899);
+  padding: 1px 4px;
+  /* the full address on a wide window; wraps on a phone instead of pushing the page sideways */
+  overflow-wrap: anywhere;
+  min-width: 0;
+  user-select: all;
+}
+.ca__note {
+  flex-basis: 100%;
+  color: var(--warn, #9a6300);
+}
+.ca__short {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}

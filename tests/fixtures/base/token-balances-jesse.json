@@ -1,0 +1,211 @@
+[
+ {
+  "token": {
+   "address_hash": "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22",
+   "decimals": "18",
+   "exchange_rate": "3044.25",
+   "name": "Coinbase Wrapped Staked ETH",
+   "symbol": "CBETH",
+   "type": "ERC-20"
+  },
+  "token_id": null,
+  "value": "64482000250000000000"
+ },
+ {
+  "token": {
+   "address_hash": "0x50F88fe97f72CD3E75b9Eb4f747F59BcEBA80d59",
+   "decimals": "18",
+   "exchange_rate": "0.00132919",
+   "name": "jesse",
+   "symbol": "JESSE",
+   "type": "ERC-20"
+  },
+  "token_id": null,
+  "value": "45690152448037775880285876"
+ },
+ {
+  "token": {
+   "address_hash": "0x1111111111166b7FE7bd91427724B487980aFc69",
+   "decimals": "18",
+   "exchange_rate": "0.00781123",
+   "name": "Zora",
+   "symbol": "ZORA",
+   "type": "ERC-20"
+  },
+  "token_id": null,
+  "value": "5962218509806917819001011"
+ },
+ {
+  "token": {
+   "address_hash": "0x4200000000000000000000000000000000000006",
+   "decimals": "18",
+   "exchange_rate": "2668.7",
+   "name": "L2 Standard Bridged WETH (Base)",
+   "symbol": "WETH",
+   "type": "ERC-20"
+  },
+  "token_id": null,
+  "value": "2281807347495925534"
+ },
+ {
+  "token": {
+   "address_hash": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+   "decimals": "8",
+   "exchange_rate": "83220",
+   "name": "Coinbase Wrapped BTC",
+   "symbol": "CBBTC",
+   "type": "ERC-20"
+  },
+  "token_id": null,
+  "value": "6934917"
+ },
+ {
+  "token": {
+   "address_hash": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+   "decimals": "6",
+   "exchange_rate": "0.999838",
+   "name": "USDC",
+   "symbol": "USDC",
+   "type": "ERC-20"
+  },
+  "token_id": null,
+  "value": "4244385701"
+ },
+ {
+  "token": {
+   "address_hash": "0xA4A2E2ca3fBfE21aed83471D28b6f65A233C6e00",
+   "decimals": "18",
+   "exchange_rate": "0.327126",
+   "name": "Ribbita by Virtuals",
+   "symbol": "TIBBIR",
+   "type": "ERC-20"
+  },
+  "token_id": null,
+  "value": "10000000000000000000000"
+ },
+ {
+  "token": {
+   "address_hash": "0x17d70172C7C4205bd39ce80F7f0ee660B7Dc5A23",
+   "decimals": "18",
+   "exchange_rate": "0.00001287",
+   "name": "Dimes",
+   "symbol": "DIME",
+   "type": "ERC-20"
+  },
+  "token_id": null,
+  "value": "202131314170192972439378828"
+ },
+ {
+  "token": {
+   "address_hash": "0x3ec2156D4c0A9CBdAB4a016633b7BcF6a8d68Ea2",
+   "decimals": "18",
+   "exchange_rate": "0.00019884",
+   "name": "DebtReliefBot",
+   "symbol": "DRB",
+   "type": "ERC-20"
+  },
+  "token_id": null,
+  "value": "11448228857696374684690161"
+ },
+ {
+  "token": {
+   "address_hash": "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b",
+   "decimals": "18",
+   "exchange_rate": "0.786712",
+   "name": "Virtuals Protocol",
+   "symbol": "VIRTUAL",
+   "type": "ERC-20"
+  },
+  "token_id": null,
+  "value": "2544643026487648923196"
+ },
+ {
+  "token": {
+   "address_hash": "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+   "decimals": "18",
+   "exchange_rate": "0.799742",
+   "name": "Aerodrome Finance",
+   "symbol": "AERO",
+   "type": "ERC-20"
+  },
+  "token_id": null,
+  "value": "2240408919255741049044"
+ },
+ {
+  "token": {
+   "address_hash": "0xED6E000dEF95780fb89734c07EE2ce9F6dcAf110",
+   "decimals": "18",
+   "exchange_rate": "0.108225",
+   "name": "Definitive",
+   "symbol": "EDGE",
+   "type": "ERC-20"
+  },
+  "token_id": null,
+  "value": "14112264619830441913299"
+ },
+ {
+  "token": {
+   "address_hash": "0x75Ef2024571e218A20Ef6F7b019D8ce55B49Ab6b",
+   "decimals": "18",
+   "exchange_rate": null,
+   "name": "Melon Usk, Founder of SpaceY",
+   "symbol": "Melon Usk",
+   "type": "ERC-20"
+  },
+  "token_id": null,
+  "value": "4017389526332896058135085019509"
+ },
+ {
+  "token": {
+   "address_hash": "0x0F7D6cB36074782E3b75675eb6CCF7E01BDEE5F7",
+   "decimals": "18",
+   "exchange_rate": null,
+   "name": "Shibaseinu",
+   "symbol": "SHIBASE",
+   "type": "ERC-20"
+  },
+  "token_id": null,
+  "value": "200000000000000000000000000000"
+ },
+ {
+  "token": {
+   "address_hash": "0x9304B221156E12DdFBe0379eaafBc7556dbaFb07",
+   "decimals": null,
+   "exchange_rate": null,
+   "name": null,
+   "symbol": null,
+   "type": "ERC-20"
+  },
+  "token_id": null,
+  "value": "50000000000000000000000000"
+ },
+ {
+  "token": null,
+  "token_id": null,
+  "value": "95979355603465794118959560020"
+ },
+ {
+  "token": {
+   "address_hash": "0x23B6A8525325f7f54e6f098D3baf0024e8Bf418f",
+   "decimals": null,
+   "exchange_rate": null,
+   "name": "VIBE STRATEGY",
+   "symbol": "VIST",
+   "type": "ERC-721"
+  },
+  "token_id": null,
+  "value": "106"
+ },
+ {
+  "token": {
+   "address_hash": "0x6AfC6851F0DFe01b797aa17779112907991BAfAe",
+   "decimals": null,
+   "exchange_rate": null,
+   "name": "Base  Africa (Akure Chapter)",
+   "symbol": null,
+   "type": "ERC-1155"
+  },
+  "token_id": "1",
+  "value": "111"
+ }
+]

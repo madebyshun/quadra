@@ -1,23 +1,74 @@
-import { describe, it, expect } from "vitest";
-import { FEATURES, VISIBLE_FEATURES, resolveFeature, isEnabled } from "@/features/registry";
+import { describe, it, expect, vi } from "vitest";
+import {
+  CORNER,
+  DESKTOP,
+  FEATURES,
+  FOLDERS,
+  FOLDER_IDS,
+  comingSoon,
+  desktopItems,
+  entryOf,
+  folderItems,
+  folderOf,
+  isFolder,
+  visibleFeatures,
+  resolveFeature,
+  isEnabled,
+} from "@/features/registry";
 import { FLAGS } from "@/config/chain";
+
+const flags = vi.hoisted(() => ({ robinhood: false, allOn: false }));
+vi.mock("@/config/chain", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/config/chain")>();
+  return { ...real, FLAGS: new Proxy(real.FLAGS, { get: (t, k) => (flags.allOn ? true : k === "robinhood" ? flags.robinhood : t[k as keyof typeof t]) }) };
+});
 
 /**
  * Feature ids are permanent: they are the `?do=` in every link anyone saved.
  * The list below is pinned literally so that renaming an id fails here instead
  * of silently 404-ing a link that is already out in the world.
+ *
+ * One id was dropped on 2026-09-30: `router`, the private-balance agent payer, archived
+ * with the privacy model. That was only acceptable because nothing is public yet — no
+ * link to it exists outside this repo. Once the site is live, an id is removed by
+ * redirecting it, never by deleting it.
  */
 const SHIPPED_IDS = [
-  "swap",
-  "inference",
-  "router",
+  "wallet",
+  "terminal",
+  "research",
+  "safety",
+  "markets",
+  "trade",
   "send",
-  "mcp",
+  "swap",
   "bridge",
   "launch",
+  "coins",
+  "profile",
+  "taskmgr",
+  "rugsweeper",
+  "achievements",
+  "leaderboard",
+  "card",
+  // a directory of projects on Base, 2026-10-22
+  "explore",
+  "x402",
+  "mcp",
+  "inference",
   "audit",
   "hooks",
-  "x402",
+  "soon",
+  "trash",
+  // the desktop reorganised into folders, 2026-10-21
+  "computer",
+  "folder-research",
+  "folder-money",
+  "folder-launchpad",
+  "folder-games",
+  "folder-agents",
+  "control",
+  "readme",
 ] as const;
 
 describe("the feature registry", () => {
@@ -40,13 +91,16 @@ describe("the feature registry", () => {
 
   it("points every feature at a flag that exists", () => {
     for (const f of FEATURES) {
-      expect(Object.keys(FLAGS), f.id).toContain(f.flag);
+      if (f.flag !== undefined) expect(Object.keys(FLAGS), f.id).toContain(f.flag);
     }
+    // only the desktop's furniture goes without one: a folder is never the thing that is off — and
+    // Explore Base, a fixed directory that reads nothing live
+    expect(FEATURES.filter((f) => f.flag === undefined).map((f) => f.id)).toEqual(["explore", ...FOLDER_IDS, "control", "readme"]);
   });
 
   it("keeps ids url-safe, since they go in a query string", () => {
     for (const f of FEATURES) {
-      expect(f.id).toMatch(/^[a-z0-9]+$/);
+      expect(f.id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)?$/);
       expect(encodeURIComponent(f.id)).toBe(f.id);
     }
   });
@@ -85,18 +139,102 @@ describe("resolveFeature", () => {
 describe("isEnabled", () => {
   it("reads the flag table, not a field on the feature", () => {
     for (const f of FEATURES) {
-      expect(isEnabled(f), f.id).toBe(FLAGS[f.flag]);
+      expect(isEnabled(f), f.id).toBe((f.flag === undefined || FLAGS[f.flag]) && (f.id !== "bridge" || FLAGS.robinhood));
     }
   });
 
-  it("reports the two unbuilt features as off", () => {
+  /**
+   * `audit` and `hooks` went off on 2026-09-29 as off-thesis. On 2026-09-30 `launch` came
+   * back on (it goes out in public through o1) and `inference` went off — it is a stub
+   * with no enclave behind it, and an on-chain supercomputer does not need one to start.
+   * Pinned as a list so turning one back on is a visible decision rather than a flag
+   * nobody noticed flipping.
+   */
+  it("reports the switched-off features as off", () => {
     const off = FEATURES.filter((f) => !isEnabled(f)).map((f) => f.id);
-    expect(off).toEqual(["bridge", "launch"]);
+    // bridge: on its own flag, but its only destination is Robinhood Chain, hidden 2026-10-02
+    expect(off).toEqual(["bridge", "inference", "audit", "hooks"]);
+  });
+
+  it("no longer resolves the archived router id", () => {
+    expect(resolveFeature("router")).toBeNull();
   });
 });
 
-describe("VISIBLE_FEATURES", () => {
-  it("shows off features too, rather than hiding them", () => {
-    expect(VISIBLE_FEATURES).toHaveLength(FEATURES.length);
+describe("visibleFeatures", () => {
+  it("shows off features too, rather than hiding them — all but Robinhood Chain's", () => {
+    expect(visibleFeatures().map((f) => f.id)).toEqual(FEATURES.map((f) => f.id).filter((id) => id !== "bridge"));
+    expect(resolveFeature("bridge")?.robinhood).toBe(true);
+  });
+
+  it("brings Bridge back, on, the day Robinhood Chain is switched on", () => {
+    flags.robinhood = true;
+    expect(visibleFeatures()).toHaveLength(FEATURES.length);
+    expect(isEnabled(resolveFeature("bridge")!)).toBe(true);
+    flags.robinhood = false;
+  });
+});
+
+describe("the desktop's folders (2026-10-21)", () => {
+  const ids = () => desktopItems().map((e) => e.id);
+
+  it("keeps only the folders, four shortcuts and README.TXT on the desktop", () => {
+    expect(ids()).toEqual([
+      "computer",
+      "folder-research",
+      "folder-money",
+      "folder-launchpad",
+      "folder-games",
+      "folder-agents",
+      "terminal",
+      "launch",
+      "coins",
+      "wallet",
+      "readme",
+    ]);
+    expect(DESKTOP).toEqual(ids());
+  });
+
+  it("files every switched-on program somewhere: a folder, the desktop, or the Trash's corner", () => {
+    const filed = new Set([...DESKTOP, ...CORNER, ...FOLDER_IDS.flatMap((f) => FOLDERS[f])]);
+    for (const f of FEATURES.filter(isEnabled)) expect(filed.has(f.id), f.id).toBe(true);
+    for (const d of ["docs", "api", "verify"] as const) expect(folderOf(d)).toBe("folder-agents");
+    expect(folderOf("terminal")).toBeNull();
+    expect(folderOf("safety")).toBe("folder-research");
+  });
+
+  it("lists a folder's switched-on programs only, and Coming Soon while it holds something", () => {
+    expect(folderItems("folder-money").map((e) => e.id)).toEqual(["wallet", "send", "swap", "trade"]);
+    expect(folderItems("computer").map((e) => e.id)).toEqual(["taskmgr", "control", "soon"]);
+    expect(folderItems("folder-agents").map((e) => e.title)).toEqual(["MCP", "x402", "API", "Docs", "Verify"]);
+    expect(entryOf("docs").doc?.path).toBe("/docs");
+    expect(entryOf("wallet").doc).toBeNull();
+  });
+
+  it("tells a folder from anything else, inherited keys included", () => {
+    expect(isFolder("folder-games")).toBe(true);
+    expect(isFolder("games")).toBe(false);
+    expect(isFolder("constructor")).toBe(false);
+  });
+
+  it("puts the switched-off programs in Coming Soon, not on the desktop", () => {
+    expect(comingSoon().map((f) => f.id)).toEqual(["inference", "audit", "hooks"]);
+    for (const id of ["inference", "audit", "hooks", "bridge"]) expect(ids()).not.toContain(id);
+  });
+
+  it("keeps the Trash in its own corner", () => {
+    expect([...CORNER]).toEqual(["trash"]);
+    expect(ids()).not.toContain("trash");
+  });
+
+  it("hides the Coming Soon folder when nothing is waiting in it, and shows Bridge in Money", () => {
+    flags.allOn = true;
+    try {
+      expect(comingSoon()).toEqual([]);
+      expect(folderItems("computer").map((e) => e.id)).not.toContain("soon");
+      expect(folderItems("folder-money").map((e) => e.id)).toContain("bridge");
+    } finally {
+      flags.allOn = false;
+    }
   });
 });

@@ -1,0 +1,14 @@
+{
+ "hash": "0x8f17c8c5edf6f048c9cec01fe74a322befddeb1182a832388eeff16fedfb5dec",
+ "method": "deployToken",
+ "from": {
+  "hash": "0xd9aCd656A5f1B519C9E76a2A6092265A74186e58",
+  "is_contract": false
+ },
+ "to": {
+  "hash": "0xE85A59c628F7d27878ACeB4bf3b35733630083a9",
+  "is_contract": true,
+  "name": "Clanker",
+  "is_verified": true
+ }
+}

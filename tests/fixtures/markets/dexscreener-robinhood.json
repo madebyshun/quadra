@@ -1,0 +1,80 @@
+[
+ {
+  "chainId": "robinhood",
+  "dexId": "uniswap",
+  "url": "https://dexscreener.com/robinhood/0xa821b3724b451b22476c5347471b2a96d185b86af8760f226273e34ab4b2b8a0",
+  "pairAddress": "0xa821b3724b451b22476c5347471b2a96d185b86af8760f226273e34ab4b2b8a0",
+  "labels": [
+   "v4"
+  ],
+  "baseToken": {
+   "address": "0x322F0929c4625eD5bAd873c95208D54E1c003b2d",
+   "name": "Tesla \u2022 Robinhood Token",
+   "symbol": "TSLA"
+  },
+  "quoteToken": {
+   "address": "0x117cc2133c37B721F49dE2A7a74833232B3B4C0C",
+   "name": "SPDR S&P 500 ETF Trust \u2022 Robinhood Token",
+   "symbol": "SPY"
+  },
+  "priceNative": "0.4546",
+  "priceUsd": "349.048",
+  "priceChange": {
+   "m5": -0.06,
+   "h1": 0.87,
+   "h6": -1.31,
+   "h24": -1.7
+  },
+  "liquidity": {
+   "usd": 430097.14,
+   "base": 837.5346,
+   "quote": 179.4219
+  },
+  "volume": {
+   "h24": 606732.19,
+   "h6": 365878.73,
+   "h1": 59923.99,
+   "m5": 1779.49
+  },
+  "pairCreatedAt": 1785786492000
+ },
+ {
+  "chainId": "robinhood",
+  "dexId": "uniswap",
+  "url": "https://dexscreener.com/robinhood/0xddcbba3666f578e3f09516f21ff85bfee859ab5e",
+  "pairAddress": "0xDDCBBa3666f578E3F09516f21Ff85BFee859AB5e",
+  "labels": [
+   "v3"
+  ],
+  "baseToken": {
+   "address": "0x117cc2133c37B721F49dE2A7a74833232B3B4C0C",
+   "name": "SPDR S&P 500 ETF Trust \u2022 Robinhood Token",
+   "symbol": "SPY"
+  },
+  "quoteToken": {
+   "address": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+   "name": "WETH",
+   "symbol": "WETH"
+  },
+  "priceNative": "0.2873",
+  "priceUsd": "769.34",
+  "priceChange": {
+   "m5": -0.06,
+   "h1": -0.02,
+   "h6": 0.27,
+   "h24": 0.25
+  },
+  "liquidity": {
+   "usd": 1709113.77,
+   "base": 1652.1056,
+   "quote": 163.6097
+  },
+  "volume": {
+   "h24": 5116414.39,
+   "h6": 1997160.72,
+   "h1": 613333.27,
+   "m5": 12103.83
+  },
+  "pairCreatedAt": 1785765407000
+ }
+]

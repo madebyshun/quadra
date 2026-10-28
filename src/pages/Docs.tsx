@@ -1,53 +1,94 @@
 import { BRAND } from "@/brand";
 import { BASE } from "@/config/chain";
-import { AAPL_BASE, AAPL_REFERENCE_POOL } from "@/config/pair";
 import { Page } from "@/pages/Page";
-import { Crt } from "@/ui/Crt";
 
-export function Docs() {
+/**
+ * The prose alone. Rendered inside a window on the desktop and inside `Page`
+ * on `/docs` — the same body either way, so the two can never drift.
+ */
+export function DocsBody() {
   return (
-    <Page title={`Docs — ${BRAND.name}`}>
+    <>
       <fieldset className="group">
         <legend>What it does</legend>
         <p className="panel__lede">{BRAND.tagline}</p>
       </fieldset>
 
+      {/*
+        What works and what does not, in one place a person reads before trusting anything.
+        The tagline says "being built"; this is where that is made specific. Two short lists
+        because each line is a claim somebody can check in the app.
+      */}
       <fieldset className="group">
-        <legend>Where your money sits</legend>
-        <p className="panel__lede">
-          This site never holds a key. You put money into the pool yourself, and what comes back is
-          a note: a secret your browser keeps. Spending a note proves you own one without saying
-          which one. Lose the note and the money is gone, the same way cash is gone.
-        </p>
+        <legend>What works today</legend>
+        <ul className="notes" aria-label="Works today">
+          <li>
+            Research: see what launched on Base in the last hour, read from the chain, with each
+            launchpad named and every hook that can take a cut of a trade flagged.
+          </li>
+          <li>
+            Safety: a real buy and sell of a token, run on Base without sending anything, before you
+            buy it — plus what its owner can do, who holds it, who launched it and its market. A check
+            that could not run says so; it never reads as a pass.
+          </li>
+          <li>The Terminal: every skill above, typed.</li>
+          <li>
+            Send ETH or any token on Base to an address or a Basename; swap any token on Base; launch a coin on this app&apos;s own launchpad — a fixed supply nobody
+            can mint and liquidity nobody can pull. Each is checked before your
+            wallet is asked — where it goes, how much it can take — and signed there.
+          </li>
+          <li>
+            Pay any x402 endpoint from your own wallet, with every 402 checked before anything signs
+            and spending limits you set.
+          </li>
+          <li>Every skill as a tool your own AI agent can call, from a server that holds no key.</li>
+        </ul>
       </fieldset>
 
       <fieldset className="group">
-        <legend>{BRAND.ticker}</legend>
+        <legend>Not yet</legend>
+        <ul className="notes" aria-label="Not yet">
+          <li>The app itself is not deployed: it runs on a developer&apos;s machine while each feature is tested.</li>
+          <li>The launchpad contract has not been audited. It holds the liquidity of every coin launched through it, forever.</li>
+        </ul>
+      </fieldset>
+
+      <fieldset className="group">
+        <legend>Where your money sits</legend>
         <p className="panel__lede">
-          {BRAND.ticker} pairs against tokenized Apple stock on {BASE.name}. The name is a 1991
-          Macintosh, so the pair is the point.
-        </p>
-        <Crt label="The other side of the pair, checked on chain">
-          {`token    ${AAPL_BASE.symbol}  (${AAPL_BASE.name})\n`}
-          {`address  ${AAPL_BASE.address}\n`}
-          {`chain    ${BASE.name} ${BASE.id}\n`}
-          {`decimals ${AAPL_BASE.decimals}\n`}
-          <span className="crt__dim">
-            {`\npool     ${AAPL_REFERENCE_POOL.address}\n`}
-            {`tvl      $${AAPL_REFERENCE_POOL.tvlUsd.toLocaleString("en-US")}  ·  24h $${AAPL_REFERENCE_POOL.volume24hUsd.toLocaleString("en-US")}\n`}
-            {`measured ${AAPL_REFERENCE_POOL.measuredAt} — these move, read them live\n`}
-          </span>
-          <span className="crt__amber">
-            {`\n${AAPL_BASE.symbol} has no Solidity source: it is a node precompile. Identity was\n`}
-            {`asserted on chain, not read off an explorer page.`}
-          </span>
-        </Crt>
-        <p className="dim">
-          <a href={AAPL_BASE.explorer} target="_blank" rel="noreferrer">
-            {AAPL_BASE.symbol} on Basescan
-          </a>
+          In your wallet. This site never holds a key and has no field to type one into: anything
+          that moves money is a transaction your own wallet shows you and you sign.
         </p>
       </fieldset>
+
+      {/*
+        There were sections here about the product's own token and a tokenized-stock pair,
+        both removed on the owner's call — the token is not deployed (`CONTRACTS.token` is
+        null), and a plan printed beside checked facts borrows their credibility.
+      */}
+      <fieldset className="group">
+        <legend>Where the answers come from</legend>
+        <p className="panel__lede">
+          Every report names its sources. Balances and contract reads come from {BASE.name} itself;
+          the rest from services that index or scan it.
+        </p>
+        <ul className="notes" aria-label="Sources">
+          <li>Base RPC — balances, gas, contract reads, Basenames. The chain, read directly.</li>
+          <li>Blockscout — token lists, holders, verified contracts, decoded transactions. An indexer: seconds behind the chain.</li>
+          <li>GoPlus Security — the token scan. It does not run every check on every token; the report says which it skipped.</li>
+          <li>DexScreener — prices, liquidity and volume from on-chain markets.</li>
+          <li>Relay — swap quotes.</li>
+          <li>Markets — GeckoTerminal for on-chain charts; Coinbase&apos;s Tokenized Stocks API for which contract is a real stock on Base.</li>
+        </ul>
+      </fieldset>
+    </>
+  );
+}
+
+export function Docs() {
+  return (
+    <Page title={`Docs — ${BRAND.name}`}>
+      <DocsBody />
     </Page>
   );
 }

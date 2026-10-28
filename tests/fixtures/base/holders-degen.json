@@ -1,0 +1,129 @@
+{
+ "items": [
+  {
+   "address": {
+    "ens_domain_name": null,
+    "hash": "0x06A19654e0872Ba71c2261EA691Ecf8a0c677156",
+    "is_contract": true,
+    "name": "GnosisSafeProxy"
+   },
+   "token_id": null,
+   "value": "8146548469706150495940807558"
+  },
+  {
+   "address": {
+    "ens_domain_name": null,
+    "hash": "0x82d4cD9bF16017fd518511d8bBE6d0493aF31A10",
+    "is_contract": false,
+    "name": null
+   },
+   "token_id": null,
+   "value": "2023345890120737828511330738"
+  },
+  {
+   "address": {
+    "ens_domain_name": null,
+    "hash": "0xEfEf4558802bF373Ce3307189C79a9cAb0a4Cb9C",
+    "is_contract": true,
+    "name": "TransparentUpgradeableProxy"
+   },
+   "token_id": null,
+   "value": "1922530529015325399275117762"
+  },
+  {
+   "address": {
+    "ens_domain_name": null,
+    "hash": "0x9773C9e7D048Ae91a4Fd9a48cd0B984e31fA418C",
+    "is_contract": false,
+    "name": null
+   },
+   "token_id": null,
+   "value": "1908210966989284933307315429"
+  },
+  {
+   "address": {
+    "ens_domain_name": null,
+    "hash": "0x7d00D30269fC62Ab5fAb54418feeDBdc71FDb25f",
+    "is_contract": true,
+    "name": "OtcVesting"
+   },
+   "token_id": null,
+   "value": "1848296798000000000000000000"
+  },
+  {
+   "address": {
+    "ens_domain_name": null,
+    "hash": "0x4Cc69ff3264e61D5D5E8F368331320c66daD2714",
+    "is_contract": false,
+    "name": null
+   },
+   "token_id": null,
+   "value": "1725081559452058179479322015"
+  },
+  {
+   "address": {
+    "ens_domain_name": null,
+    "hash": "0x13454580Bd3300075Eb4b2470A107a5cF4e6aF35",
+    "is_contract": false,
+    "name": null
+   },
+   "token_id": null,
+   "value": "1467257237704842865920199500"
+  },
+  {
+   "address": {
+    "ens_domain_name": null,
+    "hash": "0x21bb2A7e0e26449e60E6Fb994cd435b11BFe1a1A",
+    "is_contract": true,
+    "name": "DegenYearBurner"
+   },
+   "token_id": null,
+   "value": "1235001845514373414510400815"
+  },
+  {
+   "address": {
+    "ens_domain_name": null,
+    "hash": "0x17891B029eAEAd89A82bde0f398F87f5dEf4A1dd",
+    "is_contract": true,
+    "name": "SafeProxy"
+   },
+   "token_id": null,
+   "value": "1196329091000000000000000000"
+  },
+  {
+   "address": {
+    "ens_domain_name": null,
+    "hash": "0xBaeD383EDE0e5d9d72430661f3285DAa77E9439F",
+    "is_contract": false,
+    "name": null
+   },
+   "token_id": null,
+   "value": "802586190368446239502738140"
+  },
+  {
+   "address": {
+    "ens_domain_name": null,
+    "hash": "0xc8802fEaB2FaFb48B7d1aDe77e197002c210f391",
+    "is_contract": false,
+    "name": null
+   },
+   "token_id": null,
+   "value": "656264175221562047100000000"
+  },
+  {
+   "address": {
+    "ens_domain_name": null,
+    "hash": "0x4E4c31E49D430A4C57C30B3EA00AB259887e915D",
+    "is_contract": true,
+    "name": "SafeProxy"
+   },
+   "token_id": null,
+   "value": "651967706000000000000000000"
+  }
+ ],
+ "next_page_params": {
+  "value": "166851489993310029283841719",
+  "address_hash": "0x1985ea6e9c68e1c272d8209f3b478ac2fdb25c87",
+  "items_count": 50
+ }
+}

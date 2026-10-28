@@ -1,5 +1,10 @@
 import { MCP_BUILD, MCP_SERVER, MCP_TOOLS, mcpConfigSnippet, type Reach } from "@/lib/manifest";
 import { Crt } from "@/ui/Crt";
+import { SKILLS } from "@/skills";
+import { skillTools } from "@/skills/mcp";
+
+/** The skills as the stdio server advertises them — the same definitions, from `skills/mcp.ts`. */
+const SKILL_TOOLS = skillTools();
 
 /**
  * What another agent can do with this, and what it cannot.
@@ -22,8 +27,8 @@ const REACH: Record<Reach, string> = {
 /**
  * Takes `published` rather than reading the manifest, so the installed wording is
  * checked now instead of first appearing on the day it publishes. Same reason as
- * `poolBadge` in lib/status: a sentence that only renders once something ships
- * should not make its debut untested.
+ * `endpointBadge` in pages/ApiPage: a sentence that only renders once something
+ * ships should not make its debut untested.
  */
 export function installLine(published: boolean, name: string): string {
   return published
@@ -49,9 +54,31 @@ export function McpPanel() {
             </li>
           ))}
         </ul>
+      </fieldset>
+
+      <fieldset className="group">
+        <legend>Every skill, as a tool</legend>
+        <ul className="notes" aria-label="Skill tools">
+          {SKILL_TOOLS.map((tool, i) => {
+            // every skill takes at least one argument since the no-argument `gas` was deleted (2026-10-01)
+            const takes = SKILLS[i]!.args.map((a, k) => `${Object.keys(tool.inputSchema.properties)[k]}${a.optional ? " (optional)" : ""}`);
+            return (
+              <li key={tool.name}>
+                <span className="notes__row">
+                  <code className="notes__id">{tool.name}</code>
+                  <span className="chip">public read</span>
+                </span>
+                <span className="notes__why">
+                  {SKILLS[i]!.title} — {SKILLS[i]!.summary} Takes: {takes.join(", ")}.
+                </span>
+              </li>
+            );
+          })}
+        </ul>
         <p className="dim">
-          All five of these read. None can sign, send or pay — the server holds no key, and that is
-          checked by a test that reads its source, not promised in a comment.
+          All {MCP_TOOLS.length + SKILL_TOOLS.length} tools read. None can sign, send or pay — the server holds no key, and that is checked by
+          a test that reads its source and the skill bundle it loads, not promised in a comment. The skills run on your own machine
+          and read Base directly, free; the same skills over HTTP are sold per call on this app&apos;s API.
         </p>
       </fieldset>
 

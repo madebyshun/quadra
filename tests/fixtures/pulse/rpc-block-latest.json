@@ -1,0 +1,13 @@
+{
+ "number": "0x3226b08",
+ "timestamp": "0x6acf32f3",
+ "gasUsed": "0x1d3fce4",
+ "gasLimit": "0x17d78400",
+ "baseFeePerGas": "0x4c4b40",
+ "transactions": [
+  "0xf5f3cafc01c6e8e11e40fffcdb9df65e59c81dbca3a3da756d01b04dbc808a81",
+  "0x8c52e5d8271f6a145c0a3d2d1c900bfa24f7398a0c605635264901ab197cc17b",
+  "0x7c5e0dc9e3f2b0dc6597490f3a73c720b185d3cbf40b57f2ad5e1db706ada6c5",
+  "0xb898c5dccd51c72fd09a42bae2623604b1678f4def42b908d57df67fb62a9646"
+ ]
+}

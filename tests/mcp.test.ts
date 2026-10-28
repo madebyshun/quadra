@@ -13,6 +13,7 @@ import {
 import { HOOK_PERMISSIONS, NOT_AN_ADDRESS, readHookAddress } from "@/lib/hooks";
 import { formatAmount, parseAmount } from "@/lib/amount";
 import { BASE, CONTRACTS } from "@/config/chain";
+import { skillTools } from "@/skills/mcp";
 
 /**
  * The MCP server is the one part of this repo that runs outside the app.
@@ -38,6 +39,8 @@ import { BASE, CONTRACTS } from "@/config/chain";
 const ROOT = process.cwd();
 const SERVER = resolve(ROOT, "tools/quadra-mcp/index.mjs");
 const SOURCE = readFileSync(SERVER, "utf8");
+/** The generated skill bundle the server loads — held to the same no-key rules as the server. */
+const BUNDLE = readFileSync(resolve(ROOT, "tools/quadra-mcp/skills.mjs"), "utf8");
 
 /**
  * The server's code with its block comments removed.
@@ -191,17 +194,19 @@ describe("the manifest", () => {
  * comment saying "holds no key" is exactly as true as nobody having edited since.
  */
 describe("holding no key", () => {
-  it("reads no environment variable, only the command line", () => {
+  it("reads no environment variable, only the command line — nor does the skill bundle it loads", () => {
     expect(CODE).not.toContain("process.env");
     expect(CODE).toContain("process.argv");
+    expect(BUNDLE).not.toContain("process.env");
   });
 
   it.each(["PRIVATE_KEY", "MNEMONIC", "privateKey", "mnemonic", "signTypedData", "sendTransaction"])(
-    "has no %s in its code",
+    "has no %s in its code or in the skill bundle",
     (forbidden) => {
       expect(CODE, "if this tripped on a comment, reword the comment — the check is literal").not.toContain(
         forbidden,
       );
+      expect(BUNDLE).not.toContain(forbidden);
     },
   );
 
@@ -223,10 +228,12 @@ describe("the protocol", () => {
     expect(reply?.result?.["capabilities"]).toEqual({ tools: {} });
   });
 
-  it("advertises exactly what the manifest lists, and nothing more", async () => {
+  it("advertises exactly what the manifest lists, then every skill, and nothing more", async () => {
     const [reply] = await talk([{ jsonrpc: "2.0", id: 1, method: "tools/list" }]);
     const tools = reply?.result?.["tools"] as { name: string; description: string }[];
-    expect(tools.map((t) => t.name)).toEqual(MCP_TOOLS.map((t) => t.name));
+    expect(tools.map((t) => t.name)).toEqual([...MCP_TOOLS.map((t) => t.name), ...skillTools().map((t) => t.name)]);
+    // the server advertises the bundle's definitions, and they are this source's
+    expect(tools.slice(MCP_TOOLS.length)).toEqual(skillTools());
   });
 
   /**
@@ -281,6 +288,23 @@ describe("the protocol", () => {
     const { text, failed } = await call("quadra_drain_wallet");
     expect(failed).toBe(true);
     expect(text).toContain("quadra_read_hook");
+    expect(text).toContain("quadra_radar");
+  });
+});
+
+/**
+ * The skills as tools, through the real server. Only answers that need no network are
+ * checked here — the spawned process reads the real chain, which no test may reach; the
+ * skills' reports themselves are tested against captures in the skills suites and through
+ * `callSkillTool` in `tests/mcpSkills.test.ts`.
+ */
+describe("the skills as tools", () => {
+  it("refuses missing input in the skill's own words, as an MCP error rather than a crash", async () => {
+    const radar = await call("quadra_radar", { minutes: "abc" });
+    expect(radar).toEqual({ failed: true, text: "Minutes must be a whole number from 1 to 180." });
+    const token = await call("quadra_verdict", { token_address: "0x12" });
+    expect(token.failed).toBe(true);
+    expect(token.text).toMatch(/not a 20-byte hex address/);
   });
 });
 

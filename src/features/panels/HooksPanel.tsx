@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { isHookAddress, NOT_AN_ADDRESS, readHookAddress, type HookReading } from "@/lib/hooks";
+import { describeChecksum } from "@/lib/address";
+import { hookAddressProblem, readHookAddress, type HookReading } from "@/lib/hooks";
 import { Crt } from "@/ui/Crt";
 
 /**
@@ -22,13 +23,19 @@ export function HooksPanel() {
    * caller that has already validated — but catching here would add a
    * non-Error branch that nothing can reach, since the only thrower is one line
    * away and throws an Error every time.
+   *
+   * ⚠️ `hookAddressProblem` rather than `isHookAddress` because there are now two ways
+   * to fail and they need different sentences: "that is not an address" for a paste that
+   * is not one, and the EIP-55 sentence for one character being wrong. A single message
+   * covering both would tell somebody who mistyped a real address to paste an address.
    */
   const { reading, error } = useMemo((): {
     reading: HookReading | null;
     error: string | null;
   } => {
     if (!text.trim()) return { reading: null, error: null };
-    if (!isHookAddress(text)) return { reading: null, error: NOT_AN_ADDRESS };
+    const problem = hookAddressProblem(text);
+    if (problem !== null) return { reading: null, error: problem };
     return { reading: readHookAddress(text), error: null };
   }, [text]);
 
@@ -73,6 +80,13 @@ export function HooksPanel() {
                 </li>
               ))}
             </ul>
+            {/*
+              The checksum line sits with the caveat rather than with the verdict, because
+              it qualifies which address was read rather than what was found in it. An
+              `inert` reading of a lowercase address is two separate uncertainties and
+              collapsing them would hide the weaker one.
+            */}
+            <span className="crt__dim">{`// ${describeChecksum(reading.checksum)}`}</span>
             <span className="crt__dim">
               {
                 "// these bits say which callbacks run, never what they do. A hook with one permission can still take everything in the swap."

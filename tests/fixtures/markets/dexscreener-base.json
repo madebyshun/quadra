@@ -1,0 +1,178 @@
+[
+ {
+  "chainId": "base",
+  "dexId": "pancakeswap",
+  "url": "https://dexscreener.com/base/0x72ab388e2e2f6facef59e3c3fa2c4e29011c2d38",
+  "pairAddress": "0x72AB388E2E2F6FaceF59E3C3FA2C4E29011c2D38",
+  "baseToken": {
+   "address": "0x4200000000000000000000000000000000000006",
+   "name": "Wrapped Ether",
+   "symbol": "WETH"
+  },
+  "quoteToken": {
+   "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+   "name": "USD Coin",
+   "symbol": "USDC"
+  },
+  "priceNative": "2670.9123",
+  "priceUsd": "2670.91",
+  "priceChange": {
+   "m5": 0.08,
+   "h1": -0.71,
+   "h6": 0.08,
+   "h24": -1.7
+  },
+  "liquidity": {
+   "usd": 4963660.28,
+   "base": 1121.4909,
+   "quote": 1968256
+  },
+  "volume": {
+   "h24": 68799201.74,
+   "h6": 28464974.52,
+   "h1": 9384419.1,
+   "m5": 654653.83
+  },
+  "pairCreatedAt": 1697608465000
+ },
+ {
+  "chainId": "base",
+  "dexId": "aerodrome",
+  "url": "https://dexscreener.com/base/0x7c7420dd105e2779316423ba3e973f434315efa9",
+  "pairAddress": "0x7C7420DD105E2779316423Ba3E973f434315EFA9",
+  "baseToken": {
+   "address": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+   "name": "Coinbase Wrapped BTC",
+   "symbol": "cbBTC"
+  },
+  "quoteToken": {
+   "address": "0x4200000000000000000000000000000000000006",
+   "name": "Wrapped Ether",
+   "symbol": "WETH"
+  },
+  "priceNative": "31.2468",
+  "priceUsd": "83546.65",
+  "priceChange": {
+   "m5": 0.05,
+   "h1": -1.02,
+   "h6": 0.68,
+   "h24": -0.19
+  },
+  "liquidity": {
+   "usd": 2041854.36,
+   "base": 9.5063,
+   "quote": 466.6191
+  },
+  "volume": {
+   "h24": 74423956.88,
+   "h6": 24808432.17,
+   "h1": 5198902.74,
+   "m5": 250818.57
+  }
+ },
+ {
+  "chainId": "base",
+  "dexId": "aerodrome",
+  "url": "https://dexscreener.com/base/0x853f5f1b92b16714fe6cda67caad0856b83c7ab9",
+  "pairAddress": "0x853F5f1B92b16714Fe6CDA67CAad0856B83C7ab9",
+  "baseToken": {
+   "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+   "name": "NVIDIA Corporation",
+   "symbol": "NVDAc"
+  },
+  "quoteToken": {
+   "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+   "name": "USD Coin",
+   "symbol": "USDC"
+  },
+  "priceNative": "230.5573",
+  "priceUsd": "230.55",
+  "priceChange": {
+   "m5": 0.01,
+   "h1": -0.09,
+   "h6": 0.8,
+   "h24": -0.1
+  },
+  "liquidity": {
+   "usd": 2220811.93,
+   "base": 3980.973,
+   "quote": 1302969
+  },
+  "volume": {
+   "h24": 9915575.09,
+   "h6": 3313102.45,
+   "h1": 780757.57,
+   "m5": 33286.18
+  }
+ },
+ {
+  "chainId": "base",
+  "dexId": "aerodrome",
+  "url": "https://dexscreener.com/base/0xa3b1e3f9747065e2073722ff4c9027d3ea4994f0",
+  "pairAddress": "0xA3b1E3f9747065e2073722Ff4c9027d3eA4994F0",
+  "baseToken": {
+   "address": "0xb200000000000000000000C2e324d24d7eEcd1fb",
+   "name": "Apple Inc.",
+   "symbol": "AAPLc"
+  },
+  "quoteToken": {
+   "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+   "name": "USD Coin",
+   "symbol": "USDC"
+  },
+  "priceNative": "338.6402",
+  "priceUsd": "338.64",
+  "priceChange": {
+   "m5": 0.21,
+   "h1": 1.9,
+   "h6": 2.52,
+   "h24": 2.01
+  },
+  "liquidity": {
+   "usd": 1560082.23,
+   "base": 1580.2809,
+   "quote": 1024935
+  },
+  "volume": {
+   "h24": 7510038.57,
+   "h6": 3458963.61,
+   "h1": 1091995.16,
+   "m5": 43480.65
+  }
+ },
+ {
+  "chainId": "base",
+  "dexId": "aerodrome",
+  "url": "https://dexscreener.com/base/0x3f0296bf652e19bca772ec3df08b32732f93014a",
+  "pairAddress": "0x3f0296BF652e19bca772EC3dF08b32732F93014A",
+  "baseToken": {
+   "address": "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b",
+   "name": "Virtual Protocol",
+   "symbol": "VIRTUAL"
+  },
+  "quoteToken": {
+   "address": "0x4200000000000000000000000000000000000006",
+   "name": "Wrapped Ether",
+   "symbol": "WETH"
+  },
+  "priceNative": "0.0002935",
+  "priceUsd": "0.7850",
+  "priceChange": {
+   "m5": 0.11,
+   "h1": -2.17,
+   "h6": 0.8,
+   "h24": -4.32
+  },
+  "liquidity": {
+   "usd": 371596.44,
+   "base": 316774,
+   "quote": 45.9758
+  },
+  "volume": {
+   "h24": 4837074.36,
+   "h6": 1330889.49,
+   "h1": 344933.17,
+   "m5": 29349.35
+  }
+ }
+]

@@ -3,6 +3,7 @@ import { LOCAL_TOOLS, LocalCatalog, priceOf } from "@/adapters/local/catalog";
 import type { Catalog } from "@/adapters/types";
 import { BLUEAGENT } from "@/config/upstream";
 import { USDC } from "@/config/chain";
+import { USDC_DOMAIN } from "@/lib/eip712";
 
 const free = () => LOCAL_TOOLS.find((t) => t.priceBaseUnits === 0n)!;
 const paid = () => LOCAL_TOOLS.find((t) => t.priceBaseUnits > 0n)!;
@@ -64,27 +65,62 @@ describe("quoting a tool", () => {
     const quote = await new LocalCatalog().quote(tool.id);
     expect(quote.toolId).toBe(tool.id);
     if (quote.price.kind !== "paid") throw new Error("expected a paid quote");
-    expect(quote.price.amountBaseUnits).toBe(tool.priceBaseUnits);
-    expect(quote.price.asset).toEqual(USDC);
-    expect(quote.price.network).toBe("eip155:8453");
+    expect(quote.price.requirements.value).toBe(tool.priceBaseUnits);
+    expect(quote.price.requirements.asset).toEqual(USDC);
+    expect(quote.price.requirements.toolId).toBe(tool.id);
+  });
+
+  /**
+   * ⚠️ The chain is asserted by its ABSENCE from the struct, which is the only place
+   * it can be asserted now.
+   *
+   * This used to read `expect(quote.price.network).toBe("eip155:8453")`, and that
+   * test could pass with the network never checked — a string copied off the wire
+   * and displayed is indistinguishable from a string that was verified. Today
+   * `checkRequirements` refuses anything but `eip155:8453` and then does not keep it,
+   * because a field that survived a check has nothing left to tell a caller. So the
+   * statement "this quote is on Base" is now carried by the quote existing at all,
+   * and the refusals are pinned where they belong, in `tests/requirements.test.ts`.
+   */
+  it("keeps no network string, because a checked chain has nothing left to report", async () => {
+    const quote = await new LocalCatalog().quote(paid().id);
+    if (quote.price.kind !== "paid") throw new Error("expected a paid quote");
+    expect(quote.price.requirements).not.toHaveProperty("network");
   });
 
   /**
    * The stub must not contain an invented address. This pins it to the one
    * BLUEAGENT publishes, so a typo in either place is a failing test rather than
    * a payment to a wallet nobody controls.
+   *
+   * `kind: "known"` is the second half of the same statement: the checker compared
+   * this address against `BLUEAGENT.knownPayTo` and recognised it. A stub whose
+   * payee came back `unrecognised` would still render, and would be a stub that
+   * disagrees with the config it claims to copy.
    */
   it("pays the address upstream actually publishes, not a made-up one", async () => {
     const quote = await new LocalCatalog().quote(paid().id);
     if (quote.price.kind !== "paid") throw new Error("expected a paid quote");
-    expect(quote.price.payTo).toBe(BLUEAGENT.knownPayTo);
+    expect(quote.price.requirements.payee.address).toBe(BLUEAGENT.knownPayTo);
+    expect(quote.price.requirements.payee.kind).toBe("known");
+  });
+
+  /**
+   * 120 is upstream's own ask (`askedSeconds`), not `DEFAULT_AUTHORIZATION_SECONDS`.
+   * `lifetimeSeconds` is the longer window this build actually signs — the ask plus
+   * `SETTLEMENT_SLACK_SECONDS` — see `lib/eip712.ts`.
+   */
+  it("asks for the settlement window upstream asks for", async () => {
+    const quote = await new LocalCatalog().quote(paid().id);
+    if (quote.price.kind !== "paid") throw new Error("expected a paid quote");
+    expect(quote.price.requirements.askedSeconds).toBe(120n);
+    expect(quote.price.requirements.lifetimeSeconds).toBe(180n);
   });
 
   it("calls a free tool free, rather than pricing it at zero", async () => {
     const quote = await new LocalCatalog().quote(free().id);
     expect(quote.price.kind).toBe("free");
-    expect(quote.price).not.toHaveProperty("amountBaseUnits");
-    expect(quote.price).not.toHaveProperty("payTo");
+    expect(quote.price).not.toHaveProperty("requirements");
   });
 
   it("names what exists when asked for a tool that does not", async () => {
@@ -193,5 +229,34 @@ describe("priceOf", () => {
   it("treats exactly zero as free", () => {
     const price = priceOf({ id: "x", title: "X", summary: "", inputs: [], priceBaseUnits: 0n });
     expect(price.kind).toBe("free");
+  });
+
+  /**
+   * 🔴 The stub's price is the checker's OUTPUT, not a struct shaped like one.
+   *
+   * `toBe` and not `toEqual`, on purpose: the domain must be the very object
+   * `config/chain.ts` exports, which is only true if `assertDomain` returned
+   * `USDC_DOMAIN` by identity after comparing upstream's `extra` against it. A
+   * hand-built `PaymentRequirements` literal in this file would pass a `toEqual`
+   * and would prove nothing about production — that is the drift this whole stub
+   * exists to make impossible, and it is why `priceOf` assembles upstream's
+   * envelope and hands it to `checkRequirements` instead of assembling the result.
+   */
+  it("produces a price that production's own checker produced", () => {
+    const price = priceOf({ id: "x", title: "X", summary: "", inputs: [], priceBaseUnits: 1n });
+    if (price.kind !== "paid") throw new Error("expected a paid price");
+    expect(price.requirements.domain).toBe(USDC_DOMAIN);
+  });
+
+  /**
+   * The cap in `requirements.ts` is anchored to the real catalog's maximum
+   * (`blue-audit`, $1.00), so every price this stub carries must sit under it. If a
+   * future entry is priced past the cap, this fails here rather than at the moment
+   * a user is shown a number the signer would refuse.
+   */
+  it("prices every tool within the cap the checker enforces", () => {
+    for (const tool of LOCAL_TOOLS) {
+      expect(() => priceOf(tool)).not.toThrow();
+    }
   });
 });

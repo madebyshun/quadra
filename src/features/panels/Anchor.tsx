@@ -1,4 +1,4 @@
-import type { Anchoring, Attestation, Settlement } from "@/adapters/types";
+import type { Attestation, Settlement } from "@/adapters/types";
 import { formatAmount } from "@/lib/amount";
 import { BASE, USDC } from "@/config/chain";
 
@@ -10,27 +10,6 @@ import { BASE, USDC } from "@/config/chain";
  * local wording over a real proof. That is the only reason these are components
  * rather than a string in each panel.
  */
-
-export function Anchor({ anchoring }: { anchoring: Anchoring }) {
-  switch (anchoring.kind) {
-    case "onchain":
-      return (
-        <span className="crt__ok">
-          {"On chain in block "}
-          {anchoring.block}.{" "}
-          <a
-            href={`${BASE.explorer}/tx/${anchoring.txHash}`}
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            See it on Basescan
-          </a>
-        </span>
-      );
-    case "local":
-      return <span className="crt__amber">Not on chain: {anchoring.why}.</span>;
-  }
-}
 
 export function Attested({ attestation }: { attestation: Attestation }) {
   switch (attestation.kind) {

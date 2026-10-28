@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * The Quadra MCP server. Five tools, over stdio, for another agent to call.
+ * The Quadra MCP server. Five tools of its own plus every read-only skill of the app
+ * (`skills.mjs`, generated from `src/skills/mcp.ts`), over stdio, for another agent to call.
  *
  * ── It holds no key, and that is enforced, not promised ──────────────────────
  * This file reads no environment variable, opens no keystore, and has no signing
@@ -15,8 +16,8 @@
  * Only what genuinely works today. Reading a v4 hook address is real arithmetic;
  * the catalog and the 402 quote are real free reads upstream; the amount
  * conversion is the exact one the app uses. There is no swap tool, no send tool
- * and no run-a-paid-tool tool, because the shielded pool is not deployed and
- * there is no wallet here. A tool that exists and cannot work is worse than an
+ * and no run-a-paid-tool tool, because every one of those needs a signature and
+ * there is no wallet here (T18 adds prepared, owner-approved ones). A tool that exists and cannot work is worse than an
  * absent one: the agent picks it, fails, and retries.
  *
  * ── The two duplications, on purpose ─────────────────────────────────────────
@@ -43,6 +44,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { callSkillTool, skillTools } from "./skills.mjs";
 
 const MANIFEST = JSON.parse(readFileSync(new URL("./tools.json", import.meta.url), "utf8"));
 
@@ -230,14 +232,22 @@ const IMPL = {
   quadra_quote_tool: quoteTool,
 };
 
+/**
+ * The skills, from the generated `skills.mjs` (`src/skills/mcp.ts`): the same reports the app's
+ * Research window and Terminal show, read live from Base by this process, free, with no key.
+ */
+const SKILL_TOOLS = skillTools();
+
 async function callTool(name, args) {
   const impl = IMPL[name];
-  if (!impl) {
-    const known = Object.keys(IMPL).join(", ");
+  const skill = SKILL_TOOLS.some((t) => t.name === name);
+  if (!impl && !skill) {
+    const known = [...Object.keys(IMPL), ...SKILL_TOOLS.map((t) => t.name)].join(", ");
     return { content: [{ type: "text", text: `No tool called ${name}. There are: ${known}.` }], isError: true };
   }
   try {
-    return { content: [{ type: "text", text: await impl(args ?? {}) }] };
+    const text = impl ? await impl(args ?? {}) : await callSkillTool(name, args ?? {});
+    return { content: [{ type: "text", text }] };
   } catch (e) {
     return { content: [{ type: "text", text: e instanceof Error ? e.message : String(e) }], isError: true };
   }
@@ -248,11 +258,14 @@ async function callTool(name, args) {
  * uses it to say which tools touch the network; a client has no use for it.
  */
 function advertised() {
-  return MANIFEST.tools.map(({ name, description, inputSchema }) => ({
-    name,
-    description,
-    inputSchema,
-  }));
+  return [
+    ...MANIFEST.tools.map(({ name, description, inputSchema }) => ({
+      name,
+      description,
+      inputSchema,
+    })),
+    ...SKILL_TOOLS,
+  ];
 }
 
 async function handle(msg) {

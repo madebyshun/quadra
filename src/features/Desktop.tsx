@@ -1,60 +1,38 @@
-import { Link } from "react-router-dom";
 import { BRAND } from "@/brand";
-import { VISIBLE_FEATURES, isEnabled } from "@/features/registry";
-import { badges } from "@/lib/status";
+import type { WindowId } from "@/features/registry";
+import { IconMenu } from "@/features/IconMenu";
+import { MarketsGadget } from "@/features/markets/MarketsGadget";
+import { Icon } from "@/ui/icons";
 
-const DOCS = [
-  { to: "/docs", title: "Docs", blurb: `how it works, and ${BRAND.ticker}` },
-  { to: "/api", title: "API", blurb: "two public endpoints, with code" },
-  { to: "/verify", title: "Verify", blurb: "check any link" },
-] as const;
+export type DesktopProps = {
+  /** a feature icon was clicked: open (or re-focus) its window */
+  onOpen: (id: WindowId) => void;
+};
 
-export function Desktop() {
+export function Desktop({ onOpen }: DesktopProps) {
   return (
     <div className="home stack">
       <header className="home__head">
         <h1 className="home__brand">{BRAND.name}</h1>
+        {/*
+          Three status chips used to sit here — the feature count, "holds no key"
+          and the pool's deployment state. Removed on the owner's call: the
+          desktop leads with the name and the line, and the claims they made are
+          still made where they can be acted on (the Docs window for the pool and
+          the token, the MCP window for the key).
+        */}
         <p className="home__tagline">{BRAND.tagline}</p>
-        <ul className="row" aria-label="What is true right now">
-          {badges().map((b) => (
-            <li
-              key={b.text}
-              className={`chip ${b.tone === "ok" ? "chip--ok" : b.tone === "warn" ? "chip--warn" : ""}`}
-            >
-              {b.text}
-            </li>
-          ))}
-        </ul>
       </header>
 
-      <ul className="cards" aria-label="What you can do">
-        {VISIBLE_FEATURES.map((f) => {
-          const on = isEnabled(f);
-          return (
-            <li key={f.id}>
-              <Link
-                to={`/?do=${f.id}`}
-                className={`card ${on ? "" : "card--off"}`}
-                aria-disabled={on ? undefined : true}
-              >
-                <span className="card__title">{f.title}</span>
-                <span className="card__blurb">{on ? f.blurb : "not switched on yet"}</span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-
-      <ul className="cards cards--docs" aria-label="Read about it">
-        {DOCS.map((d) => (
-          <li key={d.to}>
-            <Link to={d.to} className="card card--doc">
-              <span className="card__title">{d.title}</span>
-              <span className="card__blurb">{d.blurb}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <IconMenu onOpen={onOpen} />
+      <MarketsGadget />
+      {/* the Trash keeps its own corner, the way it always has */}
+      <button type="button" className="icon desk-trash" onClick={() => onOpen("trash")}>
+        <span className="icon__glyph">
+          <Icon id="trash" />
+        </span>
+        <span className="icon__title">Trash</span>
+      </button>
     </div>
   );
 }

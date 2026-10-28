@@ -1,0 +1,130 @@
+[
+ {
+  "dexId": "uniswap",
+  "url": "https://dexscreener.com/base/0x07fe05d6c737ae0ed44f735b5a748c3d22082aa7f161283d69d8967020af3e4f",
+  "pairAddress": "0x07fe05d6c737ae0ed44f735b5a748c3d22082aa7f161283d69d8967020af3e4f",
+  "baseToken": {
+   "address": "0xb2000000000000000000002DF28FE1e36391efD5",
+   "name": "Still Based",
+   "symbol": "BASED"
+  },
+  "quoteToken": {
+   "address": "0x0000000000000000000000000000000000000000",
+   "name": "Ether",
+   "symbol": "ETH"
+  },
+  "priceUsd": "0.000001860",
+  "txns": {
+   "h24": {
+    "buys": 39,
+    "sells": 16
+   }
+  },
+  "volume": {
+   "h24": 711.74
+  },
+  "liquidity": {
+   "usd": 1799.7,
+   "base": 819364289,
+   "quote": 0.1098
+  },
+  "pairCreatedAt": 1791961067000,
+  "marketCap": 1860
+ },
+ {
+  "dexId": "uniswap",
+  "url": "https://dexscreener.com/base/0x2966b659853fcd1bda1ee144f53e39adf1dda5587d52d3e82b79b8ed6ded4385",
+  "pairAddress": "0x2966b659853fcd1bda1ee144f53e39adf1dda5587d52d3e82b79b8ed6ded4385",
+  "baseToken": {
+   "address": "0xB2000000000000000000001E1AC75af2158E8e45",
+   "name": "DEXSI",
+   "symbol": "DEXSI"
+  },
+  "quoteToken": {
+   "address": "0x0000000000000000000000000000000000000000",
+   "name": "Ether",
+   "symbol": "ETH"
+  },
+  "priceUsd": "0.00002781",
+  "txns": {
+   "h24": {
+    "buys": 70,
+    "sells": 47
+   }
+  },
+  "volume": {
+   "h24": 23633.23
+  },
+  "liquidity": {
+   "usd": 14159.66,
+   "base": 292939063,
+   "quote": 2.3987
+  },
+  "pairCreatedAt": 1791961157000,
+  "marketCap": 27811
+ },
+ {
+  "dexId": "uniswap",
+  "url": "https://dexscreener.com/base/0x2df380544b88adb3ad0a94100dcc45fd705aae2d",
+  "pairAddress": "0x2dF380544B88AdB3ad0A94100dcC45fd705aAE2d",
+  "baseToken": {
+   "address": "0x07b3D902783c3C12b077508c3B5c00113d1291D0",
+   "name": "Doppler",
+   "symbol": "XDP"
+  },
+  "quoteToken": {
+   "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+   "name": "USD Coin",
+   "symbol": "USDC"
+  },
+  "priceUsd": "0.02068",
+  "txns": {
+   "h24": {
+    "buys": 240304,
+    "sells": 236679
+   }
+  },
+  "volume": {
+   "h24": 177794512.11
+  },
+  "liquidity": {
+   "usd": 1867042.31,
+   "base": 43131030,
+   "quote": 974670
+  },
+  "pairCreatedAt": 1790599925000,
+  "marketCap": 20689791
+ },
+ {
+  "dexId": "uniswap",
+  "url": "https://dexscreener.com/base/0x7681c00520c26da8d8970c21a65461c726f274068eb08743debc1178e697044e",
+  "pairAddress": "0x7681c00520c26da8d8970c21a65461c726f274068eb08743debc1178e697044e",
+  "baseToken": {
+   "address": "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2",
+   "name": "Tether USD",
+   "symbol": "USDT"
+  },
+  "quoteToken": {
+   "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+   "name": "USD Coin",
+   "symbol": "USDC"
+  },
+  "priceUsd": "0.9987",
+  "txns": {
+   "h24": {
+    "buys": 21226,
+    "sells": 21503
+   }
+  },
+  "volume": {
+   "h24": 9657671.38
+  },
+  "liquidity": {
+   "usd": 293028.87,
+   "base": 232695,
+   "quote": 60633
+  },
+  "pairCreatedAt": 1746455851000,
+  "marketCap": 27277841
+ }
+]

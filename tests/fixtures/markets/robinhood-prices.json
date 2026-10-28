@@ -1,0 +1,124 @@
+{
+ "quotes": [
+  {
+   "tokenSymbol": "CRM",
+   "deployments": [
+    {
+     "contractAddress": "0xd95B44124e475743a7589e68F3D74008A5536D44",
+     "chainId": 4663,
+     "networkName": "Robinhood Chain",
+     "itnEnabled": false,
+     "atomicEnabled": false
+    }
+   ],
+   "bid": "224",
+   "ask": "226.01",
+   "currency": "USD",
+   "dailyTradingVolume": "6471",
+   "isTradingHalt": false,
+   "generatedAt": "2026-09-30T12:27:35.920226824Z",
+   "dailyHigh": "226.48",
+   "dailyLow": "224.86",
+   "mintBurnTokenVolume": "16.07589968",
+   "mintBurnUsdVolume": "3617.1578074984",
+   "tokenBid": "224.257224307360001632",
+   "tokenAsk": "226.269532436189437361"
+  },
+  {
+   "tokenSymbol": "SPY",
+   "deployments": [
+    {
+     "contractAddress": "0x117cc2133c37B721F49dE2A7a74833232B3B4C0C",
+     "chainId": 4663,
+     "networkName": "Robinhood Chain",
+     "itnEnabled": false,
+     "atomicEnabled": false
+    }
+   ],
+   "bid": "765.03",
+   "ask": "765.12",
+   "currency": "USD",
+   "dailyTradingVolume": "462600",
+   "isTradingHalt": false,
+   "generatedAt": "2026-09-30T12:27:35.920226824Z",
+   "dailyHigh": "766.73",
+   "dailyLow": "763.23",
+   "mintBurnTokenVolume": "2402.26444084",
+   "mintBurnUsdVolume": "1837912.467075663",
+   "tokenBid": "766.344314798151706455",
+   "tokenAsk": "766.434469417358578935"
+  },
+  {
+   "tokenSymbol": "NVDA",
+   "deployments": [
+    {
+     "contractAddress": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+     "chainId": 4663,
+     "networkName": "Robinhood Chain",
+     "itnEnabled": false,
+     "atomicEnabled": false
+    }
+   ],
+   "bid": "227.8",
+   "ask": "227.84",
+   "currency": "USD",
+   "dailyTradingVolume": "997491",
+   "isTradingHalt": false,
+   "generatedAt": "2026-09-30T12:27:35.920226824Z",
+   "dailyHigh": "228.9183",
+   "dailyLow": "227.2",
+   "mintBurnTokenVolume": "32437.73825992",
+   "mintBurnUsdVolume": "7389965.5303749744",
+   "tokenBid": "227.976581257702849541",
+   "tokenAsk": "228.016612264069434765"
+  },
+  {
+   "tokenSymbol": "AAPL",
+   "deployments": [
+    {
+     "contractAddress": "0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9",
+     "chainId": 4663,
+     "networkName": "Robinhood Chain",
+     "itnEnabled": false,
+     "atomicEnabled": false
+    }
+   ],
+   "bid": "330.15",
+   "ask": "330.36",
+   "currency": "USD",
+   "dailyTradingVolume": "244812",
+   "isTradingHalt": false,
+   "generatedAt": "2026-09-30T12:27:35.920226824Z",
+   "dailyHigh": "330.62",
+   "dailyLow": "328.7554",
+   "mintBurnTokenVolume": "1533.10795812",
+   "mintBurnUsdVolume": "506316.5687089206",
+   "tokenBid": "330.336891332169667745",
+   "tokenAsk": "330.547010208982497157"
+  },
+  {
+   "tokenSymbol": "TSLA",
+   "deployments": [
+    {
+     "contractAddress": "0x322F0929c4625eD5bAd873c95208D54E1c003b2d",
+     "chainId": 4663,
+     "networkName": "Robinhood Chain",
+     "itnEnabled": false,
+     "atomicEnabled": false
+    }
+   ],
+   "bid": "350.13",
+   "ask": "350.19",
+   "currency": "USD",
+   "dailyTradingVolume": "839716",
+   "isTradingHalt": false,
+   "generatedAt": "2026-09-30T12:27:35.920226824Z",
+   "dailyHigh": "355",
+   "dailyLow": "349.16",
+   "mintBurnTokenVolume": "1252.18755",
+   "mintBurnUsdVolume": "438465.992508",
+   "tokenBid": "350.130000000000000000",
+   "tokenAsk": "350.190000000000000000"
+  }
+ ]
+}

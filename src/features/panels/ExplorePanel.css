@@ -1,0 +1,74 @@
+/* Explore Base — reuses theme.css's `.explorer` furniture; only what is new lives here, in its own file. */
+.explore {
+  position: relative;
+}
+.explore__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  background: var(--xp-face, #ece9d8);
+  border-bottom: 1px solid var(--xp-border-mid, #aca899);
+  font-size: 12px;
+  min-width: 0;
+}
+.explore__path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.explore__logo {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+.explore__source {
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+  border-top: 1px solid var(--xp-border-mid, #aca899);
+}
+.explore__veil {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.18);
+}
+.explore__dialog {
+  width: min(360px, 100%);
+  background: var(--xp-face, #ece9d8);
+  border: 1px solid var(--xp-border-dark, #716f64);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+  color: var(--xp-ink, #000);
+}
+.explore__dialog-title {
+  margin: 0;
+  padding: 3px 8px;
+  font-weight: bold;
+  color: #fff;
+  background: var(--xp-title-a, #0058e6);
+}
+.explore__dialog-body {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  align-items: flex-start;
+}
+.explore__dialog-body p {
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+}
+.explore__dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+.explore__dialog-actions a.gel {
+  text-decoration: none;
+}

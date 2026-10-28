@@ -4,7 +4,9 @@
     "version": "0.0.0",
     "published": false,
     "command": "node",
-    "args": ["tools/quadra-mcp/index.mjs"]
+    "args": [
+      "tools/quadra-mcp/index.mjs"
+    ]
   },
   "tools": [
     {
@@ -19,7 +21,9 @@
             "description": "The hook's 20-byte address, 0x and 40 hex digits."
           }
         },
-        "required": ["address"],
+        "required": [
+          "address"
+        ],
         "additionalProperties": false
       }
     },
@@ -42,25 +46,40 @@
           },
           "to": {
             "type": "string",
-            "enum": ["base", "human"],
+            "enum": [
+              "base",
+              "human"
+            ],
             "description": "base turns 12.5 into base units; human turns base units back into 12.5."
           }
         },
-        "required": ["value", "decimals", "to"],
+        "required": [
+          "value",
+          "decimals",
+          "to"
+        ],
         "additionalProperties": false
       }
     },
     {
       "name": "quadra_status",
       "reach": "offline",
-      "description": "What this build can and cannot do right now: which chain it targets, which of its own contracts are deployed, and what is still missing. Ask this before assuming a capability exists. The shielded pool is not deployed, so nothing that needs it can run yet, and this server holds no key and cannot sign or send anything at all.",
-      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+      "description": "What this build can and cannot do right now: which chain it targets, which of its own addresses are set (the fee recipient; no token is deployed), and what is still missing. Ask this before assuming a capability exists. This server holds no key and cannot sign or send anything at all — sending, swapping, bridging and launching happen in the Quadra window, signed in the user's own wallet.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
     },
     {
       "name": "quadra_list_tools",
       "reach": "public-read",
       "description": "List the paid tools available upstream on BlueAgent, each with its price and its inputs. Reads the free public catalog. This lists them only: it cannot run one and it spends nothing.",
-      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
     },
     {
       "name": "quadra_quote_tool",
@@ -74,37 +93,82 @@
             "description": "A tool id from quadra_list_tools, for example honeypot."
           }
         },
-        "required": ["toolId"],
+        "required": [
+          "toolId"
+        ],
         "additionalProperties": false
       }
     }
   ],
   "build": {
-    "chain": { "id": 8453, "name": "Base" },
+    "chain": {
+      "id": 8453,
+      "name": "Base"
+    },
     "contracts": {
-      "shieldedPool": null,
-      "verifier": null,
-      "treasury": null,
-      "token": null
+      "treasury": "0xD5C1dFc036F9911348EA8065F73c8123f4013FAB",
+      "token": null,
+      "launchFactory": "0xef1F427bB57e0ECd7BB8051cE8bC7AAb709a0c03",
+      "launchFactoryV3": "0x006Da367654a487bb277fe25ff54f0fE0f741377",
+      "launchFactoryV1": "0xcDb2eC1c487fbcB6B4AF25cCD86aFf8120FaB8a5"
     },
     "limits": [
       "This server holds no key. It cannot sign, send, swap, or pay.",
-      "The shielded pool is not deployed, so no proof is made on chain and no transfer is shielded.",
       "Upstream tools can be listed and quoted, never run: running one costs USDC and needs a wallet this server does not have.",
       "Nothing here is published. The tool names may still change."
     ]
   },
   "hookPermissions": [
-    { "bit": 13, "name": "beforeInitialize", "means": "runs once, before the pool exists" },
-    { "bit": 12, "name": "afterInitialize", "means": "runs once, just after the pool is created" },
-    { "bit": 11, "name": "beforeAddLiquidity", "means": "runs before anyone adds liquidity" },
-    { "bit": 10, "name": "afterAddLiquidity", "means": "runs after liquidity is added" },
-    { "bit": 9, "name": "beforeRemoveLiquidity", "means": "runs before anyone takes liquidity out" },
-    { "bit": 8, "name": "afterRemoveLiquidity", "means": "runs after liquidity is taken out" },
-    { "bit": 7, "name": "beforeSwap", "means": "runs before your swap, and can change its price" },
-    { "bit": 6, "name": "afterSwap", "means": "runs after your swap" },
-    { "bit": 5, "name": "beforeDonate", "means": "runs before a donation to the pool" },
-    { "bit": 4, "name": "afterDonate", "means": "runs after a donation to the pool" },
+    {
+      "bit": 13,
+      "name": "beforeInitialize",
+      "means": "runs once, before the pool exists"
+    },
+    {
+      "bit": 12,
+      "name": "afterInitialize",
+      "means": "runs once, just after the pool is created"
+    },
+    {
+      "bit": 11,
+      "name": "beforeAddLiquidity",
+      "means": "runs before anyone adds liquidity"
+    },
+    {
+      "bit": 10,
+      "name": "afterAddLiquidity",
+      "means": "runs after liquidity is added"
+    },
+    {
+      "bit": 9,
+      "name": "beforeRemoveLiquidity",
+      "means": "runs before anyone takes liquidity out"
+    },
+    {
+      "bit": 8,
+      "name": "afterRemoveLiquidity",
+      "means": "runs after liquidity is taken out"
+    },
+    {
+      "bit": 7,
+      "name": "beforeSwap",
+      "means": "runs before your swap, and can change its price"
+    },
+    {
+      "bit": 6,
+      "name": "afterSwap",
+      "means": "runs after your swap"
+    },
+    {
+      "bit": 5,
+      "name": "beforeDonate",
+      "means": "runs before a donation to the pool"
+    },
+    {
+      "bit": 4,
+      "name": "afterDonate",
+      "means": "runs after a donation to the pool"
+    },
     {
       "bit": 3,
       "name": "beforeSwapReturnsDelta",

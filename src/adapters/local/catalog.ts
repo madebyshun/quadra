@@ -1,5 +1,7 @@
 import type { Catalog, Quote, Tool, ToolField, ToolRun } from "@/adapters/types";
 import { USDC } from "@/config/chain";
+import { checkRequirements } from "@/lib/requirements";
+import { BLUEAGENT } from "@/config/upstream";
 
 /**
  * The upstream tool catalog, offline.
@@ -39,7 +41,11 @@ import { USDC } from "@/config/chain";
 
 const WHY_LOCAL = "nothing was charged — this ran against the local stub, not the catalog";
 
-/** The published payee, not a made-up one. Kept in sync with `BLUEAGENT.knownPayTo`. */
+/**
+ * The published payee, not a made-up one. Kept in sync with `BLUEAGENT.knownPayTo`, and
+ * the stub's 402s are checked as coming from `BLUEAGENT.origin` — the stub mirrors that
+ * directory, so it answers as that origin would.
+ */
 const PAY_TO = "0x02950ad38ada1d599375bd447e080cd404809205";
 
 /**
@@ -50,6 +56,16 @@ const PAY_TO = "0x02950ad38ada1d599375bd447e080cd404809205";
  * will be handed, which is the only thing a stub is for.
  */
 const NETWORK = "eip155:8453";
+
+/**
+ * The settlement window upstream asks for, copied like every other column here.
+ *
+ * Measured 2026-09-28: `maxTimeoutSeconds: 120` on every paid id. Not
+ * `DEFAULT_AUTHORIZATION_SECONDS` — that constant is a fallback for callers with no
+ * requirements to read, and a stub that used it would be quietly claiming upstream
+ * asks for ten minutes when it asks for two.
+ */
+const SETTLEMENT_SECONDS = 120;
 
 type LocalTool = Tool & { priceBaseUnits: bigint };
 
@@ -119,17 +135,42 @@ function find(toolId: string): LocalTool {
   return found;
 }
 
-/** Free is a case, not a zero. See the `Price` type for why that distinction exists. */
+/**
+ * Free is a case, not a zero. See the `Price` type for why that distinction exists.
+ *
+ * 🔴 **The paid branch goes through `checkRequirements`, the same function that reads
+ * production's 402.** Building a `PaymentRequirements` literal would have been shorter
+ * and is exactly the drift this file's header forbids: a hand-built struct can hold a
+ * scheme, a chain or a window the real checker would refuse, and then every panel test
+ * passes against a price that could never have come off a live 402. Assembling
+ * upstream's envelope and handing it to the checker makes the stub *provably* a shape
+ * production could produce — if `PAY_TO`, `NETWORK` or the domain ever drift out of
+ * agreement with `config/`, this throws in the test suite rather than in front of a
+ * user.
+ *
+ * "A stub is a claim about upstream. Copy it; do not compose it" — the header of this
+ * file, which until now composed four of the seven fields and dropped the other three.
+ */
 export function priceOf(tool: LocalTool): Quote["price"] {
   if (tool.priceBaseUnits === 0n) {
     return { kind: "free", why: "this tool answers without asking for payment" };
   }
   return {
     kind: "paid",
-    payTo: PAY_TO,
-    amountBaseUnits: tool.priceBaseUnits,
-    asset: USDC,
-    network: NETWORK,
+    requirements: checkRequirements(tool.id, BLUEAGENT.origin, {
+      x402Version: 2,
+      accepts: [
+        {
+          scheme: "exact",
+          network: NETWORK,
+          asset: USDC.address,
+          amount: `${tool.priceBaseUnits}`,
+          payTo: PAY_TO,
+          maxTimeoutSeconds: SETTLEMENT_SECONDS,
+          extra: USDC.eip712,
+        },
+      ],
+    }),
   };
 }
 
@@ -151,7 +192,12 @@ export class LocalCatalog implements Catalog {
     return { toolId: tool.id, price: priceOf(tool) };
   }
 
-  async run(toolId: string, input: Record<string, string>): Promise<ToolRun> {
+  /**
+   * `_payment` is accepted and ignored: the interface takes it so a paid tool can be
+   * wired the same way against every adapter, but this stub never charges anything,
+   * signed or not — see the header for why that must stay true.
+   */
+  async run(toolId: string, input: Record<string, string>, _payment?: string): Promise<ToolRun> {
     const tool = find(toolId);
     const missing = tool.inputs
       .filter((field) => field.required && !(input[field.name] ?? "").trim())

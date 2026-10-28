@@ -1,0 +1,32 @@
+{
+ "items": [
+  {
+   "address": {
+    "ens_domain_name": null,
+    "hash": "0xcDb2eC1c487fbcB6B4AF25cCD86aFf8120FaB8a5",
+    "implementations": [],
+    "is_contract": true,
+    "is_scam": false,
+    "is_verified": true,
+    "metadata": null,
+    "name": "LaunchFactory",
+    "private_tags": [],
+    "proxy_type": null,
+    "public_tags": [],
+    "reputation": "ok",
+    "watchlist_names": []
+   },
+   "block_number": 52066747,
+   "block_timestamp": "2026-10-02T06:34:01.000000Z",
+   "data": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "topics": [
+    "0xfca62d2170394690e6f5573ceb06a7c869407ae2860aa00a0082a0493118eb40",
+    "0x000000000000000000000000b200000000000000000000660433ed1bb04b0df9",
+    "0x000000000000000000000000d5c1dfc036f9911348ea8065f73c8123f4013fab",
+    "0xaeef2263c5b62941eb0225d8d6e7caf4dcb0c09e8c9f55f9f6514e6aef03b2b5"
+   ],
+   "transaction_hash": "0x587621596330afe68b668d83f7a8625b99bb6a038ebb74747fe46a7b5a587fa9"
+  }
+ ],
+ "next_page_params": null
+}

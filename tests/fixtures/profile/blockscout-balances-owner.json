@@ -1,0 +1,68 @@
+[
+ {
+  "value": "7690836",
+  "token": {
+   "address_hash": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+   "symbol": "USDC",
+   "name": "USDC",
+   "decimals": "6",
+   "exchange_rate": "0.999876",
+   "type": "ERC-20"
+  }
+ },
+ {
+  "value": "25000000000000000000",
+  "token": {
+   "address_hash": "0xB2000000000000000000007cFaA3D74Fe8EB4285",
+   "symbol": "cobee",
+   "name": "cobee",
+   "decimals": "18",
+   "exchange_rate": null,
+   "type": "ERC-20"
+  }
+ },
+ {
+  "value": "25000000000000000000",
+  "token": {
+   "address_hash": "0x89FE034C3048681DC5dd29575817cf8F78E0A84B",
+   "symbol": "AGOR",
+   "name": "ASSET GLOBAL OIL RESERVE",
+   "decimals": "18",
+   "exchange_rate": null,
+   "type": "ERC-20"
+  }
+ },
+ {
+  "value": "25000000000000000000",
+  "token": {
+   "address_hash": "0x99eD4345b02bF6eF83bc2507E9a9519a5c9AB2F1",
+   "symbol": "DBV",
+   "name": "DERIVE BY VIRTUAL",
+   "decimals": "18",
+   "exchange_rate": null,
+   "type": "ERC-20"
+  }
+ },
+ {
+  "value": "25000000000000000000",
+  "token": {
+   "address_hash": "0x7DDe08AEf92a1694E9f6Ff0059B14Ec170E0259f",
+   "symbol": "UGGR",
+   "name": "UNITED GLOBAL GOLD RESERVE",
+   "decimals": "18",
+   "exchange_rate": null,
+   "type": "ERC-20"
+  }
+ },
+ {
+  "value": "25000000000000000000",
+  "token": {
+   "address_hash": "0x8bb69e0E7BEa35Ca96FeaCd544A85797dD906517",
+   "symbol": "RCOS",
+   "name": "RESERVE CURRENY OF SOCIAL",
+   "decimals": "18",
+   "exchange_rate": null,
+   "type": "ERC-20"
+  }
+ }
+]
