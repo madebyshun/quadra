@@ -92,6 +92,7 @@ npm install                 # Uniswap v4-core / v4-periphery come from npm, thro
 npm run gate:contracts      # base-forge build → base-forge test → 100% coverage of src/
 PATH="$HOME/.foundry/bin:$PATH" npx vite-node scripts/simulate-launchpad.ts   # hand-run, mainnet state
 PATH="$HOME/.foundry/bin:$PATH" npx vite-node scripts/simulate-launchpad-v3.ts   # v3: the opening fee, hand-run
+PATH="$HOME/.foundry/bin:$PATH" npx vite-node scripts/simulate-revenue-share.ts   # RevenueShare on the deployed v3, hand-run
 ```
 
 The tests (30) run against the real B20 precompile (Base Foundry registers it locally) and a real
@@ -213,7 +214,7 @@ serves every factory. New: `LaunchFee(address indexed token, uint24 fee)`, emitt
   the pool manager (needs `fs_permissions` read on `./src`, in foundry.toml). Three mutants of the hook
   — no first-buy exemption, no factory check at initialize, no decay — each fail named tests.
   `npm run gate:contracts`: 89 tests (30 v2 + 59 v3), 100% lines/functions/branches of all three files
-  in `src/` (2026-10-22; 77 = 30 + 47 before referrals).
+  in `src/` (2026-10-22; 77 = 30 + 47 before referrals). 119 over four files since RevenueShare (2026-10-28).
 - **Mainnet simulation** (`scripts/simulate-launchpad-v3.ts`, hand-run, 2026-10-14): one
   `eth_simulateV1` call, three blocks (the fee depends on the block's time, so the clock must move):
   deploy v3 (hook salt mined in the script) → launch a 1% and a 3% coin with 0.01 ETH first buys →
@@ -306,3 +307,118 @@ number it relies on back from the factory before each launch.
 ⚠️ Not audited. It is small (≈ 425 lines), uses no hook and no upgrade path, and its tests and the
 mainnet simulation pass — none of which is an audit. It will hold the liquidity of every token
 launched through it, permanently.
+
+## RevenueShare — opt-in fee sharing with stakers (PROPOSAL, NOT deployed, NOT audited)
+
+Built 2026-10-28 for Blue Agent's "tokenize your agent" flow, and **waiting on the owner's yes**
+before anything is deployed. `src/RevenueShare.sol`: `RevenueShare` (one per coin) and
+`RevenueShareDeployer` (deploys one at a predictable address and announces it). It changes nothing
+in the launchpad: it is just an address a coin's creator recipient may hand the launcher's 80% to,
+with v3's (and v2's) existing `setCreatorRecipient`.
+
+**What it does.** Whatever the launchpad pays it — only in the pool's two currencies, the coin and
+its quote (ETH, or a stock with 8 decimals) — is split once, at a share fixed at deployment:
+`agentBps` (0 to 90%) to the `agent` address, the rest to the people who **stake the coin** in it,
+pro rata to stake × time. Stakers claim both currencies whenever they like; the agent's share is
+paid by `payAgent()`, which anyone may call. `harvest()` calls the launchpad's public `collect`
+and accounts for what came.
+
+**Why staking, not "every holder".** Holder accounting on plain balances is impossible here, and
+the alternatives were weighed:
+
+| Option | Verdict |
+|---|---|
+| Pro rata over balances, via a transfer hook | **Impossible**: the coin is a B20 with no admin; nothing runs on its transfers and nothing can be added. |
+| Snapshot + Merkle root posted per period | Needs an operator who computes and posts the root — a party everyone must trust with the money, i.e. an owner power. Also pays the pool itself (PoolManager holds most of the supply) unless the operator filters, which is more trust. Rejected. |
+| A wrapped, transfer-hooked version of the coin | Splits liquidity between the coin and its wrapper; the pool trades the coin, so the wrapper has no market. Rejected. |
+| **Stake-to-earn vault (built)** | Exact, on-chain, no operator. Cost: a holder must stake (one approve + stake, or one `stakeWithPermit`), and a staked coin is not in the wallet — it can be unstaked any second, with no lock and no fee. |
+
+**Why a stream.** `collect` is public, so with an instant split anyone could stake a large amount,
+call `collect`, claim and unstake in one transaction and take most of the fees accrued since the
+last collect. Each arrival is released in a straight line over `STREAM` (7 days); a new arrival
+re-spreads everything still unreleased over a fresh 7 days. A stake earns only for the seconds it
+is staked — tested: a stake made around a `collect` and withdrawn in the same second earns 0.
+While nobody is staked the stream PAUSES (its end moves with the clock), so nothing is released
+into nothing; the first stakers receive it as it runs.
+
+**Accounting by balance.** The launchpad pushes (ETH by call, a token by `transfer`) and nothing
+tells the receiver. Every entry point compares each currency's balance with what is accounted
+(stakes included, for the coin); the difference is an arrival. A gift counts the same way.
+
+**What it guarantees** (each a test in `test/RevenueShare.t.sol`):
+- no owner, no admin, no upgrade, no pause, no sweep; `agent` and `agentBps` are immutable;
+- once a coin's creator recipient is set to it, the launcher's share is there FOR GOOD — the
+  contract has no function that calls `setCreatorRecipient`, and the launchpad lets only the
+  current recipient change it;
+- a refused payout (a recipient that refuses ETH, a stock whose policy refuses the receiver, a
+  re-entering recipient) stays credited to whoever was owed, and the other currency is still paid;
+  `claim(to)` lets a staker name another receiver; one refusal never blocks anyone else;
+- if the launchpad itself could not push to it (a quote's policy refused the contract), the
+  launchpad keeps it as `owed` and anyone can `pullOwed(currency)` it in;
+- a balance taken FROM it (a stock issuer's seizure) does not brick it: nothing new is counted,
+  and what it can no longer cover is refused at the claim and stays credited;
+- solvency and dust, fuzzed (512 runs × 40 random steps of stake/unstake/gift/claim/wait across
+  three stakers): after every step the contract holds at least what it owes in both currencies;
+  it never pays out more than arrived; once the stream has run out, what stays behind is rounding
+  dust (≤ a wei per bookkeeping step). Two more fuzzes: payment in proportion to stake (±2 wei),
+  and a late joiner earning exactly its share of the time left (±3 wei).
+
+**What it cannot do — say these plainly wherever it is offered:**
+- **Holders who do not stake get nothing.** "Holders" in any wording means "stakers".
+- It shares only the LAUNCHER's 80%. The protocol's share and a referrer's 5% are untouched.
+- It cannot be undone. Once pointed at it, the launcher's share cannot be taken back — by the
+  launcher, the agent, Quadra or anyone. An agent that later wants its income back cannot have it.
+- It does not guarantee any income: fees exist only while people trade the coin, and they are paid
+  in the coin and its quote, whose prices move. Nothing is converted to a stable value.
+- Fees reach stakers over 7 days, and frequent arrivals (or 1-wei gifts) re-spread the unreleased
+  remainder each time, which slows the tail — it never loses it.
+- Rounding dust (a few wei per operation) stays in the contract forever; there is deliberately no
+  function that could move it.
+- Fee-on-transfer or rebasing quotes are not supported (the launchpad enables none; Coinbase stocks
+  are neither). A stock's issuer CAN seize from the contract; that loss falls on the stakers owed it.
+- It does not work with launchpad v1 (v1's `owedEth`/`withdraw()` differ); v2 and v3 share the ABI.
+  One deployer is bound to ONE launchpad (v3 in the deploy script).
+
+**Measured on mainnet state** (`scripts/simulate-revenue-share.ts`, hand-run, 2026-10-28, pinned on
+Base block 53,191,842): one `eth_simulateV1` call against the DEPLOYED v3 (`0x006D…1377`, its real
+hook), the real PoolManager, Universal Router, Permit2 and Coinbase's real NVDAc with its real
+transfer policies — keyless addresses, nothing sent. The deployer deployed (2.00M gas); the app's own
+`launchTx` launched a 1% ETH coin (0.01 ETH first buy, Blue Agent's referrer — `referrerOf` read it
+back, approved on chain) and a 1% NVDAc coin; `create` (1.56M gas each) → `setCreatorRecipient` →
+`isActive` true for both. 30 s later a trader bought each coin (0.5 ETH; 2.892 NVDAc bought through
+Relay) and sold 5,000,000 of the ETH coin through the app's `buildSwap` + Permit2; the launcher staked
+the ETH coin, the trader the NVDAc coin; `harvest` both. Results:
+- every arrival was exactly the launcher's 80% of what `collect` took — ETH 4,079,999,999,999,999 wei
+  of 5,099,999,999,999,999 (and traceTransfers shows the same ETH pushed to the share), the coin
+  40,000 of 50,000, NVDAc 2,313,875 of 2,892,344 units (8 decimals);
+- **NVDAc's transfer policies accepted the share contract both ways**: the launchpad's push arrived
+  (`owed(share, NVDAc)` = 0), and the share paid NVDAc to the staker and to the agent (`paid = true`),
+  leaving 0 NVDAc behind;
+- the agent got exactly 20% of each arrival, in all three currencies;
+- `claimable` was 0 / 0 in the harvest's second, exactly half at +STREAM/2 (1,632,000,000,000,000
+  wei and 16,000 coins; 925,550 NVDAc units), and at +STREAM the only staker claimed exactly the
+  stakers' 80% in each currency, **0 wei left behind**; both unstakes returned the stakes.
+
+**Gas** (from `base-forge test --gas-report`, medians): `stake` ~115k, `stakeWithPermit` ~175k,
+`unstake` ~94k, `claim` ~84k (both currencies), `harvest` ~263k (includes the launchpad's
+`collect`), `payAgent` ~91k, `sync` ~53k.
+
+**Securities-sensitive — for the owner.** A token whose holders receive a share of an activity's
+income can be read as an investment contract in some jurisdictions. Wording that is safe to show:
+"Stake ACAT to receive a share of the trading fees this coin's pool earns, while staked. Fees vary
+and may be zero; they are paid in ACAT and ETH, whose prices change. This is not an investment
+product and no return is promised. Unstake at any time." Never "earn yield", "APY", "dividends",
+"passive income" or a projected return; never a dollar figure for the future. The owner decides
+whether Quadra offers this at all, and in which countries — this repo does not decide that.
+
+### Deploying — only after the owner's explicit approval
+
+```
+cd contracts
+base-forge script script/DeployRevenueShareDeployer.s.sol --rpc-url https://mainnet.base.org   # dry run
+base-forge script script/DeployRevenueShareDeployer.s.sol --rpc-url https://mainnet.base.org \
+  --account <your keystore> --broadcast --verify --verifier sourcify
+```
+
+The deployer has no owner; after it, every coin's share contract is created by whoever sets one up.
+Blue Agent's integration: `REVENUE_SHARE_INTEGRATION.md`.

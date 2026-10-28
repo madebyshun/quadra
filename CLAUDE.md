@@ -82,9 +82,10 @@ commit.**
 `base-forge build` → `base-forge test` → `scripts/check-contract-coverage.ts` (100% of
 `contracts/src`, or it fails — `forge coverage` has no `--fail-under`). It needs **Base Foundry**
 (`base-foundryup --install v1.1.1`), because stock Foundry cannot reach the B20 precompile; it is
-not part of `npm run gate`, which must run on a bare clone. 89 tests (v2 30 + v3 59), 100% over 3
-files in `contracts/src` (`LaunchFactory.sol` v2, `LaunchFactoryV3.sol`, `LaunchHook.sol`), measured 2026-10-22
-with v3's approved referrers (77 = 30 + 47 on 2026-10-14; 30 tests, 1 contract on 2026-10-02; 21 for v1, whose exact source is in `contracts/deployed/`). Run it whenever `contracts/` changes. The shielded pool's Foundry project stays in
+not part of `npm run gate`, which must run on a bare clone. 119 tests (v2 30 + v3 59 + RevenueShare 30), 100% over 4
+files in `contracts/src` (`LaunchFactory.sol` v2, `LaunchFactoryV3.sol`, `LaunchHook.sol`, `RevenueShare.sol`), measured 2026-10-28
+with RevenueShare (a PROPOSAL for Blue Agent — NOT deployed, waiting on the owner; contracts/README.md "RevenueShare") (89 = 30 + 59 on 2026-10-22
+with v3's approved referrers; 77 = 30 + 47 on 2026-10-14; 30 tests, 1 contract on 2026-10-02; 21 for v1, whose exact source is in `contracts/deployed/`). Run it whenever `contracts/` changes. The shielded pool's Foundry project stays in
 `archive/privacy/`; the Foundry lessons below apply to the launchpad.
 
 Dev server is `npm run dev` on **port 5273**.
