@@ -125,7 +125,11 @@ const cta = () => screen.getByRole("button", { name: /Connect|Enter|Get a quote|
 // ── Swap ─────────────────────────────────────────────────────────────────────
 
 describe("SwapPanel", () => {
-  beforeEach(() => launchOf.mockReset());
+  // a block, not an expression: Vitest runs a function returned from beforeEach as teardown, and
+  // mockReset returns the mock — which would then be called once more after every test
+  beforeEach(() => {
+    launchOf.mockReset();
+  });
   it("rates a price impact by size, and an unreported one as worth a look", () => {
     expect(impactTone("-0.11")).toBe("ok");
     expect(impactTone("-2")).toBe("warn");
@@ -355,6 +359,38 @@ describe("SwapPanel", () => {
     expect(await screen.findByLabelText("Swap error")).toHaveTextContent("Relay: No routes found.");
     await userEvent.click(screen.getByRole("button", { name: "Trade through its pool" }));
     expect(opened).toEqual([{ id: "coins", params: { t: token } }]);
+  });
+
+  it("names a launchpad coin Relay cannot route even where no window can be opened", async () => {
+    wallet();
+    launchOf.mockResolvedValue({ factory: "0x3333333333333333333333333333333333333333", creator: USER, creatorRecipient: USER });
+    world({ quote: () => json({ message: "No routes found" }, 400) });
+    mount(<SwapPanel />);
+    await settle();
+    await userEvent.selectOptions(screen.getByLabelText("You get"), "other");
+    await userEvent.type(screen.getByLabelText("You get address"), OTHER_TOKEN);
+    await userEvent.type(screen.getByLabelText("Amount"), "1");
+    await userEvent.click(cta());
+    expect(await screen.findByText("Relay has no route for this launchpad coin yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Trade through its pool" })).toBeNull();
+  });
+
+  it("keeps Relay's refusal, and offers nothing, when the launchpad cannot be read", async () => {
+    wallet();
+    launchOf.mockImplementation(async () => {
+      throw new Error("rpc down");
+    });
+    world({ quote: () => json({ message: "No routes found" }, 400) });
+    mount(<SwapPanel />, () => {});
+    await settle();
+    await userEvent.selectOptions(screen.getByLabelText("You get"), "other");
+    await userEvent.type(screen.getByLabelText("You get address"), OTHER_TOKEN);
+    await userEvent.type(screen.getByLabelText("Amount"), "1");
+    await userEvent.click(cta());
+    expect(await screen.findByLabelText("Swap error")).toHaveTextContent("Relay: No routes found.");
+    await settle();
+    expect(launchOf).toHaveBeenCalledWith(OTHER_TOKEN);
+    expect(screen.queryByText("Relay has no route for this launchpad coin yet.")).toBeNull();
   });
 
   it("reads a pasted token from its contract for either side", async () => {

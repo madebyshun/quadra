@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { decodeFunctionData, encodeFunctionData, erc20Abi } from "viem";
 import { BASE, CONTRACTS, USDC, WETH } from "@/config/chain";
 import { ACROSS, ACROSS_ABI, NATIVE, RELAY, ROBINHOOD } from "@/config/routes";
-import { checkSwap, quoteSwap, type SwapRequest } from "@/adapters/http/relay";
+import { checkSwap, isRelayNoRoute, quoteSwap, type SwapRequest } from "@/adapters/http/relay";
 import { checkBridge, exactApproval, quoteBridge, type BridgeRequest } from "@/adapters/http/across";
 import { askQuote, rawAmount } from "@/adapters/http/quotes";
 import { robinhoodBalance, waitForArrival } from "@/lib/arrival";
@@ -60,6 +60,16 @@ function usdcQuote(edit: (q: Json) => void = () => {}): Json {
   return q;
 }
 const item = (q: Json, step: number) => ((q.steps as Json[])[step]!.items as Json[])[0]!.data as Json;
+
+describe("Relay's no-route refusal", () => {
+  it("is recognised in both of Relay's wordings, thrown as an Error or as a bare string", () => {
+    expect(isRelayNoRoute(new Error("Relay: No routes found."))).toBe(true);
+    expect(isRelayNoRoute(new Error("Relay: no route"))).toBe(true);
+    expect(isRelayNoRoute("Relay: No routes found")).toBe(true);
+    expect(isRelayNoRoute("Relay: Amount is too small to be swapped.")).toBe(false);
+    expect(isRelayNoRoute(new Error("No routes found"))).toBe(false);
+  });
+});
 
 describe("checking a Relay swap", () => {
   it("accepts the measured USDC→WETH quote: an exact approval, then the swap, both to pinned contracts", () => {
