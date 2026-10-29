@@ -35,10 +35,10 @@ describe("the menu bar's app menu, without a window manager to open into", () =>
     renderTaskbar();
     await user.click(screen.getByRole("button", { name: BRAND.name }));
     const item = within(screen.getByRole("menu", { name: `${BRAND.name} menu` })).getByRole("menuitem", {
-      name: /^Send/,
+      name: /^Coins/,
     });
     expect(item.tagName).toBe("A");
-    expect(item).toHaveAttribute("href", "/?do=send");
+    expect(item).toHaveAttribute("href", "/?do=coins");
   });
 
   it("closes the menu when a link item is clicked", async () => {
@@ -46,7 +46,7 @@ describe("the menu bar's app menu, without a window manager to open into", () =>
     renderTaskbar();
     await user.click(screen.getByRole("button", { name: BRAND.name }));
     await user.click(
-      within(screen.getByRole("menu", { name: `${BRAND.name} menu` })).getByRole("menuitem", { name: /^Send/ }),
+      within(screen.getByRole("menu", { name: `${BRAND.name} menu` })).getByRole("menuitem", { name: /^Coins/ }),
     );
     expect(screen.queryByRole("menu", { name: `${BRAND.name} menu` })).not.toBeInTheDocument();
   });
@@ -73,8 +73,8 @@ describe("the menu bar's app menu, without a window manager to open into", () =>
   it("links a folder's own menu back to the desktop too", async () => {
     const user = userEvent.setup();
     renderTaskbar();
-    await user.click(screen.getByRole("button", { name: "Money folder" }));
-    expect(screen.getByRole("menuitem", { name: /^Send/ })).toHaveAttribute("href", "/?do=send");
+    await user.click(screen.getByRole("button", { name: "Agents folder" }));
+    expect(screen.getByRole("menuitem", { name: /^MCP/ })).toHaveAttribute("href", "/?do=mcp");
   });
 });
 

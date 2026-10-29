@@ -1,7 +1,6 @@
 import { BRAND } from "@/brand";
 import type { WindowId } from "@/features/registry";
 import { IconMenu } from "@/features/IconMenu";
-import { MarketsGadget } from "@/features/markets/MarketsGadget";
 import { Icon } from "@/ui/icons";
 
 export type DesktopProps = {
@@ -25,7 +24,8 @@ export function Desktop({ onOpen }: DesktopProps) {
       </header>
 
       <IconMenu onOpen={onOpen} />
-      <MarketsGadget />
+      {/* the Markets gadget left the desktop on 2026-10-29 (one door per job: Coins shows the coins);
+          it lives on in the Markets window, in My Computer > Research */}
       {/* the Trash keeps its own corner, the way it always has */}
       <button type="button" className="icon desk-trash" onClick={() => onOpen("trash")}>
         <span className="icon__glyph">

@@ -3,6 +3,9 @@ import { BASE } from "@/config/chain";
 import { RELAY } from "@/config/routes";
 import { isObj, listOf, objAt, strOf } from "@/skills/json";
 import { rpc } from "@/skills/http";
+import { UNISWAP_V4 } from "@/config/uniswap";
+import { approveData } from "@/lib/erc20";
+import { buildSwap, minOutFor, permit2ApproveData, quoteV4, type LaunchPool } from "@/lib/v4swap";
 
 /**
  * A real trade, run on Base without sending it: buy a token with ETH, then sell it all back —
@@ -74,6 +77,40 @@ export function stepsOf(body: unknown): SimTx[] {
       return to && data ? [{ to, data, value: rawAmount(String(d.value ?? "0")) ?? 0n }] : [];
     }),
   );
+}
+
+/** Where a simulated trade gets its transactions: `sell` → `buy`, exactly `amount` in. */
+export type Router = (sell: string, buy: string, amount: bigint) => Promise<{ steps: SimTx[]; out: bigint }>;
+
+/** The slippage a simulated trade allows, as Relay is asked for: 5%. */
+const SIM_SLIPPAGE_BPS = 500;
+/** A deadline far enough out that the simulated block is always before it. */
+const SIM_DEADLINE_S = 3600;
+
+/**
+ * A coin launched on this app's launchpad, traded through ITS OWN POOL — Uniswap's Quoter, then the
+ * Universal Router, with the exact approvals (token → Permit2 → router) a wallet would sign. MEASURED
+ * 2026-10-28: Relay answers "no routes found" for every v3 coin (a pool with a hook), so a verdict that
+ * asked only Relay called this app's own coins untradable while they traded fine.
+ */
+export function poolRouter(pool: LaunchPool, now: () => number = Date.now): Router {
+  return async (sell, _buy, amount) => {
+    const zeroForOne = sell.toLowerCase() === pool.key.currency0.toLowerCase();
+    const deadline = Math.floor(now() / 1000) + SIM_DEADLINE_S;
+    if (sell.toLowerCase() === NATIVE) {
+      const out = (await quoteV4(pool.key, zeroForOne, amount)).amountOut;
+      return { steps: [buildSwap({ key: pool.key, zeroForOne, amountIn: amount, minOut: minOutFor(out, SIM_SLIPPAGE_BPS), deadline })], out };
+    }
+    // The sell is NOT quoted: a quote prices it against the pool as it is now, before the simulated buy put
+    // any ETH in — MEASURED on a fresh launch, "could not fill" although the buy would pay for it. It runs
+    // after the buy in the same simulated block with a floor of one wei, and what came back is measured.
+    const swap = buildSwap({ key: pool.key, zeroForOne, amountIn: amount, minOut: 1n, deadline });
+    const approvals: SimTx[] = [
+      { to: sell, data: approveData(UNISWAP_V4.permit2, amount), value: 0n },
+      { to: UNISWAP_V4.permit2, data: permit2ApproveData(sell, UNISWAP_V4.universalRouter, amount, deadline), value: 0n },
+    ];
+    return { steps: [...approvals, swap], out: 0n };
+  };
 }
 
 async function relayQuote(sell: string, buy: string, amount: bigint): Promise<{ steps: SimTx[]; out: bigint }> {
@@ -149,10 +186,10 @@ export function transferData(to: string, amount: bigint): string {
 const failed = (calls: readonly SimCall[]) => calls.find((c) => !c.ok) ?? null;
 
 /** The full round trip — buy, transfer test, sell — as the chain answers it right now. */
-export async function roundTrip(token: string): Promise<RoundTrip> {
+export async function roundTrip(token: string, route: Router = relayQuote): Promise<RoundTrip> {
   let buy: { steps: SimTx[]; out: bigint };
   try {
-    buy = await relayQuote(NATIVE, token, SIM_ETH_IN);
+    buy = await route(NATIVE, token, SIM_ETH_IN);
   } catch (e) {
     return { kind: "no-route", side: "buy", why: (e as Error).message };
   }
@@ -172,7 +209,7 @@ export async function roundTrip(token: string): Promise<RoundTrip> {
 
   let sell: { steps: SimTx[]; out: bigint };
   try {
-    sell = await relayQuote(token, NATIVE, received);
+    sell = await route(token, NATIVE, received);
   } catch (e) {
     return { kind: "no-route", side: "sell", why: (e as Error).message };
   }
@@ -183,7 +220,7 @@ export async function roundTrip(token: string): Promise<RoundTrip> {
     // selling all failed: does selling half? A token that lets part out and keeps the rest is a known trap
     let halfSold: boolean | null = null;
     try {
-      const part = await relayQuote(token, NATIVE, received / 2n);
+      const part = await route(token, NATIVE, received / 2n);
       halfSold = failed((await simulate([...buy.steps, ...part.steps])).slice(buy.steps.length)) === null;
     } catch {
       halfSold = null;

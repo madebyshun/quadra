@@ -72,7 +72,7 @@ describe("a command line", () => {
 describe("a skill run from a window", () => {
   it("opens the skill's own window, told — by a key only that window reads — to run it", () => {
     expect(skillOpening(SKILLS.find((s) => s.id === "verdict")!, [T])).toEqual({ window: "safety", params: { [runKey("safety")]: `verdict ${T}` } });
-    expect(skillOpening(SKILLS.find((s) => s.id === "forensics")!, [T]).window).toBe("research");
+    expect(skillOpening(SKILLS.find((s) => s.id === "forensics")!, [T]).window).toBe("safety");
     expect(skillOpening({ id: "elsewhere" } as Skill, []).window).toBe("terminal");
     // every skill has a home
     for (const s of SKILLS) expect(SKILL_HOME[s.id], s.id).toBeDefined();
@@ -116,9 +116,10 @@ describe("the desktop's folders (2026-10-21)", () => {
     expect(lines[0]).toBe("On the desktop:");
     expect(lines).toContain("Folders:");
     const money = lines.findIndex((l) => l.startsWith("  open money"));
-    expect(lines[money]).toContain("Money — wallet, send, swap, trade");
-    expect(lines[money + 1]).toMatch(/^ {4}wallet +Wallet — connect one you control$/);
-    expect(windowsText()).toMatch(/^ {2}readme +README\.TXT — start here$/m);
+    expect(lines[money]).toContain("Money — send, swap, trade");
+    expect(lines[money + 1]).toMatch(/^ {4}send /);
+    expect(windowsText()).toMatch(/^ {2}wallet +Wallet — connect one you control$/m);
+    expect(windowsText()).toMatch(/^ {4}(open )?readme +README\.TXT — start here$/m);
     expect(windowsText()).toMatch(/^ {2}trash +Trash/m);
     // a program with no shortcut word of its own is opened by id
     expect(windowsText()).toMatch(/^ {4}open soon +Coming Soon/m);

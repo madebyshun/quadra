@@ -76,6 +76,27 @@ describe("PoolTrade", () => {
     expect(screen.queryByText(/You get ≈/)).toBeNull();
   });
 
+  it("a stock-paired BUY offers paying with ETH as well as the stock, and back (2026-10-29)", async () => {
+    poolKeyOf.mockResolvedValue({ ...ethPool, quote: STOCK, key: { ...key, currency0: STOCK }, tokenIs0: true });
+    chainToken.mockResolvedValue({ symbol: "AAPLc", decimals: 8 });
+    render(<PoolTrade token={TOKEN} symbol="TEST" side="buy" />);
+    await settle();
+    expect(screen.getByRole("button", { name: "Pay with AAPLc" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/You pay \(AAPLc\)/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Pay with ETH" }));
+    expect(screen.getByLabelText("Amount of ETH")).toBeInTheDocument();
+    expect(screen.getByText(/only for eligible persons outside the U\.S\./)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Pay with AAPLc" }));
+    expect(screen.getByText(/You pay \(AAPLc\)/)).toBeInTheDocument();
+  });
+
+  it("an ETH-paired buy has no choice to make", async () => {
+    poolKeyOf.mockResolvedValue(ethPool);
+    render(<PoolTrade token={TOKEN} symbol="TEST" side="buy" />);
+    await settle();
+    expect(screen.queryByRole("group", { name: "Pay with" })).toBeNull();
+  });
+
   it("a stock-paired sell: the quote's symbol read from the chain; a failed trade keeps the review; an edit drops it", async () => {
     poolKeyOf.mockResolvedValue({ ...ethPool, quote: STOCK, key: { ...key, currency0: STOCK }, tokenIs0: true });
     chainToken.mockResolvedValue({ symbol: "AAPLc", decimals: 8 });

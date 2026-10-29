@@ -27,10 +27,12 @@ import { row, type Report } from "@/skills/types";
 import { Gel } from "@/ui/Gel";
 import { useWalletSession } from "@/ui/WalletProvider";
 import { ReportView } from "@/features/panels/ReportView";
-import { SwapPanel, type Picked } from "@/features/panels/SwapPanel";
 import { PoolTrade } from "@/features/panels/PoolTrade";
+import { CoinRewards } from "@/features/panels/CoinRewards";
+import { VerdictBadge } from "@/features/panels/VerdictBadge";
+import { CoinShare } from "@/features/panels/CoinShare";
 import { TxStepList, useTxSteps } from "@/features/panels/TxSteps";
-import { Disclosures, NewLaunches, TokenChart, TokenInfo, TokenStats, TokenTabs, TokenWarning, useCoinFee, useCoinPage, useCoinReferrer } from "@/features/panels/TokenPage";
+import { Disclosures, FeeLedger, CoinMoves, CreatorLaunches, NewLaunches, TokenChart, TokenInfo, TokenStats, TokenTabs, TokenWarning, useCoinFee, useCoinPage, useCoinReferrer } from "@/features/panels/TokenPage";
 import { feePercent } from "@/config/launchpad";
 import { tokenInfo } from "@/skills/blockscout";
 import { feesText, valueText } from "@/features/panels/BaseLaunch";
@@ -74,12 +76,14 @@ export function listFee(c: Listed): string {
 }
 
 export type Tab = "all" | "crypto" | "stocks";
-export type Sort = "trending" | "volume" | "new" | "liquidity";
+export type Sort = "trending" | "volume" | "new" | "liquidity" | "marketCap" | "gainers";
 export const SORTS: readonly { readonly id: Sort; readonly label: string }[] = [
   { id: "trending", label: "🔥 Trending" },
   { id: "volume", label: "⚡ Vol 24h" },
   { id: "new", label: "🌱 New" },
   { id: "liquidity", label: "💧 Liquidity" },
+  { id: "marketCap", label: "Mcap" },
+  { id: "gainers", label: "Gainers" },
 ];
 
 const trades = (c: Listed) => (c.market ? (c.market.buys24h ?? 0) + (c.market.sells24h ?? 0) : null);
@@ -94,6 +98,8 @@ export function sortCoins(coins: readonly Listed[], by: Sort): Listed[] {
     volume: (c) => c.market?.volume24h ?? null,
     new: time,
     liquidity: (c) => c.market?.liquidityUsd ?? null,
+    marketCap: (c) => c.value && c.value.quoteUsd !== null ? c.value.supplyInQuote * c.value.quoteUsd : null,
+    gainers: (c) => c.market?.change.h24 ?? null,
   };
   return [...coins].sort((a, b) => desc(key[by](a), key[by](b)) || time(b) - time(a));
 }
@@ -105,6 +111,16 @@ export function filterCoins(coins: readonly Listed[], tab: Tab, asset: string | 
     if (tab === "crypto" && quote !== "ETH") return false;
     if (tab === "stocks" && (quote === null || quote === "ETH")) return false;
     return asset === null || quote === asset;
+  });
+}
+
+/** Every search term may match the coin name, ticker, or contract address. */
+export function searchCoins(coins: readonly Listed[], query: string): Listed[] {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return [...coins];
+  return coins.filter((c) => {
+    const text = `${c.facts?.name ?? ""} ${c.facts?.symbol ?? ""} ${c.token}`.toLowerCase();
+    return terms.every((term) => text.includes(term));
   });
 }
 
@@ -183,11 +199,6 @@ export function coinReport(
   };
 }
 
-const COUNTER: Record<"ETH" | "USDC", Picked> = {
-  ETH: { choice: "ETH", address: "", symbol: "ETH" },
-  USDC: { choice: "USDC", address: "", symbol: "USDC" },
-};
-
 function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | null; onBack: () => void }) {
   const { wallet, signingProvider } = useWalletSession();
   const openWindow = useOpenWindow();
@@ -197,8 +208,6 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
   const [value, setValue] = useState<PoolValue | null>(listed?.value ?? null);
   const [fees, setFees] = useState<Awaited<ReturnType<typeof pendingFees>> | null>(null);
   const [side, setSide] = useState<"buy" | "sell">("buy");
-  // the coin's own pool first: it is the one place a coin launched here is sure to trade (2026-10-14)
-  const [using, setUsing] = useState<"pool" | "ETH" | "USDC">("pool");
   const [verdict, setVerdict] = useState<Report | "running" | { readonly problem: string } | null>(null);
   const [fresh, setFresh] = useState(0);
   const collecting = useTxSteps();
@@ -276,7 +285,6 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
   }
 
   const symbol = facts?.symbol ?? short(token);
-  const coin: Picked = { choice: "other", address: token, symbol };
   const onVerdict = () => {
     setVerdict("running");
     tokenVerdict(token, Date.now()).then(setVerdict, (e: unknown) => setVerdict({ problem: messageOf(e) }));
@@ -314,7 +322,6 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
         )}
       </p>
       <ContractAddress address={token} />
-      <TokenStats page={page} value={value} holders={holders} />
 
       <fieldset className="group">
         <legend>Trade {symbol}</legend>
@@ -324,25 +331,25 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
               {s === "buy" ? `Buy ${symbol}` : `Sell ${symbol}`}
             </button>
           ))}
-          <span className="trade__sep">{side === "buy" ? "pay with" : "receive"}</span>
-          <span role="group" aria-label={side === "buy" ? "Pay with" : "Receive"} className="trade__counters">
-            {(["pool", "ETH", "USDC"] as const).map((c) => (
-              <button key={c} type="button" className="chip chip--mode" aria-pressed={using === c} onClick={() => setUsing(c)}>
-                {c === "pool" ? (value ? `${value.quoteSymbol} · its pool` : "its pool") : `${c} · Relay`}
-              </button>
-            ))}
-          </span>
         </div>
-        {using === "pool" ? (
-          <PoolTrade key={`${token}:${side}`} token={token} symbol={symbol} side={side} />
-        ) : (
-          <SwapPanel key={`${token}:${side}:${using}`} fixed={side === "buy" ? { sell: COUNTER[using], buy: coin } : { sell: coin, buy: COUNTER[using] }} />
-        )}
+        {/* ONE route (2026-10-29, the owner: "no overlapping features"): the coin's own pool. Relay does not
+            route a v3 hook pool at all (MEASURED: "no routes found" on the first referred launch), and this
+            pool is the one place a coin launched here is sure to trade. Swap and Trade keep Relay for the rest. */}
+        <PoolTrade key={`${token}:${side}`} token={token} symbol={symbol} side={side} />
       </fieldset>
+      {/* below the trade: the page's call to action stays above the fold (MEASURED 2026-10-29: with
+          market activity above it the trade's button sat 30px below a 659px-wide window's fold, and
+          with the number cards above it 59px below a phone's) — the head line already says the cap */}
+      <section className="coin__overview" aria-label="Coin overview">
+        <TokenStats page={page} value={value} holders={holders} />
+      </section>
+      <CoinMoves token={token} />
+      <FeeLedger page={page} fee={fee} referrer={referrer} />
 
       <TokenChart page={page} />
       <TokenInfo page={page} creator={record.creator} launchedAt={launchedAt} quoteUsd={value?.quoteUsd ?? null} fee={fee} referrer={referrer} />
-      <TokenTabs token={token} page={page} now={now} />
+      <TokenTabs token={token} page={page} now={now} quoteUsd={value?.quoteUsd ?? null} />
+      <CreatorLaunches creator={record.creator} current={token} />
       <Disclosures factory={record.factory} fee={fee} referrer={referrer} />
 
       <details className="trade__more">
@@ -359,6 +366,11 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
           <p className="dim">80% to you, 20% to this app — the launchpad&apos;s split, in both currencies of the pool.</p>
           <TxStepList states={collecting.states} label="Collect progress" />
         </fieldset>
+      ) : null}
+
+      <CoinRewards token={token} symbol={symbol} record={record} />
+      {facts && value ? (
+        <CoinShare c={{ token, name: facts.name, symbol: facts.symbol, pair: value.quoteSymbol, cap: valueText(value).replace(/^market cap ≈ /, "") }} />
       ) : null}
 
       <fieldset className="group">
@@ -389,6 +401,7 @@ export function CoinsPanel() {
   const [list, setList] = useState<{ readonly coins: readonly Listed[]; readonly total: number; readonly complete: boolean } | "reading" | { readonly problem: string }>("reading");
   const [tab, setTab] = useState<Tab>("all");
   const [asset, setAsset] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("trending");
   const [now] = useState(() => Date.now());
 
@@ -436,7 +449,7 @@ export function CoinsPanel() {
 
   const ready = typeof list === "object" && "coins" in list ? list : null;
   const stats = ready ? statsOf(ready.coins, ready.total, ready.complete) : null;
-  const shown = ready ? sortCoins(filterCoins(ready.coins, tab, asset), sort) : [];
+  const shown = ready ? sortCoins(searchCoins(filterCoins(ready.coins, tab, asset), query), sort) : [];
 
   return (
     <div className="stack">
@@ -466,20 +479,24 @@ export function CoinsPanel() {
         ))}
       </dl>
 
-      <div className="group__row group__row--actions" role="group" aria-label="Coins shown">
-        {(["all", "crypto", "stocks"] as const).map((t) => (
-          <button key={t} type="button" className="chip chip--mode" aria-pressed={tab === t} onClick={() => (setTab(t), setAsset(null))}>
-            {t === "all" ? "All" : t === "crypto" ? "Crypto" : "Stocks"}
-          </button>
-        ))}
-        <select className="field coins__asset" aria-label="Paired with" value={asset ?? ""} onChange={(e) => setAsset(e.target.value || null)}>
-          <option value="">All assets</option>
-          {(ready ? assetsOf(filterCoins(ready.coins, tab, null)) : []).map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
+      <div className="coins__filters">
+        <label className="coins__search-label">
+          <span>Find a coin</span>
+          <input className="field coins__search" type="search" aria-label="Search coins" placeholder="Name, ticker, or contract address" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </label>
+        <div className="group__row group__row--actions" role="group" aria-label="Coins shown">
+          {(["all", "crypto", "stocks"] as const).map((t) => (
+            <button key={t} type="button" className="chip chip--mode" aria-pressed={tab === t} onClick={() => (setTab(t), setAsset(null))}>
+              {t === "all" ? "All" : t === "crypto" ? "Crypto" : "Stocks"}
+            </button>
           ))}
-        </select>
+          <select className="field coins__asset" aria-label="Paired with" value={asset ?? ""} onChange={(e) => setAsset(e.target.value || null)}>
+            <option value="">All assets</option>
+            {(ready ? assetsOf(filterCoins(ready.coins, tab, null)) : []).map((a) => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+        </div>
       </div>
       <div className="group__row group__row--actions" role="group" aria-label="Sort">
         {SORTS.map((s) => (
@@ -506,6 +523,7 @@ export function CoinsPanel() {
                   {c.facts ? `${c.facts.name} (${c.facts.symbol})` : short(c.token)}
                 </button>
                 <CopyCa address={c.token} />
+                <VerdictBadge token={c.token} />
                 <span className="notes__id">{c.value === undefined ? "…" : c.value === null ? "pair not read" : `vs ${c.value.quoteSymbol}`}</span>
               </span>
               <span className="notes__why">

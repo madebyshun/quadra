@@ -5,7 +5,7 @@ import { CONTRACTS, UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
 import { parseCoinPage, type IndexedCoinPage } from "@/adapters/http/indexer";
 import { BLOCKSCOUT } from "@/skills/blockscout";
 import type { PoolValue } from "@/skills/launchpad";
-import { ago, autoFrame, bucket, Disclosures, FRAMES, inBoth, NewLaunches, TokenChart, TokenInfo, TokenStats, TokenTabs, TokenWarning, useCoinPage } from "@/features/panels/TokenPage";
+import { ago, autoFrame, bucket, CoinMoves, Disclosures, FeeLedger, FRAMES, inBoth, NewLaunches, TokenChart, TokenInfo, TokenStats, TokenTabs, TokenWarning, useCoinPage } from "@/features/panels/TokenPage";
 import { copy, FX } from "./fixtures/base";
 import { COINS } from "./fixtures/indexer";
 import { DOWN, net, useNet } from "./net";
@@ -202,6 +202,21 @@ describe("the page's cards and facts", () => {
     } finally {
       (CONTRACTS as { launchFactoryV1: string | null }).launchFactoryV1 = saved;
     }
+  });
+});
+
+describe("coin analytics blocks", () => {
+  it("states when DexScreener has no market", async () => {
+    net({ get: (u) => u.startsWith("https://api.dexscreener.com/tokens/v1/base/") ? [] : undefined });
+    render(<CoinMoves token={COINS.eth} />);
+    expect(await screen.findByText(/DexScreener has no pair/)).toBeInTheDocument();
+  });
+
+  it("renders the fee route and the generic ledger", () => {
+    render(<FeeLedger page={pageOf(true)} fee={{ fee: 10_000, opening: null }} referrer={{ referrer: null }} />);
+    expect(screen.getByLabelText("Fee ledger")).toHaveTextContent("1% per trade");
+    expect(screen.getByLabelText("Fee ledger")).toHaveTextContent("Creator 80% · Protocol ~20%");
+    expect(screen.getByLabelText("Fee ledger")).toHaveTextContent("Collected quote:");
   });
 });
 

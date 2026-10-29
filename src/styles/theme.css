@@ -296,6 +296,10 @@
   border: 1px solid #777;
   box-shadow: inset 1px 1px 0 #fff;
   padding: 14px;
+  /* a 42-character address inside prose may break; ordinary words still wrap at spaces. MEASURED
+     2026-10-29 at 375px: an address in a coin page's notes widened the whole window body by 61px.
+     `anywhere`, not `break-all` — break-all splits every word ("will mo / ve money") */
+  overflow-wrap: anywhere;
 }
 
 .win--floating .win__body {
@@ -2280,10 +2284,28 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.group__row--actions .coins__asset {
-  flex: 0 0 auto;
-  width: auto;
-  margin-left: auto;
+.coins__filters {
+  display: grid;
+  gap: 6px;
+}
+.coins__search-label {
+  display: grid;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--xp-ink-dim);
+}
+.coins__search {
+  width: 100%;
+  box-sizing: border-box;
+}
+.coins__filters .group__row--actions {
+  margin: 0;
+}
+@media (min-width: 620px) {
+  .coins__filters {
+    grid-template-columns: minmax(180px, 1fr) auto;
+    align-items: end;
+  }
 }
 
 /* Profile: who the address is, as a two-column list above the tabs */
@@ -2883,6 +2905,56 @@
   padding-left: 22px;
   font-size: 12px;
 }
+.coin__moves,
+.coin__ledger,
+.coin__creator,
+.coin__concentration {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  background: var(--xp-sunken);
+  border: 1px solid var(--xp-border-mid);
+  font-size: 12px;
+}
+.coin__overview {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--xp-border-mid);
+  background: var(--xp-face-lit);
+}
+.coin__moves-head,
+.coin__creator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.coin__flow {
+  display: flex;
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid var(--xp-border-mid);
+}
+.coin__flow span:first-child { background: #2d9a62; }
+.coin__flow span:last-child { background: #c95b6b; }
+.coin__moves-grid,
+.coin__concentration {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(4, 1fr);
+}
+.coin__concentration { grid-template-columns: repeat(3, 1fr); padding: 0; border: 0; background: transparent; }
+.coin__moves-grid > div,
+.coin__concentration > div { display: grid; gap: 2px; }
+.coin__moves-grid strong,
+.coin__concentration strong { font-variant-numeric: tabular-nums; }
+.coin__ledger,
+.coin__creator { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.coin__ledger strong { grid-column: 1 / -1; }
+.coin__ledger .dim { grid-column: 1 / -1; }
+.coin__creator strong { grid-column: 1 / -1; }
+.coin__creator a { color: var(--xp-link); }
 
 /* ===================================================================
    The Welcome screen (src/ui/Welcome.tsx) — Windows 95's welcome in
@@ -2922,99 +2994,63 @@
   color: var(--xp-ink);
 }
 
-.welcome__main {
-  display: flex;
-  gap: 12px;
-  align-items: stretch;
-}
-
-.welcome__tip {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  min-height: 150px;
-  padding: 12px;
-  background: #ffffe1;
-  border: 1px solid #888;
-  box-shadow: var(--bevel-in);
-  color: var(--xp-ink);
-}
-
-.welcome__tip svg {
-  flex: none;
-}
-
-.welcome__did {
-  margin: 0 0 6px;
-  font-weight: 700;
+.welcome__lede {
+  margin: -6px 0 14px;
   font-size: 13px;
-}
-
-.welcome__text {
-  margin: 0;
-  font-size: 12px;
   line-height: 1.5;
+  color: var(--xp-ink-dim);
 }
 
-.welcome__buttons {
+/* the front door: one field and its button, then the other two doors (2026-10-29) */
+.welcome__check {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: 150px;
-  flex: none;
+  padding: 12px;
+  background: var(--pt-face);
+  border: 1px solid #888;
+  box-shadow: var(--bevel-in);
 }
 
-.welcome__buttons .gel {
-  width: calc(100% - 8px);
-  margin: 4px;
+.welcome__checkrow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.welcome__checkrow .field {
+  flex: 1;
+  min-width: 0;
+}
+
+.welcome__check .tx__warn {
+  margin: 0;
+}
+
+.welcome__doors {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.welcome__doors .gel {
+  width: 100%;
+  margin: 0;
 }
 
 .welcome__again {
   display: flex;
   gap: 6px;
   align-items: center;
-  margin-top: 12px;
+  margin-top: 14px;
   font-size: 12px;
   color: var(--xp-ink);
-}
-
-.welcome__news {
-  position: absolute;
-  width: min(400px, calc(100% - 32px));
-  max-height: calc(100% - 32px);
-  display: flex;
-  flex-direction: column;
-}
-
-.welcome__news .win__body {
-  overflow: auto;
-}
-
-.welcome__list {
-  margin: 0 0 12px;
-  padding-left: 18px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--xp-ink);
-}
-
-.welcome__row {
-  justify-content: flex-end;
 }
 
 @media (max-width: 520px) {
-  .welcome__main {
-    flex-direction: column;
-  }
-  .welcome__buttons {
-    width: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-  .welcome__tip {
-    min-height: 0;
+  .welcome__doors {
+    grid-template-columns: 1fr;
   }
   .welcome__head {
     font-size: 20px;
@@ -3220,4 +3256,25 @@
     linear-gradient(90deg, transparent 0 8px, #6e3a2c 8px 9px, transparent 9px);
   background-size: 16px 8px, 16px 16px, 16px 16px;
   background-position: 0 0, 0 0, 0 8px;
+}
+
+/* Token Verdict as a badge on a Coins row (2026-10-29): the verdict's own three answers, in its colours */
+.badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid #888;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge--ok { background: #e3f4e1; color: #1d5e1a; border-color: #5f9b5a; }
+.badge--warn { background: #fff4d6; color: #7a5200; border-color: #c9a24a; }
+.badge--bad { background: #fde3e1; color: #9b1c12; border-color: #c4574d; }
+
+/* a coin's share card, shown at the window's width (2026-10-29) */
+.coin__card svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #777;
 }

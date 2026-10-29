@@ -84,8 +84,9 @@ const EXPLAIN: Partial<Record<Feature["id"], string>> = {
 const BUILT: Partial<Record<Feature["id"], () => ReactNode>> = {
   wallet: () => <WalletPanel />,
   terminal: () => <TerminalPanel />,
-  research: () => <SkillWindow label="Research" window="research" skills={[radarSkill, verdictSkill, forensicsSkill, launcherSkill]} />,
-  safety: () => <SkillWindow label="Safety" window="safety" skills={[verdictSkill, gateSkill, sendCheckSkill]} />,
+  research: () => <SkillWindow label="Radar" window="research" skills={[radarSkill]} />,
+  // ONE window to check anything (2026-10-29): a token, a recipient, a launch, a launcher
+  safety: () => <SkillWindow label="Check" window="safety" skills={[verdictSkill, sendCheckSkill, forensicsSkill, launcherSkill, gateSkill]} />,
   markets: () => <MarketsPanel />,
   trade: () => <TradePanel />,
   send: () => <SendPanel />,

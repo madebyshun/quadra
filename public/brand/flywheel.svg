@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000" font-family="Inter, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8aa4d6"/></marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#ffd34d"/></marker>
+    <marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#ff7a45"/></marker>
+  </defs>
+  <rect width="1600" height="1000" fill="#070b16"/>
+  <rect x="24" y="24" width="1552" height="952" rx="18" fill="none" stroke="#1d2a4a" stroke-width="2"/>
+
+  <!-- title -->
+  <g transform="translate(64 64)">
+    <g shape-rendering="crispEdges" transform="scale(1.6)">
+      <rect x="2" y="1" width="12" height="12" fill="#fff"/><rect x="3" y="2" width="10" height="8" fill="#0052ff"/>
+      <rect x="6" y="4" width="4" height="4" fill="#fff"/><rect x="7" y="5" width="2" height="2" fill="#0052ff"/><rect x="9" y="7" width="2" height="2" fill="#fff"/>
+      <rect x="4" y="13" width="8" height="2" fill="#fff"/>
+    </g>
+    <text x="44" y="22" fill="#fff" font-size="22" font-weight="700" letter-spacing="3">QUADRA</text>
+  </g>
+  <text x="64" y="160" fill="#fff" font-size="52" font-weight="800">Every coin launched here feeds $QUADRA.</text>
+  <text x="64" y="204" fill="#8aa4d6" font-size="24">Launch fees to the treasury. $QUADRA's own fees to buybacks and burns. Read from Base, not promised.</text>
+
+  <!-- legend -->
+  <g font-size="16" fill="#c9d4ee">
+    <rect x="1180" y="60" width="16" height="16" rx="3" fill="#2fd27a"/><text x="1204" y="74">Live on Base</text>
+    <rect x="1180" y="88" width="16" height="16" rx="3" fill="#ffd34d"/><text x="1204" y="102">Built — goes live when the furnace is deployed</text>
+    <rect x="1180" y="116" width="16" height="16" rx="3" fill="none" stroke="#ff7a45" stroke-dasharray="4 3" stroke-width="2"/><text x="1204" y="130">Planned (stage C)</text>
+  </g>
+
+  <!-- column 1: every launch -->
+  <text x="64" y="290" fill="#8aa4d6" font-size="16" font-weight="700" letter-spacing="2">LAUNCHED ON QUADRA</text>
+  <g font-size="15" font-weight="700" text-anchor="middle">
+    <circle cx="104" cy="350" r="30" fill="#0f1830" stroke="#33466e"/><text x="104" y="355" fill="#fff">ETH</text>
+    <circle cx="184" cy="350" r="30" fill="#0f1830" stroke="#33466e"/><text x="184" y="355" fill="#fff">AAPL</text>
+    <circle cx="104" cy="430" r="30" fill="#0f1830" stroke="#33466e"/><text x="104" y="435" fill="#fff">NVDA</text>
+    <circle cx="184" cy="430" r="30" fill="#0f1830" stroke="#33466e"/><text x="184" y="435" fill="#fff">META</text>
+    <circle cx="104" cy="510" r="30" fill="#0f1830" stroke="#33466e"/><text x="104" y="515" fill="#fff">TSLA</text>
+    <circle cx="184" cy="510" r="30" fill="#0f1830" stroke="#33466e"/><text x="184" y="515" fill="#fff">+7</text>
+  </g>
+  <text x="64" y="580" fill="#8aa4d6" font-size="15">Any coin, paired with ETH or one of 11 stocks</text>
+  <path d="M220 430 H330" stroke="#8aa4d6" stroke-width="2" fill="none" marker-end="url(#a)"/>
+
+  <!-- 1% of every trade -->
+  <circle cx="400" cy="430" r="68" fill="#0b1226" stroke="#2fd27a" stroke-width="3"/>
+  <text x="400" y="440" fill="#fff" font-size="44" font-weight="800" text-anchor="middle">1%</text>
+  <text x="400" y="470" fill="#8aa4d6" font-size="14" text-anchor="middle">every trade</text>
+  <text x="400" y="530" fill="#8aa4d6" font-size="14" text-anchor="middle">or 3%, the launcher's choice</text>
+
+  <!-- split -->
+  <path d="M440 376 C 480 300, 520 290, 560 290" stroke="#8aa4d6" stroke-width="2" fill="none" marker-end="url(#a)"/>
+  <text x="580" y="284" fill="#fff" font-size="40" font-weight="800">80%</text>
+  <text x="580" y="310" fill="#8aa4d6" font-size="16">to the coin's creator</text>
+  <path d="M468 430 H560" stroke="#8aa4d6" stroke-width="2" fill="none" marker-end="url(#a)"/>
+  <text x="580" y="424" fill="#fff" font-size="40" font-weight="800">15–20%</text>
+  <text x="580" y="450" fill="#8aa4d6" font-size="16">to Quadra's treasury</text>
+  <path d="M440 484 C 480 560, 520 570, 560 570" stroke="#8aa4d6" stroke-width="2" fill="none" marker-end="url(#a)"/>
+  <text x="580" y="566" fill="#fff" font-size="40" font-weight="800">5%</text>
+  <text x="580" y="592" fill="#8aa4d6" font-size="16">to an approved referrer, if any</text>
+
+  <!-- treasury -->
+  <rect x="800" y="380" width="200" height="100" rx="14" fill="#0b1226" stroke="#2fd27a" stroke-width="3"/>
+  <text x="900" y="425" fill="#fff" font-size="24" font-weight="800" text-anchor="middle">Treasury</text>
+  <text x="900" y="455" fill="#8aa4d6" font-size="14" text-anchor="middle">runs the product</text>
+  <path d="M760 430 H796" stroke="#8aa4d6" stroke-width="2" fill="none" marker-end="url(#a)"/>
+
+  <!-- stage C: part of the treasury to the furnace -->
+  <path d="M960 484 V640 H1076" stroke="#ff7a45" stroke-width="2.5" stroke-dasharray="8 6" fill="none" marker-end="url(#o)"/>
+  <text x="976" y="530" fill="#ff7a45" font-size="15" font-weight="700">STAGE C · planned</text>
+  <text x="976" y="552" fill="#ffb08f" font-size="14">a share of</text>
+  <text x="976" y="572" fill="#ffb08f" font-size="14">launch fees</text>
+  <text x="976" y="592" fill="#ffb08f" font-size="14">buys $QUADRA</text>
+
+  <!-- QUADRA pool -->
+  <text x="1060" y="290" fill="#8aa4d6" font-size="16" font-weight="700" letter-spacing="2">$QUADRA · PAIRED WITH AAPLc</text>
+  <circle cx="1160" cy="400" r="68" fill="#0b1226" stroke="#2fd27a" stroke-width="3"/>
+  <text x="1160" y="410" fill="#fff" font-size="44" font-weight="800" text-anchor="middle">1%</text>
+  <text x="1160" y="440" fill="#8aa4d6" font-size="14" text-anchor="middle">its own pool</text>
+  <path d="M1090 430 H1006" stroke="#8aa4d6" stroke-width="2" fill="none" marker-end="url(#a)"/>
+  <text x="1048" y="420" fill="#c9d4ee" font-size="14" text-anchor="middle">20%</text>
+  <path d="M1160 468 V560" stroke="#ffd34d" stroke-width="2.5" fill="none" marker-end="url(#g)"/>
+  <text x="1176" y="520" fill="#ffd34d" font-size="15" font-weight="700">80% creator share</text>
+
+  <!-- furnace -->
+  <rect x="1080" y="566" width="160" height="150" rx="14" fill="#1a1405" stroke="#ffd34d" stroke-width="3"/>
+  <text x="1160" y="616" fill="#ffd34d" font-size="26" font-weight="800" text-anchor="middle">Furnace</text>
+  <text x="1160" y="646" fill="#ffe59a" font-size="14" text-anchor="middle">50% burnt</text>
+  <text x="1160" y="668" fill="#ffe59a" font-size="14" text-anchor="middle">50% treasury</text>
+  <text x="1160" y="696" fill="#bfa560" font-size="12" text-anchor="middle">fixed at deploy</text>
+
+  <!-- outcomes -->
+  <path d="M1244 610 H1330" stroke="#ffd34d" stroke-width="2.5" fill="none" marker-end="url(#g)"/>
+  <text x="1340" y="604" fill="#fff" font-size="18" font-weight="700">QUADRA fees</text>
+  <text x="1340" y="628" fill="#ffe59a" font-size="15">burnt at once</text>
+  <path d="M1244 680 H1330" stroke="#ffd34d" stroke-width="2.5" fill="none" marker-end="url(#g)"/>
+  <text x="1340" y="674" fill="#fff" font-size="18" font-weight="700">AAPLc fees</text>
+  <text x="1340" y="698" fill="#ffe59a" font-size="15">buy $QUADRA → burn</text>
+  <path d="M1160 720 V790 H860 V488" stroke="#ffd34d" stroke-width="2" fill="none" marker-end="url(#g)"/>
+  <text x="876" y="780" fill="#ffe59a" font-size="14">the other 50% → treasury</text>
+
+  <!-- footer ledger -->
+  <rect x="64" y="830" width="1472" height="110" rx="14" fill="#0b1226" stroke="#1d2a4a"/>
+  <text x="96" y="872" fill="#8aa4d6" font-size="15" font-weight="700" letter-spacing="2">CIRCULATION LEDGER · READ FROM BASE</text>
+  <text x="96" y="912" fill="#fff" font-size="22" font-weight="700">$QUADRA burnt · AAPLc spent on buybacks · every buyback's transaction</text>
+  <text x="1500" y="912" fill="#8aa4d6" font-size="15" text-anchor="end">No admin · fixed supply · liquidity locked for good · not audited</text>
+</svg>

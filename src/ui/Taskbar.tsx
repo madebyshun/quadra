@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { BRAND } from "@/brand";
 import { BASE } from "@/config/chain";
-import { FOLDER_IDS, entryOf, folderItems, type Entry, type WindowId } from "@/features/registry";
+import { DESKTOP, entryOf, folderItems, isFolder, type Entry, type FolderId, type WindowId } from "@/features/registry";
 import { Icon } from "@/ui/icons";
 import { WalletStatus } from "@/ui/WalletStatus";
 import { BlockClock, SoundToggle } from "@/ui/TrayExtras";
@@ -29,8 +29,10 @@ export type TaskbarProps = {
   onOpenFeature?: (id: WindowId) => void;
 };
 
-/** Above the folders in the app's own menu: the programs that live on the desktop itself rather than in one. */
-const START_TOP: readonly WindowId[] = ["terminal", "readme"];
+/** Above the folders in the app's own menu: the doors on the desktop itself (Check, Coins, Launch, Wallet). */
+const START_TOP: readonly WindowId[] = DESKTOP.filter((id) => !isFolder(id));
+/** The menu bar's own folder menus: only the folders ON the desktop — the rest are inside My Computer (2026-10-29). */
+const BAR_FOLDERS: readonly FolderId[] = DESKTOP.filter(isFolder);
 
 /** The app's own mark — this app's pixel machine, never anybody's logo. */
 export function BrandMark() {
@@ -145,7 +147,7 @@ export function Taskbar({ windows, onToggle, onStart, onOpenFeature }: TaskbarPr
               <li key={id}>{item(entryOf(id))}</li>
             ))}
           </ul>
-          {FOLDER_IDS.map((folder) => (
+          {BAR_FOLDERS.map((folder) => (
             <div key={folder} className="menu__group" role="group" aria-label={entryOf(folder).title}>
               {item(entryOf(folder), "menu__item--folder")}
               <ul className="menu__list menu__list--sub">
@@ -158,7 +160,7 @@ export function Taskbar({ windows, onToggle, onStart, onOpenFeature }: TaskbarPr
         </>,
         "menubar__menu--app",
       )}
-      {FOLDER_IDS.map((folder) =>
+      {BAR_FOLDERS.map((folder) =>
         menu(
           folder,
           entryOf(folder).title,

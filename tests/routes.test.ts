@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { decodeFunctionData, encodeFunctionData, erc20Abi } from "viem";
 import { BASE, CONTRACTS, USDC, WETH } from "@/config/chain";
-import { ACROSS, ACROSS_ABI, NATIVE, RELAY, ROBINHOOD } from "@/config/routes";
+import { ACROSS, ACROSS_ABI, NATIVE, RELAY, RELAY_V32, ROBINHOOD } from "@/config/routes";
 import { checkSwap, isRelayNoRoute, quoteSwap, type SwapRequest } from "@/adapters/http/relay";
 import { checkBridge, exactApproval, quoteBridge, type BridgeRequest } from "@/adapters/http/across";
 import { askQuote, rawAmount } from "@/adapters/http/quotes";
@@ -87,6 +87,27 @@ describe("checking a Relay swap", () => {
     expect(q.steps).toHaveLength(1);
     expect(q.steps[0]!.tx.to.toLowerCase()).toBe(RELAY.router.toLowerCase());
     expect(q.steps[0]!.tx.value).toBe(10n ** 15n);
+  });
+
+  /**
+   * Relay moved to its v3.2 pair on 2026-10-26 (docs.relay.link, "Contract Addresses"; MEASURED
+   * 2026-10-29: every ETH quote targeted the v3.2 Router). The measured quotes, re-pointed at the v3.2
+   * pair — a variant, built here — are accepted; a quote that mixes the two pairs is not.
+   */
+  it("accepts Relay's v3.2 pair too, but never a quote that mixes v3 and v3.2", () => {
+    const eth = structuredClone(ROUTES_FX.relayEthUsdc) as Json;
+    item(eth, 0).to = RELAY_V32.router;
+    expect(checkSwap(eth, SELL_ETH).steps[0]!.tx.to).toBe(RELAY_V32.router);
+    const usdc = structuredClone(ROUTES_FX.relayUsdcWeth) as Json;
+    item(usdc, 0).data = approveData(RELAY_V32.approvalProxy, 5_000_000n);
+    item(usdc, 1).to = RELAY_V32.approvalProxy;
+    expect(checkSwap(usdc, SELL_USDC).steps[1]!.tx.to).toBe(RELAY_V32.approvalProxy);
+    // a v3.2 approval, then a swap through the v3 proxy: refused, naming the one pair it may use
+    item(usdc, 1).to = RELAY.approvalProxy;
+    expect(() => checkSwap(usdc, SELL_USDC)).toThrow(`the swap goes to ${RELAY.approvalProxy}, not Relay's verified contract ${RELAY_V32.approvalProxy}.`);
+    // an ETH swap to neither router names both
+    item(eth, 0).to = OTHER;
+    expect(() => checkSwap(eth, SELL_ETH)).toThrow(`not Relay's verified contract ${RELAY.router} or ${RELAY_V32.router}.`);
   });
 
   it.each([

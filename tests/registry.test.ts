@@ -178,20 +178,8 @@ describe("visibleFeatures", () => {
 describe("the desktop's folders (2026-10-21)", () => {
   const ids = () => desktopItems().map((e) => e.id);
 
-  it("keeps only the folders, four shortcuts and README.TXT on the desktop", () => {
-    expect(ids()).toEqual([
-      "computer",
-      "folder-research",
-      "folder-money",
-      "folder-launchpad",
-      "folder-games",
-      "folder-agents",
-      "terminal",
-      "launch",
-      "coins",
-      "wallet",
-      "readme",
-    ]);
+  it("keeps the four doors, Agents and My Computer on the desktop (2026-10-29: one door per job)", () => {
+    expect(ids()).toEqual(["safety", "coins", "launch", "wallet", "folder-agents", "computer"]);
     expect(DESKTOP).toEqual(ids());
   });
 
@@ -199,13 +187,27 @@ describe("the desktop's folders (2026-10-21)", () => {
     const filed = new Set([...DESKTOP, ...CORNER, ...FOLDER_IDS.flatMap((f) => FOLDERS[f])]);
     for (const f of FEATURES.filter(isEnabled)) expect(filed.has(f.id), f.id).toBe(true);
     for (const d of ["docs", "api", "verify"] as const) expect(folderOf(d)).toBe("folder-agents");
-    expect(folderOf("terminal")).toBeNull();
-    expect(folderOf("safety")).toBe("folder-research");
+    expect(folderOf("safety")).toBeNull();
+    expect(folderOf("terminal")).toBe("computer");
+    expect(folderOf("folder-research")).toBe("computer");
+    // nothing is in two places: a program is on the desktop or in one folder
+    const everywhere = [...DESKTOP, ...FOLDER_IDS.flatMap((f) => FOLDERS[f])];
+    expect(new Set(everywhere).size).toBe(everywhere.length);
   });
 
   it("lists a folder's switched-on programs only, and Coming Soon while it holds something", () => {
-    expect(folderItems("folder-money").map((e) => e.id)).toEqual(["wallet", "send", "swap", "trade"]);
-    expect(folderItems("computer").map((e) => e.id)).toEqual(["taskmgr", "control", "soon"]);
+    expect(folderItems("folder-money").map((e) => e.id)).toEqual(["send", "swap", "trade"]);
+    expect(folderItems("computer").map((e) => e.id)).toEqual([
+      "folder-research",
+      "folder-money",
+      "folder-launchpad",
+      "folder-games",
+      "terminal",
+      "taskmgr",
+      "control",
+      "readme",
+      "soon",
+    ]);
     expect(folderItems("folder-agents").map((e) => e.title)).toEqual(["MCP", "x402", "API", "Docs", "Verify"]);
     expect(entryOf("docs").doc?.path).toBe("/docs");
     expect(entryOf("wallet").doc).toBeNull();

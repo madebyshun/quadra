@@ -14,6 +14,13 @@
  *   Across SpokePool      0x09aea4b2…7bEC64  ERC1967Proxy → OP_SpokePool; USDC deposits + spender
  *   SpokePoolPeriphery    0x97CCDBea…b15fD4  ETH deposits
  *
+ * 🔴 RELAY MOVED, 2026-10-26 (MEASURED 2026-10-29: every ETH swap quote now targets the v3.2 Router, and
+ * the app refused them — rightly, by this file). docs.relay.link "Contract Addresses" lists, for Base,
+ * the v3.2 pair — Router 0x0729E2a4…97f7 and ApprovalProxy 0x5567954c…2E58 — and says to allow BOTH
+ * pairs during the transition. Both are Sourcify-verified ("RelayRouter", "RelayApprovalProxy"; Blockscout
+ * answered a Cloudflare 403 that day). A quote must stay within ONE pair: a v3 approval for a v3.2 swap
+ * is refused.
+ *
  * Robinhood Chain (hard rule 2 — a chain id, never a name alone): MEASURED 2026-09-30,
  * `eth_chainId` on its public RPC answered `0x1237` = 4663, with `access-control-allow-origin:
  * *`. Its two tokens here are listed on docs.robinhood.com/chain/contracts AND answered on
@@ -27,6 +34,15 @@ export const RELAY = {
   approvalProxy: "0xCcC88a9d1B4ED6b0EABA998850414b24f1c315bE",
   router: "0xb92fe925DC43a0ECdE6c8b1a2709c170Ec4fFf4f",
 } as const;
+
+/** Relay's v3.2 pair on Base, live since 2026-10-26 — see the note above. */
+export const RELAY_V32 = {
+  approvalProxy: "0x5567954cD026CEbFE486062cb75848e0f1c12E58",
+  router: "0x0729E2a4716d9f7dD17858d5d504426D228697f7",
+} as const;
+
+/** Every Relay pair a quote may use, each a router (ETH in) and an approval proxy (a token in). */
+export const RELAY_PAIRS: readonly { readonly router: string; readonly approvalProxy: string }[] = [RELAY, RELAY_V32];
 
 export const ACROSS = {
   api: "https://app.across.to/api",

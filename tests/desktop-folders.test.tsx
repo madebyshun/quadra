@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { renderHook } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderAt, settle } from "./helpers";
@@ -180,19 +180,18 @@ describe("the screen saver's settings", () => {
 });
 
 describe("README.TXT", () => {
-  it("opens in Notepad from the desktop, in the product's own name", async () => {
-    const user = userEvent.setup();
-    renderAt("/");
-    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^README\.TXT/ }));
+  it("opens in Notepad from My Computer, in the product's own name", async () => {
+    renderAt("/?do=readme");
     const text = screen.getByLabelText("README.TXT", { selector: "pre" });
     expect(text.textContent).toBe(README);
     expect(README.startsWith(`${BRAND.name.toUpperCase()} FOR BASE 8453\n${"=".repeat(`${BRAND.name} FOR BASE 8453`.length)}\n`)).toBe(true);
     expect(screen.getByLabelText("README.TXT - Notepad", { selector: "section" })).toBeInTheDocument();
   });
 
-  it("names every folder on the desktop", () => {
+  it("names every icon on the desktop, and the folders inside My Computer", () => {
     render(<ReadmePanel />);
-    for (const name of ["My Computer", "Research", "Money", "Launchpad", "Games", "Agents"]) expect(README).toContain(`  ${name}`);
+    for (const name of ["Check", "Coins", "Launch", "Wallet", "Agents", "My Computer"]) expect(README).toContain(`\n  ${name} `);
+    for (const name of ["Research", "Money", "Launchpad", "Games"]) expect(README).toContain(name);
   });
 });
 

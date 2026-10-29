@@ -9,7 +9,7 @@ import type { Market } from "@/skills/dexscreener";
 import type { Launch, PoolValue } from "@/skills/launchpad";
 import { row } from "@/skills/types";
 import { OpenWindowProvider } from "@/features/openWindow";
-import { ago, assetsOf, CoinsPanel, coinReport, filterCoins, SHOWN_COINS, sortCoins, statsOf, versionOf, type Listed } from "@/features/panels/CoinsPanel";
+import { ago, assetsOf, CoinsPanel, coinReport, filterCoins, searchCoins, SHOWN_COINS, sortCoins, statsOf, versionOf, type Listed } from "@/features/panels/CoinsPanel";
 import { WalletProvider } from "@/ui/WalletProvider";
 import { ADDR, copy, FX } from "./fixtures/base";
 import { BLOCKSCOUT } from "@/skills/blockscout";
@@ -64,11 +64,11 @@ const launch = (token: string, minutesAgo: number): Launch => ({
   tx: "",
 });
 const market = (volume24h: number | null, buys: number | null, liquidityUsd: number | null): Market =>
-  ({ volume24h, buys24h: buys, sells24h: buys === null ? null : 0, liquidityUsd }) as Market;
+  ({ volume24h, buys24h: buys, sells24h: buys === null ? null : 0, change: { m5: null, h1: null, h6: null, h24: null }, liquidityUsd }) as Market;
 const value = (quoteSymbol: string, quoteUsd: number | null = 100, supplyInQuote = 10): PoolValue => ({ quote: T, quoteSymbol, quoteDecimals: 8, supplyInQuote, quoteUsd });
 
-const A: Listed = { ...launch("0xa", 10), value: value("ETH", 2000, 5), market: market(50, 3, 900), facts: { name: "Alpha", symbol: "A" } };
-const B: Listed = { ...launch("0xb", 5), value: value("AAPLc", 330, 40), market: market(10, 9, null) };
+const A: Listed = { ...launch("0xa", 10), value: value("ETH", 2000, 5), market: { ...market(50, 3, 900), change: { m5: null, h1: null, h6: null, h24: 6 } }, facts: { name: "Alpha", symbol: "A" } };
+const B: Listed = { ...launch("0xb", 5), value: value("AAPLc", 330, 40), market: { ...market(10, 9, null), change: { m5: null, h1: null, h6: null, h24: -4 } }, facts: { name: "Apple", symbol: "AAPLc" } };
 const C: Listed = { ...launch("0xc", 1), value: null, market: null };
 const D: Listed = { ...launch("0xd", 20), value: value("NVDAc", null), market: undefined };
 
@@ -87,6 +87,21 @@ describe("the coins, sorted and filtered", () => {
     for (const pair of [[A, C], [C, A]]) expect(sortCoins(pair, "volume").map((c) => c.token)).toEqual(["0xa", "0xc"]);
   });
 
+  it("sorts by market cap and 24h gainers, leaving unread values last", () => {
+    expect(sortCoins([B, A, C], "marketCap").map((c) => c.token)).toEqual(["0xb", "0xa", "0xc"]);
+    expect(sortCoins([A, B, C], "gainers").map((c) => c.token)).toEqual(["0xa", "0xb", "0xc"]);
+    expect(sortCoins([A, C], "gainers").map((c) => c.token)).toEqual(["0xa", "0xc"]);
+  });
+
+  it("searches name, ticker, address and multiple terms without case sensitivity", () => {
+    expect(searchCoins([A, B, C], "alpha").map((c) => c.token)).toEqual(["0xa"]);
+    expect(searchCoins([A, B, C], "AAPLc").map((c) => c.token)).toEqual(["0xb"]);
+    expect(searchCoins([A, B, C], "0xA").map((c) => c.token)).toEqual(["0xa"]);
+    expect(searchCoins([A, B, C], "ALPHA A").map((c) => c.token)).toEqual(["0xa"]);
+    expect(searchCoins([A, B, C], "   ")).toHaveLength(3);
+    expect(searchCoins([A, B, C], "missing")).toEqual([]);
+  });
+
   it("splits Crypto (ETH) from Stocks, narrows to one asset, and keeps an unread pair under All only", () => {
     expect(filterCoins([A, B, C, D], "all", null)).toHaveLength(4);
     expect(filterCoins([A, B, C, D], "crypto", null).map((c) => c.token)).toEqual(["0xa"]);
@@ -99,10 +114,12 @@ describe("the coins, sorted and filtered", () => {
   });
 
   it("totals what was read, and says — rather than $0 — when nothing was", () => {
-    expect(statsOf([A, B, C, D], 4, true)).toEqual({ launched: "4", volume: "$60.00", trades: "12", top: "$13,200.00" });
+    expect(statsOf([A, B, C, D], 4, true)).toEqual({ launched: "4", volume: "$60.00", trades: "12", top: "$13,200.00 · AAPLc" });
     expect(statsOf([A], 25, false)).toEqual({ launched: "25+", volume: "$50.00", trades: "3", top: "$10,000.00 · A" });
     expect(statsOf([C, D], 2, true)).toEqual({ launched: "2", volume: "—", trades: "—", top: "—" });
     expect(statsOf([{ ...A, market: market(null, 1, null) }], 1, true).volume).toBe("$0.00");
+    // the top coin's name could not be read: its value alone, never a guessed name
+    expect(statsOf([{ ...A, facts: null }], 1, true).top).toBe("$10,000.00");
   });
 
   it("names the launchpad version and the time since a launch", () => {
@@ -155,6 +172,21 @@ describe("the Coins window", () => {
     expect(open).toHaveBeenCalledWith("launch");
   });
 
+  it("searches by coin text and address, then reports an empty query result", async () => {
+    wallet(null);
+    net({ rpc: chainRoutes(), get: getRoutes() });
+    mount("/?do=coins", null);
+    const list = await screen.findByLabelText("Coins", { selector: "ul" });
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search coins" }), "test");
+    expect(list).toHaveTextContent("test (test)");
+    await userEvent.clear(screen.getByRole("searchbox", { name: "Search coins" }));
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search coins" }), T.slice(0, 10));
+    expect(list).toHaveTextContent("test (test)");
+    await userEvent.clear(screen.getByRole("searchbox", { name: "Search coins" }));
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search coins" }), "no such coin");
+    expect(screen.getByText("No coin matches — try All.")).toBeInTheDocument();
+  });
+
   it("filters by tab and asset, sorts, and says when nothing matches", async () => {
     wallet(null);
     net({ rpc: chainRoutes(), get: getRoutes() });
@@ -169,7 +201,7 @@ describe("the Coins window", () => {
     await userEvent.selectOptions(screen.getByLabelText("Paired with"), "ETH");
     expect(screen.getByLabelText("Coins", { selector: "ul" })).toHaveTextContent("test (test)");
     await userEvent.selectOptions(screen.getByLabelText("Paired with"), "");
-    for (const label of ["⚡ Vol 24h", "🌱 New", "💧 Liquidity", "🔥 Trending"]) {
+    for (const label of ["⚡ Vol 24h", "🌱 New", "💧 Liquidity", "Mcap", "Gainers", "🔥 Trending"]) {
       await userEvent.click(screen.getByRole("button", { name: label }));
       expect(screen.getByRole("button", { name: label })).toHaveAttribute("aria-pressed", "true");
     }
@@ -246,14 +278,11 @@ describe("the Coins window", () => {
     expect(screen.getByLabelText("url")).toHaveTextContent(`t=${T}`);
     await waitFor(() => expect(screen.getByText(/· vs ETH · market cap ≈/)).toBeInTheDocument());
     expect(screen.getByText("test (test)", { selector: "strong" })).toBeInTheDocument();
-    // the coin's own pool is the default route (2026-10-14): Relay may not route a minutes-old pool
-    expect(screen.getByRole("button", { name: "ETH · its pool" })).toHaveAttribute("aria-pressed", "true");
+    // ONE route (2026-10-29): the coin's own pool — Relay does not route a v3 hook pool
     expect(await screen.findByLabelText("Amount of ETH")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "ETH · Relay" }));
-    expect(screen.getByText("ETH → test on Base")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /· Relay$/ })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Sell test" }));
-    await userEvent.click(screen.getByRole("button", { name: "USDC · Relay" }));
-    expect(screen.getByText("test → USDC on Base")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Amount of test")).toBeInTheDocument();
     // the launcher, one click away: their profile
     await userEvent.click(screen.getByRole("button", { name: `Profile of ${ME}` }));
     expect(open).toHaveBeenCalledWith("profile", { a: ME });

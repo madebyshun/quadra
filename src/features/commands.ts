@@ -36,8 +36,8 @@ export const SKILL_HOME: Readonly<Record<string, WindowId>> = {
   gate: "safety",
   sendcheck: "safety",
   radar: "research",
-  forensics: "research",
-  launcher: "research",
+  forensics: "safety",
+  launcher: "safety",
   launch: "terminal",
 };
 

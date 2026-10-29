@@ -5,7 +5,8 @@
  *   GET /api/stocks/prices → `https://api.robinhood.com/rhj/prices/` — Robinhood's stock tokens
  *       on Robinhood Chain, all 195 quotes in one call.
  *   GET /api/stocks/base   → `https://api.coinbase.com/v1/tokenized-stocks` — Coinbase's
- *       tokenized stocks on Base (docs.base.org, "List Tokenized Stocks"): 40 of them, each with
+ *       tokenized stocks on Base (docs.base.org, "List Tokenized Stocks"): 218 of them in pages of 100
+ *       (MEASURED 2026-10-29; 40 on 2026-09-30), each with
  *       its contract, decimals, multiplier, paused features and Chainlink NAV. No key either.
  *
  * Same shape and same guard as `charts.ts`: a Fetch-API handler, one route, GET only, and the
@@ -21,6 +22,9 @@ const UPSTREAM: Record<string, { readonly url: string; readonly name: string; re
   "/base": { url: COINBASE_STOCKS, name: "Coinbase's tokenized stocks API", maxAge: 300 },
 };
 
+/** What one of Coinbase's page tokens looks like: base64, short. */
+export const PAGE_TOKEN = /^[A-Za-z0-9+/=_-]{1,200}$/;
+
 function problem(status: number, detail: string): Response {
   return new Response(JSON.stringify({ status, detail, origin: "quadra-server" }), {
     status,
@@ -35,9 +39,14 @@ export function stocksHandler(fetchImpl: typeof fetch = fetch) {
     const route = Object.hasOwn(UPSTREAM, path) ? UPSTREAM[path]! : null;
     if (route === null) return problem(404, `${path} is not a route this server forwards.`);
     if (request.method !== "GET") return problem(405, `${path} takes GET.`);
+    // Coinbase's list comes in pages (MEASURED 2026-10-29: 218 stocks, 100 a page): its own page
+    // token, and nothing else, is passed on — checked against a fixed shape, never forwarded raw
+    const page = new URL(request.url).searchParams.get("page_token");
+    if (page !== null && (path !== "/base" || !PAGE_TOKEN.test(page))) return problem(400, "page_token is not a page of Coinbase's list.");
+    const url = page === null ? route.url : `${route.url}?page_token=${encodeURIComponent(page)}`;
     let upstream: Response;
     try {
-      upstream = await fetchImpl(route.url, { headers: { accept: "application/json" }, redirect: "manual" });
+      upstream = await fetchImpl(url, { headers: { accept: "application/json" }, redirect: "manual" });
     } catch {
       return problem(502, `${route.name} could not be reached.`);
     }

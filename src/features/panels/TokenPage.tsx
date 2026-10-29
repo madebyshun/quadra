@@ -5,7 +5,8 @@ import { launchpadCoin, launchpadCoins, type IndexedCoin, type IndexedCoinPage, 
 import { messageOf } from "@/lib/errors";
 import { topHolders, type Holding } from "@/skills/blockscout";
 import { compact, explorer, quoteAmountText, quoteWithUsd, short, tinyPrice, usd } from "@/skills/format";
-import { coinFeeOf, isV3, referrerOf, type CoinFee, type PoolValue } from "@/skills/launchpad";
+import { coinFeeOf, isV3, launchesBy, referrerOf, type CoinFee, type PoolValue } from "@/skills/launchpad";
+import { deepest, marketsOf, type Market } from "@/skills/dexscreener";
 import { feePercent, LAUNCHPAD_EXPECTS } from "@/config/launchpad";
 import { PriceChart } from "@/features/markets/Chart";
 
@@ -203,6 +204,50 @@ export function autoFrame(points: readonly Point[]): Frame {
   return "trades";
 }
 
+/** Market activity from DexScreener: its own pool may be absent until the first trade. */
+export function CoinMoves({ token }: { token: string }) {
+  const [market, setMarket] = useState<Market | null | "reading">("reading");
+  useEffect(() => {
+    marketsOf([token]).then((all) => setMarket(deepest(all.filter((m) => m.base?.toLowerCase() === token.toLowerCase()))), () => setMarket(null));
+  }, [token]);
+  if (market === "reading") return <p className="dim">Reading market activity…</p>;
+  if (market === null) return <p className="tx__warn">Market activity not checked — DexScreener has no pair for this coin yet.</p>;
+  const moves = (["m5", "h1", "h6", "h24"] as const).map((id) => [id, market.change[id]] as const);
+  const total = (market.buys24h ?? 0) + (market.sells24h ?? 0);
+  const buys = market.buys24h;
+  const buyWidth = buys === null || total === 0 ? null : (buys / total) * 100;
+  return (
+    <section className="coin__moves" aria-label="Market activity">
+      <div className="coin__moves-head"><strong>Market activity</strong><span>{buys === null || market.sells24h === null ? "Buy / sell 24h: not read" : `${buys} ${buys === 1 ? "buy" : "buys"} · ${market.sells24h} ${market.sells24h === 1 ? "sell" : "sells"} · 24h`}</span></div>
+      {buyWidth === null ? <p className="dim">Buy/sell split not reported.</p> : <div className="coin__flow" aria-label={`${buyWidth.toFixed(0)}% buys`}><span style={{ width: `${buyWidth}%` }} /><span style={{ width: `${100 - buyWidth}%` }} /></div>}
+      <div className="coin__moves-grid">
+        {moves.map(([id, n]) => <div key={id}><span className="dim">{id}</span><strong className={n === null ? "dim" : n >= 0 ? "tone-ok" : "tone-bad"}>{n === null ? "not read" : `${n >= 0 ? "+" : ""}${n}%`}</strong></div>)}
+      </div>
+    </section>
+  );
+}
+
+/** Where every trade's fee goes, and what has been collected so far. */
+export function FeeLedger({ page, fee, referrer }: { page: Read<IndexedCoinPage>; fee: Read<CoinFee>; referrer: Read<CoinReferrer> }) {
+  if (page === "reading") return <p className="dim">Reading the fee ledger…</p>;
+  if ("problem" in page) return <p className="tx__warn">Fee ledger not checked — {page.problem}</p>;
+  const referred = isDone(referrer) && referrer.referrer !== null;
+  const protocol = referred ? 15 : 20;
+  return <div className="coin__ledger" aria-label="Fee ledger"><strong>Fee route</strong><span>{fee === "reading" ? "reading…" : "problem" in fee ? `not checked — ${fee.problem}` : `${feePercent(fee.fee)} per trade`}</span><span>Creator 80% · {referred ? "Referrer 5% · " : ""}Protocol ~{protocol}%</span><span>Collected quote: {page.feesQuote === null ? "not read" : page.feesQuote}</span><span>Collected coin: {page.feesToken === null ? "not read" : page.feesToken}</span></div>;
+}
+
+/** Other launches by the same creator, linking the coin page's identity to a profile-like history. */
+export function CreatorLaunches({ creator, current }: { creator: string; current: string }) {
+  const [result, setResult] = useState<Read<{ readonly launches: readonly { readonly token: string; readonly symbol?: string | null; readonly block: number }[] }>>("reading");
+  useEffect(() => {
+    launchesBy(creator).then((r) => setResult(r), (e: unknown) => setResult({ problem: messageOf(e) }));
+  }, [creator]);
+  if (result === "reading") return <p className="dim">Reading this creator&apos;s launches…</p>;
+  if ("problem" in result) return <p className="tx__warn">Creator history not checked — {result.problem}</p>;
+  const others = result.launches.filter((l) => l.token.toLowerCase() !== current.toLowerCase());
+  return <div className="coin__creator" aria-label="Creator launches"><strong>{short(creator)} launched {result.launches.length} coin{result.launches.length === 1 ? "" : "s"}</strong>{others.length === 0 ? <span className="dim">No other launch indexed yet.</span> : others.slice(0, 5).map((l) => <a key={l.token} href={`?do=coins&t=${l.token}`}>{l.symbol ?? short(l.token)}</a>)}</div>;
+}
+
 /** The price over time, from the pool's own opening price and trades, in the frame the visitor picks. */
 export function TokenChart({ page }: { page: Read<IndexedCoinPage> }) {
   const [picked, setPicked] = useState<Frame | null>(null);
@@ -305,7 +350,7 @@ export function TokenInfo({
 
 type TabId = "trades" | "holders";
 
-function Trades({ page, now }: { page: IndexedCoinPage; now: number }) {
+function Trades({ page, now, quoteUsd }: { page: IndexedCoinPage; now: number; quoteUsd: number | null }) {
   const [only, setOnly] = useState<"all" | "buy" | "sell">("all");
   const qs = page.coin.quoteSymbol ?? "";
   const sym = page.coin.symbol ?? "coin";
@@ -330,6 +375,7 @@ function Trades({ page, now }: { page: IndexedCoinPage; now: number }) {
               <th>{sym}</th>
               <th>{qs}</th>
               <th>Fee</th>
+              <th>USD</th>
               <th>Wallet</th>
             </tr>
           </thead>
@@ -348,6 +394,7 @@ function Trades({ page, now }: { page: IndexedCoinPage; now: number }) {
                 <td className="mono">
                   {compact(t.fee, 3)} {t.feeIn === "quote" ? qs : sym}
                 </td>
+                <td className="mono">{quoteUsd === null ? "—" : usd(t.quote * quoteUsd)}</td>
                 <td className="mono">{t.trader ? short(t.trader) : "—"}</td>
               </tr>
             ))}
@@ -370,8 +417,14 @@ function Holders({ token }: { token: string }) {
   if ("problem" in list) return <p className="tx__warn">Not checked — the holders could not be read: {list.problem}</p>;
   if (list.items.length === 0) return <p className="dim">No holders indexed yet — Blockscout lags a brand-new coin.</p>;
   const manager = UNISWAP_V4_POOL_MANAGER.toLowerCase();
+  const total = list.items.reduce((sum, h) => sum + h.raw, 0n);
+  const share = (count: number) => total === 0n ? null : Number(list.items.slice(0, count).reduce((sum, h) => sum + h.raw, 0n) * 10_000n / total) / 100;
   return (
-    <ol className="token__holders" aria-label="Top holders">
+    <div className="stack">
+      <div className="coin__concentration" aria-label="Holder concentration">
+        {[1, 5, 10].map((n) => <div key={n}><span>Top {n}</span><strong>{share(n) === null ? "not read" : `${share(n)}%`}</strong></div>)}
+      </div>
+      <ol className="token__holders" aria-label="Top holders">
       {list.items.slice(0, 20).map((h) => (
         <li key={h.holder.address}>
           <a href={explorer.address(h.holder.address)} target="_blank" rel="noreferrer" className="mono">
@@ -382,12 +435,13 @@ function Holders({ token }: { token: string }) {
           <span className="dim"> ({((Number(h.raw / 10n ** 14n) / 1e4 / 1e9) * 100).toFixed(2)}%)</span>
         </li>
       ))}
-    </ol>
+      </ol>
+    </div>
   );
 }
 
 /** Trades and holders, as tabs. `now` is unix seconds. */
-export function TokenTabs({ token, page, now }: { token: string; page: Read<IndexedCoinPage>; now: number }) {
+export function TokenTabs({ token, page, now, quoteUsd = null }: { token: string; page: Read<IndexedCoinPage>; now: number; quoteUsd?: number | null }) {
   const [tab, setTab] = useState<TabId>("trades");
   return (
     <div className="stack">
@@ -405,7 +459,7 @@ export function TokenTabs({ token, page, now }: { token: string; page: Read<Inde
       ) : "problem" in page ? (
         <p className="tx__warn">Not checked — the trades could not be read: {page.problem}</p>
       ) : (
-        <Trades page={page} now={now} />
+        <Trades page={page} now={now} quoteUsd={quoteUsd} />
       )}
     </div>
   );

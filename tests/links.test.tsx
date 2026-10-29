@@ -118,9 +118,8 @@ describe("a report's next steps in a window", () => {
     offline();
     renderAt("/?do=research&run-research=radar%205");
     await settle();
-    const research = win("Research")!;
-    // the instruction chose the tab and ran it
-    expect(within(research).getByRole("button", { name: "Launch Radar" })).toHaveAttribute("aria-pressed", "true");
+    const research = win("Radar")!;
+    // the instruction ran the window's one skill
     expect(within(research).getByLabelText("Stand-in radar")).toBeInTheDocument();
     const next = within(research).getByRole("group", { name: "Next" });
 
@@ -136,14 +135,14 @@ describe("a report's next steps in a window", () => {
     await userEvent.click(within(research).getByRole("button", { name: `profile ${WHO}` }));
     await settle();
     expect(win("Profile")).not.toBeNull();
-    // a skill in another window: Safety opens on Token Gate and runs it
+    // a skill in another window: Check opens on Token Gate and runs it
     await userEvent.click(within(next).getByRole("button", { name: "Gate it" }));
     await settle();
-    await waitFor(() => expect(within(win("Safety")!).getByRole("button", { name: "Token Gate" })).toHaveAttribute("aria-pressed", "true"));
+    await waitFor(() => expect(within(win("Check")!).getByRole("button", { name: "Token Gate" })).toHaveAttribute("aria-pressed", "true"));
     // asked again while it is open: run again, afresh
     await userEvent.click(within(next).getByRole("button", { name: "Gate it" }));
     await settle();
-    expect(within(win("Safety")!).getByLabelText("token address")).toHaveValue(TOKEN);
+    expect(within(win("Check")!).getByLabelText("token address")).toHaveValue(TOKEN);
     // a Terminal-only command opens the Terminal, which runs it
     await userEvent.click(within(next).getByRole("button", { name: "Help" }));
     await settle();
@@ -154,12 +153,12 @@ describe("a report's next steps in a window", () => {
     offline();
     const first = renderAt(`/?do=research&run-research=gate%20${TOKEN}`);
     await settle();
-    expect(within(win("Research")!).queryByLabelText("Stand-in radar")).not.toBeInTheDocument();
+    expect(within(win("Radar")!).queryByLabelText("Stand-in radar")).not.toBeInTheDocument();
     first.unmount();
     offline();
     renderAt("/?do=research&run-research=frobnicate");
     await settle();
-    expect(screen.getAllByRole("button", { name: "Launch Radar" }).at(-1)).toHaveAttribute("aria-pressed", "true");
+    expect(within(win("Radar")!).queryByLabelText("Stand-in radar")).not.toBeInTheDocument();
   });
 });
 

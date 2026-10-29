@@ -104,16 +104,16 @@ export const FEATURES: readonly Feature[] = [
   },
   {
     id: "research",
-    title: "Research",
+    title: "Radar",
     blurb: "new launches, read from the chain",
-    window: "Research",
+    window: "Radar",
     flag: "research",
   },
   {
     id: "safety",
-    title: "Safety",
-    blurb: "a simulated buy and sell, before you buy",
-    window: "Safety",
+    title: "Check",
+    blurb: "any token or address, before you act",
+    window: "Check",
     flag: "safety",
   },
   {
@@ -263,10 +263,10 @@ export const FEATURES: readonly Feature[] = [
     The desktop's furniture (2026-10-21, the owner: "sắp xếp lại thư mục" — put things in folders).
     Folders hold THIS app's programs only; no flag, because a folder is never the thing that is off.
   */
-  { id: "computer", title: "My Computer", blurb: "the machine: tasks, settings, what's next", window: "My Computer" },
-  { id: "folder-research", title: "Research", blurb: "radar, verdicts, markets, profiles", window: "Research" },
-  { id: "folder-money", title: "Money", blurb: "wallet, send, swap, trade", window: "Money" },
-  { id: "folder-launchpad", title: "Launchpad", blurb: "launch a coin, see every coin", window: "Launchpad" },
+  { id: "computer", title: "My Computer", blurb: "everything else: tools, games, settings", window: "My Computer" },
+  { id: "folder-research", title: "Research", blurb: "radar, markets, profiles, Base apps", window: "Research" },
+  { id: "folder-money", title: "Money", blurb: "send, swap, trade", window: "Money" },
+  { id: "folder-launchpad", title: "Launchpad", blurb: "the leaderboard, your Base card", window: "Launchpad" },
   { id: "folder-games", title: "Games", blurb: "real mines, and trophies", window: "Games" },
   { id: "folder-agents", title: "Agents", blurb: "tools your AI agent can use", window: "Agents" },
   { id: "control", title: "Control Panel", blurb: "desktop pattern, sound, screen saver", window: "Control Panel" },
@@ -347,12 +347,16 @@ export function comingSoon(): readonly Feature[] {
   return visibleFeatures().filter((f) => !isEnabled(f));
 }
 
-/** What a folder holds, in the order it shows them. Ids only — a link to any of them still opens it directly. */
+/**
+ * What a folder holds, in the order it shows them. Ids only — a link to any of them still opens it directly.
+ * Since 2026-10-29 (the owner: "extremely simple, no overlapping features") the desktop carries the four
+ * things people come for and Agents; My Computer holds everything else, the other folders among it.
+ */
 export const FOLDERS: Readonly<Record<FolderId, readonly WindowId[]>> = {
-  computer: ["taskmgr", "control", "soon"],
-  "folder-research": ["research", "safety", "markets", "profile", "explore"],
-  "folder-money": ["wallet", "send", "swap", "trade", "bridge"],
-  "folder-launchpad": ["launch", "coins", "leaderboard", "card"],
+  computer: ["folder-research", "folder-money", "folder-launchpad", "folder-games", "terminal", "taskmgr", "control", "readme", "soon"],
+  "folder-research": ["research", "markets", "profile", "explore"],
+  "folder-money": ["send", "swap", "trade", "bridge"],
+  "folder-launchpad": ["leaderboard", "card"],
   "folder-games": ["rugsweeper", "achievements"],
   "folder-agents": ["mcp", "x402", "api", "docs", "verify"],
 };
@@ -392,10 +396,10 @@ export function folderOf(id: WindowId): FolderId | null {
 }
 
 /**
- * The desktop's icons since 2026-10-21: the folders, then the most-used programs as shortcuts, then
- * README.TXT. Everything else lives in a folder. The Trash keeps its corner (`CORNER`).
+ * The desktop's icons since 2026-10-29: Check, Coins, Launch and Wallet — one door for each thing the app
+ * does — then Agents and My Computer, which holds the rest. The Trash keeps its corner (`CORNER`).
  */
-export const DESKTOP: readonly WindowId[] = [...FOLDER_IDS, "terminal", "launch", "coins", "wallet", "readme"];
+export const DESKTOP: readonly WindowId[] = ["safety", "coins", "launch", "wallet", "folder-agents", "computer"];
 
 export function desktopItems(): readonly Entry[] {
   return DESKTOP.filter(shown).map(entryOf);

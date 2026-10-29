@@ -5,6 +5,7 @@ import { renderAt, settle } from "./helpers";
 import { BRAND } from "@/brand";
 import { CONTRACTS } from "@/config/chain";
 import { visibleFeatures, FEATURES, desktopItems, comingSoon, folderItems, FOLDER_IDS, entryOf } from "@/features/registry";
+import { radarSkill } from "@/skills/radar";
 
 describe("the desktop", () => {
   it("leads with the product name", () => {
@@ -30,23 +31,11 @@ describe("the desktop", () => {
     }
   });
 
-  it("puts the folders, four shortcuts and README.TXT on the desktop, and the Trash in its corner", () => {
+  it("puts the four doors, Agents and My Computer on the desktop, and the Trash in its corner", () => {
     renderAt("/");
     const cards = within(screen.getByLabelText("What you can do")).getAllByRole("button");
     expect(cards.map((c) => c.querySelector(".icon__title")!.textContent)).toEqual(desktopItems().map((e) => e.title));
-    expect(cards.map((c) => c.querySelector(".icon__title")!.textContent)).toEqual([
-      "My Computer",
-      "Research",
-      "Money",
-      "Launchpad",
-      "Games",
-      "Agents",
-      "Terminal",
-      "Launch",
-      "Coins",
-      "Wallet",
-      "README.TXT",
-    ]);
+    expect(cards.map((c) => c.querySelector(".icon__title")!.textContent)).toEqual(["Check", "Coins", "Launch", "Wallet", "Agents", "My Computer"]);
     expect(FEATURES.length - visibleFeatures().length).toBe(1);
     expect(screen.queryByRole("button", { name: /^Bridge/ })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Read about it")).not.toBeInTheDocument();
@@ -56,10 +45,12 @@ describe("the desktop", () => {
   it("opens a folder as an Explorer window: one click selects, a double click or Enter opens", async () => {
     const user = userEvent.setup();
     renderAt("/");
-    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Money/ }));
+    // the desktop's My Computer holds the other folders: open it, then Money inside it
+    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^My Computer/ }));
+    await user.dblClick(within(screen.getByRole("list", { name: "My Computer" })).getByRole("button", { name: "Money" }));
     const folder = screen.getByRole("list", { name: "Money" });
     const win = windowFrame("Money");
-    expect(within(win).getByRole("status")).toHaveTextContent("4 objects");
+    expect(within(win).getByRole("status")).toHaveTextContent("3 objects");
     const send = within(folder).getByRole("button", { name: "Send" });
     await user.click(send);
     expect(send).toHaveAttribute("aria-pressed", "true");
@@ -228,7 +219,7 @@ describe("opening a feature with ?do=", () => {
     );
   });
 
-  it("gives the Terminal and Research real controls, not a placeholder", async () => {
+  it("gives the Terminal and Radar real controls, not a placeholder", async () => {
     const { unmount } = renderAt("/?do=terminal");
     await settle();
     expect(screen.getByLabelText("Command")).toBeInTheDocument();
@@ -237,8 +228,8 @@ describe("opening a feature with ?do=", () => {
 
     renderAt("/?do=research");
     await settle();
-    expect(screen.getByRole("button", { name: "Launch Radar" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Research is not built yet")).not.toBeInTheDocument();
+    expect(screen.getByText(radarSkill.summary)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Radar is not built yet")).not.toBeInTheDocument();
   });
 });
 
@@ -270,32 +261,32 @@ describe("multiple windows", () => {
     const user = userEvent.setup();
     renderAt("/?do=send");
     await settle();
-    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Terminal/ }));
+    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Coins/ }));
     expect(windowFrame("Send")).toBeInTheDocument();
-    expect(windowFrame("Terminal")).toBeInTheDocument();
+    expect(windowFrame("Coins")).toBeInTheDocument();
   });
 
   it("closing one window leaves the other open", async () => {
     const user = userEvent.setup();
     renderAt("/?do=send");
     await settle();
-    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Terminal/ }));
+    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Coins/ }));
     await user.click(within(windowFrame("Send")).getByRole("button", { name: "Close" }));
     expect(screen.queryByLabelText("Send", { selector: "section" })).not.toBeInTheDocument();
-    expect(windowFrame("Terminal")).toBeInTheDocument();
+    expect(windowFrame("Coins")).toBeInTheDocument();
   });
 
   it("clicking a background window brings it in front (its taskbar chip becomes active)", async () => {
     const user = userEvent.setup();
     renderAt("/?do=send");
     await settle();
-    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Terminal/ }));
+    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Coins/ }));
     await user.click(windowFrame("Send"));
     await user.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: "Windows" }));
     const send = within(screen.getByRole("menu", { name: "Windows menu" })).getByRole("menuitemcheckbox", { name: "Send" });
     expect(send).toHaveAttribute("aria-checked", "true");
     // and the window behind loses its title bar's stripes
-    expect(windowFrame("Terminal")).toHaveClass("win--inactive");
+    expect(windowFrame("Coins")).toHaveClass("win--inactive");
     expect(windowFrame("Send")).not.toHaveClass("win--inactive");
   });
 });
@@ -416,18 +407,18 @@ describe("the app's own menu (it holds what the Start menu held)", () => {
     renderAt("/");
     await user.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: BRAND.name }));
     const menu = screen.getByRole("menu", { name: `${BRAND.name} menu` });
-    expect(within(menu).getByRole("menuitem", { name: /Send/ })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /^Check/ })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Docs" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "API" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Verify" })).toBeInTheDocument();
   });
 
-  it("groups the programs by the desktop's folders, the off ones waiting in Coming Soon", async () => {
+  it("lists the desktop's doors, then its folders' programs, the off ones waiting in Coming Soon", async () => {
     const user = userEvent.setup();
     renderAt("/");
     await user.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: BRAND.name }));
     const menu = screen.getByRole("menu", { name: `${BRAND.name} menu` });
-    for (const id of FOLDER_IDS) {
+    for (const id of ["folder-agents", "computer"] as const) {
       const group = within(menu).getByRole("group", { name: entryOf(id).title });
       expect(within(group).getAllByRole("menuitem").map((m) => m.textContent)).toEqual([entryOf(id).title, ...folderItems(id).map((e) => e.title)]);
     }
@@ -443,9 +434,9 @@ describe("the app's own menu (it holds what the Start menu held)", () => {
     renderAt("/");
     await user.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: BRAND.name }));
     await user.click(
-      within(screen.getByRole("menu", { name: `${BRAND.name} menu` })).getByRole("menuitem", { name: /^Send/ }),
+      within(screen.getByRole("menu", { name: `${BRAND.name} menu` })).getByRole("menuitem", { name: /^Coins/ }),
     );
-    expect(windowFrame("Send")).toBeInTheDocument();
+    expect(windowFrame("Coins")).toBeInTheDocument();
     expect(screen.queryByRole("menu", { name: `${BRAND.name} menu` })).not.toBeInTheDocument();
   });
 
@@ -471,19 +462,21 @@ describe("the app's own menu (it holds what the Start menu held)", () => {
     const user = userEvent.setup();
     renderAt("/");
     const bar = within(screen.getByLabelText("Menu bar"));
-    await user.click(bar.getByRole("button", { name: "Money folder" }));
-    const money = screen.getByRole("menu", { name: "Money folder menu" });
-    expect(within(money).getAllByRole("menuitem").map((m) => m.textContent)).toEqual([entryOf("folder-money").title, ...folderItems("folder-money").map((e) => e.title)]);
+    // only the folders ON the desktop have a title in the bar (2026-10-29)
+    expect(bar.queryByRole("button", { name: "Money folder" })).toBeNull();
+    await user.click(bar.getByRole("button", { name: "My Computer folder" }));
+    const computer = screen.getByRole("menu", { name: "My Computer folder menu" });
+    expect(within(computer).getAllByRole("menuitem").map((m) => m.textContent)).toEqual([entryOf("computer").title, ...folderItems("computer").map((e) => e.title)]);
     // hovering another title while one is open opens that one instead
-    await user.hover(bar.getByRole("button", { name: "Games folder" }));
-    expect(screen.queryByRole("menu", { name: "Money folder menu" })).not.toBeInTheDocument();
-    await user.click(within(screen.getByRole("menu", { name: "Games folder menu" })).getByRole("menuitem", { name: /Rugsweeper/ }));
-    expect(windowFrame("Rugsweeper")).toBeInTheDocument();
+    await user.hover(bar.getByRole("button", { name: "Agents folder" }));
+    expect(screen.queryByRole("menu", { name: "My Computer folder menu" })).not.toBeInTheDocument();
+    await user.click(within(screen.getByRole("menu", { name: "Agents folder menu" })).getByRole("menuitem", { name: /^MCP/ }));
+    expect(windowFrame("MCP tools")).toBeInTheDocument();
     // with no menu open, hovering opens nothing; a second click on an open title closes it
-    await user.hover(bar.getByRole("button", { name: "Money folder" }));
+    await user.hover(bar.getByRole("button", { name: "My Computer folder" }));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    await user.click(bar.getByRole("button", { name: "Money folder" }));
-    await user.click(bar.getByRole("button", { name: "Money folder" }));
+    await user.click(bar.getByRole("button", { name: "My Computer folder" }));
+    await user.click(bar.getByRole("button", { name: "My Computer folder" }));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 });

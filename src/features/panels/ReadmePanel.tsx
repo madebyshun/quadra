@@ -10,24 +10,24 @@ Please read this file before you begin.
 
 WHAT IS ON THIS DESKTOP
 -----------------------
-  My Computer   Task Manager, the Control Panel, and Coming Soon.
-  Research      Launch Radar, Token Verdict, Markets, Profile.
-  Money         Wallet, Send, Swap, Trade.
-  Launchpad     Launch a coin, every coin launched here, the
-                Leaderboard, and your Base card.
-  Games         Rugsweeper and Achievements.
+  Check         Paste a token before you buy it: a simulated
+                buy and sell, its code, holders and launcher.
+  Coins         Every coin launched here. Open one to trade it.
+  Launch        Launch a coin, paired with ETH or a stock.
+  Wallet        Connect, see what you hold, claim your fees.
   Agents        MCP, x402, the API, the Docs, Verify.
+  My Computer   Everything else: Research, Money, Launchpad,
+                Games, the Terminal, Task Manager, the Control
+                Panel, and this file.
 
-  Terminal, Launch, Coins and Wallet also sit on the desktop.
-  Double-click an icon in a folder to open it.
+  Double-click an icon to open it.
 
 
 GETTING STARTED
 ---------------
-  1. Open the Terminal and type  help  for every skill.
-  2. Before you buy a coin, type  verdict 0x...  It reads the
-     trade, the code, the holders and the launcher.
-  3. Connect a wallet only when you want to send, swap or
+  1. Paste a token's address into Check.
+  2. Open Coins and pick one to buy or sell it.
+  3. Connect a wallet only when you want to trade or
      launch. Looking things up needs no wallet at all.
 
 

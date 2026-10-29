@@ -9,6 +9,7 @@ import { tokenAmount } from "@/skills/format";
 import { Gel } from "@/ui/Gel";
 import { useWalletSession } from "@/ui/WalletProvider";
 import { TxStepList, useTxSteps } from "@/features/panels/TxSteps";
+import { PoolTradeEth } from "@/features/panels/PoolTradeEth";
 
 /**
  * Trade a coin launched here straight against ITS OWN POOL — no aggregator in between (2026-10-14).
@@ -33,6 +34,8 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
   const [pool, setPool] = useState<Pool | "reading" | { readonly problem: string }>("reading");
   const [amount, setAmount] = useState("");
   const [review, setReview] = useState<Review | "quoting" | { readonly problem: string } | null>(null);
+  // a stock-paired coin can be bought with plain ETH too: two legs, in PoolTradeEth (2026-10-29)
+  const [withEth, setWithEth] = useState(false);
   const steps = useTxSteps();
 
   useEffect(() => {
@@ -53,6 +56,25 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
   if (pool === "reading") return <p className="dim">Reading {symbol}&apos;s pool…</p>;
   if (pool === null) return <p className="tx__warn">{symbol} has no pool on this launchpad.</p>;
   if ("problem" in pool) return <p className="tx__warn">The pool could not be read: {pool.problem}</p>;
+
+  const stockBuy = side === "buy" && pool.quote.toLowerCase() !== NATIVE;
+  const payWith = stockBuy ? (
+    <div className="group__row group__row--actions" role="group" aria-label="Pay with">
+      {[false, true].map((eth) => (
+        <button key={String(eth)} type="button" className="chip chip--mode" aria-pressed={withEth === eth} onClick={() => setWithEth(eth)}>
+          {eth ? "Pay with ETH" : `Pay with ${pool.quoteSymbol}`}
+        </button>
+      ))}
+    </div>
+  ) : null;
+  if (stockBuy && withEth) {
+    return (
+      <div className="stack">
+        {payWith}
+        <PoolTradeEth pool={pool} symbol={symbol} />
+      </div>
+    );
+  }
 
   const inSym = side === "buy" ? pool.quoteSymbol : symbol;
   const outSym = side === "buy" ? symbol : pool.quoteSymbol;
@@ -94,6 +116,7 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
 
   return (
     <div className="stack">
+      {payWith}
       <label className="field-label">
         You {side === "buy" ? "pay" : "sell"} ({inSym})
         <input

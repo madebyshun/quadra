@@ -108,6 +108,15 @@ export const CONTRACTS = {
    */
   launchFactoryV3: "0x006Da367654a487bb277fe25ff54f0fE0f741377" as string | null,
   /**
+   * `RevenueShareDeployer` (contracts/src/RevenueShare.sol) for launchpad v3 — DEPLOYED by the owner
+   * 2026-10-29 (tx 0xaad62e6e…f42b, block 53,235,674, from the deployer 0x00FD…746F). CHECKED before it
+   * was written here: Sourcify EXACT match (creation and runtime), `launchpad()` = `launchFactoryV3`,
+   * 9,041 bytes of code. A coin page offers "share with stakers" through it; a coin whose recipient
+   * already is a RevenueShare is recognised either way (src/lib/revenueShare.ts). NOT audited — an
+   * internal review only (contracts/REVIEW-2026-10-29.md). Set back to `null` to stop offering it.
+   */
+  revenueShareDeployer: "0x774CD3CD89337cF7e57aF6a04256733F1dd74139" as string | null,
+  /**
    * The launchpad, version 1 (`contracts/deployed/LaunchFactory.v1.sol`: ETH pairs only), DEPLOYED BY
    * THE OWNER 2026-10-02: tx 0xc51a517c…4a972764d, block 52,066,273. CHECKED before it was written
    * here: Blockscout "LaunchFactory", fully verified; runtime bytecode byte-identical to the v1 source

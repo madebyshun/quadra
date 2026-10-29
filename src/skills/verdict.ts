@@ -11,7 +11,8 @@ import { isV3, launchOf, launchpadOrigin, poolValue, v3FeeOf, v3ReferrerOf, type
 import { chainToken } from "@/skills/chaintoken";
 import { BRAND } from "@/brand";
 import { feePercent, LAUNCHPAD_EXPECTS } from "@/config/launchpad";
-import { roundTrip, type RoundTrip, type Transfer } from "@/skills/simulate";
+import { poolRouter, roundTrip, type RoundTrip, type Transfer } from "@/skills/simulate";
+import { NATIVE, poolKeyOf, type LaunchPool } from "@/lib/v4swap";
 import { row, type Report, type Row, type Skill } from "@/skills/types";
 
 /**
@@ -368,6 +369,9 @@ export function verdictRow(rows: readonly Row[]): Row {
 /** A failed read as `undefined`, kept apart from a source that answered "nothing" (`null`). */
 const settled = <T,>(p: Promise<T>): Promise<T | undefined> => p.catch(() => undefined);
 
+/** The pool router for an ETH-paired coin launched here; nothing (so Relay) for anything else. */
+const ownPool = (pool: LaunchPool | null) => (pool && pool.quote.toLowerCase() === NATIVE ? [poolRouter(pool)] : []);
+
 /** The whole verdict for one token, as of `now`. */
 export async function tokenVerdict(input: string, now: number): Promise<Report> {
   const address = toChecksumAddress(assertChecksummedAddress(input, "Token"));
@@ -385,7 +389,8 @@ export async function tokenVerdict(input: string, now: number): Promise<Report> 
     settled(topHolders(address)),
     launch.then((l) =>
       l ? settled(launchpadOrigin(l)) : Promise.all([market, pad]).then(([p, d]) => settled(originOf(address, p ?? [], d?.kind === "proven" ? d : null)))),
-    roundTrip(address).catch((e: unknown) => {
+    // a coin launched here and paired with ETH trades through its own pool: Relay routes no v3 pool
+    launch.then(async (l) => roundTrip(address, ...ownPool(l ? await poolKeyOf(address) : null))).catch((e: unknown) => {
       simFailure = messageOf(e);
       return null;
     }),
@@ -416,7 +421,7 @@ export async function tokenVerdict(input: string, now: number): Promise<Report> 
       ...(simFailure ? [`The simulation could not run: ${simFailure}`] : []),
       ...(token === null ? ["Blockscout has no token at this address — check it is a token contract on Base."] : []),
     ],
-    sources: ["Base (eth_simulateV1)", "Relay", "GoPlus Security", "Blockscout", "DexScreener", ...(launchpad ? ["Uniswap v4 (its pool, read directly)"] : ["Base (the launchpads' own records)"])],
+    sources: ["Base (eth_simulateV1)", launchpad ? "Uniswap v4 (Quoter, Universal Router)" : "Relay", "GoPlus Security", "Blockscout", "DexScreener", ...(launchpad ? ["Uniswap v4 (its pool, read directly)"] : ["Base (the launchpads' own records)"])],
     next: [
       ...(launchpad ? [{ label: "Its page here", command: `coin ${address}` }] : []),
       { label: "Buy or sell it", command: `swap ${address}` },

@@ -1,6 +1,6 @@
 import { decodeFunctionData, erc20Abi } from "viem";
 import { BASE, CONTRACTS } from "@/config/chain";
-import { FEE_BPS, NATIVE, RELAY } from "@/config/routes";
+import { FEE_BPS, NATIVE, RELAY, RELAY_PAIRS } from "@/config/routes";
 import { sameAddress } from "@/lib/address";
 import type { Asset } from "@/lib/erc20";
 import type { TxRequest } from "@/lib/transact";
@@ -61,7 +61,10 @@ function refuse(why: string): never {
 
 type Item = { readonly id: string; readonly data: Record<string, unknown> };
 
-function checkStep(step: Item, req: SwapRequest): { label: string; tx: TxRequest } {
+/** The one Relay pair a quote's steps all belong to — fixed by its first step that names one. */
+type Pair = (typeof RELAY_PAIRS)[number];
+
+function checkStep(step: Item, req: SwapRequest, pair: { current: Pair | null }): { label: string; tx: TxRequest } {
   const d = step.data;
   if (d.chainId !== BASE.id) refuse(`a step is for chain ${String(d.chainId)}.`);
   if (typeof d.from !== "string" || !sameAddress(d.from, req.user)) refuse("a step is sent from a different wallet.");
@@ -80,14 +83,18 @@ function checkStep(step: Item, req: SwapRequest): { label: string; tx: TxRequest
     } catch {
       return refuse("the approval step is not an ERC-20 approve.");
     }
-    if (!sameAddress(spender, RELAY.approvalProxy)) refuse(`the approval is for ${spender}, not Relay's verified approval proxy.`);
+    const p = RELAY_PAIRS.find((x) => sameAddress(spender, x.approvalProxy));
+    if (!p) refuse(`the approval is for ${spender}, not Relay's verified approval proxy.`);
+    pair.current = p!;
     if (amount !== req.amount) refuse(`the approval is for ${amount}, not exactly the ${req.amount} being sold.`);
     if (value !== 0n) refuse("the approval step sends ETH.");
     return { label: `Approve Relay to move exactly this much ${req.sell.symbol}`, tx: { to, data } };
   }
 
-  const target = req.sell.kind === "native" ? RELAY.router : RELAY.approvalProxy;
-  if (!sameAddress(to, target)) refuse(`the swap goes to ${to}, not Relay's verified contract ${target}.`);
+  const kind = req.sell.kind === "native" ? "router" : "approvalProxy";
+  const allowed = pair.current ? [pair.current] : RELAY_PAIRS;
+  const p = allowed.find((x) => sameAddress(to, x[kind]));
+  if (!p) refuse(`the swap goes to ${to}, not Relay's verified contract ${allowed.map((x) => x[kind]).join(" or ")}.`);
   const expected = req.sell.kind === "native" ? req.amount : 0n;
   if (value !== expected) refuse(`the swap sends ${value} wei of ETH, not ${expected}.`);
   return { label: `Swap ${req.sell.symbol} for ${req.buy.symbol}`, tx: { to, data, value } };
@@ -102,7 +109,8 @@ export function checkSwap(body: unknown, req: SwapRequest): SwapQuote {
     return listOf(step.items).map((i) => ({ id, data: objAt(i, "data") }));
   });
   if (!items.some((i) => i.id === "swap")) refuse("it has no swap step.");
-  const steps = items.map((i) => checkStep(i, req));
+  const pair: { current: Pair | null } = { current: null };
+  const steps = items.map((i) => checkStep(i, req, pair));
 
   const details = objAt(body, "details");
   const into = objAt(details, "currencyIn");

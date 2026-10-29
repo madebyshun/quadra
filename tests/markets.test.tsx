@@ -13,6 +13,8 @@ import {
   DEXSCREENER,
   fillGaps,
   forgetCatalog,
+  nextPageOf,
+  STOCK_PAGES,
   parseBaseStocks,
   parseCandles,
   parseQuotes,
@@ -117,6 +119,20 @@ describe("the stock list routes", () => {
     expect(await prices.json()).toEqual({ quotes: [] });
     expect(prices.headers.get("cache-control")).toBe("max-age=15");
     expect(base.headers.get("cache-control")).toBe("max-age=300");
+  });
+
+  it("passes Coinbase's page token on for the stock list, and nothing else (2026-10-29)", async () => {
+    const seen: string[] = [];
+    const handle = stocksHandler((async (url: string) => {
+      seen.push(url);
+      return json({ tokens: [] });
+    }) as unknown as typeof fetch);
+    expect((await handle(req("/base?page_token=MHhiMjAw%2B%2F%3D"))).status).toBe(200);
+    expect(seen).toEqual([`${COINBASE_STOCKS}?page_token=MHhiMjAw%2B%2F%3D`]);
+    // a token of the wrong shape, or on the other route, is refused before anything is asked
+    expect((await handle(req("/base?page_token=a%26b%3Dc"))).status).toBe(400);
+    expect((await handle(req("/prices?page_token=abc"))).status).toBe(400);
+    expect(seen).toHaveLength(1);
   });
 
   it("refuses without the header, off the routes, or with the wrong method, and names an outage", async () => {
@@ -378,6 +394,32 @@ describe("Coinbase's stocks on Base", () => {
     await expect(baseStocks()).rejects.toThrow("(Coinbase's tokenized stocks API could not be reached.)");
     markets({ get: (u) => (u === `${STOCKS_PATH}/base` ? json([], 503) : undefined) });
     await expect(baseStocks()).rejects.toThrow("(HTTP 503)");
+  });
+
+  it("reads EVERY page of Coinbase's list — AAPLc, NVDAc and SPCXc sat past the first (MEASURED 2026-10-29)", async () => {
+    const page = (symbol: string, next?: string) => ({
+      tokens: [{ symbol, contract_address: `0xb2${symbol.length.toString(16).padStart(38, "0")}`, decimals: 8, multiplier: 1, nav_price: 1 }],
+      ...(next ? { next_page_token: next } : {}),
+    });
+    const asked: string[] = [];
+    forgetCatalog();
+    net({
+      get: (u) => {
+        asked.push(u);
+        return u === `${STOCKS_PATH}/base` ? page("GOOGLc", "p2") : u === `${STOCKS_PATH}/base?page_token=p2` ? page("AAPLc", "p3") : u === `${STOCKS_PATH}/base?page_token=p3` ? { tokens: [], next_page_token: "p4" } : undefined;
+      },
+    });
+    expect([...(await baseStocks()).keys()]).toEqual(["GOOGL", "AAPL"]);
+    // an empty page ends the list even when it names a next one
+    expect(asked).toHaveLength(3);
+    expect(nextPageOf(null)).toBeNull();
+  });
+
+  it("stops after STOCK_PAGES pages, however many Coinbase says remain", async () => {
+    let n = 0;
+    forgetCatalog();
+    net({ get: (u) => (u.startsWith(`${STOCKS_PATH}/base`) ? { tokens: [{ symbol: `S${n}c`, contract_address: `0xb2${(n++).toString(16).padStart(38, "0")}`, decimals: 8, multiplier: 1 }], next_page_token: "more" } : undefined) });
+    expect((await baseStocks()).size).toBe(STOCK_PAGES);
   });
 
   it("is asked of Coinbase directly where there is no page — an agent's run of a skill", () => {
@@ -1034,13 +1076,10 @@ describe("the Markets window", () => {
 });
 
 describe("on the desktop", () => {
-  it("shows the gadget, and a click opens the Markets window on that asset", async () => {
+  it("is not on the desktop any more — one door per job (2026-10-29); the Markets window keeps it", async () => {
     markets();
     renderAt("/");
     await settle();
-    const gadget = screen.getByRole("complementary", { name: "Markets" });
-    await userEvent.click(within(gadget).getByRole("button", { name: /AAPL/ }));
-    await waitFor(() => expect(screen.getByLabelText("Markets", { selector: "section" })).toBeInTheDocument());
-    expect(screen.getByRole("region", { name: "AAPL" })).toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "Markets" })).toBeNull();
   });
 });

@@ -242,24 +242,51 @@ let catalog: Promise<Map<string, BaseStock>> | null = null;
  */
 export const stocksUrl = (): string => (typeof document === "undefined" ? COINBASE_STOCKS : `${STOCKS_PATH}/base`);
 
-/** Coinbase's tokenized stocks on Base, read once per page; a failed read is asked again next time. */
+/** The most pages of Coinbase's list read — 218 stocks were 3 pages (MEASURED 2026-10-29); a loop that never ends is a bug. */
+export const STOCK_PAGES = 10;
+
+/** Coinbase's token for the next page of its list, or null on the last one. */
+export function nextPageOf(body: unknown): string | null {
+  if (!isObj(body)) return null;
+  const t = strOf(body.next_page_token);
+  return t && listOf(body.tokens).length > 0 ? t : null;
+}
+
+async function stockPage(token: string | null): Promise<unknown> {
+  let res: Response;
+  try {
+    res = await fetch(token === null ? stocksUrl() : `${stocksUrl()}?page_token=${encodeURIComponent(token)}`, { headers: { [SERVER_HEADER]: "1" } });
+  } catch {
+    throw new Error("This app's server could not be reached for the list of stocks on Base.");
+  }
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    throw new Error("The list of stocks on Base needs this app's server, which is not running here.");
+  }
+  if (!res.ok) throw new Error(`Coinbase's list of stocks on Base is unavailable right now (${strOf(isObj(body) ? body.detail : null) ?? `HTTP ${res.status}`}).`);
+  return body;
+}
+
+/**
+ * Coinbase's tokenized stocks on Base, EVERY page, read once per page load; a failed read is asked again
+ * next time. 🔴 MEASURED 2026-10-29: the list is paged (100 a page) and only the first page used to be
+ * read — AAPLc, NVDAc and SPCXc were on a later one, so "no NAV" was written about stocks never read.
+ * A page that fails fails the whole list: a partial list would read as "not listed".
+ */
 export function baseStocks(): Promise<Map<string, BaseStock>> {
   if (!catalog) {
     catalog = (async () => {
-      let res: Response;
-      try {
-        res = await fetch(stocksUrl(), { headers: { [SERVER_HEADER]: "1" } });
-      } catch {
-        throw new Error("This app's server could not be reached for the list of stocks on Base.");
+      const all = new Map<string, BaseStock>();
+      let token: string | null = null;
+      for (let i = 0; i < STOCK_PAGES; i++) {
+        const body = await stockPage(token);
+        for (const [k, v] of parseBaseStocks(body)) all.set(k, v);
+        token = nextPageOf(body);
+        if (token === null) break;
       }
-      let body: unknown;
-      try {
-        body = await res.json();
-      } catch {
-        throw new Error("The list of stocks on Base needs this app's server, which is not running here.");
-      }
-      if (!res.ok) throw new Error(`Coinbase's list of stocks on Base is unavailable right now (${strOf(isObj(body) ? body.detail : null) ?? `HTTP ${res.status}`}).`);
-      return parseBaseStocks(body);
+      return all;
     })();
     catalog.catch(() => (catalog = null));
   }

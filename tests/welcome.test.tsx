@@ -4,13 +4,12 @@ import { BRAND } from "@/brand";
 import { Welcome, cardWindow } from "@/ui/Welcome";
 import { OpenWindowProvider } from "@/features/openWindow";
 import { PulseContext } from "@/ui/usePulse";
-import { FIXED_TIPS, WELCOME_KEY } from "@/lib/welcome";
-import { WHATS_NEW } from "@/lib/whatsnew";
+import { WELCOME_KEY } from "@/lib/welcome";
 import { GREETING, forgetTips } from "@/lib/assistant";
 import { HELLO_MS } from "@/ui/Assistant";
 import type { Activity } from "@/skills/activity";
 import type { Bin } from "@/skills/rugs";
-import { fakePulse, pulse } from "./pulseFake";
+import { fakePulse } from "./pulseFake";
 import { renderAt, settle } from "./helpers";
 
 const launchActivity = vi.fn<() => Promise<Activity>>();
@@ -18,8 +17,6 @@ const recycleBin = vi.fn<() => Promise<Bin>>();
 vi.mock("@/skills/activity", () => ({ launchActivity: () => launchActivity() }));
 vi.mock("@/skills/rugs", () => ({ recycleBin: () => recycleBin() }));
 
-const ACT: Activity = { latest: 9, minutes: 10, total: 7, processes: [{ name: "Zora", launches: 5, ours: false }] };
-const BIN: Bin = { latest: 9, minutes: 180, removals: 0, emptied: [], unread: 0 };
 
 beforeEach(() => {
   localStorage.removeItem(WELCOME_KEY);
@@ -42,90 +39,58 @@ function mount(p = fakePulse()) {
   return { open, onClose, p, view };
 }
 
-const tip = () => document.querySelector(".welcome__text")!.textContent;
+/** A checksummed token on Base — the first launch on this app's launchpad. */
+const TOKEN = "0xb200000000000000000000694E3F5A4AB150b283";
 const click = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
 
 describe("the Welcome screen", () => {
-  it("titles itself with the brand, shows a fixed tip until something is read, then a live one first", async () => {
-    let done!: (a: Activity) => void;
-    launchActivity.mockReturnValue(new Promise((r) => (done = r)));
-    const { p } = mount();
+  it("is the front door: the brand, one field to check a token, and three doors", () => {
+    mount();
     expect(screen.getByRole("heading", { name: `Welcome to ${BRAND.name}` }).querySelector("b")).toHaveTextContent(BRAND.name);
-    expect(tip()).toBe(FIXED_TIPS[0]);
-    act(() => p.set({ kind: "live", pulse: pulse(100), history: [] }));
-    expect(tip()).toMatch(/^The latest Base block is #100/);
-    act(() => p.set({ kind: "live", pulse: pulse(104), history: [] }));
-    expect(tip()).toMatch(/^Base has made 4 blocks since you opened this page/);
-    await act(async () => done(ACT));
-    expect(tip()).toMatch(/^7 pools opened .* Zora, with 5\./);
+    expect(screen.getByRole("button", { name: "Check" })).toBeDisabled();
+    for (const name of ["Launch a coin", "Browse coins", "Your wallet"]) expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    // the playful doors moved to My Computer
+    expect(screen.queryByRole("button", { name: "Next Tip" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "What's New" })).toBeNull();
   });
 
-  it("Next Tip cycles, reading the Trash once, lazily; a failed read adds nothing", async () => {
-    mount();
-    expect(recycleBin).not.toHaveBeenCalled();
-    click("Next Tip");
-    expect(tip()).toBe(FIXED_TIPS[1]);
-    click("Next Tip");
-    expect(recycleBin).toHaveBeenCalledOnce();
-    for (let i = 2; i < FIXED_TIPS.length; i++) click("Next Tip");
-    expect(tip()).toBe(FIXED_TIPS[0]);
-  });
-
-  it("shows the Trash tip at the end once read; a failed activity read is simply absent", async () => {
-    launchActivity.mockRejectedValue(new Error("down"));
-    recycleBin.mockResolvedValue(BIN);
-    mount();
-    await act(async () => click("Next Tip"));
-    for (let i = 1; i < FIXED_TIPS.length; i++) click("Next Tip");
-    expect(tip()).toMatch(/Trash is empty/);
-  });
-
-  it("a stale pulse still names its last block; an activity read that lands after closing is dropped", async () => {
-    let done!: (a: Activity) => void;
-    launchActivity.mockReturnValue(new Promise((r) => (done = r)));
-    const { view } = mount(fakePulse({ kind: "stale", pulse: pulse(5), history: [], why: "x" }));
-    expect(tip()).toMatch(/#5/);
-    view.unmount();
-    await act(async () => done(ACT));
-  });
-
-  it("opens Explore Base, the Base card, Launch — each closing the Welcome screen", () => {
+  it("checks a pasted token in the Check window, and closes", () => {
     const { open, onClose } = mount();
-    click("Explore Base");
-    expect(open.mock.calls[0]![0]).toBe("explore");
-    click("Make my Base card");
-    expect(open.mock.calls[1]![0]).toBe(cardWindow());
+    fireEvent.change(screen.getByLabelText("Check a token before you buy it"), { target: { value: ` ${TOKEN} ` } });
+    click("Check");
+    expect(open).toHaveBeenCalledWith("safety", { "run-safety": `verdict ${TOKEN}` });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("says why a paste is not an address, and checks nothing", () => {
+    const { open, onClose } = mount();
+    const field = screen.getByLabelText("Check a token before you buy it");
+    fireEvent.change(field, { target: { value: "pepe" } });
+    click("Check");
+    expect(screen.getByText(/pepe/)).toHaveClass("tx__warn");
+    expect(open).not.toHaveBeenCalled();
+    // a wrong checksum is refused too, never "corrected"
+    fireEvent.change(field, { target: { value: TOKEN.replace("B", "b").replace("E", "e").replace("f", "F") } });
+    expect(screen.queryByText(/pepe/)).toBeNull();
+    click("Check");
+    expect(document.querySelector(".welcome .tx__warn")).not.toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("opens Launch, Coins and the wallet — each closing the Welcome screen", () => {
+    const { open, onClose } = mount();
     click("Launch a coin");
-    expect(open.mock.calls[2]![0]).toBe("launch");
+    click("Browse coins");
+    click("Your wallet");
+    expect(open.mock.calls.map((c) => c[0])).toEqual(["launch", "coins", "wallet"]);
     expect(onClose).toHaveBeenCalledTimes(3);
-    click("Close");
     fireEvent.click(document.querySelector(".welcome__win .light--close")!);
-    expect(onClose).toHaveBeenCalledTimes(5);
+    expect(onClose).toHaveBeenCalledTimes(4);
   });
 
   it("the card window is `card` once registered, else the profile", () => {
     expect(cardWindow(() => ({}))).toBe("card");
     expect(cardWindow(() => null)).toBe("profile");
-  });
-
-  it("What's New lists every item; Later and Esc close it alone; Show me opens the first item's window", () => {
-    const { open, onClose } = mount();
-    click("What's New");
-    const news = screen.getByRole("dialog", { name: "What's New" });
-    expect(news).toHaveTextContent(`New in ${BRAND.name}!`);
-    for (const item of WHATS_NEW) expect(news).toHaveTextContent(item.title);
-    click("Later");
-    expect(screen.queryByRole("dialog", { name: "What's New" })).toBeNull();
-    click("What's New");
-    click("Close What's New");
-    click("What's New");
-    fireEvent.keyDown(window, { key: "Escape" });
-    expect(screen.queryByRole("dialog", { name: "What's New" })).toBeNull();
-    expect(onClose).not.toHaveBeenCalled();
-    click("What's New");
-    click("Show me");
-    expect(open).toHaveBeenCalledWith(WHATS_NEW[0]!.window);
-    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it("Esc closes it, other keys do not; the checkbox remembers", () => {
@@ -155,13 +120,13 @@ describe("the Welcome screen on the desktop", () => {
     expect(screen.queryByRole("dialog", { name: `Welcome to ${BRAND.name}` })).toBeNull();
   });
 
-  it("does not show for a ?do= link, and Q greets as before", async () => {
+  it("does not show for a ?do= link, and Q stays quiet until something real happens (2026-10-29)", async () => {
     vi.useFakeTimers();
     renderAt("/?do=markets");
     await act(async () => {});
     expect(screen.queryByRole("dialog", { name: `Welcome to ${BRAND.name}` })).toBeNull();
-    act(() => void vi.advanceTimersByTime(HELLO_MS));
-    expect(screen.getByText(GREETING.text)).toBeInTheDocument();
+    act(() => void vi.advanceTimersByTime(HELLO_MS * 2));
+    expect(screen.queryByText(GREETING.text)).toBeNull();
   });
 
   it("does not show once turned off, and Q greets", async () => {

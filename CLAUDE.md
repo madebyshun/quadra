@@ -55,7 +55,7 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. **2085 tests in 105 files**, 100% on all four metrics, measured 2026-10-28 after the Relay no-route fallback's missing branches were tested (2082 at the fallback's commit, which had left `relay.ts` and `SwapPanel.tsx` below 100% — the gate was red); 2081 measured 2026-10-22 after Explore Base, the coin page's CA, the compact small-number format and the Mac OS 8 "Platinum" redesign (2049/102 earlier that day, after v3's approved referrers reached the app, and re-measured the same day after v3's deploy, when v2-fixture test files were pinned to `launchFactoryV3: null` (`tests/v2only.ts`); 2041/102 earlier that day, after the desktop was reorganised into folders; 2017/101 on 2026-10-21, with the Base card program (`card`) and the Welcome screen in the tree; 1971/97 earlier that day, after the coin chart's frames and opening price; 1968/97 earlier that day, after the app was wired to launchpad v3; 1945/96 on 2026-10-14; 1918/95 before the coin page, same day) (1684/76 on 2026-10-02, before the "more fun" programs, the wallet's fees,
+in one go. Do not report "done" on a subset. **2145 tests in 113 files**, 100% on all four metrics, measured 2026-10-29 after the coin page's furnace block (lib/furnace.ts — Harvest for anyone, Buy back & burn for the furnace's treasury only; `shareOf` now treats a contract that refuses `agent()` as not a share); 2136/112 after Relay's v3.2 pair was pinned beside v3 (Relay moved 2026-10-26; config/routes.ts RELAY_PAIRS); 2135 after RevenueShareDeployer was deployed and wired (2134 after the six launchpad additions (Pay with ETH for a stock-paired coin, every page of Coinbase's stocks, a share card, Verdict badges on Coins, where the 80% goes, staking into a RevenueShare)); 2104/107 after Coinbase's stock list began to be read past its first page (2101 after the simplification (one door per job: Check / Coins / Launch / Wallet on the desktop, the coin page trading through its own pool only, Token Verdict simulating a launchpad coin on its own pool)); 2085/105 measured 2026-10-28 after the Relay no-route fallback's missing branches were tested (2082 at the fallback's commit, which had left `relay.ts` and `SwapPanel.tsx` below 100% — the gate was red); 2081 measured 2026-10-22 after Explore Base, the coin page's CA, the compact small-number format and the Mac OS 8 "Platinum" redesign (2049/102 earlier that day, after v3's approved referrers reached the app, and re-measured the same day after v3's deploy, when v2-fixture test files were pinned to `launchFactoryV3: null` (`tests/v2only.ts`); 2041/102 earlier that day, after the desktop was reorganised into folders; 2017/101 on 2026-10-21, with the Base card program (`card`) and the Welcome screen in the tree; 1971/97 earlier that day, after the coin chart's frames and opening price; 1968/97 earlier that day, after the app was wired to launchpad v3; 1945/96 on 2026-10-14; 1918/95 before the coin page, same day) (1684/76 on 2026-10-02, before the "more fun" programs, the wallet's fees,
 pool trading, the indexer and launchpad recognition; 1682/76 before the doc audit's fixes) — it FELL from 1627/68 the same day, deliberately: o1 was taken out
 of Launch and `tests/launch.test.tsx` went with it to `archive/o1/` (1608/67 before the verdict, radar and Launch window read the
 launchpad; 1585/66 before the launchpad's window; 1548/60 on 2026-10-01 before the 3D intro; 1547/59 on 2026-09-30, before the seven basic skills were deleted
@@ -549,6 +549,57 @@ src/
                                counted as `unread`, never dropped. A coin `lureOf` flags is named FAKE-
                    Coming Soon — the off programs wait in a folder inside My Computer
                                (`comingSoon`, `CORNER` in registry.ts)
+                   🔴 $QUADRA IS LIVE (owner, 2026-10-29: "launch luôn"): `0xb200…ab0816`, v3, paired with
+                               AAPLc, 1%, no referrer, launched from the terminal by `quadra-deployer`
+                               (tx 0x9529911d…2b43, block 53,236,421); metadata built by
+                               scripts/prepare-quadra-launch.ts with the on-chain pixel logo
+                               (public/brand/quadra-token/quadra-white.svg — metadata is FROZEN, no website).
+                               contracts/src/QuadraFurnace.sol (stage B — DEPLOYED 2026-10-29 at 0x7838…a44c, Sourcify exact, and $QUADRA's creator recipient set to it FOR GOOD; NOT audited): the
+                               coin's 80% → `burnBps` (50%) burnt — coin side at once, quote side set aside
+                               and bought back by the TREASURY only (`buyAndBurn(amountIn, minOut)`; a v4
+                               pool has no oracle) — the rest to the treasury. ETH pushed with a 50k
+                               stipend, no return data (review F1 kept out). `script/DeployQuadraFurnace.s.sol`;
+                               `script/SimulateQuadraFurnace.s.sol` ran the whole cycle on mainnet state
+                               (0.0569 AAPLc → 1,566,435 QUADRA burnt). Stage C (a share of every launch's
+                               protocol fee into it) is planned only. public/brand/flywheel.svg/.png = the diagram
+                   🔴 THE LAUNCHPAD'S SIX (owner, 2026-10-29: "build cả 6"). panels/PoolTradeEth.tsx —
+                               a STOCK-paired coin bought with plain ETH: Relay ETH → the stock (stocks
+                               trade on Aerodrome vs USDC, MEASURED — no single router reaches both),
+                               then the stock that ARRIVED (its receipt) into the coin's pool, quoted
+                               afresh; PoolTrade shows "Pay with <stock> / Pay with ETH". Coinbase's stock
+                               list is PAGED (218, 100 a page — MEASURED; only page one used to be read, so
+                               AAPLc/NVDAc/SPCXc were "missing"): `baseStocks` reads every page
+                               (STOCK_PAGES), the server forwards `page_token` only; Launch asks the
+                               factory only about stocks WITH a NAV (12, not 218). panels/CoinShare.tsx —
+                               a share card (SVG → `drawCard`) + "Post on X" linking the coin page.
+                               panels/VerdictBadge.tsx — Check on each Coins row, run when asked, kept
+                               per page. panels/CoinRewards.tsx + lib/revenueShare.ts — where the 80%
+                               goes: the recipient can `setCreatorRecipient` to another wallet; a coin
+                               whose recipient IS a RevenueShare (asked of the recipient itself: token()
+                               and launchpad()) gets stake / unstake / claim; handing it to a share needs
+                               `CONTRACTS.revenueShareDeployer` = `0x774C…4139`, DEPLOYED by the owner
+                               2026-10-29 (Sourcify exact, `launchpad()` = v3), NOT audited — internal
+                               review in contracts/REVIEW-2026-10-29.md (F1: a hostile creator recipient
+                               can make v3's `collect` revert for its own coin; needs a new factory).
+                               The page skips `create` when the predicted share already has code.
+                               v3 quotes since 2026-10-29: ETH + 11 stocks (AAPLc, METAc, MSFTc added)
+                   🔴 ONE DOOR PER JOB (owner, 2026-10-29: "cực kì đơn giản, không chồng chéo"). The
+                               desktop is `DESKTOP` = Check (`safety`: Verdict, Send Check, Forensics,
+                               Launcher, Gate), Coins, Launch, Wallet, Agents, My Computer — and My Computer
+                               holds the other folders (Research = Radar alone, Markets, Profile, Explore;
+                               Money = Send, Swap, Trade; Launchpad = Leaderboard, Card; Games), Terminal,
+                               Task Manager, Control Panel, README. Nothing sits in two places (tested). The
+                               menu bar's folder menus are only the folders ON the desktop. The Welcome
+                               screen is the front door: paste a token → `verdict` in Check, or Launch /
+                               Browse coins / Your wallet. Q never greets unprompted; the Markets gadget left
+                               the desktop. The coin page trades through ITS OWN POOL only (no Relay chips —
+                               Relay routes no v3 hook pool, MEASURED); Swap offers the pool when a
+                               launchpad coin is on EITHER side. Token Verdict simulates an ETH-paired
+                               launchpad coin through `poolRouter` (simulate.ts): the buy at the Quoter's
+                               figure, the sell UNQUOTED with a 1-wei floor in the same simulated block
+                               (MEASURED: quoting the sell first read "could not fill" on a fresh pool) —
+                               the first referred v3 coin read 1.99% round trip. `.win__body` has
+                               `overflow-wrap: anywhere` (an address in prose widened a phone window 61px)
                    🔴 THE DESKTOP IN FOLDERS (owner, 2026-10-21, after solana95.com: "sắp xếp lại
                                thư mục"; NO external-links directory — folders hold this app's programs
                                only). registry.ts `FOLDERS`/`DESKTOP`/`folderItems`/`desktopItems`: the

@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { encodeFunctionResult, parseAbi } from "viem";
-import { RELAY } from "@/config/routes";
 import { BLOCKSCOUT } from "@/skills/blockscout";
 import { chainToken } from "@/skills/chaintoken";
 import {
@@ -18,6 +17,7 @@ import {
   slot0Of,
 } from "@/skills/launchpad";
 import { UNISWAP_V4_POOL_MANAGER, WETH } from "@/config/chain";
+import { UNISWAP_V4 } from "@/config/uniswap";
 import { LAUNCHPAD_CODE, launchpadRows, marketRows, poolValueRows, stockQuote, tokenVerdict } from "@/skills/verdict";
 import { row } from "@/skills/types";
 import { copy, FX } from "./fixtures/base";
@@ -25,7 +25,7 @@ import { factoryCalls, LAUNCHPAD, LX, NO_LOGS, SLOT0_TEST_SLOT, V2_LOGS_URL } fr
 import { VX } from "./fixtures/verdict";
 import { MARKETS_FX } from "./fixtures/markets";
 import { toChecksumAddress } from "@/lib/address";
-import { DOWN, json, net, useNet, type Answer } from "./net";
+import { DOWN, net, useNet, type Answer } from "./net";
 import { withoutV3 } from "./v2only";
 
 // Its fixtures are real v2/v1 captures, so it runs as the app did before v3 was set.
@@ -232,8 +232,7 @@ describe("a token's name from the chain", () => {
   it("gives a launchpad token's verdict the factory's facts instead of guesses", async () => {
     const T = LAUNCHPAD.test;
     net({
-      rpc: (m, p) => poolManager(m, p) ?? factoryCalls(ours)(m, p) ?? tokenReads(m, p),
-      post: (u) => (u === `${RELAY.api}/quote` ? json({ message: "No routes found" }, 400) : undefined),
+      rpc: (m, p) => poolManager(m, p) ?? quoter(m, p) ?? factoryCalls(ours)(m, p) ?? tokenReads(m, p),
       get: (u) =>
         ({
           // MEASURED: Blockscout had the minutes-old B20 with every field null
@@ -257,8 +256,15 @@ describe("a token's name from the chain", () => {
     expect(by("Launcher's track record")?.value).toBe("1 launch through Quadra's launchpad");
     expect(by("Market cap (its own pool)")?.value).toMatch(/^4\.97 ETH for the whole supply/);
     expect(report.sources).toContain("Uniswap v4 (its pool, read directly)");
+    // an ETH-paired coin launched here is simulated through ITS OWN POOL, not Relay: the Quoter is asked
+    expect(by("Buy → sell, simulated now")).toEqual(row("Buy → sell, simulated now", "no buy route — The Base RPC could not be reached for eth_call.", { tone: "warn" }));
+    expect(report.sources).toContain("Uniswap v4 (Quoter, Universal Router)");
   });
 });
+
+/** Uniswap's Quoter, unreachable: the simulation through the coin's own pool stops at its first quote. */
+const quoter = (m: string, p: readonly unknown[]): Answer | undefined =>
+  m === "eth_call" && (p[0] as { to?: string } | undefined)?.to?.toLowerCase() === UNISWAP_V4.quoter.toLowerCase() ? DOWN : undefined;
 
 /** The PoolManager answering `extsload` for the first launch's pool with the captured word. */
 const poolManager = (m: string, p: readonly unknown[]): Answer | undefined => {

@@ -17,7 +17,7 @@ import { decodeFunctionResult, encodeAbiParameters, encodeFunctionData, getContr
 import { CONTRACTS, UNISWAP_V4_POOL_MANAGER } from "../src/config/chain";
 import { RELAY } from "../src/config/routes";
 import { openingValueEth, startTickFor } from "../src/adapters/http/launchpad";
-import { parseBaseStocks } from "../src/adapters/http/markets";
+import { baseStocks } from "../src/adapters/http/markets";
 import { ethUsd } from "../src/skills/dexscreener";
 import { rpc } from "../src/skills/http";
 import { stepsOf } from "../src/skills/simulate";
@@ -39,8 +39,8 @@ const ERC20 = parseAbi(["function approve(address, uint256) returns (bool)", "fu
 
 // the opening tick for NVDAc, from live prices — exactly what scripts/quote-ticks.ts prints
 const eth = (await ethUsd())!;
-const nvda = parseBaseStocks(await (await fetch("https://api.coinbase.com/v1/tokenized-stocks")).json()).get(NVDA.toLowerCase())
-  ?? [...parseBaseStocks(await (await fetch("https://api.coinbase.com/v1/tokenized-stocks")).json()).values()].find((s) => s.symbol === "NVDAc")!;
+// every page of Coinbase's list: NVDAc is not on the first one (MEASURED 2026-10-29)
+const nvda = [...(await baseStocks()).values()].find((s) => s.symbol === "NVDAc")!;
 const nvdaTick = startTickFor(openingValueEth() * eth, nvda.nav!, nvda.decimals);
 console.log(`ETH $${eth.toFixed(0)} · NVDAc NAV $${nvda.nav} · NVDAc opening tick ${nvdaTick}`);
 

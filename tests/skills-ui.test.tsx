@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ALIASES, findSkill, helpText, parseLine, reportText, SKILLS } from "@/skills";
 import type { Report, Skill } from "@/skills/types";
@@ -8,6 +8,7 @@ import { SkillForm, SkillWindow } from "@/features/panels/SkillWindow";
 import { TerminalPanel } from "@/features/panels/TerminalPanel";
 import { quietRadar } from "./fixtures/radar";
 import { verdictSkill } from "@/skills/verdict";
+import { radarSkill } from "@/skills/radar";
 import { net, useNet } from "./net";
 import { renderAt, settle } from "./helpers";
 
@@ -299,14 +300,20 @@ describe("TerminalPanel", () => {
 });
 
 describe("the skill windows on the desktop", () => {
-  it("opens Research with every research skill as a tab", async () => {
+  it("opens Radar on its own, and Check with every way to check something as a tab (2026-10-29)", async () => {
     renderAt("/?do=research");
     await settle();
-    const tabs = within(screen.getByRole("group", { name: "Research" }));
-    expect(tabs.getAllByRole("button").map((b) => b.textContent)).toEqual(["Launch Radar", "Token Verdict", "Launch Forensics", "Launcher"]);
+    // one skill, so no tabs: the form alone
+    expect(screen.queryByRole("group", { name: "Radar" })).toBeNull();
+    expect(screen.getByText(radarSkill.summary)).toBeInTheDocument();
+    cleanup();
+    renderAt("/?do=safety");
+    await settle();
+    const tabs = within(screen.getByRole("group", { name: "Check" }));
+    expect(tabs.getAllByRole("button").map((b) => b.textContent)).toEqual(["Token Verdict", "Send Check", "Launch Forensics", "Launcher", "Token Gate"]);
   });
 
-  it("opens Safety straight onto the Token Verdict", async () => {
+  it("opens Check straight onto the Token Verdict", async () => {
     renderAt("/?do=safety");
     await settle();
     expect(screen.getByText(verdictSkill.summary)).toBeInTheDocument();

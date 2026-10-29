@@ -232,7 +232,7 @@ describe("achievements", () => {
 });
 
 const M = (base: string, over: Partial<Market> = {}): Market => ({
-  dex: "uniswap", pair: null, priceUsd: 1, liquidityUsd: 10, volume24h: 100, createdAt: null, quote: "WETH", url: null, buys24h: null, sells24h: null, base, symbol: "SYM", marketCap: null, ...over,
+  dex: "uniswap", pair: null, priceUsd: 1, liquidityUsd: 10, volume24h: 100, createdAt: null, quote: "WETH", url: null, buys24h: null, sells24h: null, change: { m5: null, h1: null, h6: null, h24: null }, base, symbol: "SYM", marketCap: null, ...over,
 });
 const coin = (i: number, trades24h: number, trades: number, symbol: string | null = `T${i}`): IndexedCoin => ({ token: A(i), symbol, trades24h, trades }) as unknown as IndexedCoin;
 

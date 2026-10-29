@@ -155,7 +155,10 @@ export async function launchPairs(factory: string): Promise<{ readonly pairs: re
     return { pairs, problem: messageOf(e) };
   }
   // a stock whose TRANSFER feature (0) is paused cannot trade at all — B20 reverts it — so a pool of it would be dead
-  const live = stocks.filter((st) => !st.paused.includes(0));
+  // and only a stock with a NAV can have been enabled: the quote admin opens each pair at its NAV
+  // (`scripts/quote-ticks.ts`). MEASURED 2026-10-29: 218 stocks, 12 with a NAV — asking the factory
+  // about all 218 at once is a burst the public RPC answers with 429s
+  const live = stocks.filter((st) => !st.paused.includes(0) && st.nav !== null);
   const enabled = await Promise.all(live.map(async (st) => ({ st, q: await quoteOf(factory, st.address) })));
   for (const { st, q } of enabled) {
     if (q.enabled) pairs.push({ address: st.address, symbol: st.symbol, name: st.name, decimals: st.decimals, startTick: q.startTick });

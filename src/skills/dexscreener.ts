@@ -26,6 +26,8 @@ export type Market = {
   readonly url: string | null;
   readonly buys24h: number | null;
   readonly sells24h: number | null;
+  /** percent price change per window — `null` when DexScreener did not publish it */
+  readonly change: { readonly m5: number | null; readonly h1: number | null; readonly h6: number | null; readonly h24: number | null };
   /** the token this market prices, and what it calls itself here */
   readonly base: string | null;
   readonly symbol: string | null;
@@ -46,6 +48,12 @@ export function parseMarkets(body: unknown): Market[] {
       url: strOf(p.url),
       buys24h: numOf(objAt(objAt(p, "txns"), "h24").buys),
       sells24h: numOf(objAt(objAt(p, "txns"), "h24").sells),
+      change: {
+        m5: numOf(objAt(p, "priceChange").m5),
+        h1: numOf(objAt(p, "priceChange").h1),
+        h6: numOf(objAt(p, "priceChange").h6),
+        h24: numOf(objAt(p, "priceChange").h24),
+      },
       base: strOf(objAt(p, "baseToken").address),
       symbol: strOf(objAt(p, "baseToken").symbol),
       marketCap: numOf(p.marketCap),

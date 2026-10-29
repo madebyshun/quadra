@@ -11,14 +11,15 @@
  * guessed. Prints one `base-cast send` line per stock for the quote admin's keystore.
  */
 import { openingValue, openingValueEth, startTickFor } from "../src/adapters/http/launchpad";
-import { parseBaseStocks } from "../src/adapters/http/markets";
+import { baseStocks } from "../src/adapters/http/markets";
 import { ethUsd } from "../src/skills/dexscreener";
 
 const factory = process.argv[2] ?? "<factory>";
 const eth = await ethUsd();
 if (eth === null) throw new Error("No ETH price: DexScreener could not be read.");
 const targetUsd = openingValueEth() * eth;
-const stocks = parseBaseStocks(await (await fetch("https://api.coinbase.com/v1/tokenized-stocks")).json());
+// every page of Coinbase's list (MEASURED 2026-10-29: the first page alone missed AAPLc, NVDAc and SPCXc)
+const stocks = await baseStocks();
 
 console.log(`ETH $${eth.toFixed(2)} → every pair opens with the supply worth ≈ $${Math.round(targetUsd).toLocaleString("en-US")}\n`);
 const lines: string[] = [];

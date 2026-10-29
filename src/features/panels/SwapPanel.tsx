@@ -3,7 +3,8 @@ import { quoteSwap, isRelayNoRoute, type SwapQuote } from "@/adapters/http/relay
 import { launchOf } from "@/skills/launchpad";
 import { BASE } from "@/config/chain";
 import { BRAND } from "@/brand";
-import { FEE_BPS, RELAY } from "@/config/routes";
+import { FEE_BPS } from "@/config/routes";
+import { toChecksumAddress } from "@/lib/address";
 import { formatAmount, parseAmount } from "@/lib/amount";
 import { balanceOf, type Asset } from "@/lib/erc20";
 import { messageOf } from "@/lib/errors";
@@ -65,8 +66,9 @@ function report(r: Review, balance: bigint, slippage: string): Report {
     row("At least", `${formatAmount(quote.min, buy.decimals)} ${buy.symbol} (slippage ${slippage})`),
     row("Price impact", quote.impact === null ? "not reported" : `${quote.impact}%`, { tone: impactTone(quote.impact) }),
     ...(buy.kind === "erc20" ? [row("Token you get", buy.address, { href: explorer.token(buy.address) })] : []),
-    row("Signs to", `Relay's verified contract ${sell.kind === "native" ? RELAY.router : RELAY.approvalProxy}`, {
-      href: explorer.address(sell.kind === "native" ? RELAY.router : RELAY.approvalProxy),
+    // the swap step's own target, which checkSwap already held to one of Relay's verified pairs
+    row("Signs to", `Relay's verified contract ${toChecksumAddress(quote.steps[quote.steps.length - 1]!.tx.to)}`, {
+      href: explorer.address(quote.steps[quote.steps.length - 1]!.tx.to),
       tone: "ok",
     }),
     ...(sell.kind === "erc20" && quote.steps.length > 1 ? [row("Approval", `exactly ${formatAmount(r.amount, sell.decimals)} ${sell.symbol} — never unlimited`)] : []),
@@ -146,10 +148,12 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
       setReview({ sell, buy, amount: value, quote, quotedAt: Date.now(), balance, short: balance < value });
     } catch (e) {
       setError(messageOf(e));
-      if (isRelayNoRoute(e) && buyChoice === "other" && buyAddress.trim() !== "") {
+      // either side may be the launchpad coin: selling one hits the same missing route as buying it
+      const coin = buyChoice === "other" && buyAddress.trim() !== "" ? buyAddress.trim() : sellChoice === "other" && sellAddress.trim() !== "" ? sellAddress.trim() : null;
+      if (isRelayNoRoute(e) && coin !== null) {
         try {
-          const target = await launchOf(buyAddress.trim());
-          if (target !== null) setNoRouteToken(buyAddress.trim());
+          const target = await launchOf(coin);
+          if (target !== null) setNoRouteToken(coin);
         } catch {
           // The fallback is advisory; keep Relay's measured refusal when the launchpad cannot be read.
         }

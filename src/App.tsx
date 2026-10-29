@@ -223,8 +223,9 @@ function Home() {
         onStart={showDesktop}
         onOpenFeature={openFeature}
       />
-      {/* Q keeps its hello to itself while the Welcome screen says it — two hellos at once is one too many */}
-      {intro ? <Intro onDone={endIntro} /> : <Assistant greet={!welcomeAtStart} />}
+      {/* Q no longer greets on its own (2026-10-29, the owner: "extremely simple"): it speaks only when
+          something real happens — a red verdict, fees waiting, a Rugsweeper win */}
+      {intro ? <Intro onDone={endIntro} /> : <Assistant greet={false} />}
       {!intro && welcome && <Welcome onClose={closeWelcome} />}
       {!intro && <Screensaver />}
       </OpenWindowProvider>

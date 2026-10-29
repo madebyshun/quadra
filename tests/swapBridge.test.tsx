@@ -361,6 +361,21 @@ describe("SwapPanel", () => {
     expect(opened).toEqual([{ id: "coins", params: { t: token } }]);
   });
 
+  it("offers the pool when the launchpad coin is the one being SOLD", async () => {
+    const opened: string[] = [];
+    wallet();
+    launchOf.mockResolvedValue({ factory: "0x3333333333333333333333333333333333333333", creator: USER, creatorRecipient: USER });
+    world({ quote: () => json({ message: "No routes found" }, 400) });
+    mount(<SwapPanel />, (id, params) => opened.push(`${id}:${params?.t ?? ""}`));
+    await settle();
+    await userEvent.selectOptions(screen.getByLabelText("You pay"), "other");
+    await userEvent.type(screen.getByLabelText("You pay address"), OTHER_TOKEN);
+    await userEvent.type(screen.getByLabelText("Amount"), "1");
+    await userEvent.click(cta());
+    await userEvent.click(await screen.findByRole("button", { name: "Trade through its pool" }));
+    expect(opened).toEqual([`coins:${OTHER_TOKEN}`]);
+  });
+
   it("names a launchpad coin Relay cannot route even where no window can be opened", async () => {
     wallet();
     launchOf.mockResolvedValue({ factory: "0x3333333333333333333333333333333333333333", creator: USER, creatorRecipient: USER });
