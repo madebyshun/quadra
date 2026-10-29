@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { BRAND } from "@/brand";
 import { Welcome, cardWindow } from "@/ui/Welcome";
 import { OpenWindowProvider } from "@/features/openWindow";
@@ -127,6 +127,15 @@ describe("the Welcome screen on the desktop", () => {
     expect(screen.queryByRole("dialog", { name: `Welcome to ${BRAND.name}` })).toBeNull();
     act(() => void vi.advanceTimersByTime(HELLO_MS * 2));
     expect(screen.queryByText(GREETING.text)).toBeNull();
+  });
+
+  it("comes back from Home in the menu bar, with every window out of the way (2026-10-29)", async () => {
+    renderAt("/?do=coins");
+    await settle();
+    expect(screen.queryByRole("dialog", { name: `Welcome to ${BRAND.name}` })).toBeNull();
+    fireEvent.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: "Home" }));
+    expect(screen.getByRole("dialog", { name: `Welcome to ${BRAND.name}` })).toBeInTheDocument();
+    expect(screen.getByLabelText("Coins", { selector: "section" })).not.toBeVisible();
   });
 
   it("does not show once turned off, and Q greets", async () => {

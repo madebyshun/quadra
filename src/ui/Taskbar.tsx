@@ -21,6 +21,8 @@ export type TaskbarProps = {
   onToggle: (id: string) => void;
   /** "Show Desktop" — every window out of the way on the desktop, "go home" on a standalone page */
   onStart: () => void;
+  /** Home (2026-10-29, the owner: "no way back to the front page"): the desktop's front door; `onStart` where absent */
+  onHome?: () => void;
   /**
    * Present only on the desktop: a menu item opens a window in place.
    * Absent on the standalone pages, where an item is a plain link
@@ -61,7 +63,7 @@ export function BrandMark() {
  * One menu is open at a time; an outside click or Esc closes it; while one is open, moving over
  * another title opens that one instead, as the Finder does.
  */
-export function Taskbar({ windows, onToggle, onStart, onOpenFeature }: TaskbarProps) {
+export function Taskbar({ windows, onToggle, onStart, onHome, onOpenFeature }: TaskbarProps) {
   const [open, setOpen] = useState<string | null>(null);
   const barRef = useRef<HTMLElement>(null);
 
@@ -160,6 +162,16 @@ export function Taskbar({ windows, onToggle, onStart, onOpenFeature }: TaskbarPr
         </>,
         "menubar__menu--app",
       )}
+      <button
+        type="button"
+        className="menubar__title menubar__home"
+        onClick={() => {
+          close();
+          (onHome ?? onStart)();
+        }}
+      >
+        Home
+      </button>
       {BAR_FOLDERS.map((folder) =>
         menu(
           folder,

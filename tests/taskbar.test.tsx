@@ -78,6 +78,15 @@ describe("the menu bar's app menu, without a window manager to open into", () =>
   });
 });
 
+describe("Home", () => {
+  it("goes home on a standalone page, where there is no front door to open", async () => {
+    const user = userEvent.setup();
+    const { onStart } = renderTaskbar();
+    await user.click(screen.getByRole("button", { name: "Home" }));
+    expect(onStart).toHaveBeenCalledOnce();
+  });
+});
+
 describe("the Windows menu", () => {
   it("lists every open window, checks the one in front, dims a hidden one, and toggles the picked one", async () => {
     const user = userEvent.setup();

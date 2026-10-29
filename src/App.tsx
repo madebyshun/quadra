@@ -180,6 +180,11 @@ function Home() {
     [setParams],
   );
   const showDesktop = useCallback(() => dispatch({ type: "minimizeAll" }), []);
+  /** Home: every window out of the way, and the Welcome screen — the front door — open again */
+  const goHome = useCallback(() => {
+    dispatch({ type: "minimizeAll" });
+    setWelcome(true);
+  }, []);
   const openMarkets = useCallback(() => dispatch(openAction("markets")), []);
 
   return (
@@ -221,6 +226,7 @@ function Home() {
         }))}
         onToggle={(id) => dispatch({ type: "toggleFromTaskbar", id: id as WindowId })}
         onStart={showDesktop}
+        onHome={goHome}
         onOpenFeature={openFeature}
       />
       {/* Q no longer greets on its own (2026-10-29, the owner: "extremely simple"): it speaks only when
