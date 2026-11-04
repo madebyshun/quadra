@@ -55,6 +55,9 @@ export async function rpc(method: string, params: readonly unknown[] = []): Prom
  * The same call against another chain's endpoints — Robinhood Chain, for a bridge's arrival.
  * `chain` is the name every sentence uses, so a failure says WHICH chain's RPC failed.
  */
+/** HTTP statuses that are ONE endpoint's limit rather than the chain's answer: the next endpoint is asked. */
+export const ENDPOINT_LIMITS: ReadonlySet<number> = new Set([400, 403, 413, 429]);
+
 export async function rpcOn(chain: string, endpoints: readonly string[], method: string, params: readonly unknown[]): Promise<unknown> {
   let last = `The ${chain} RPC could not be reached for ${method}.`;
   for (const endpoint of endpoints) {
@@ -75,7 +78,8 @@ export async function rpcOn(chain: string, endpoints: readonly string[], method:
     // answers; the refusal is the endpoint's, not the chain's, so the next endpoint is asked
     // 400: MEASURED 2026-11-04 — Alchemy's free tier answers eth_getLogs over more than 10 blocks with
     // HTTP 400, and the indexer on Vercel stopped dead on it; that too is one endpoint's limit, not the chain's
-    if (res.status !== 429 && res.status !== 403 && res.status !== 400 && res.status < 500) break;
+    // 413: MEASURED the same day, when the index reached block 52,780,272 — a payload limit, again one endpoint's
+    if (!ENDPOINT_LIMITS.has(res.status) && res.status < 500) break;
   }
   throw new Error(last);
 }

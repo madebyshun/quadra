@@ -3918,6 +3918,7 @@ var RPC_ENDPOINTS = [BASE.rpc, BASE.rpcFallback];
 async function rpc(method, params = []) {
   return rpcOn(BASE.name, RPC_ENDPOINTS, method, params);
 }
+var ENDPOINT_LIMITS = /* @__PURE__ */ new Set([400, 403, 413, 429]);
 async function rpcOn(chain, endpoints, method, params) {
   let last = `The ${chain} RPC could not be reached for ${method}.`;
   for (const endpoint of endpoints) {
@@ -3933,7 +3934,7 @@ async function rpcOn(chain, endpoints, method, params) {
     }
     if (res.ok) return readRpc(chain, method, await res.json());
     last = `The ${chain} RPC answered ${res.status} to ${method}.`;
-    if (res.status !== 429 && res.status !== 403 && res.status !== 400 && res.status < 500) break;
+    if (!ENDPOINT_LIMITS.has(res.status) && res.status < 500) break;
   }
   throw new Error(last);
 }

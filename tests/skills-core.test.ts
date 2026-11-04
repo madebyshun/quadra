@@ -97,9 +97,11 @@ describe("rpc", () => {
    * one endpoint's limit, so the next is asked. Any other client error (401, 404…) still stops the call.
    */
   it("moves on from a 400, and stops at any other client error", async () => {
-    const moved = net({ rpc: (_m, _p, endpoint) => (endpoint === BASE.rpc ? json({}, 400) : "0x3") });
-    expect(await rpc("eth_blockNumber")).toBe("0x3");
-    expect(moved.map((c) => c.url)).toEqual([BASE.rpc, BASE.rpcFallback]);
+    for (const status of [400, 413]) {
+      const moved = net({ rpc: (_m, _p, endpoint) => (endpoint === BASE.rpc ? json({}, status) : "0x3") });
+      expect(await rpc("eth_blockNumber")).toBe("0x3");
+      expect(moved.map((c) => c.url)).toEqual([BASE.rpc, BASE.rpcFallback]);
+    }
     const calls = net({ rpc: () => json({}, 401) });
     await expect(rpc("eth_blockNumber")).rejects.toThrow("The Base RPC answered 401 to eth_blockNumber.");
     expect(calls).toHaveLength(1);
