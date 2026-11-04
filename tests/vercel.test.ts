@@ -35,6 +35,15 @@ describe("the launchpad index and its cron, in production", () => {
     expect((await routes({ BLOB_READ_WRITE_TOKEN: "t" }, never, null).launchpad(new Request("https://x/api/launchpad/coins"))).status).toBe(503);
   });
 
+  it("takes a store connected through Vercel's OIDC (a store id, no token), and passes no token then", async () => {
+    const seen: unknown[] = [];
+    const watching = { get: async (_: string, o: unknown) => (seen.push(o), null), put: async () => undefined };
+    const rpc = async () => Promise.reject(new Error("node down"));
+    const res = await routes({ BLOB_STORE_ID: "store_1" }, never, watching, { rpc }).launchpad(new Request("https://x/api/launchpad/coins", { headers: { "x-quadra": "1" } }));
+    expect(res.status).toBe(502);
+    expect(seen).toEqual([{ access: "private", useCache: false }]);
+  });
+
   it("reads the stored index with the store's token, public when the owner says so", async () => {
     const seen: unknown[] = [];
     const watching = { get: async (_: string, o: unknown) => (seen.push(o), null), put: async () => undefined };

@@ -40,11 +40,13 @@ function problem(status: number, detail: string): Response {
  */
 export function routes(env: Env, fetchImpl: typeof fetch = fetch, blob: BlobCalls | null = null, indexer: IndexerDeps = {}) {
   const creds = cdpFrom(env);
-  const token = env.BLOB_READ_WRITE_TOKEN;
+  const token = env.BLOB_READ_WRITE_TOKEN ?? null;
+  // a connected store arrives as a read-write token, or as a store id the SDK reaches with Vercel's OIDC token
+  const connected = token !== null || Boolean(env.BLOB_STORE_ID);
   const launchpad =
-    token && blob
+    connected && blob
       ? indexerHandler({ ...indexer, store: blobStore(blob, token, env.BLOB_ACCESS === "public" ? "public" : "private") })
-      : async () => problem(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN).");
+      : async () => problem(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID).");
   return {
     stocks: stocksHandler(fetchImpl),
     charts: chartsHandler(fetchImpl),

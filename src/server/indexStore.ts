@@ -71,11 +71,11 @@ export type Store = {
 
 /** The two Blob calls the store makes — the SDK's `get` and `put`, passed in so a test can stand in. */
 export type BlobCalls = {
-  readonly get: (path: string, options: { access: "public" | "private"; useCache: false; token: string }) => Promise<{ stream: ReadableStream | null } | null>;
+  readonly get: (path: string, options: { access: "public" | "private"; useCache: false; token?: string }) => Promise<{ stream: ReadableStream | null } | null>;
   readonly put: (
     path: string,
     body: string,
-    options: { access: "public" | "private"; allowOverwrite: true; addRandomSuffix: false; contentType: string; token: string },
+    options: { access: "public" | "private"; allowOverwrite: true; addRandomSuffix: false; contentType: string; token?: string },
   ) => Promise<unknown>;
 };
 
@@ -83,14 +83,17 @@ export type BlobCalls = {
  * The index in a Vercel Blob store. `access` must be the store's own ("private" unless the owner made it
  * public); reads bypass the CDN cache, so a run never steps forward from an older copy than the last one saved.
  */
-export function blobStore(calls: BlobCalls, token: string, access: "public" | "private" = "private"): Store {
+export function blobStore(calls: BlobCalls, token: string | null, access: "public" | "private" = "private"): Store {
+  // no token: the SDK authenticates itself — Vercel's OIDC token with BLOB_STORE_ID, how a store connected
+  // to a project may arrive (MEASURED 2026-11-04: a connected store and no BLOB_READ_WRITE_TOKEN yet)
+  const auth = token === null ? {} : { token };
   return {
     load: async () => {
-      const found = await calls.get(STATE_PATH, { access, useCache: false, token });
+      const found = await calls.get(STATE_PATH, { access, useCache: false, ...auth });
       return found?.stream ? await new Response(found.stream).text() : null;
     },
     save: async (text) => {
-      await calls.put(STATE_PATH, text, { access, allowOverwrite: true, addRandomSuffix: false, contentType: "application/json", token });
+      await calls.put(STATE_PATH, text, { access, allowOverwrite: true, addRandomSuffix: false, contentType: "application/json", ...auth });
     },
   };
 }

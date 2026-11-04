@@ -7548,13 +7548,14 @@ function decodeState(text) {
   return state;
 }
 function blobStore(calls, token, access = "private") {
+  const auth = token === null ? {} : { token };
   return {
     load: async () => {
-      const found = await calls.get(STATE_PATH, { access, useCache: false, token });
+      const found = await calls.get(STATE_PATH, { access, useCache: false, ...auth });
       return found?.stream ? await new Response(found.stream).text() : null;
     },
     save: async (text) => {
-      await calls.put(STATE_PATH, text, { access, allowOverwrite: true, addRandomSuffix: false, contentType: "application/json", token });
+      await calls.put(STATE_PATH, text, { access, allowOverwrite: true, addRandomSuffix: false, contentType: "application/json", ...auth });
     }
   };
 }
@@ -7937,8 +7938,9 @@ function problem5(status, detail) {
 }
 function routes(env, fetchImpl = fetch, blob2 = null, indexer = {}) {
   const creds = cdpFrom(env);
-  const token = env.BLOB_READ_WRITE_TOKEN;
-  const launchpad = token && blob2 ? indexerHandler({ ...indexer, store: blobStore(blob2, token, env.BLOB_ACCESS === "public" ? "public" : "private") }) : async () => problem5(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN).");
+  const token = env.BLOB_READ_WRITE_TOKEN ?? null;
+  const connected = token !== null || Boolean(env.BLOB_STORE_ID);
+  const launchpad = connected && blob2 ? indexerHandler({ ...indexer, store: blobStore(blob2, token, env.BLOB_ACCESS === "public" ? "public" : "private") }) : async () => problem5(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID).");
   return {
     stocks: stocksHandler(fetchImpl),
     charts: chartsHandler(fetchImpl),
