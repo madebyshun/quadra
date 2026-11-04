@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { cdpFrom, routes } from "@/server/vercel";
+import { describe, expect, it, vi } from "vitest";
+import { cdpFrom, indexerRpc, routes } from "@/server/vercel";
 
 /** The production server's wiring: the CDP key from the function's environment, both halves or none. */
 describe("the production routes", () => {
@@ -61,5 +61,33 @@ describe("the launchpad index and its cron, in production", () => {
     expect((await r.cron(new Request("https://x/api/cron/index", { headers: { authorization: "Bearer s" } }))).status).toBe(502);
     // without a secret set, the cron route runs for anyone (Vercel sends it only when CRON_SECRET exists)
     expect((await routes({}, never, blob).cron(new Request("https://x/api/cron/index"))).status).toBe(503);
+  });
+});
+
+describe("the indexer's own RPC", () => {
+  it("is used only for an https BASE_RPC_URL, and is asked before the public endpoints", async () => {
+    expect(indexerRpc({})).toBeUndefined();
+    expect(indexerRpc({ BASE_RPC_URL: "http://plain" })).toBeUndefined();
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (url: string) => (asked.push(url), new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: "0x10" }), { headers: { "content-type": "application/json" } })));
+    try {
+      expect(await indexerRpc({ BASE_RPC_URL: "https://base.example/key" })!("eth_blockNumber", [])).toBe("0x10");
+      expect(asked).toEqual(["https://base.example/key"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("takes the owner's RPC into the stored index", async () => {
+    const blob = { get: async () => null, put: async () => undefined };
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (url: string) => (asked.push(url), new Response("down", { status: 503 })));
+    try {
+      const r = routes({ BLOB_STORE_ID: "s", BASE_RPC_URL: "https://base.example/key" }, fetch, blob);
+      expect((await r.launchpad(new Request("https://x/api/launchpad/coins", { headers: { "x-quadra": "1" } }))).status).toBe(502);
+      expect(asked[0]).toBe("https://base.example/key");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

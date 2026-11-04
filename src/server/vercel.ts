@@ -2,7 +2,9 @@ import { apiHandler } from "@/server/api";
 import { cdpFacilitator, type CdpCredentials } from "@/server/cdp";
 import { chartsHandler } from "@/server/charts";
 import { stocksHandler } from "@/server/stocks";
-import { indexerHandler, type IndexerDeps } from "@/server/indexer";
+import { indexerHandler, INDEXER_RPC, type IndexerDeps, type Rpc } from "@/server/indexer";
+import { BASE } from "@/config/chain";
+import { rpcOn } from "@/skills/http";
 import { INDEXER_PATH } from "@/server/indexerPath";
 import { blobStore, type BlobCalls } from "@/server/indexStore";
 
@@ -26,6 +28,18 @@ import { blobStore, type BlobCalls } from "@/server/indexStore";
 
 export type Env = Readonly<Record<string, string | undefined>>;
 
+/**
+ * The indexer's chain: the owner's own RPC first when `BASE_RPC_URL` is set (a server-side secret, hard
+ * rule 14 — a provider URL usually carries its key), then the public ones. MEASURED 2026-11-04 on the
+ * first Vercel deploy: mainnet.base.org answered 429 to eth_getLogs from Vercel and the index stopped at
+ * block 52,096,272, 1.4M blocks behind — Base's docs say the public endpoints are not for production.
+ */
+export function indexerRpc(env: Env): Rpc | undefined {
+  const own = env.BASE_RPC_URL;
+  if (!own || !/^https:\/\//.test(own)) return undefined;
+  return (method, params) => rpcOn(BASE.name, [own, ...INDEXER_RPC], method, params);
+}
+
 export function cdpFrom(env: Env): CdpCredentials | null {
   return env.CDP_API_KEY_ID && env.CDP_API_KEY_SECRET ? { keyId: env.CDP_API_KEY_ID, secret: env.CDP_API_KEY_SECRET } : null;
 }
@@ -43,9 +57,10 @@ export function routes(env: Env, fetchImpl: typeof fetch = fetch, blob: BlobCall
   const token = env.BLOB_READ_WRITE_TOKEN ?? null;
   // a connected store arrives as a read-write token, or as a store id the SDK reaches with Vercel's OIDC token
   const connected = token !== null || Boolean(env.BLOB_STORE_ID);
+  const chain = indexerRpc(env);
   const launchpad =
     connected && blob
-      ? indexerHandler({ ...indexer, store: blobStore(blob, token, env.BLOB_ACCESS === "public" ? "public" : "private") })
+      ? indexerHandler({ ...(chain ? { rpc: chain } : {}), ...indexer, store: blobStore(blob, token, env.BLOB_ACCESS === "public" ? "public" : "private") })
       : async () => problem(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID).");
   return {
     stocks: stocksHandler(fetchImpl),

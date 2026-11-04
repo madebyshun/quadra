@@ -7930,6 +7930,11 @@ function indexerHandler(deps = {}) {
 }
 
 // src/server/vercel.ts
+function indexerRpc(env) {
+  const own = env.BASE_RPC_URL;
+  if (!own || !/^https:\/\//.test(own)) return void 0;
+  return (method, params) => rpcOn(BASE.name, [own, ...INDEXER_RPC], method, params);
+}
 function cdpFrom(env) {
   return env.CDP_API_KEY_ID && env.CDP_API_KEY_SECRET ? { keyId: env.CDP_API_KEY_ID, secret: env.CDP_API_KEY_SECRET } : null;
 }
@@ -7940,7 +7945,8 @@ function routes(env, fetchImpl = fetch, blob2 = null, indexer = {}) {
   const creds = cdpFrom(env);
   const token = env.BLOB_READ_WRITE_TOKEN ?? null;
   const connected = token !== null || Boolean(env.BLOB_STORE_ID);
-  const launchpad = connected && blob2 ? indexerHandler({ ...indexer, store: blobStore(blob2, token, env.BLOB_ACCESS === "public" ? "public" : "private") }) : async () => problem5(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID).");
+  const chain = indexerRpc(env);
+  const launchpad = connected && blob2 ? indexerHandler({ ...chain ? { rpc: chain } : {}, ...indexer, store: blobStore(blob2, token, env.BLOB_ACCESS === "public" ? "public" : "private") }) : async () => problem5(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID).");
   return {
     stocks: stocksHandler(fetchImpl),
     charts: chartsHandler(fetchImpl),
