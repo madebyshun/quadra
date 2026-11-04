@@ -8,6 +8,7 @@ import { furnaceOf, type Furnace } from "@/lib/furnace";
 import { messageOf } from "@/lib/errors";
 import { launchOf } from "@/skills/launchpad";
 import { explorer, short, tokenAmount } from "@/skills/format";
+import { Flywheel } from "./Flywheel";
 
 /**
  * The plain page (2026-11-04, after c-na.dev): one scroll that says what this app is in ten seconds —
@@ -124,7 +125,7 @@ export function About() {
 
       <section className="about__section">
         <h2>Every coin launched here feeds {BRAND.ticker}</h2>
-        <img className="about__flywheel" src="/brand/flywheel.svg" alt={`How fees flow: 1% of every trade, 80% to the coin's creator, the rest to the treasury; ${BRAND.ticker}'s own fees half burnt, half to the treasury.`} />
+        <Flywheel />
         <p className="about__note">
             {BRAND.ticker} is <a href={explorer.token(token)}>{short(token)}</a> on {BASE.name}.{" "}
             {furnace !== null && furnace !== "reading" && !("problem" in furnace) ? (

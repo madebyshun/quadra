@@ -3422,3 +3422,35 @@
   border-top: 1px solid #aaa;
   font-size: 13px;
 }
+
+/* The fee flow on /about (pages/Flywheel.tsx): a Platinum window whose fees travel as dots. */
+.flow { margin: 0; }
+.flow__svg { display: block; width: 100%; height: auto; font-family: Inter, system-ui, sans-serif; }
+.flow__window { fill: var(--pt-face); stroke: #000; stroke-width: 1; }
+.flow__wintitle { font-size: 12px; font-weight: 700; text-anchor: middle; fill: #000; }
+.flow__closebox { fill: var(--pt-face-lit); stroke: #000; }
+.flow__paper { fill: var(--pt-paper); stroke: var(--pt-shade-dark); }
+.flow__shadow { fill: var(--pt-shade); }
+.flow__face { fill: var(--pt-face-lit); stroke: #000; }
+.flow__box--accent .flow__face { fill: var(--pt-select-soft); stroke: var(--pt-accent); stroke-width: 2; }
+.flow__box--furnace .flow__face { fill: #fde8c8; stroke: #b4540a; stroke-width: 2; }
+.flow__title { font-size: 15px; font-weight: 700; text-anchor: middle; fill: #000; }
+.flow__line { font-size: 12px; text-anchor: middle; fill: #333; }
+.flow__line--start { text-anchor: start; }
+.flow__label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; fill: var(--pt-accent); }
+.flow__out { font-size: 14px; font-weight: 700; fill: #b4540a; }
+.flow__fee { fill: var(--pt-accent); stroke: #000; stroke-width: 2; }
+.flow__big { font-size: 30px; font-weight: 700; text-anchor: middle; fill: #fff; }
+.flow__line.flow__line--on-fee { fill: #fff; }
+.flow__arrow { fill: none; stroke: #333; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.flow__arrow--planned { stroke: #b4540a; stroke-dasharray: 5 4; }
+.flow__dot { fill: var(--pt-select); stroke: #000; stroke-width: 1; }
+.flow__dot--token { fill: #f2b233; }
+.flow__dot--burn { fill: #e2461f; }
+.flow__ledger { fill: var(--pt-face); stroke: var(--pt-shade-dark); }
+@media (prefers-reduced-motion: reduce) { .flow__dot { display: none; } }
+.flow__coin circle { fill: var(--pt-face-lit); stroke: #000; stroke-width: 1.5; }
+.flow__coin:first-child circle { fill: var(--pt-select-soft); }
+.flow__coin text { font-size: 11px; font-weight: 700; text-anchor: middle; fill: #000; }
+.flow__eth path { fill: #3c3c3d; }
+.flow__eth path:first-child { fill: #8c8c8c; }

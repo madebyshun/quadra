@@ -71,3 +71,17 @@ describe("the About page", () => {
     expect(screen.getByRole("link", { name: `What is ${BRAND.name}? ›` })).toHaveAttribute("href", "/about");
   });
 });
+
+describe("the fee flow", () => {
+  it("draws every flow as an arrow with a dot on it, and names the furnace's split", async () => {
+    const { FLOWS } = await import("@/pages/Flywheel");
+    const a = renderAt("/about");
+    await settle();
+    const svg = document.querySelector("svg.flow__svg")!;
+    expect(svg).toHaveAttribute("aria-labelledby", "flow-title flow-desc");
+    for (const f of FLOWS) expect(svg.querySelector(`#flow-${f.id}`)).not.toBeNull();
+    expect(svg.querySelectorAll(".flow__dot")).toHaveLength(FLOWS.length * 3);
+    expect(svg).toHaveTextContent("50% burnt");
+    a.unmount();
+  });
+});
