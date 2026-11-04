@@ -39,14 +39,27 @@ const MARK: Record<Tone, string> = { bad: "✕", warn: "!", ok: "✓" };
 const RANK: Record<Tone, number> = { bad: 0, warn: 1, ok: 2 };
 
 const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+/** like `cut`, but at a word, so a tile never ends mid-word ("cannot be fill") */
+export function words(s: string, n: number): string {
+  if (s.length <= n) return s;
+  let out = "";
+  for (const w of s.split(" ")) {
+    if ((out ? out.length + 1 : 0) + w.length > n - 1) break;
+    out = out ? `${out} ${w}` : w;
+  }
+  return `${out || s.slice(0, n - 1)}…`;
+}
+/** what fits in a tile: its title at 36 px, its line at 24 px */
+const TITLE = 16;
+const SUB = 28;
 /** a row's value up to its first " — ", the part that reads as an answer */
 const gist = (v: string) => v.split(" — ")[0]!;
 
 function tradeTile(r: Row | undefined): Tile {
-  if (!r?.tone || r.tone === "warn") return { tone: "warn", title: "Trade not checked", sub: r ? cut(gist(r.value), 34) : "no simulation" };
-  if (r.tone === "bad") return { tone: "bad", title: "Can't sell", sub: cut(gist(r.value), 34) };
+  if (!r?.tone || r.tone === "warn") return { tone: "warn", title: "Trade not checked", sub: r ? words(gist(r.value), SUB) : "no simulation" };
+  if (r.tone === "bad") return { tone: "bad", title: "Can't sell", sub: words(gist(r.value), SUB) };
   const lost = r.value.match(/([\d.]+)% lost/)?.[1];
-  return { tone: "ok", title: "Sells fine", sub: lost ? `−${lost}% round trip` : cut(gist(r.value), 34) };
+  return { tone: "ok", title: "Sells fine", sub: lost ? `−${lost}% round trip` : words(gist(r.value), SUB) };
 }
 
 function codeTile(rows: readonly Row[]): Tile {
@@ -55,20 +68,20 @@ function codeTile(rows: readonly Row[]): Tile {
   const flags = rows.filter((r) => labels.has(r.label) && r.tone && r.tone !== "ok").sort((a, b) => RANK[a.tone!] - RANK[b.tone!]);
   if (flags.length) {
     const worst = flags[0]!;
-    return { tone: worst.tone!, title: worst.tone === "bad" ? "Code trap" : flags.length === 1 ? "1 code flag" : `${flags.length} code flags`, sub: cut(worst.label, 34) };
+    return { tone: worst.tone!, title: worst.tone === "bad" ? "Code trap" : flags.length === 1 ? "1 code flag" : `${flags.length} code flags`, sub: words(worst.label, SUB) };
   }
   if (scan?.tone === "ok") {
     if (scan.label === LAUNCHPAD_CODE.label) return { tone: "ok", title: "Code clean", sub: "no admin, ever" };
     const tax = scan.value.match(/tax ([\d.]+)% buy \/ ([\d.]+)% sell/);
-    return { tone: "ok", title: "Code clean", sub: tax ? `${Number(tax[1])}% buy / ${Number(tax[2])}% sell tax` : cut(gist(scan.value), 34) };
+    return { tone: "ok", title: "Code clean", sub: tax ? `${Number(tax[1])}% buy / ${Number(tax[2])}% sell tax` : words(gist(scan.value), SUB) };
   }
-  return { tone: "warn", title: "Code not scanned", sub: scan ? cut(gist(scan.value), 34) : "no report" };
+  return { tone: "warn", title: "Code not scanned", sub: scan ? words(gist(scan.value), SUB) : "no report" };
 }
 
 function otherTile(rows: readonly Row[]): Tile {
   const worst = [...rows].sort((a, b) => RANK[a.tone!] - RANK[b.tone!])[0];
   if (!worst || worst.tone === "ok") return { tone: "ok", title: "No other flags", sub: `${rows.length} more checks` };
-  return { tone: worst.tone!, title: cut(worst.label, 17), sub: cut(gist(worst.value), 34) };
+  return { tone: worst.tone!, title: words(worst.label, TITLE), sub: words(gist(worst.value), SUB) };
 }
 
 /** The card's facts, or `null` for any report that is not a finished Token Verdict. */
@@ -89,7 +102,7 @@ export function verdictCard(report: Report): VerdictCard | null {
     tone: verdict.tone,
     headline: HEADLINE[verdict.tone],
     score: verdict.value.match(/\d+\/100/)?.[0] ?? "",
-    reason: verdict.tone === "bad" && red ? cut(`${red.label}: ${gist(red.value)}`, 52) : null,
+    reason: verdict.tone === "bad" && red ? words(`${red.label}: ${gist(red.value)}`, 56) : null,
     tiles: [tradeTile(trade), codeTile(report.rows), otherTile(rest)],
     figures,
   };
@@ -209,10 +222,10 @@ export function VerdictSvg({ c, logo = null, when, block = null }: { c: VerdictC
             <text x={x + 50} y={tilesY + 68} textAnchor="middle" fontFamily={SANS} fontWeight="800" fontSize="34" fill="#fff">
               {MARK[t.tone]}
             </text>
-            <text x={x + 28} y={tilesY + tileH - 64} fontFamily={SANS} fontWeight="800" fontSize="40">
+            <text x={x + 28} y={tilesY + tileH - 64} fontFamily={SANS} fontWeight="800" fontSize="36">
               {t.title}
             </text>
-            <text x={x + 28} y={tilesY + tileH - 24} fontFamily={SANS} fontSize="26" fill="#333">
+            <text x={x + 28} y={tilesY + tileH - 24} fontFamily={SANS} fontSize="24" fill="#333">
               {t.sub}
             </text>
           </g>

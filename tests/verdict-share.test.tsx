@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { BRAND } from "@/brand";
 import { row, type Report } from "@/skills/types";
 import { LAUNCHPAD_CODE } from "@/skills/verdict";
-import { checkedAt, logoOf, qrCells, VerdictShare, VerdictSvg, verdictCard, verdictLink, verdictPost } from "@/features/panels/VerdictShare";
+import { checkedAt, words, logoOf, qrCells, VerdictShare, VerdictSvg, verdictCard, verdictLink, verdictPost } from "@/features/panels/VerdictShare";
 import { ReportView } from "@/features/panels/ReportView";
 import { settle } from "./helpers";
 import { PulseContext } from "@/ui/usePulse";
@@ -108,6 +108,9 @@ describe("a Token Verdict as a picture", () => {
     expect(text).toContain(`$TEST on Base: no red flags found — 90/100 on ${BRAND.name}'s Token Verdict`);
     expect(text).toContain(verdictLink(TOKEN));
     expect(text.toLowerCase()).not.toContain("safe ");
+    expect(words("even 0.01 ETH cannot be filled", 20)).toBe("even 0.01 ETH…");
+    expect(words("Supercalifragilistic", 8)).toBe("Superca…");
+    expect(words("short", 8)).toBe("short");
     expect(checkedAt(Date.UTC(2026, 10, 4, 13, 19))).toBe("4 Nov 2026, 13:19 UTC");
     const qr = qrCells(verdictLink(TOKEN));
     expect(qr.cells.length).toBeGreaterThan(qr.size);
@@ -127,6 +130,8 @@ describe("a Token Verdict as a picture", () => {
     expect(card).not.toHaveTextContent("block");
     rerender(<VerdictSvg c={verdictCard(verdict("No red flags found — 100/100", "ok"))!} when="now" />);
     expect(card).toHaveTextContent("NO RED FLAGS FOUND");
+    rerender(<VerdictSvg c={{ ...verdictCard(reboot)!, symbol: "AVERYLONGSYMBOL" }} when="now" />);
+    expect(card).toHaveTextContent("$AVERYLONG…");
   });
 
   it("reads the logo from this app's own route as a data: URL, and goes without one", async () => {
