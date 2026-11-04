@@ -13,6 +13,8 @@
  *   clanker  0xE85A…83a9 deploymentInfoForToken(token)
  *   zora     0x7777…baF3 getVersionForDeployedCoin(token)
  *   tokenFactory         token.factory()                 (a basepad LaunchToken names its factory)
+ *   originalAdmin        token.originalAdmin()           (a Clanker v4 token's named admin; captured
+ *                                                         2026-11-04 the same way — BOAR's is NOT its launcher)
  * the raw result hex, or the node's `error` (a revert). The tokens:
  *   basepadToken 0xaeAd…106d — the token the DelegationManager bug was measured on (launch #3106859)
  *   feelToken    0xc5A5…FeE1 — a Feel.cash launch from api.feel.cash/v1/launches (officialFeelLaunch: true)
@@ -75,6 +77,8 @@ export function padCalls(as: { [token: string]: Captured } = {}): (method: strin
     if (pad) return answer(stand(`0x${call.data.slice(34, 74)}`)[pad]);
     // factory() — the selector computed with `cast sig "factory()"`
     if (call.data === "0xc45a0155") return answer(stand(call.to).tokenFactory);
+    // originalAdmin() — `cast sig "originalAdmin()"`
+    if (call.data === "0x1c7b2ff4") return answer(stand(call.to).originalAdmin);
     return undefined;
   };
 }

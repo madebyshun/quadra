@@ -4601,9 +4601,15 @@ function dopplerPad(data) {
     launcher: null
   };
 }
-function clankerPad(info) {
+function clankerPad(admin) {
+  const named = admin && !same2(admin, ZERO2) ? { admin: toChecksumAddress(admin) } : {};
+  return { kind: "proven", id: "clanker", name: "Clanker", address: CLANKER_FACTORY, how: "Clanker's factory recorded its deployment", guarantees: [], launcher: null, ...named };
+}
+var CLANKER_TOKEN_ABI = parseAbi(["function originalAdmin() view returns (address)"]);
+async function clankerOf(token, info) {
   if (same2(info[0], ZERO2)) return null;
-  return { kind: "proven", id: "clanker", name: "Clanker", address: CLANKER_FACTORY, how: "Clanker's factory recorded its deployment", guarantees: [], launcher: null };
+  const admin = await read(CLANKER_TOKEN_ABI, token, "originalAdmin", []).then((a) => a, refusedIsNull);
+  return clankerPad(admin);
 }
 function zoraPad(version3) {
   if (version3 === 0) return null;
@@ -4627,7 +4633,7 @@ async function launchpadOf(token, ours = launchOf(token)) {
   const found = await Promise.all([
     read(BASEPAD_ABI, BASEPAD.factory, "infoOf", [token]).then((r) => basepadPad(r)),
     read(DOPPLER_ABI, DOPPLER_AIRLOCK, "getAssetData", [token]).then((r) => dopplerPad(r)),
-    read(CLANKER_ABI, CLANKER_FACTORY, "deploymentInfoForToken", [token]).then((r) => clankerPad(r)),
+    read(CLANKER_ABI, CLANKER_FACTORY, "deploymentInfoForToken", [token]).then((r) => clankerOf(token, r)),
     read(ZORA_ABI, ZORA_FACTORY, "getVersionForDeployedCoin", [token]).then((r) => zoraPad(Number(r)))
   ]);
   const proven = found.find((p) => p !== null);
@@ -5258,11 +5264,15 @@ function checkRow(c) {
   if (c.flag === "unknown") return row(c.label, "not checked", { tone: "warn" });
   return row(c.label, c.flag, { tone: c.flag === c.badWhen ? c.severity : "ok" });
 }
+function cleanScan(s) {
+  const tax = s.buyTax !== null && s.sellTax !== null ? `, tax ${pct2(s.buyTax)} buy / ${pct2(s.sellTax)} sell` : "";
+  return `${checksOf(s).length} checks passed \u2014 not a honeypot, no mint, no pause, no blacklist, source verified${tax}`;
+}
 function codeRows(s) {
   if (s === void 0) return [row("Code scan", "not checked \u2014 GoPlus could not be reached", { tone: "warn" })];
   if (s === null) return [row("Code scan", "not checked \u2014 GoPlus has no report on this token", { tone: "warn" })];
   const lines = checksOf(s).map(checkRow).filter((r) => r.tone !== "ok");
-  return lines.length ? lines : [row("Code scan", "none of the known traps or owner powers", { tone: "ok" })];
+  return lines.length ? lines : [row("Code scan", cleanScan(s), { tone: "ok" })];
 }
 function concentration(holders, supply, pools) {
   let set = 0n;
@@ -5300,8 +5310,15 @@ function age(ms) {
   if (days < 60) return plural2(Math.round(days), "day", "days");
   return `${(days / 365).toFixed(1)} years`;
 }
-function originRows(o, now) {
-  if (o === void 0) return [row("Launched by", "not checked \u2014 Blockscout could not be read", { tone: "warn" })];
+function originRows(o, now, pad3 = null) {
+  if (o === void 0 && pad3?.admin)
+    return [
+      row("Launched by", `not read just now \u2014 ${pad3.name} recorded ${short(pad3.admin)} as the token's admin at launch (often, not always, its creator)`, {
+        tone: "warn",
+        href: explorer.address(pad3.admin)
+      })
+    ];
+  if (o === void 0) return [row("Launched by", "not checked \u2014 its launch could not be read just now (Blockscout or the Base RPC refused); try again", { tone: "warn" })];
   if (o === null) return [row("Launched by", "not checked \u2014 no launch transaction on record", { tone: "warn" })];
   const through = o.via ? o.via.name ?? short(o.via.address) : null;
   const l = o.launcher;
@@ -5455,7 +5472,7 @@ async function tokenVerdict(input, now) {
     ...tradeRows(trip),
     ...launchpad ? [LAUNCHPAD_CODE] : codeRows(security),
     ...holderRows(token, holders ?? null, pairs ?? null),
-    ...originRows(origin, now),
+    ...originRows(origin, now, other?.kind === "proven" ? other : null),
     ...poolValueRows(value),
     ...marketRows(pairs ?? null, now, stockQuote(value))
   ];

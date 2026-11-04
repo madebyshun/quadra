@@ -3,6 +3,7 @@ import type { Report } from "@/skills/types";
 import { useRunCommand } from "@/features/openWindow";
 import { say } from "@/lib/assistant";
 import { count } from "@/lib/achievements";
+import { VerdictShare, verdictCard } from "@/features/panels/VerdictShare";
 
 /**
  * What Q says about a report, if anything: a red Verdict or Decision row is worth a word before
@@ -75,6 +76,18 @@ export function ReportView({ report }: { report: Report }) {
         </div>
       ) : null}
       {refused ? <p className="tx__warn">{refused}</p> : null}
+      <Shareable report={report} />
     </section>
   );
+}
+
+/** A finished Token Verdict can be posted as a picture; opened on demand, so the report stays first. */
+function Shareable({ report }: { report: Report }) {
+  const card = verdictCard(report);
+  return card ? (
+    <details className="report__share">
+      <summary>Share as a picture</summary>
+      <VerdictShare c={card} />
+    </details>
+  ) : null;
 }

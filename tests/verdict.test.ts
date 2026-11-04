@@ -23,6 +23,7 @@ import {
   checkRow,
   checksOf,
   codeRows,
+  cleanScan,
   concentration,
   holderRows,
   marketRows,
@@ -312,7 +313,9 @@ describe("the code, as rows", () => {
   });
 
   it("says when nothing was found, when GoPlus has no report, and when it could not be reached", () => {
-    expect(codeRows({ ...degen, mintable: "no" })).toEqual([row("Code scan", "none of the known traps or owner powers", { tone: "ok" })]);
+    expect(codeRows({ ...degen, mintable: "no" })).toEqual([row("Code scan", cleanScan({ ...degen, mintable: "no" }), { tone: "ok" })]);
+    expect(cleanScan({ ...degen, buyTax: 0, sellTax: 0.05 })).toBe("11 checks passed — not a honeypot, no mint, no pause, no blacklist, source verified, tax 0.00% buy / 5.00% sell");
+    expect(cleanScan({ ...degen, buyTax: null })).toBe("11 checks passed — not a honeypot, no mint, no pause, no blacklist, source verified");
     expect(codeRows(null)[0]?.value).toBe("not checked — GoPlus has no report on this token");
     expect(codeRows(undefined)[0]?.value).toBe("not checked — GoPlus could not be reached");
   });
@@ -564,7 +567,7 @@ describe("the launcher, as rows", () => {
       row("Launched by", "a smart wallet, through EntryPoint — the launcher is not identified", { tone: "warn" }),
     ]);
     expect(originRows(null, now)[0]?.value).toBe("not checked — no launch transaction on record");
-    expect(originRows(undefined, now)[0]?.value).toBe("not checked — Blockscout could not be read");
+    expect(originRows(undefined, now)[0]?.value).toBe("not checked — its launch could not be read just now (Blockscout or the Base RPC refused); try again");
   });
 });
 

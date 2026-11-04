@@ -8,6 +8,7 @@ import {
   basepadPad,
   DOPPLER_CREATE_TOPIC,
   dopplerPad,
+  clankerPad,
   launchpadOf,
   padsBetween,
   parsePadLogs,
@@ -76,7 +77,11 @@ describe("which launchpad made a token, from its own record", () => {
 
   it("proves Clanker and Zora by their factories' records — and promises nothing they do not show", async () => {
     expect(await proven(T.boar)).toMatchObject({ id: "clanker", address: CLANKER_FACTORY, guarantees: [] });
-    expect(await proven(T.clankerToken)).toMatchObject({ id: "clanker" });
+    expect(await proven(T.clankerToken)).toMatchObject({ id: "clanker", launcher: null, admin: "0xE7535782201A2165DE705f6B9f7144b481D33b50" });
+    expect(clankerPad(null)).not.toHaveProperty("admin");
+    expect(clankerPad("0x0000000000000000000000000000000000000000")).not.toHaveProperty("admin");
+    // BOAR's named admin is not the wallet that launched it — so it is never called the launcher
+    expect(await proven(T.boar)).toMatchObject({ launcher: null, admin: "0x32d1C8A4d133241a710d780f1198992A015Ea5Ed" });
     expect(await proven(T.zoraCoin)).toMatchObject({ id: "zora", address: ZORA_FACTORY, how: "Zora's coin factory recorded it (coin version 4); the factory itself is upgradeable" });
   });
 
@@ -269,6 +274,13 @@ describe("the launchpad and a relayed launch, as rows", () => {
       row("Launched by", "an ERC-4337 bundle, through Clanker — the launcher is not identified", { tone: "warn" }),
     ]);
     expect(originRows({ via: null, launcher: null }, now)[0]!.value).toBe("a smart wallet — the launcher is not identified");
+    // the launch could not be read: a Clanker token still names the admin its launch recorded, as the admin
+    const pad = { kind: "proven", id: "clanker", name: "Clanker", address: CLANKER_FACTORY, how: "", guarantees: [], launcher: null, admin: "0xE7535782201A2165DE705f6B9f7144b481D33b50" } as const;
+    expect(originRows(undefined, now, pad)[0]).toMatchObject({
+      value: "not read just now — Clanker recorded 0xE753…3b50 as the token's admin at launch (often, not always, its creator)",
+      tone: "warn",
+    });
+    expect(originRows(undefined, now, { ...pad, admin: undefined } as never)[0]!.value).toMatch(/^not checked — its launch could not be read just now/);
     const launcher = copy({ address: LAUNCHERS.chubby, complete: true, txCount: 1, firstSeen: null, deployments: 0, factoryCalls: 0, callsComplete: true, funder: null, pulledAt: null });
     expect(originRows({ via: null, launcher, relay: "an EIP-7702 smart account" }, now)[0]).toEqual(
       row("Launched by", "0x46b9…2cDe, through an EIP-7702 smart account — the contract that created the token is not identified", {

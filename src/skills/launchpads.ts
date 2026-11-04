@@ -1,4 +1,4 @@
-import { decodeFunctionResult, encodeFunctionData, type Abi } from "viem";
+import { decodeFunctionResult, encodeFunctionData, parseAbi, type Abi } from "viem";
 import { BRAND } from "@/brand";
 import {
   BASEPAD,
@@ -48,6 +48,12 @@ export type Launchpad =
       readonly guarantees: readonly string[];
       /** the launcher the launchpad RECORDED, when it records one (the caller, so a 7702 account's own address) */
       readonly launcher: string | null;
+      /**
+       * Clanker only: the admin the launch NAMED (the token's `originalAdmin()`). NOT the launcher —
+       * MEASURED on BOAR: admin 0x32d1…a5ed, while the wallet that called the factory was 0xd9aC…6e58
+       * (a launch made for somebody else). Shown only when the launch itself could not be read.
+       */
+      readonly admin?: string;
     }
   | { readonly kind: "claimed"; readonly name: string; readonly why: string }
   | { readonly kind: "unknown" };
@@ -118,9 +124,24 @@ export function dopplerPad(data: AssetData): Proven | null {
   };
 }
 
-export function clankerPad(info: readonly [string, string, string]): Proven | null {
+/**
+ * `admin` is the token's own `originalAdmin()` — the admin the launch named, which every Clanker v4
+ * token records for good (MEASURED 2026-11-04 on Reboot: `admin()` = `originalAdmin()` = 0xec8d…caf6).
+ * Read from the token, it needs no log search, so when a rate-limited `eth_getLogs` leaves the launch
+ * unread the verdict still has a name to show — as the admin, never as the launcher.
+ */
+export function clankerPad(admin: string | null): Proven {
+  const named = admin && !same(admin, ZERO) ? { admin: toChecksumAddress(admin) } : {};
+  return { kind: "proven", id: "clanker", name: "Clanker", address: CLANKER_FACTORY, how: "Clanker's factory recorded its deployment", guarantees: [], launcher: null, ...named };
+}
+
+const CLANKER_TOKEN_ABI = parseAbi(["function originalAdmin() view returns (address)"]);
+
+/** Clanker's record of a token, with the admin the token itself names; a token that does not answer names none. */
+async function clankerOf(token: string, info: readonly [string, string, string]): Promise<Proven | null> {
   if (same(info[0], ZERO)) return null;
-  return { kind: "proven", id: "clanker", name: "Clanker", address: CLANKER_FACTORY, how: "Clanker's factory recorded its deployment", guarantees: [], launcher: null };
+  const admin = await read(CLANKER_TOKEN_ABI, token, "originalAdmin", []).then((a) => a as string, refusedIsNull);
+  return clankerPad(admin);
 }
 
 export function zoraPad(version: number): Proven | null {
@@ -152,7 +173,7 @@ export async function launchpadOf(token: string, ours: Promise<LaunchRecord | nu
   const found = await Promise.all([
     read(BASEPAD_ABI, BASEPAD.factory, "infoOf", [token]).then((r) => basepadPad(r as never)),
     read(DOPPLER_ABI, DOPPLER_AIRLOCK, "getAssetData", [token]).then((r) => dopplerPad(r as never)),
-    read(CLANKER_ABI, CLANKER_FACTORY, "deploymentInfoForToken", [token]).then((r) => clankerPad(r as never)),
+    read(CLANKER_ABI, CLANKER_FACTORY, "deploymentInfoForToken", [token]).then((r) => clankerOf(token, r as never)),
     read(ZORA_ABI, ZORA_FACTORY, "getVersionForDeployedCoin", [token]).then((r) => zoraPad(Number(r))),
   ]);
   const proven = found.find((p): p is Proven => p !== null);

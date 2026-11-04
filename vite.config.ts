@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { anyPublicHttps, forward, FORWARD_PATH } from "./src/server/forward";
 import { stocksHandler, STOCKS_PATH } from "./src/server/stocks";
 import { chartsHandler, CHARTS_PATH } from "./src/server/charts";
+import { logoHandler, LOGO_PATH } from "./src/server/logo";
 import { cdpFacilitator, type CdpCredentials } from "./src/server/cdp";
 import { API_PATH } from "./src/server/apiPath";
 import type { apiHandler } from "./src/server/api";
@@ -31,7 +32,7 @@ function asMiddleware(base: string, handle: (request: Request) => Promise<Respon
       void handle(request).then(async (answer) => {
         res.statusCode = answer.status;
         answer.headers.forEach((value, name) => res.setHeader(name, value));
-        res.end(await answer.text());
+        res.end(Buffer.from(await answer.arrayBuffer()));
       });
     });
   };
@@ -49,6 +50,8 @@ function devRoutes(): Plugin {
       server.middlewares.use(STOCKS_PATH, asMiddleware(STOCKS_PATH, stocksHandler()));
       /** GeckoTerminal's candles, cached and shared across tabs — `src/server/charts.ts`. */
       server.middlewares.use(CHARTS_PATH, asMiddleware(CHARTS_PATH, chartsHandler()));
+      /** A token's logo for the share card, from this origin — `src/server/logo.ts`. */
+      server.middlewares.use(LOGO_PATH, asMiddleware(LOGO_PATH, logoHandler()));
     },
   };
 }

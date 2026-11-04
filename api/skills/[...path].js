@@ -3946,8 +3946,8 @@ function hookAddressProblem(raw) {
 }
 function readHookAddress(raw) {
   const address2 = raw.trim();
-  const problem6 = hookAddressProblem(address2);
-  if (problem6 !== null) throw new Error(problem6);
+  const problem7 = hookAddressProblem(address2);
+  if (problem7 !== null) throw new Error(problem7);
   const bits = BigInt(address2) & (1n << BigInt(ALL_HOOK_BITS)) - 1n;
   const permissions = HOOK_PERMISSIONS.map((p) => ({
     ...p,
@@ -4664,9 +4664,15 @@ function dopplerPad(data) {
     launcher: null
   };
 }
-function clankerPad(info) {
+function clankerPad(admin) {
+  const named = admin && !same2(admin, ZERO2) ? { admin: toChecksumAddress(admin) } : {};
+  return { kind: "proven", id: "clanker", name: "Clanker", address: CLANKER_FACTORY, how: "Clanker's factory recorded its deployment", guarantees: [], launcher: null, ...named };
+}
+var CLANKER_TOKEN_ABI = parseAbi(["function originalAdmin() view returns (address)"]);
+async function clankerOf(token, info) {
   if (same2(info[0], ZERO2)) return null;
-  return { kind: "proven", id: "clanker", name: "Clanker", address: CLANKER_FACTORY, how: "Clanker's factory recorded its deployment", guarantees: [], launcher: null };
+  const admin = await read(CLANKER_TOKEN_ABI, token, "originalAdmin", []).then((a) => a, refusedIsNull);
+  return clankerPad(admin);
 }
 function zoraPad(version3) {
   if (version3 === 0) return null;
@@ -4690,7 +4696,7 @@ async function launchpadOf(token, ours = launchOf(token)) {
   const found = await Promise.all([
     read(BASEPAD_ABI, BASEPAD.factory, "infoOf", [token]).then((r) => basepadPad(r)),
     read(DOPPLER_ABI, DOPPLER_AIRLOCK, "getAssetData", [token]).then((r) => dopplerPad(r)),
-    read(CLANKER_ABI, CLANKER_FACTORY, "deploymentInfoForToken", [token]).then((r) => clankerPad(r)),
+    read(CLANKER_ABI, CLANKER_FACTORY, "deploymentInfoForToken", [token]).then((r) => clankerOf(token, r)),
     read(ZORA_ABI, ZORA_FACTORY, "getVersionForDeployedCoin", [token]).then((r) => zoraPad(Number(r)))
   ]);
   const proven = found.find((p) => p !== null);
@@ -5316,11 +5322,15 @@ function checkRow(c) {
   if (c.flag === "unknown") return row(c.label, "not checked", { tone: "warn" });
   return row(c.label, c.flag, { tone: c.flag === c.badWhen ? c.severity : "ok" });
 }
+function cleanScan(s) {
+  const tax = s.buyTax !== null && s.sellTax !== null ? `, tax ${pct2(s.buyTax)} buy / ${pct2(s.sellTax)} sell` : "";
+  return `${checksOf(s).length} checks passed \u2014 not a honeypot, no mint, no pause, no blacklist, source verified${tax}`;
+}
 function codeRows(s) {
   if (s === void 0) return [row("Code scan", "not checked \u2014 GoPlus could not be reached", { tone: "warn" })];
   if (s === null) return [row("Code scan", "not checked \u2014 GoPlus has no report on this token", { tone: "warn" })];
   const lines = checksOf(s).map(checkRow).filter((r) => r.tone !== "ok");
-  return lines.length ? lines : [row("Code scan", "none of the known traps or owner powers", { tone: "ok" })];
+  return lines.length ? lines : [row("Code scan", cleanScan(s), { tone: "ok" })];
 }
 function concentration(holders, supply, pools) {
   let set = 0n;
@@ -5358,8 +5368,15 @@ function age(ms) {
   if (days < 60) return plural2(Math.round(days), "day", "days");
   return `${(days / 365).toFixed(1)} years`;
 }
-function originRows(o, now) {
-  if (o === void 0) return [row("Launched by", "not checked \u2014 Blockscout could not be read", { tone: "warn" })];
+function originRows(o, now, pad3 = null) {
+  if (o === void 0 && pad3?.admin)
+    return [
+      row("Launched by", `not read just now \u2014 ${pad3.name} recorded ${short(pad3.admin)} as the token's admin at launch (often, not always, its creator)`, {
+        tone: "warn",
+        href: explorer.address(pad3.admin)
+      })
+    ];
+  if (o === void 0) return [row("Launched by", "not checked \u2014 its launch could not be read just now (Blockscout or the Base RPC refused); try again", { tone: "warn" })];
   if (o === null) return [row("Launched by", "not checked \u2014 no launch transaction on record", { tone: "warn" })];
   const through = o.via ? o.via.name ?? short(o.via.address) : null;
   const l = o.launcher;
@@ -5513,7 +5530,7 @@ async function tokenVerdict(input, now) {
     ...tradeRows(trip),
     ...launchpad ? [LAUNCHPAD_CODE] : codeRows(security),
     ...holderRows(token, holders ?? null, pairs ?? null),
-    ...originRows(origin, now),
+    ...originRows(origin, now, other?.kind === "proven" ? other : null),
     ...poolValueRows(value),
     ...marketRows(pairs ?? null, now, stockQuote(value))
   ];
@@ -7135,12 +7152,12 @@ async function pairOf(factory, asked) {
     const t = await chainToken(address2);
     return { address: address2, symbol: t.symbol, name: t.name, decimals: t.decimals, startTick: q.startTick };
   }
-  const { pairs, problem: problem6 } = await launchPairs(factory);
+  const { pairs, problem: problem7 } = await launchPairs(factory);
   const found = pairs.find((p) => p.symbol.toLowerCase() === text.toLowerCase());
   if (found) return found;
   const offered = pairs.map((p) => p.symbol).join(", ");
   throw new Error(
-    problem6 ? `The list of stocks could not be read (${problem6}) \u2014 give the stock token's address instead of "${text}".` : `The launchpad does not pair with "${text}". It pairs with: ${offered}.`
+    problem7 ? `The list of stocks could not be read (${problem7}) \u2014 give the stock token's address instead of "${text}".` : `The launchpad does not pair with "${text}". It pairs with: ${offered}.`
   );
 }
 function feeOf(text, version3) {
@@ -7514,6 +7531,43 @@ function cdpFacilitator(creds, fetchImpl = fetch, base = CDP_FACILITATOR) {
   };
 }
 
+// src/server/logo.ts
+var LOGO_PATH = "/api/logo";
+var ADDRESS = /^\/(0x[0-9a-fA-F]{40})$/;
+var CDN = "https://cdn.dexscreener.com/";
+var MAX_LOGO_BYTES = 512 * 1024;
+function problem4(status, detail) {
+  return new Response(JSON.stringify({ status, detail, origin: "quadra-server" }), { status, headers: { "content-type": "application/problem+json" } });
+}
+function imageOf(body) {
+  const pairs = typeof body === "object" && body !== null && Array.isArray(body.pairs) ? body.pairs : [];
+  for (const p of pairs) {
+    const url = typeof p === "object" && p !== null ? p.info?.imageUrl : void 0;
+    if (typeof url === "string" && url.startsWith(CDN)) return `${url.split("?")[0]}?width=256&height=256&format=png`;
+  }
+  return null;
+}
+function logoHandler(fetchImpl = fetch) {
+  return async (request) => {
+    if (request.headers.get("x-quadra") !== "1") return problem4(403, "Requests to this server need the x-quadra: 1 header.");
+    if (request.method !== "GET") return problem4(405, "The logo takes GET.");
+    const token = new URL(request.url).pathname.slice(LOGO_PATH.length).match(ADDRESS)?.[1];
+    if (!token) return problem4(404, "Ask for /api/logo/<token address>.");
+    try {
+      const pairs = await fetchImpl(`https://api.dexscreener.com/latest/dex/tokens/${token}`, { headers: { accept: "application/json" }, redirect: "manual" });
+      const image = pairs.ok ? imageOf(await pairs.json()) : null;
+      if (image === null) return problem4(404, "DexScreener names no logo for this token.");
+      const picture = await fetchImpl(image, { redirect: "manual" });
+      const type = picture.headers.get("content-type") ?? "";
+      const bytes = await picture.arrayBuffer();
+      if (!picture.ok || !type.startsWith("image/") || bytes.byteLength > MAX_LOGO_BYTES) return problem4(502, "DexScreener's logo could not be read.");
+      return new Response(bytes, { status: 200, headers: { "content-type": type, "cache-control": "max-age=86400" } });
+    } catch {
+      return problem4(502, "DexScreener could not be reached.");
+    }
+  };
+}
+
 // src/server/indexerPath.ts
 var INDEXER_PATH = "/api/launchpad";
 
@@ -7850,7 +7904,7 @@ async function syncOnce(state, rpc2, head, maxChunks = MAX_CHUNKS) {
 }
 var FRESH_MS2 = 15e3;
 var CATCH_UP_MS = 1500;
-function problem4(status, detail) {
+function problem5(status, detail) {
   return new Response(JSON.stringify({ status, detail, origin: "quadra-server" }), {
     status,
     headers: { "content-type": "application/problem+json" }
@@ -7908,19 +7962,19 @@ function indexerHandler(deps = {}) {
   };
   return async (request) => {
     const path = new URL(request.url).pathname.slice(INDEXER_PATH.length);
-    if (request.headers.get("x-quadra") !== "1") return problem4(403, "Requests to this server need the x-quadra: 1 header.");
-    if (path !== "/coins" && path !== "/creators" && path !== "/coin") return problem4(404, `${path} is not a route of the launchpad index.`);
-    if (request.method !== "GET") return problem4(405, `${path} takes GET.`);
+    if (request.headers.get("x-quadra") !== "1") return problem5(403, "Requests to this server need the x-quadra: 1 header.");
+    if (path !== "/coins" && path !== "/creators" && path !== "/coin") return problem5(404, `${path} is not a route of the launchpad index.`);
+    if (request.method !== "GET") return problem5(405, `${path} takes GET.`);
     if (last === null || now() - last.at >= FRESH_MS2) await sync();
     const { head, error } = last;
     if (state.syncedTo < FIRST_BLOCK) {
-      return problem4(502, `The launchpad index has read nothing from Base yet: ${error ?? "the chain is still being read"}`);
+      return problem5(502, `The launchpad index has read nothing from Base yet: ${error ?? "the chain is still being read"}`);
     }
     if (path === "/coin") {
       const token = new URL(request.url).searchParams.get("token") ?? "";
-      if (!/^0x[0-9a-fA-F]{40}$/.test(token)) return problem4(400, "/coin takes ?token=0x\u2026 \u2014 a 20-byte address.");
+      if (!/^0x[0-9a-fA-F]{40}$/.test(token)) return problem5(400, "/coin takes ?token=0x\u2026 \u2014 a 20-byte address.");
       const detail = coinDetail(state, token, Math.floor(now() / 1e3));
-      if (detail === null) return problem4(404, `${token} is not a coin of this launchpad, or the index has not reached its launch yet.`);
+      if (detail === null) return problem5(404, `${token} is not a coin of this launchpad, or the index has not reached its launch yet.`);
       return new Response(JSON.stringify({ ...detail, syncedTo: state.syncedTo, head, behind: head === null ? null : Math.max(0, head - state.syncedTo), error }), {
         status: 200,
         headers: { "content-type": "application/json", "cache-control": "public, max-age=10, s-maxage=15, stale-while-revalidate=60" }
@@ -7951,7 +8005,7 @@ function asSent(request) {
   for (const k of routed) url.searchParams.delete(k);
   return new Request(url, request);
 }
-function problem5(status, detail) {
+function problem6(status, detail) {
   return new Response(JSON.stringify({ status, detail, origin: "quadra-server" }), { status, headers: { "content-type": "application/problem+json" } });
 }
 function routes(env, fetchImpl = fetch, blob2 = null, indexer = {}) {
@@ -7959,18 +8013,20 @@ function routes(env, fetchImpl = fetch, blob2 = null, indexer = {}) {
   const token = env.BLOB_READ_WRITE_TOKEN ?? null;
   const connected = token !== null || Boolean(env.BLOB_STORE_ID);
   const chain = indexerRpc(env);
-  const launchpad = connected && blob2 ? indexerHandler({ ...chain ? { rpc: chain } : {}, ...indexer, store: blobStore(blob2, token, env.BLOB_ACCESS === "public" ? "public" : "private") }) : async () => problem5(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID).");
+  const launchpad = connected && blob2 ? indexerHandler({ ...chain ? { rpc: chain } : {}, ...indexer, store: blobStore(blob2, token, env.BLOB_ACCESS === "public" ? "public" : "private") }) : async () => problem6(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID).");
   const stocks = stocksHandler(fetchImpl);
   const charts = chartsHandler(fetchImpl);
+  const logo = logoHandler(fetchImpl);
   const skills = apiHandler({ facilitator: creds ? cdpFacilitator(creds, fetchImpl) : null });
   return {
     stocks: (request) => stocks(asSent(request)),
     charts: (request) => charts(asSent(request)),
+    logo: (request) => logo(asSent(request)),
     skills: (request) => skills(asSent(request)),
     launchpad: (request) => launchpad(asSent(request)),
     /** Vercel Cron's daily call: the index stepped forward with nobody asking. Vercel sends `CRON_SECRET` as a bearer. */
     cron: async (request) => {
-      if (env.CRON_SECRET && request.headers.get("authorization") !== `Bearer ${env.CRON_SECRET}`) return problem5(401, "Only Vercel Cron may run the index step.");
+      if (env.CRON_SECRET && request.headers.get("authorization") !== `Bearer ${env.CRON_SECRET}`) return problem6(401, "Only Vercel Cron may run the index step.");
       return launchpad(new Request(new URL(`${INDEXER_PATH}/creators`, request.url), { headers: { "x-quadra": "1" } }));
     }
   };

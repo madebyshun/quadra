@@ -2,6 +2,7 @@ import { apiHandler } from "@/server/api";
 import { cdpFacilitator, type CdpCredentials } from "@/server/cdp";
 import { chartsHandler } from "@/server/charts";
 import { stocksHandler } from "@/server/stocks";
+import { logoHandler } from "@/server/logo";
 import { indexerHandler, INDEXER_RPC, type IndexerDeps, type Rpc } from "@/server/indexer";
 import { BASE } from "@/config/chain";
 import { rpcOn } from "@/skills/http";
@@ -77,10 +78,12 @@ export function routes(env: Env, fetchImpl: typeof fetch = fetch, blob: BlobCall
       : async () => problem(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID).");
   const stocks = stocksHandler(fetchImpl);
   const charts = chartsHandler(fetchImpl);
+  const logo = logoHandler(fetchImpl);
   const skills = apiHandler({ facilitator: creds ? cdpFacilitator(creds, fetchImpl) : null });
   return {
     stocks: (request: Request) => stocks(asSent(request)),
     charts: (request: Request) => charts(asSent(request)),
+    logo: (request: Request) => logo(asSent(request)),
     skills: (request: Request) => skills(asSent(request)),
     launchpad: (request: Request) => launchpad(asSent(request)),
     /** Vercel Cron's daily call: the index stepped forward with nobody asking. Vercel sends `CRON_SECRET` as a bearer. */

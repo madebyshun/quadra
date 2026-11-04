@@ -6,7 +6,7 @@ import { deepest, markets, type Market } from "@/skills/dexscreener";
 import { explorer, price, quoteWords, short, usd } from "@/skills/format";
 import { scan, type Flag, type Scan } from "@/skills/goplus";
 import { originOf, type Origin } from "@/skills/origin";
-import { launchpadOf, type Launchpad } from "@/skills/launchpads";
+import { launchpadOf, type Launchpad, type Proven } from "@/skills/launchpads";
 import { isV3, launchOf, launchpadOrigin, poolValue, v3FeeOf, v3ReferrerOf, type CoinFee, type LaunchRecord, type PoolValue } from "@/skills/launchpad";
 import { chainToken } from "@/skills/chaintoken";
 import { BRAND } from "@/brand";
@@ -110,6 +110,9 @@ export function transferRow(t: Transfer): Row {
  */
 type Check = { readonly label: string; readonly flag: Flag; readonly badWhen: "yes" | "no"; readonly severity: "bad" | "warn" };
 
+/** The labels a code check can raise, for a reader that groups a report's code lines (the share card). */
+export const codeLabels = (): string[] => checksOf({} as Scan).map((c) => c.label);
+
 export function checksOf(s: Scan): Check[] {
   return [
     { label: "Honeypot pattern", flag: s.honeypot, badWhen: "yes", severity: "bad" },
@@ -131,12 +134,19 @@ export function checkRow(c: Check): Row {
   return row(c.label, c.flag, { tone: c.flag === c.badWhen ? c.severity : "ok" });
 }
 
+/** A clean scan in words: how many checks, the ones people ask about, and the tax when GoPlus read it. */
+export function cleanScan(s: Scan): string {
+  const tax = s.buyTax !== null && s.sellTax !== null ? `, tax ${pct(s.buyTax)} buy / ${pct(s.sellTax)} sell` : "";
+  return `${checksOf(s).length} checks passed — not a honeypot, no mint, no pause, no blacklist, source verified${tax}`;
+}
+
 export function codeRows(s: Scan | null | undefined): Row[] {
   if (s === undefined) return [row("Code scan", "not checked — GoPlus could not be reached", { tone: "warn" })];
   if (s === null) return [row("Code scan", "not checked — GoPlus has no report on this token", { tone: "warn" })];
   // Only the lines that say something: a wall of "no" buries the one "yes". Unknowns stay.
   const lines = checksOf(s).map(checkRow).filter((r) => r.tone !== "ok");
-  return lines.length ? lines : [row("Code scan", "none of the known traps or owner powers", { tone: "ok" })];
+  // all clean: say WHAT was checked, so "clean" is a list a reader can weigh, not a blank
+  return lines.length ? lines : [row("Code scan", cleanScan(s), { tone: "ok" })];
 }
 
 // ── The holders ───────────────────────────────────────────────────────────
@@ -187,8 +197,15 @@ function age(ms: number): string {
   return `${(days / 365).toFixed(1)} years`;
 }
 
-export function originRows(o: Origin | null | undefined, now: number): Row[] {
-  if (o === undefined) return [row("Launched by", "not checked — Blockscout could not be read", { tone: "warn" })];
+export function originRows(o: Origin | null | undefined, now: number, pad: Proven | null = null): Row[] {
+  if (o === undefined && pad?.admin)
+    return [
+      row("Launched by", `not read just now — ${pad.name} recorded ${short(pad.admin)} as the token's admin at launch (often, not always, its creator)`, {
+        tone: "warn",
+        href: explorer.address(pad.admin),
+      }),
+    ];
+  if (o === undefined) return [row("Launched by", "not checked — its launch could not be read just now (Blockscout or the Base RPC refused); try again", { tone: "warn" })];
   if (o === null) return [row("Launched by", "not checked — no launch transaction on record", { tone: "warn" })];
   const through = o.via ? (o.via.name ?? short(o.via.address)) : null;
   const l = o.launcher;
@@ -406,7 +423,7 @@ export async function tokenVerdict(input: string, now: number): Promise<Report> 
     ...tradeRows(trip),
     ...(launchpad ? [LAUNCHPAD_CODE] : codeRows(security)),
     ...holderRows(token, holders ?? null, pairs ?? null),
-    ...originRows(origin, now),
+    ...originRows(origin, now, other?.kind === "proven" ? other : null),
     ...poolValueRows(value),
     ...marketRows(pairs ?? null, now, stockQuote(value)),
   ];

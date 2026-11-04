@@ -15,6 +15,7 @@ describe("the production routes", () => {
     const r = routes({}, never);
     expect((await r.stocks(new Request("https://x/api/stocks/base"))).status).toBe(403);
     expect((await r.charts(new Request("https://x/api/charts/ohlcv"))).status).toBe(403);
+    expect((await r.logo(new Request("https://x/api/logo/0x6F18277E5566090Ad8Ab35e401ce9155739BFb07"))).status).toBe(403);
     const paid = await r.skills(new Request("https://x/api/skills/verdict?arg=0x1"));
     expect(paid.status).toBe(503);
     expect(await paid.text()).toMatch(/CDP_API_KEY_ID/);

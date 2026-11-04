@@ -3454,3 +3454,5 @@
 .flow__coin text { font-size: 11px; font-weight: 700; text-anchor: middle; fill: #000; }
 .flow__eth path { fill: #3c3c3d; }
 .flow__eth path:first-child { fill: #8c8c8c; }
+.report__share { margin-top: 8px; }
+.report__share > summary { cursor: pointer; font-weight: 600; }
