@@ -7939,6 +7939,13 @@ function indexerRpc(env) {
 function cdpFrom(env) {
   return env.CDP_API_KEY_ID && env.CDP_API_KEY_SECRET ? { keyId: env.CDP_API_KEY_ID, secret: env.CDP_API_KEY_SECRET } : null;
 }
+function asSent(request) {
+  const url = new URL(request.url);
+  const routed = [...url.searchParams.keys()].filter((k) => k.startsWith("..."));
+  if (routed.length === 0) return request;
+  for (const k of routed) url.searchParams.delete(k);
+  return new Request(url, request);
+}
 function problem5(status, detail) {
   return new Response(JSON.stringify({ status, detail, origin: "quadra-server" }), { status, headers: { "content-type": "application/problem+json" } });
 }
@@ -7948,11 +7955,14 @@ function routes(env, fetchImpl = fetch, blob2 = null, indexer = {}) {
   const connected = token !== null || Boolean(env.BLOB_STORE_ID);
   const chain = indexerRpc(env);
   const launchpad = connected && blob2 ? indexerHandler({ ...chain ? { rpc: chain } : {}, ...indexer, store: blobStore(blob2, token, env.BLOB_ACCESS === "public" ? "public" : "private") }) : async () => problem5(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID).");
+  const stocks = stocksHandler(fetchImpl);
+  const charts = chartsHandler(fetchImpl);
+  const skills = apiHandler({ facilitator: creds ? cdpFacilitator(creds, fetchImpl) : null });
   return {
-    stocks: stocksHandler(fetchImpl),
-    charts: chartsHandler(fetchImpl),
-    skills: apiHandler({ facilitator: creds ? cdpFacilitator(creds, fetchImpl) : null }),
-    launchpad,
+    stocks: (request) => stocks(asSent(request)),
+    charts: (request) => charts(asSent(request)),
+    skills: (request) => skills(asSent(request)),
+    launchpad: (request) => launchpad(asSent(request)),
     /** Vercel Cron's daily call: the index stepped forward with nobody asking. Vercel sends `CRON_SECRET` as a bearer. */
     cron: async (request) => {
       if (env.CRON_SECRET && request.headers.get("authorization") !== `Bearer ${env.CRON_SECRET}`) return problem5(401, "Only Vercel Cron may run the index step.");

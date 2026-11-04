@@ -44,6 +44,19 @@ export function cdpFrom(env: Env): CdpCredentials | null {
   return env.CDP_API_KEY_ID && env.CDP_API_KEY_SECRET ? { keyId: env.CDP_API_KEY_ID, secret: env.CDP_API_KEY_SECRET } : null;
 }
 
+/**
+ * The request as the visitor sent it. MEASURED 2026-11-04 on the first paid 402 from Vercel: a catch-all
+ * function (`api/skills/[...path].js`) is handed the URL with Vercel's own `...path=<segments>` query
+ * parameter added, which then showed in the 402's `resource` — the URL an agent is told it is paying for.
+ */
+export function asSent(request: Request): Request {
+  const url = new URL(request.url);
+  const routed = [...url.searchParams.keys()].filter((k) => k.startsWith("..."));
+  if (routed.length === 0) return request;
+  for (const k of routed) url.searchParams.delete(k);
+  return new Request(url, request);
+}
+
 function problem(status: number, detail: string): Response {
   return new Response(JSON.stringify({ status, detail, origin: "quadra-server" }), { status, headers: { "content-type": "application/problem+json" } });
 }
@@ -62,11 +75,14 @@ export function routes(env: Env, fetchImpl: typeof fetch = fetch, blob: BlobCall
     connected && blob
       ? indexerHandler({ ...(chain ? { rpc: chain } : {}), ...indexer, store: blobStore(blob, token, env.BLOB_ACCESS === "public" ? "public" : "private") })
       : async () => problem(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID).");
+  const stocks = stocksHandler(fetchImpl);
+  const charts = chartsHandler(fetchImpl);
+  const skills = apiHandler({ facilitator: creds ? cdpFacilitator(creds, fetchImpl) : null });
   return {
-    stocks: stocksHandler(fetchImpl),
-    charts: chartsHandler(fetchImpl),
-    skills: apiHandler({ facilitator: creds ? cdpFacilitator(creds, fetchImpl) : null }),
-    launchpad,
+    stocks: (request: Request) => stocks(asSent(request)),
+    charts: (request: Request) => charts(asSent(request)),
+    skills: (request: Request) => skills(asSent(request)),
+    launchpad: (request: Request) => launchpad(asSent(request)),
     /** Vercel Cron's daily call: the index stepped forward with nobody asking. Vercel sends `CRON_SECRET` as a bearer. */
     cron: async (request: Request): Promise<Response> => {
       if (env.CRON_SECRET && request.headers.get("authorization") !== `Bearer ${env.CRON_SECRET}`) return problem(401, "Only Vercel Cron may run the index step.");

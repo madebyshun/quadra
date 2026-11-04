@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { cdpFrom, indexerRpc, routes } from "@/server/vercel";
+import { asSent, cdpFrom, indexerRpc, routes } from "@/server/vercel";
 
 /** The production server's wiring: the CDP key from the function's environment, both halves or none. */
 describe("the production routes", () => {
@@ -89,5 +89,18 @@ describe("the indexer's own RPC", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe("the request as the visitor sent it", () => {
+  it("drops Vercel's own catch-all parameter, and keeps everything else — the 402's resource with it", async () => {
+    const plain = new Request("https://x/api/skills/verdict?arg=1");
+    expect(asSent(plain)).toBe(plain);
+    expect(asSent(new Request("https://x/api/skills/verdict?arg=1&...path=verdict")).url).toBe("https://x/api/skills/verdict?arg=1");
+    const never = (() => Promise.reject(new Error("must not be called"))) as unknown as typeof fetch;
+    const keyed = routes({ CDP_API_KEY_ID: "id", CDP_API_KEY_SECRET: "s" }, never);
+    const res = await keyed.skills(new Request("https://x/api/skills/verdict?arg=0xb200000000000000000000d096efba9896ab0816&...path=verdict"));
+    expect(res.status).toBe(402);
+    expect(JSON.stringify(await res.json())).not.toContain("...path");
   });
 });
