@@ -2045,14 +2045,39 @@
   inset: 0;
 }
 
+/* the loading screen: steps really done, as a big number and three cells (2026-11-04) */
 .intro__loading {
   position: absolute;
-  inset: auto 0 46%;
+  left: 8vw;
+  bottom: 14vh;
   margin: 0;
-  text-align: center;
-  font: 12px var(--font-mono);
-  color: #7d8597;
+  font-family: var(--font-mono);
+  color: #e9e4d6;
+}
+.intro__percent {
+  margin: 0;
+  font-size: clamp(64px, 14vw, 168px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.intro__step {
+  margin: 14px 0 12px;
+  font-size: 13px;
   letter-spacing: 0.08em;
+  color: #9aa3b5;
+}
+.intro__meter {
+  display: flex;
+  gap: 6px;
+}
+.intro__cell {
+  width: clamp(40px, 9vw, 96px);
+  height: 8px;
+  background: #2a2f3c;
+}
+.intro__cell--on {
+  background: #0052ff;
 }
 
 .intro__skip {
@@ -3287,4 +3312,113 @@
 .home__brand-link:focus-visible {
   outline: 2px solid var(--pt-ink, #000);
   outline-offset: 4px;
+}
+
+/* ── The About page (2026-11-04, after c-na.dev): one plain scroll, Platinum paper ─────────── */
+.about {
+  min-height: 100vh;
+  background: var(--pt-face, #dddddd);
+  color: var(--pt-ink, #000);
+  font-family: var(--font-ui);
+}
+.about__bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: var(--pt-face-lit, #eee);
+  border-bottom: 1px solid #888;
+}
+.about__brand {
+  font-weight: 700;
+  color: inherit;
+  text-decoration: none;
+}
+.about a.gel {
+  text-decoration: none;
+}
+.about__hero,
+.about__section,
+.about__foot {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 40px 16px;
+}
+.about__hero h1 {
+  margin: 24px 0 12px;
+  font-size: clamp(48px, 10vw, 104px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.about__lede {
+  max-width: 640px;
+  font-size: 19px;
+  line-height: 1.5;
+}
+.about__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+.about__section {
+  border-top: 1px solid #aaa;
+}
+.about__section h2 {
+  margin: 0 0 16px;
+  font-size: 26px;
+}
+.about__figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+.about__figure {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  background: var(--pt-paper, #fff);
+  border: 1px solid #888;
+  box-shadow: var(--bevel-in);
+}
+.about__figure strong {
+  font-size: 34px;
+  font-variant-numeric: tabular-nums;
+}
+.about__figure span,
+.about__note {
+  font-size: 13px;
+  color: #444;
+}
+.about__doors {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+.about__doors h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+.about__doors p,
+.about__list,
+.about__section > p {
+  line-height: 1.55;
+}
+.about__flywheel {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #555;
+}
+.about__foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid #aaa;
+  font-size: 13px;
 }

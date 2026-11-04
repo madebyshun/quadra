@@ -78,6 +78,14 @@ export function hintFor(phase: Phase): string | null {
   return null;
 }
 
+/**
+ * The loading screen's steps (2026-11-04, after c-na.dev's "100% · The desk is ready."): each one is a
+ * step that really finished — three.js downloaded, the room built, the first frame drawn — never a
+ * timer pretending to count. The percentage is steps done of three.
+ */
+export const LOAD_STEPS = ["Loading the machine…", "Building the desk…", "Warming up the tube…", "The machine is ready."] as const;
+export const loadPercent = (done: number) => `${Math.round((Math.min(done, 3) / 3) * 100)}%`;
+
 /** How far a drag of one pixel turns and tilts the view (radians), and a scroll notch leans in. */
 export const DRAG = { yaw: 0.006, pitch: 0.004, zoom: 0.0008 } as const;
 /** A press that moves less than this many pixels is a click, not a drag. */
@@ -115,6 +123,7 @@ export function Intro({ onDone, start = startScene, clock = now }: IntroProps) {
   const orbit = useRef<Orbit>(REST);
   const sceneRef = useRef<IntroScene | null>(null);
   const [hover, setHover] = useState(false);
+  const [loaded, setLoaded] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -140,7 +149,7 @@ export function Intro({ onDone, start = startScene, clock = now }: IntroProps) {
     window.addEventListener("pointermove", onMove);
     window.addEventListener("resize", onResize);
 
-    start(stage.current!, screenEl, { width: window.innerWidth, height: window.innerHeight, pixelRatio: Math.min(window.devicePixelRatio, 2) }).then(
+    start(stage.current!, screenEl, { width: window.innerWidth, height: window.innerHeight, pixelRatio: Math.min(window.devicePixelRatio, 2) }, (done) => alive && setLoaded(done)).then(
       (s) => {
         if (!alive) return s.dispose();
         scene = s;
@@ -148,6 +157,7 @@ export function Intro({ onDone, start = startScene, clock = now }: IntroProps) {
         // the first frame compiles every shader — on a slow GPU, most of a second. Pay for it
         // before the clock starts, or the room's fade-up happens while nothing is on screen.
         s.frame(0, pointer);
+        setLoaded(3);
         let t0 = clock();
         let last: Phase = "loading";
         const tick = () => {
@@ -246,7 +256,17 @@ export function Intro({ onDone, start = startScene, clock = now }: IntroProps) {
     >
       <div className="intro__stage" ref={stage} aria-hidden="true" />
       {createPortal(<BootScreen phase={phase} block={block} />, screenEl)}
-      {phase === "loading" && <p className="intro__loading">Starting up…</p>}
+      {phase === "loading" && (
+        <div className="intro__loading" role="status" aria-label="Loading the intro">
+          <p className="intro__percent">{loadPercent(loaded)}</p>
+          <p className="intro__step">{LOAD_STEPS[Math.min(loaded, 3)]}</p>
+          <div className="intro__meter" aria-hidden="true">
+            {[0, 1, 2].map((i) => (
+              <span key={i} className={i < loaded ? "intro__cell intro__cell--on" : "intro__cell"} />
+            ))}
+          </div>
+        </div>
+      )}
       {hintFor(phase) ? <p className="intro__hint">{hintFor(phase)}</p> : null}
       <button
         type="button"

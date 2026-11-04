@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { blockText, BootScreen, CLICK_PX, DRAG, hintFor, Intro } from "@/intro/Intro";
+import { blockText, BootScreen, CLICK_PX, DRAG, hintFor, Intro, LOAD_STEPS, loadPercent } from "@/intro/Intro";
 import type { Hit, IntroScene } from "@/intro/scene";
 import { ORBIT_LIMITS, startOf, TOTAL_MS, type Orbit } from "@/intro/timeline";
 import { RX } from "./fixtures/radar";
@@ -67,14 +67,14 @@ function chain(block: unknown = RX.blockNumber) {
 /** The tube's element, as the component handed it to the scene — the boot screen renders into it. */
 let tube: HTMLElement = document.createElement("div");
 
-async function mount(start: () => Promise<IntroScene>) {
+async function mount(start: (...a: Parameters<typeof import("@/intro/start").startScene>) => Promise<IntroScene>) {
   const onDone = vi.fn();
   const view = render(
     <Intro
       onDone={onDone}
-      start={(_, el) => {
+      start={(host, el, size, onStep) => {
         tube = el;
-        return start();
+        return start(host, el, size, onStep);
       }}
       clock={clock}
     />,
@@ -250,10 +250,28 @@ describe("the intro", () => {
     chain();
     let release: (s: IntroScene) => void = () => {};
     const { onDone } = await mount(() => new Promise((r) => (release = r)));
-    expect(screen.getByText("Starting up…")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading the intro" })).toHaveTextContent("0%Loading the machine…");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onDone).toHaveBeenCalledOnce();
     release(fakeScene().scene);
+  });
+
+  it("counts the loading steps that really finished — three.js, the room — and never a timer", async () => {
+    chain();
+    let step: (n: number) => void = () => {};
+    let release: (s: IntroScene) => void = () => {};
+    await mount((_h, _el, _size, onStep) => ((step = onStep!), new Promise((r) => (release = r))));
+    const status = () => screen.getByRole("status", { name: "Loading the intro" });
+    expect(status()).toHaveTextContent("0%");
+    act(() => step(1));
+    expect(status()).toHaveTextContent("33%Building the desk…");
+    expect(status().querySelectorAll(".intro__cell--on")).toHaveLength(1);
+    act(() => step(2));
+    expect(status()).toHaveTextContent("67%Warming up the tube…");
+    expect(loadPercent(3)).toBe("100%");
+    expect(loadPercent(9)).toBe("100%");
+    expect(LOAD_STEPS[3]).toBe("The machine is ready.");
+    await act(async () => release(fakeScene().scene));
   });
 
   it("keeps time by the page's own monotonic clock unless it is given one", async () => {

@@ -1,6 +1,7 @@
 import { DirectionalLight, Fog, HemisphereLight, PerspectiveCamera, PointLight, Raycaster, Scene, Vector2, type Camera, type Texture } from "three";
 import { CSS3DObject, CSS3DRenderer } from "three/addons/renderers/CSS3DRenderer.js";
 import { buildMachine } from "@/intro/machine";
+import { buildRoom } from "@/intro/room";
 import { cameraAt, ease, REST, startOf, PHASES, wideDistance, type Orbit } from "@/intro/timeline";
 
 /**
@@ -67,6 +68,9 @@ export function createScene(o: SceneOptions): IntroScene {
   scene.fog = fog;
   const machine = buildMachine();
   scene.add(machine.group);
+  // the desk's other things and the posters: their own group, so the hit test below never reads them
+  const things = buildRoom();
+  scene.add(things.group);
 
   const hemi = new HemisphereLight("#cdd8ff", "#2a2420", 0.55);
   const key = new DirectionalLight("#fff1dc", 2.4);
@@ -135,6 +139,7 @@ export function createScene(o: SceneOptions): IntroScene {
     resize,
     dispose() {
       machine.dispose();
+      things.dispose();
       o.gl.dispose();
       o.gl.domElement.remove();
       css.domElement.remove();

@@ -63,7 +63,10 @@ export function Welcome({ onClose }: { onClose: () => void }) {
           <h1 id="welcome-title" className="welcome__head">
             Welcome to <b>{BRAND.name}</b>
           </h1>
-          <p className="welcome__lede">Check any token on Base, launch a coin, trade it. Every step is checked first and signed in your own wallet.</p>
+          {/* short, in the era's voice (2026-11-04, after c-na.dev's "The desk is ready.") */}
+          <p className="welcome__lede">
+            Check a token. Launch a coin. Trade it. Your wallet signs; nothing else can. <a href="/about">What is {BRAND.name}? ›</a>
+          </p>
           <form className="welcome__check" onSubmit={check} aria-label="Check a token">
             <label className="field-label" htmlFor="welcome-token">
               Check a token before you buy it

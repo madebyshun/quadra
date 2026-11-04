@@ -63,8 +63,9 @@ export function DocsBody() {
 
       {/*
         There were sections here about the product's own token and a tokenized-stock pair,
-        both removed on the owner's call — the token is not deployed (`CONTRACTS.token` is
-        null), and a plan printed beside checked facts borrows their credibility.
+        both removed on the owner's call while the token was not deployed, because a plan printed beside
+        checked facts borrows their credibility. The token is live since 2026-10-29; the About page
+        (/about) is where it is described, with its numbers read from the chain.
       */}
       <fieldset className="group">
         <legend>Where the answers come from</legend>

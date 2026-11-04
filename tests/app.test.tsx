@@ -3,7 +3,6 @@ import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderAt, settle } from "./helpers";
 import { BRAND } from "@/brand";
-import { CONTRACTS } from "@/config/chain";
 import { visibleFeatures, FEATURES, desktopItems, comingSoon, folderItems, FOLDER_IDS, entryOf } from "@/features/registry";
 import { radarSkill } from "@/skills/radar";
 
@@ -145,8 +144,7 @@ describe("the desktop", () => {
    * by absence, because prose about an unshipped token is exactly the kind of
    * thing that creeps back in one helpful paragraph at a time.
    */
-  it("says nothing about the product's own token, which does not exist", async () => {
-    expect(CONTRACTS.token).toBeNull();
+  it("says nothing about the product's own token — the About page does, with its numbers read from the chain", async () => {
     renderAt("/?do=docs");
     await settle();
     const win = screen.getByRole("heading", { level: 2 }).closest(".win")!;

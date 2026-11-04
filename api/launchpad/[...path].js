@@ -3458,8 +3458,13 @@ var CONTRACTS = {
    * the privacy model was archived on 2026-09-30.)
    */
   treasury: "0xD5C1dFc036F9911348EA8065F73c8123f4013FAB",
-  /** the product's own token, once launched — see BRAND.ticker for its name */
-  token: null,
+  /**
+   * The product's own token (see BRAND.ticker for its name), LAUNCHED by the owner 2026-10-29 on
+   * launchpad v3, paired with AAPLc, 1%: tx 0x9529911d…2b43, block 53,236,421, read back from the
+   * factory's `Launched` event. Its creator share goes to the furnace for good (`setCreatorRecipient`,
+   * tx 0xe47c4855…3185). No admin, fixed supply — the launchpad's own guarantees.
+   */
+  token: "0xb200000000000000000000d096efba9896ab0816",
   /**
    * The launchpad, version 2 (`contracts/src/LaunchFactory.sol`: ETH OR stock pairs), DEPLOYED BY THE
    * OWNER 2026-10-02 with their own key: tx 0xd05554c5…42f2a293, block 52,068,913, from 0x00FD29B7…
@@ -3831,7 +3836,7 @@ var tools_default = {
     },
     contracts: {
       treasury: "0xD5C1dFc036F9911348EA8065F73c8123f4013FAB",
-      token: null,
+      token: "0xb200000000000000000000d096efba9896ab0816",
       launchFactory: "0xef1F427bB57e0ECd7BB8051cE8bC7AAb709a0c03",
       launchFactoryV3: "0x006Da367654a487bb277fe25ff54f0fE0f741377",
       revenueShareDeployer: "0x774CD3CD89337cF7e57aF6a04256733F1dd74139",

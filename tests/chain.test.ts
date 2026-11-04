@@ -55,26 +55,30 @@ describe("our own contracts", () => {
    * written (see `CONTRACTS.treasury`). Pinned literally, so a change to where the money goes
    * is a visible edit to this line and never a side effect.
    */
-  it("sends fees to the owner's wallet, written with its checksum, and has no token yet", () => {
+  it("sends fees to the owner's wallet, written with its checksum, and names the launched token", () => {
     expect(CONTRACTS.treasury).toBe("0xD5C1dFc036F9911348EA8065F73c8123f4013FAB");
     expect(toChecksumAddress(CONTRACTS.treasury!)).toBe(CONTRACTS.treasury);
     expect(requireContract("treasury")).toBe(CONTRACTS.treasury);
-    expect(CONTRACTS.token, "CONTRACTS.token was set — deploy and verify it first").toBeNull();
+    // launched 2026-10-29 and read back from the factory's Launched event; pinned literally like the treasury
+    expect(CONTRACTS.token).toBe("0xb200000000000000000000d096efba9896ab0816");
+    expect(toChecksumAddress(CONTRACTS.token!)).toBe(CONTRACTS.token);
   });
 
+  // every address is set now, so the unset path is read through the pure helper `requireContract` wraps
   it("throws naming the constant rather than returning a zero address", () => {
-    expect(() => requireContract("token")).toThrowError(/CONTRACTS\.token/);
-    expect(() => requireContract("token")).toThrowError(/not deployed yet/);
+    expect(() => assertDeployed("token", null)).toThrowError(/CONTRACTS\.token/);
+    expect(() => assertDeployed("token", null)).toThrowError(/not deployed yet/);
+    expect(requireContract("token")).toBe(CONTRACTS.token);
   });
 
   it("names the explorer in the error, so the fix is in the message", () => {
-    expect(() => requireContract("token")).toThrowError(/basescan\.org/);
+    expect(() => assertDeployed("token", null)).toThrowError(/basescan\.org/);
   });
 
   it("never hands back a plausible-looking placeholder for what is unset", () => {
     let returned: string | null = null;
     try {
-      returned = requireContract("token");
+      returned = assertDeployed("token", null);
     } catch {
       // expected while unset
     }

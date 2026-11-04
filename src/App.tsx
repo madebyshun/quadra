@@ -8,6 +8,7 @@ import { resolveDoc, resolveFeature, windowTitle, type WindowId } from "@/featur
 import { Window } from "@/ui/Window";
 import { Taskbar } from "@/ui/Taskbar";
 import { Docs } from "@/pages/Docs";
+import { About } from "@/pages/About";
 import { ApiPage } from "@/pages/ApiPage";
 import { Verify } from "@/pages/Verify";
 import { NotFound } from "@/pages/NotFound";
@@ -274,6 +275,7 @@ export function App() {
         <div className={`desktop wallpaper--${paper}`}>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/about" element={<About />} />
             <Route path="/docs" element={<Docs />} />
             <Route path="/api" element={<ApiPage />} />
             <Route path="/verify" element={<Verify />} />
