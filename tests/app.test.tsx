@@ -422,7 +422,7 @@ describe("the app's own menu (it holds what the Start menu held)", () => {
       const group = within(menu).getByRole("group", { name: entryOf(id).title });
       expect(within(group).getAllByRole("menuitem").map((m) => m.textContent)).toEqual([entryOf(id).title, ...folderItems(id).map((e) => e.title)]);
     }
-    expect(within(menu).getByRole("menuitem", { name: "README.TXT" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Read Me" })).toBeInTheDocument();
     expect(within(menu).queryByRole("menuitem", { name: /Bridge/ })).not.toBeInTheDocument();
     for (const f of comingSoon()) expect(within(menu).queryByRole("menuitem", { name: f.title })).not.toBeInTheDocument();
     await user.click(within(menu).getByRole("menuitem", { name: "Games" }));

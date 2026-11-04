@@ -57,7 +57,7 @@ npm run gate
 ```
 
 That is `tsc --noEmit` → `vitest run --coverage` → `tsc --noEmit && vite build`. All three,
-in one go. Do not report "done" on a subset. **2151 tests in 115 files**, 100% on all four metrics, measured 2026-11-04 after the Vercel functions (T3: src/server/vercel.ts, api/ generated, vercel.json); 2147/113 on 2026-10-29 after the menu bar's Home button (2145 after the coin page's furnace block (lib/furnace.ts — Harvest for anyone, Buy back & burn for the furnace's treasury only; `shareOf` now treats a contract that refuses `agent()` as not a share)); 2136/112 after Relay's v3.2 pair was pinned beside v3 (Relay moved 2026-10-26; config/routes.ts RELAY_PAIRS); 2135 after RevenueShareDeployer was deployed and wired (2134 after the six launchpad additions (Pay with ETH for a stock-paired coin, every page of Coinbase's stocks, a share card, Verdict badges on Coins, where the 80% goes, staking into a RevenueShare)); 2104/107 after Coinbase's stock list began to be read past its first page (2101 after the simplification (one door per job: Check / Coins / Launch / Wallet on the desktop, the coin page trading through its own pool only, Token Verdict simulating a launchpad coin on its own pool)); 2085/105 measured 2026-10-28 after the Relay no-route fallback's missing branches were tested (2082 at the fallback's commit, which had left `relay.ts` and `SwapPanel.tsx` below 100% — the gate was red); 2081 measured 2026-10-22 after Explore Base, the coin page's CA, the compact small-number format and the Mac OS 8 "Platinum" redesign (2049/102 earlier that day, after v3's approved referrers reached the app, and re-measured the same day after v3's deploy, when v2-fixture test files were pinned to `launchFactoryV3: null` (`tests/v2only.ts`); 2041/102 earlier that day, after the desktop was reorganised into folders; 2017/101 on 2026-10-21, with the Base card program (`card`) and the Welcome screen in the tree; 1971/97 earlier that day, after the coin chart's frames and opening price; 1968/97 earlier that day, after the app was wired to launchpad v3; 1945/96 on 2026-10-14; 1918/95 before the coin page, same day) (1684/76 on 2026-10-02, before the "more fun" programs, the wallet's fees,
+in one go. Do not report "done" on a subset. **2161 tests in 115 files**, 100% on all four metrics, measured 2026-11-04 after the stored indexer and the Mac names (no `.exe`, "Read Me"); 2151 after the Vercel functions (T3: src/server/vercel.ts, api/ generated, vercel.json); 2147/113 on 2026-10-29 after the menu bar's Home button (2145 after the coin page's furnace block (lib/furnace.ts — Harvest for anyone, Buy back & burn for the furnace's treasury only; `shareOf` now treats a contract that refuses `agent()` as not a share)); 2136/112 after Relay's v3.2 pair was pinned beside v3 (Relay moved 2026-10-26; config/routes.ts RELAY_PAIRS); 2135 after RevenueShareDeployer was deployed and wired (2134 after the six launchpad additions (Pay with ETH for a stock-paired coin, every page of Coinbase's stocks, a share card, Verdict badges on Coins, where the 80% goes, staking into a RevenueShare)); 2104/107 after Coinbase's stock list began to be read past its first page (2101 after the simplification (one door per job: Check / Coins / Launch / Wallet on the desktop, the coin page trading through its own pool only, Token Verdict simulating a launchpad coin on its own pool)); 2085/105 measured 2026-10-28 after the Relay no-route fallback's missing branches were tested (2082 at the fallback's commit, which had left `relay.ts` and `SwapPanel.tsx` below 100% — the gate was red); 2081 measured 2026-10-22 after Explore Base, the coin page's CA, the compact small-number format and the Mac OS 8 "Platinum" redesign (2049/102 earlier that day, after v3's approved referrers reached the app, and re-measured the same day after v3's deploy, when v2-fixture test files were pinned to `launchFactoryV3: null` (`tests/v2only.ts`); 2041/102 earlier that day, after the desktop was reorganised into folders; 2017/101 on 2026-10-21, with the Base card program (`card`) and the Welcome screen in the tree; 1971/97 earlier that day, after the coin chart's frames and opening price; 1968/97 earlier that day, after the app was wired to launchpad v3; 1945/96 on 2026-10-14; 1918/95 before the coin page, same day) (1684/76 on 2026-10-02, before the "more fun" programs, the wallet's fees,
 pool trading, the indexer and launchpad recognition; 1682/76 before the doc audit's fixes) — it FELL from 1627/68 the same day, deliberately: o1 was taken out
 of Launch and `tests/launch.test.tsx` went with it to `archive/o1/` (1608/67 before the verdict, radar and Launch window read the
 launchpad; 1585/66 before the launchpad's window; 1548/60 on 2026-10-01 before the 3D intro; 1547/59 on 2026-09-30, before the seven basic skills were deleted
@@ -1077,10 +1077,13 @@ scripts/           measure-catalog.ts — hand-run, hits the network
 api/               🔴 GENERATED Vercel Functions (T3, 2026-11-04) — `npm run build:api`
                    (scripts/build-api.mjs) bundles src/server/vercel.ts `routes(process.env)` per
                    route, because Vercel's compiler does not follow the `@/` alias:
-                   stocks/[...path].js, charts/[...path].js, skills.js + skills/[...path].js.
+                   stocks/[...path].js, charts/[...path].js, skills.js + skills/[...path].js,
+                   launchpad/[...path].js (the indexer, its state in the project's Vercel Blob —
+                   server/indexStore.ts; each stale request steps it forward for ≤20 s and saves)
+                   and cron/index.js (vercel.json `crons`, daily: Hobby allows no more).
                    Web signature `export function GET(request)`. tests/apiBundle.test.ts fails while
                    one is stale. vercel.json sends every non-`/api/` path to index.html (the /api
-                   PAGE included). NOT yet: the indexer (needs a store + cron), the forwarder
+                   PAGE included). NOT yet: the forwarder
                    (serves only x402 halves that are switched off). Measured locally by importing
                    the bundles; NOT yet measured on a real Vercel deploy
 archive/           privacy/ (src, tests, contracts, the contract-gate scripts) and
@@ -1276,9 +1279,10 @@ privacy items that lived here — no verifier and no Poseidon, the join-split am
 Railgun question, `$QUADRA`'s pair — were closed on 2026-09-30 by the privacy model being
 archived, not by being solved; they are in `TASKS.md`'s Archive.)*
 
-- **The production server is half built (T3, 2026-11-04).** Stocks, charts and the paid API are
-  Vercel Functions in `api/`; the launchpad indexer is not (so coin pages read "not read" for trades
-  and charts until it is). Before 2026-11-04: Vercel is decided; nothing is deployed. The forwarder, the
+- **The production server is built, not yet measured on Vercel (T3, 2026-11-04).** Stocks, charts,
+  the paid API and the launchpad indexer are Vercel Functions in `api/`; the index lives in a Vercel
+  Blob (the owner created the store 2026-11-04; `BLOB_ACCESS=public` only if it is a public store).
+  Its first catch-up is ~1.2M blocks from v1's deploy, stepped ≤20 s per request on public RPCs. Before 2026-11-04: Vercel is decided; nothing is deployed. The forwarder, the
   charts cache and the paid API run on the dev server only (`vite.config.ts`). The Vercel functions
   are T3 — and `server/api.ts` imports the app through the `@/` alias, which a Vercel function
   bundle must resolve (measure it at deploy; the dev server does it through `ssrLoadModule`).

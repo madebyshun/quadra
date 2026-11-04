@@ -1226,14 +1226,14 @@ function pad(hexOrBytes, { dir, size: size2 = 32 } = {}) {
 function padHex(hex_, { dir, size: size2 = 32 } = {}) {
   if (size2 === null)
     return hex_;
-  const hex = hex_.replace("0x", "");
-  if (hex.length > size2 * 2)
+  const hex2 = hex_.replace("0x", "");
+  if (hex2.length > size2 * 2)
     throw new SizeExceedsPaddingSizeError({
-      size: Math.ceil(hex.length / 2),
+      size: Math.ceil(hex2.length / 2),
       targetSize: size2,
       type: "hex"
     });
-  return `0x${hex[dir === "right" ? "padEnd" : "padStart"](size2 * 2, "0")}`;
+  return `0x${hex2[dir === "right" ? "padEnd" : "padStart"](size2 * 2, "0")}`;
 }
 function padBytes(bytes, { dir, size: size2 = 32 } = {}) {
   if (size2 === null)
@@ -1316,21 +1316,21 @@ function assertSize(hexOrBytes, { size: size2 }) {
       maxSize: size2
     });
 }
-function hexToBigInt(hex, opts = {}) {
+function hexToBigInt(hex2, opts = {}) {
   const { signed: signed2 } = opts;
   if (opts.size)
-    assertSize(hex, { size: opts.size });
-  const value = BigInt(hex);
+    assertSize(hex2, { size: opts.size });
+  const value = BigInt(hex2);
   if (!signed2)
     return value;
-  const size2 = Math.ceil((hex.length - 2) / 2);
+  const size2 = Math.ceil((hex2.length - 2) / 2);
   const max = (1n << BigInt(size2) * 8n - 1n) - 1n;
   if (value <= max)
     return value;
   return value - BigInt(`0x${"f".padStart(size2 * 2, "f")}`) - 1n;
 }
-function hexToNumber(hex, opts = {}) {
-  const value = hexToBigInt(hex, opts);
+function hexToNumber(hex2, opts = {}) {
+  const value = hexToBigInt(hex2, opts);
   const number = Number(value);
   if (!Number.isSafeInteger(number))
     throw new IntegerOutOfRangeError({
@@ -1362,24 +1362,24 @@ function toHex2(value, opts = {}) {
   return bytesToHex(value, opts);
 }
 function boolToHex(value, opts = {}) {
-  const hex = `0x${Number(value)}`;
+  const hex2 = `0x${Number(value)}`;
   if (typeof opts.size === "number") {
-    assertSize(hex, { size: opts.size });
-    return pad(hex, { size: opts.size });
+    assertSize(hex2, { size: opts.size });
+    return pad(hex2, { size: opts.size });
   }
-  return hex;
+  return hex2;
 }
 function bytesToHex(value, opts = {}) {
   let string = "";
   for (let i = 0; i < value.length; i++) {
     string += hexes[value[i]];
   }
-  const hex = `0x${string}`;
+  const hex2 = `0x${string}`;
   if (typeof opts.size === "number") {
-    assertSize(hex, { size: opts.size });
-    return pad(hex, { dir: "right", size: opts.size });
+    assertSize(hex2, { size: opts.size });
+    return pad(hex2, { dir: "right", size: opts.size });
   }
-  return hex;
+  return hex2;
 }
 function numberToHex(value_, opts = {}) {
   const { signed: signed2, size: size2 } = opts;
@@ -1404,10 +1404,10 @@ function numberToHex(value_, opts = {}) {
       value: `${value_}${suffix}`
     });
   }
-  const hex = `0x${(signed2 && value < 0 ? (1n << BigInt(size2 * 8)) + BigInt(value) : value).toString(16)}`;
+  const hex2 = `0x${(signed2 && value < 0 ? (1n << BigInt(size2 * 8)) + BigInt(value) : value).toString(16)}`;
   if (size2)
-    return pad(hex, { size: size2 });
-  return hex;
+    return pad(hex2, { size: size2 });
+  return hex2;
 }
 function stringToHex(value_, opts = {}) {
   const value = encoder.encode(value_);
@@ -1454,12 +1454,12 @@ function charCodeToBase16(char) {
   return void 0;
 }
 function hexToBytes(hex_, opts = {}) {
-  let hex = hex_;
+  let hex2 = hex_;
   if (opts.size) {
-    assertSize(hex, { size: opts.size });
-    hex = pad(hex, { dir: "right", size: opts.size });
+    assertSize(hex2, { size: opts.size });
+    hex2 = pad(hex2, { dir: "right", size: opts.size });
   }
-  let hexString = hex.slice(2);
+  let hexString = hex2.slice(2);
   if (hexString.length % 2)
     hexString = `0${hexString}`;
   const length = hexString.length / 2;
@@ -1475,8 +1475,8 @@ function hexToBytes(hex_, opts = {}) {
   return bytes;
 }
 function numberToBytes(value, opts) {
-  const hex = numberToHex(value, opts);
-  return hexToBytes(hex);
+  const hex2 = numberToHex(value, opts);
+  return hexToBytes(hex2);
 }
 function stringToBytes(value, opts = {}) {
   const bytes = encoder2.encode(value);
@@ -1928,8 +1928,8 @@ var init_address = __esm({
     "use strict";
     init_base();
     InvalidAddressError = class extends BaseError2 {
-      constructor({ address }) {
-        super(`Address "${address}" is invalid.`, {
+      constructor({ address: address2 }) {
+        super(`Address "${address2}" is invalid.`, {
           metaMessages: [
             "- Address must be a hex value of 20 bytes (40 hex characters).",
             "- Address must match its checksum counterpart."
@@ -1986,16 +1986,16 @@ function checksumAddress(address_, chainId) {
     return checksumAddressCache.get(`${address_}.${chainId}`);
   const hexAddress = chainId ? `${chainId}${address_.toLowerCase()}` : address_.substring(2).toLowerCase();
   const hash2 = keccak2562(stringToBytes(hexAddress), "bytes");
-  const address = (chainId ? hexAddress.substring(`${chainId}0x`.length) : hexAddress).split("");
+  const address2 = (chainId ? hexAddress.substring(`${chainId}0x`.length) : hexAddress).split("");
   for (let i = 0; i < 40; i += 2) {
-    if (hash2[i >> 1] >> 4 >= 8 && address[i]) {
-      address[i] = address[i].toUpperCase();
+    if (hash2[i >> 1] >> 4 >= 8 && address2[i]) {
+      address2[i] = address2[i].toUpperCase();
     }
-    if ((hash2[i >> 1] & 15) >= 8 && address[i + 1]) {
-      address[i + 1] = address[i + 1].toUpperCase();
+    if ((hash2[i >> 1] & 15) >= 8 && address2[i + 1]) {
+      address2[i + 1] = address2[i + 1].toUpperCase();
     }
   }
-  const result = `0x${address.join("")}`;
+  const result = `0x${address2.join("")}`;
   checksumAddressCache.set(`${address_}.${chainId}`, result);
   return result;
 }
@@ -2011,18 +2011,18 @@ var init_getAddress = __esm({
 });
 
 // node_modules/viem/_esm/utils/address/isAddress.js
-function isAddress(address, options) {
+function isAddress(address2, options) {
   const { strict = true } = options ?? {};
-  const cacheKey = `${address}.${strict}`;
+  const cacheKey = `${address2}.${strict}`;
   if (isAddressCache.has(cacheKey))
     return isAddressCache.get(cacheKey);
   const result = (() => {
-    if (!addressRegex.test(address))
+    if (!addressRegex.test(address2))
       return false;
-    if (address.toLowerCase() === address)
+    if (address2.toLowerCase() === address2)
       return true;
     if (strict)
-      return checksumAddress(address) === address;
+      return checksumAddress(address2) === address2;
     return true;
   })();
   isAddressCache.set(cacheKey, result);
@@ -2765,8 +2765,8 @@ var init_cursor2 = __esm({
 function bytesToBigInt(bytes, opts = {}) {
   if (typeof opts.size !== "undefined")
     assertSize(bytes, { size: opts.size });
-  const hex = bytesToHex(bytes);
-  return hexToBigInt(hex, opts);
+  const hex2 = bytesToHex(bytes);
+  return hexToBigInt(hex2, opts);
 }
 function bytesToBool(bytes_, opts = {}) {
   let bytes = bytes_;
@@ -2781,8 +2781,8 @@ function bytesToBool(bytes_, opts = {}) {
 function bytesToNumber(bytes, opts = {}) {
   if (typeof opts.size !== "undefined")
     assertSize(bytes, { size: opts.size });
-  const hex = bytesToHex(bytes);
-  return hexToNumber(hex, opts);
+  const hex2 = bytesToHex(bytes);
+  return hexToNumber(hex2, opts);
 }
 function bytesToString(bytes_, opts = {}) {
   let bytes = bytes_;
@@ -3381,6 +3381,9 @@ var init_abis = __esm({
   }
 });
 
+// api/skills.js
+import { get, put } from "@vercel/blob";
+
 // src/brand.ts
 var BRAND = {
   name: "Quadra",
@@ -3680,8 +3683,8 @@ function toChecksumAddress(value) {
   }
   return out;
 }
-function carriesChecksum(hex) {
-  return hex !== hex.toLowerCase() && hex !== hex.toUpperCase();
+function carriesChecksum(hex2) {
+  return hex2 !== hex2.toLowerCase() && hex2 !== hex2.toUpperCase();
 }
 function notAnAddress(value) {
   return `That is not a 20-byte hex address: "${value}". Chain plus address identifies an account; a name or a ticker never does.`;
@@ -3691,9 +3694,9 @@ function checkAddress(value) {
   if (!hasAddressShape(trimmed)) {
     return { kind: "malformed", why: notAnAddress(trimmed) };
   }
-  const hex = trimmed.slice(2);
-  const lowercased = `0x${hex.toLowerCase()}`;
-  if (!carriesChecksum(hex)) {
+  const hex2 = trimmed.slice(2);
+  const lowercased = `0x${hex2.toLowerCase()}`;
+  if (!carriesChecksum(hex2)) {
     return { kind: "unchecked", address: lowercased };
   }
   if (toChecksumAddress(trimmed) !== trimmed) {
@@ -3937,20 +3940,20 @@ function hookAddressProblem(raw) {
   }
 }
 function readHookAddress(raw) {
-  const address = raw.trim();
-  const problem4 = hookAddressProblem(address);
-  if (problem4 !== null) throw new Error(problem4);
-  const bits = BigInt(address) & (1n << BigInt(ALL_HOOK_BITS)) - 1n;
+  const address2 = raw.trim();
+  const problem6 = hookAddressProblem(address2);
+  if (problem6 !== null) throw new Error(problem6);
+  const bits = BigInt(address2) & (1n << BigInt(ALL_HOOK_BITS)) - 1n;
   const permissions = HOOK_PERMISSIONS.map((p) => ({
     ...p,
     granted: (bits & 1n << BigInt(p.bit)) !== 0n
   }));
   return {
-    address,
+    address: address2,
     permissions,
     granted: permissions.filter((p) => p.granted),
     inert: bits === 0n,
-    checksum: checkAddress(address)
+    checksum: checkAddress(address2)
   };
 }
 
@@ -4044,21 +4047,21 @@ var BLOCKSCOUT = "https://base.blockscout.com/api/v2";
 var SERVICE = "Blockscout";
 function partyOf(v) {
   if (!isObj(v)) return null;
-  const address = strOf(v.hash);
-  if (!address) return null;
+  const address2 = strOf(v.hash);
+  if (!address2) return null;
   return {
-    address,
+    address: address2,
     label: strOf(v.ens_domain_name) ?? strOf(v.name),
     isContract: v.is_contract === true
   };
 }
 function parseToken(body) {
   if (!isObj(body)) return null;
-  const address = strOf(body.address_hash);
+  const address2 = strOf(body.address_hash);
   const decimals = numOf(body.decimals);
-  if (!address || decimals === null) return null;
+  if (!address2 || decimals === null) return null;
   return {
-    address,
+    address: address2,
     symbol: strOf(body.symbol) ?? "?",
     name: strOf(body.name) ?? "?",
     decimals,
@@ -4068,8 +4071,8 @@ function parseToken(body) {
     type: strOf(body.type)
   };
 }
-async function tokenInfo(address) {
-  return parseToken(await getJson(SERVICE, `${BLOCKSCOUT}/tokens/${address}`));
+async function tokenInfo(address2) {
+  return parseToken(await getJson(SERVICE, `${BLOCKSCOUT}/tokens/${address2}`));
 }
 function parseHolders(body) {
   const out = [];
@@ -4124,6 +4127,7 @@ function namehash(name) {
 
 // node_modules/viem/_esm/index.js
 init_abis();
+init_decodeAbiParameters();
 init_decodeFunctionResult();
 init_encodeAbiParameters();
 init_encodeFunctionData();
@@ -4224,13 +4228,13 @@ function parseHistory(body) {
   });
   return { txs, complete: !isObj(body.next_page_params) };
 }
-function summarize(address, factory, history) {
-  const me = address.toLowerCase();
+function summarize(address2, factory, history) {
+  const me = address2.toLowerCase();
   const { txs, complete } = history;
   const mine = txs.filter((t) => t.from.toLowerCase() === me);
   const funded = txs.filter((t) => t.to?.toLowerCase() === me && /^[1-9]/.test(t.value)).at(-1);
   return {
-    address,
+    address: address2,
     complete,
     txCount: txs.length,
     firstSeen: complete ? txs.at(-1)?.at ?? null : null,
@@ -4247,9 +4251,9 @@ async function poolLaunch(pool, createdAt) {
   const number = quantity(head.number, "the latest block number");
   const time = quantity(head.timestamp, "the latest block's time");
   const block = number - (time - BigInt(Math.floor(createdAt / 1e3))) / BLOCK_SECONDS;
-  const hex = (n) => `0x${(n < 0n ? 0n : n).toString(16)}`;
+  const hex2 = (n) => `0x${(n < 0n ? 0n : n).toString(16)}`;
   const logs = await rpcOn(BASE.name, ARCHIVE_RPC, "eth_getLogs", [
-    { address: UNISWAP_V4_POOL_MANAGER, topics: [INITIALIZE_TOPIC, pool], fromBlock: hex(block - BigInt(BLOCK_SLACK)), toBlock: hex(block + BigInt(BLOCK_SLACK)) }
+    { address: UNISWAP_V4_POOL_MANAGER, topics: [INITIALIZE_TOPIC, pool], fromBlock: hex2(block - BigInt(BLOCK_SLACK)), toBlock: hex2(block + BigInt(BLOCK_SLACK)) }
   ]);
   const first = listOf(logs)[0];
   return isObj(first) ? strOf(first.transactionHash) : null;
@@ -4263,8 +4267,8 @@ async function launchTx(token, pairs) {
   const hash2 = v4 ? await poolLaunch(v4.pair, v4.createdAt) : null;
   return hash2 ? { hash: hash2, creator } : null;
 }
-async function launcherProfile(address, factory) {
-  return summarize(address, factory, parseHistory(await getJson(SERVICE2, `${BLOCKSCOUT}/addresses/${address}/transactions`)));
+async function launcherProfile(address2, factory) {
+  return summarize(address2, factory, parseHistory(await getJson(SERVICE2, `${BLOCKSCOUT}/addresses/${address2}/transactions`)));
 }
 function atLeastOne(l) {
   return l.factoryCalls > 0 ? l : { ...l, factoryCalls: 1, callsComplete: false };
@@ -4563,8 +4567,8 @@ function assertDecimals(decimals) {
 }
 
 // src/skills/format.ts
-function short(address) {
-  return `${address.slice(0, 6)}\u2026${address.slice(-4)}`;
+function short(address2) {
+  return `${address2.slice(0, 6)}\u2026${address2.slice(-4)}`;
 }
 function usd(value) {
   if (value > 0 && value < 0.01) return "<$0.01";
@@ -4912,9 +4916,9 @@ var GETTERS = parseAbi([
 async function read2(token, functionName) {
   return decodeFunctionResult({ abi: GETTERS, functionName, data: await ethCall(token, encodeFunctionData({ abi: GETTERS, functionName })) });
 }
-async function chainToken(address) {
-  const [name, symbol, decimals, totalSupply] = await Promise.all([read2(address, "name"), read2(address, "symbol"), read2(address, "decimals"), read2(address, "totalSupply")]);
-  return { address, name: String(name), symbol: String(symbol), decimals: Number(decimals), totalSupply, holders: null, price: null, type: "ERC-20" };
+async function chainToken(address2) {
+  const [name, symbol, decimals, totalSupply] = await Promise.all([read2(address2, "name"), read2(address2, "symbol"), read2(address2, "decimals"), read2(address2, "totalSupply")]);
+  return { address: address2, name: String(name), symbol: String(symbol), decimals: Number(decimals), totalSupply, holders: null, price: null, type: "ERC-20" };
 }
 
 // src/adapters/http/quotes.ts
@@ -4976,8 +4980,8 @@ function kindOfCode(code) {
   const delegated = DELEGATION.exec(code);
   return delegated ? { kind: "delegated", to: toChecksumAddress(`0x${delegated[1]}`) } : { kind: "contract" };
 }
-async function accountKind(address) {
-  return kindOfCode(hexData(await rpc("eth_getCode", [address, "latest"]), "the account's code"));
+async function accountKind(address2) {
+  return kindOfCode(hexData(await rpc("eth_getCode", [address2, "latest"]), "the account's code"));
 }
 
 // src/lib/v4swap.ts
@@ -5154,17 +5158,17 @@ async function relayQuote(sell, buy, amount) {
 }
 function parseSimulation(result) {
   return listOf(objAt({ r: listOf(result)[0] }, "r").calls).map((c) => {
-    const call = isObj(c) ? c : {};
-    const error = objAt(call, "error");
+    const call2 = isObj(c) ? c : {};
+    const error = objAt(call2, "error");
     return {
-      ok: call.status === "0x1",
+      ok: call2.status === "0x1",
       reason: strOf(error.message) ?? "reverted with no reason",
-      logs: listOf(call.logs).flatMap((l) => {
+      logs: listOf(call2.logs).flatMap((l) => {
         if (!isObj(l)) return [];
-        const address = strOf(l.address);
+        const address2 = strOf(l.address);
         const data = strOf(l.data);
         const topics = listOf(l.topics).filter((t) => typeof t === "string");
-        return address && data !== null ? [{ address, topics, data }] : [];
+        return address2 && data !== null ? [{ address: address2, topics, data }] : [];
       })
     };
   });
@@ -5475,27 +5479,27 @@ function verdictRow(rows) {
 var settled = (p) => p.catch(() => void 0);
 var ownPool = (pool) => pool && pool.quote.toLowerCase() === NATIVE2 ? [poolRouter(pool)] : [];
 async function tokenVerdict(input, now) {
-  const address = toChecksumAddress(assertChecksummedAddress(input, "Token"));
+  const address2 = toChecksumAddress(assertChecksummedAddress(input, "Token"));
   let simFailure = null;
-  const market = settled(markets(address));
-  const launch = settled(launchOf(address));
-  const pad3 = launch.then((l) => l ? null : settled(launchpadOf(address, Promise.resolve(null))));
+  const market = settled(markets(address2));
+  const launch = settled(launchOf(address2));
+  const pad3 = launch.then((l) => l ? null : settled(launchpadOf(address2, Promise.resolve(null))));
   const [info, security, pairs, holders, origin, trip, launchpad, value, other] = await Promise.all([
-    settled(tokenInfo(address)).then(async (i) => i ?? await settled(chainToken(address))),
-    settled(scan(address)),
+    settled(tokenInfo(address2)).then(async (i) => i ?? await settled(chainToken(address2))),
+    settled(scan(address2)),
     market,
-    settled(topHolders(address)),
-    launch.then((l) => l ? settled(launchpadOrigin(l)) : Promise.all([market, pad3]).then(([p, d]) => settled(originOf(address, p ?? [], d?.kind === "proven" ? d : null)))),
+    settled(topHolders(address2)),
+    launch.then((l) => l ? settled(launchpadOrigin(l)) : Promise.all([market, pad3]).then(([p, d]) => settled(originOf(address2, p ?? [], d?.kind === "proven" ? d : null)))),
     // a coin launched here and paired with ETH trades through its own pool: Relay routes no v3 pool
-    launch.then(async (l) => roundTrip(address, ...ownPool(l ? await poolKeyOf(address) : null))).catch((e) => {
+    launch.then(async (l) => roundTrip(address2, ...ownPool(l ? await poolKeyOf(address2) : null))).catch((e) => {
       simFailure = messageOf(e);
       return null;
     }),
     launch,
-    launch.then((l) => l ? settled(poolValue(l.factory, address)) : null),
+    launch.then((l) => l ? settled(poolValue(l.factory, address2)) : null),
     pad3
   ]);
-  const [fee, referrer] = await Promise.all([v3FeeOf(launchpad, address), v3ReferrerOf(launchpad, address)]);
+  const [fee, referrer] = await Promise.all([v3FeeOf(launchpad, address2), v3ReferrerOf(launchpad, address2)]);
   const token = info ?? null;
   const body = [
     ...launchpadRows(launchpad, fee, referrer),
@@ -5509,8 +5513,8 @@ async function tokenVerdict(input, now) {
   ];
   const red = body.filter((r) => r.tone === "bad").map((r) => r.label);
   return {
-    title: token ? `${token.symbol} \u2014 Token Verdict` : `Token Verdict \u2014 ${address}`,
-    rows: [row("Token", token ? `${token.name} (${token.symbol})` : address, { href: explorer.token(address) }), verdictRow(body), ...body],
+    title: token ? `${token.symbol} \u2014 Token Verdict` : `Token Verdict \u2014 ${address2}`,
+    rows: [row("Token", token ? `${token.name} (${token.symbol})` : address2, { href: explorer.token(address2) }), verdictRow(body), ...body],
     notes: [
       ...red.length ? [`Red: ${red.join("; ")}.`] : [],
       "The trade is simulated on Base at this block from an address nobody holds a key to \u2014 0.01 ETH in, everything back out. Nothing was signed or sent. A token can change its rules after you buy.",
@@ -5520,10 +5524,10 @@ async function tokenVerdict(input, now) {
     ],
     sources: ["Base (eth_simulateV1)", launchpad ? "Uniswap v4 (Quoter, Universal Router)" : "Relay", "GoPlus Security", "Blockscout", "DexScreener", ...launchpad ? ["Uniswap v4 (its pool, read directly)"] : ["Base (the launchpads' own records)"]],
     next: [
-      ...launchpad ? [{ label: "Its page here", command: `coin ${address}` }] : [],
-      { label: "Buy or sell it", command: `swap ${address}` },
-      { label: "Launch forensics", command: `forensics ${address}` },
-      { label: "Its launcher", command: `launcher ${address}` }
+      ...launchpad ? [{ label: "Its page here", command: `coin ${address2}` }] : [],
+      { label: "Buy or sell it", command: `swap ${address2}` },
+      { label: "Launch forensics", command: `forensics ${address2}` },
+      { label: "Its launcher", command: `launcher ${address2}` }
     ]
   };
 }
@@ -5621,7 +5625,7 @@ function analyze(logs, pools, launchBlock) {
   }
   buys.sort((a, b) => a.block - b.block);
   const minted = logs.some((l) => l.from === ZERO3);
-  const holders = minted ? [...balance].filter(([who, b]) => b > 0n && !pools.has(who) && who !== ZERO3 && who !== DEAD2).sort((a, b) => b[1] > a[1] ? 1 : b[1] < a[1] ? -1 : 0).slice(0, 3).map(([address, amount]) => ({ address, amount })) : null;
+  const holders = minted ? [...balance].filter(([who, b]) => b > 0n && !pools.has(who) && who !== ZERO3 && who !== DEAD2).sort((a, b) => b[1] > a[1] ? 1 : b[1] < a[1] ? -1 : 0).slice(0, 3).map(([address2, amount]) => ({ address: address2, amount })) : null;
   return { launchBlock, buys, holders, sprays };
 }
 function operators(wallets) {
@@ -5706,15 +5710,15 @@ async function rangeOf(pairs, now) {
   const from = Math.max(0, latest - Math.round((now - created) / 2e3) - BLOCK_SLACK);
   return { from, to: Math.min(latest, from + WINDOW) };
 }
-async function walletOf(address, token) {
+async function walletOf(address2, token) {
   const [nonce, code, holds] = await Promise.all([
-    rpc("eth_getTransactionCount", [address, "latest"]).then((n) => Number(quantity(n, "a nonce")), () => null),
-    rpc("eth_getCode", [address, "latest"]).then((c) => String(c), () => void 0),
-    ethCall(token, encodeFunctionData({ abi: erc20Abi, functionName: "balanceOf", args: [address] })).then((d) => BigInt(d), () => null)
+    rpc("eth_getTransactionCount", [address2, "latest"]).then((n) => Number(quantity(n, "a nonce")), () => null),
+    rpc("eth_getCode", [address2, "latest"]).then((c) => String(c), () => void 0),
+    ethCall(token, encodeFunctionData({ abi: erc20Abi, functionName: "balanceOf", args: [address2] })).then((d) => BigInt(d), () => null)
   ]);
   const delegate = code === void 0 ? void 0 : /^0xef0100[0-9a-f]{40}$/i.test(code) ? toChecksumAddress(`0x${code.slice(8)}`) : null;
   const codeTag = code === void 0 ? void 0 : code === "0x" || delegate ? null : code.slice(0, 26);
-  return { address, nonce, delegate, codeTag, holds };
+  return { address: address2, nonce, delegate, codeTag, holds };
 }
 async function forensics(input, now) {
   const token = toChecksumAddress(assertChecksummedAddress(input.trim(), "Token"));
@@ -5767,18 +5771,18 @@ function reputationRow(rows) {
   if (rows.some((r) => r.tone === "warn")) return row("Reputation", "Caution \u2014 see the amber lines", { tone: "warn" });
   return row("Reputation", "No red flags found", { tone: "ok" });
 }
-async function find(address) {
-  const ours = await launchOf(address);
+async function find(address2) {
+  const ours = await launchOf(address2);
   if (ours) return { what: "token", origin: await launchpadOrigin(ours) };
-  const pairs = await markets(address).catch(() => []);
-  const isToken = pairs.length > 0 || await chainToken(address).then(() => true, () => false);
-  if (!isToken) return { what: "wallet", origin: { via: null, launcher: await launcherProfile(address, null) } };
-  const pad3 = await launchpadOf(address, Promise.resolve(null)).catch(() => null);
-  return { what: "token", origin: await originOf(address, pairs, pad3?.kind === "proven" ? pad3 : null) };
+  const pairs = await markets(address2).catch(() => []);
+  const isToken = pairs.length > 0 || await chainToken(address2).then(() => true, () => false);
+  if (!isToken) return { what: "wallet", origin: { via: null, launcher: await launcherProfile(address2, null) } };
+  const pad3 = await launchpadOf(address2, Promise.resolve(null)).catch(() => null);
+  return { what: "token", origin: await originOf(address2, pairs, pad3?.kind === "proven" ? pad3 : null) };
 }
 async function launcherReport(input, now) {
-  const address = toChecksumAddress(assertChecksummedAddress(input.trim(), "Token or wallet"));
-  const { what, origin } = await find(address);
+  const address2 = toChecksumAddress(assertChecksummedAddress(input.trim(), "Token or wallet"));
+  const { what, origin } = await find(address2);
   const launcher = origin?.launcher ?? null;
   const here = launcher ? await launchesBy(launcher.address).catch(() => null) : null;
   const body = [
@@ -5786,8 +5790,8 @@ async function launcherReport(input, now) {
     ...launcher === null ? [] : here === null ? [row(`On ${BRAND.name}'s launchpad`, "not checked \u2014 its launches could not be read", { tone: "warn" })] : [row(`On ${BRAND.name}'s launchpad`, `${here.launches.length}${here.complete ? "" : "+"} ${here.launches.length === 1 ? "launch" : "launches"}`)]
   ];
   return {
-    title: `Launcher \u2014 ${what === "token" ? `of ${address}` : address}`,
-    rows: [reputationRow(body), row(what === "token" ? "Token" : "Wallet", address, { href: what === "token" ? explorer.token(address) : explorer.address(address) }), ...body],
+    title: `Launcher \u2014 ${what === "token" ? `of ${address2}` : address2}`,
+    rows: [reputationRow(body), row(what === "token" ? "Token" : "Wallet", address2, { href: what === "token" ? explorer.token(address2) : explorer.address(address2) }), ...body],
     notes: [
       "A launcher that has taken liquidity out of a pool before is red; a new wallet, or one that launches token after token, is amber. Read from the wallet's own history on Blockscout \u2014 the newest page when it is long.",
       '"No red flags found" is about the record, not a promise about the next launch.'
@@ -5795,7 +5799,7 @@ async function launcherReport(input, now) {
     sources: ["Blockscout", "DexScreener", "Base (the launch transaction, this app's launchpad)"],
     next: [
       ...launcher ? [{ label: "The launcher's profile", command: `profile ${launcher.address}` }] : [],
-      ...what === "token" ? [{ label: "Token Verdict", command: `verdict ${address}` }] : []
+      ...what === "token" ? [{ label: "Token Verdict", command: `verdict ${address2}` }] : []
     ]
   };
 }
@@ -6628,15 +6632,15 @@ async function addressOf(name) {
   const out = decodeFunctionResult({ abi: RESOLVER_ABI, functionName: "addr", data: await ethCall(resolver, data) });
   return out === ZERO4 ? null : out;
 }
-async function nameOf(address) {
-  const node = namehash(`${address.toLowerCase().slice(2)}.${BASENAMES.reverseSuffix}`);
+async function nameOf(address2) {
+  const node = namehash(`${address2.toLowerCase().slice(2)}.${BASENAMES.reverseSuffix}`);
   const resolver = await resolverOf(node);
   if (resolver === null) return { kind: "none" };
   const data = encodeFunctionData({ abi: RESOLVER_ABI, functionName: "name", args: [node] });
   const name = decodeFunctionResult({ abi: RESOLVER_ABI, functionName: "name", data: await ethCall(resolver, data) });
   if (name === "") return { kind: "none" };
   const pointsTo = await addressOf(name);
-  return pointsTo !== null && pointsTo.toLowerCase() === address.toLowerCase() ? { kind: "verified", name } : { kind: "unverified", name, pointsTo };
+  return pointsTo !== null && pointsTo.toLowerCase() === address2.toLowerCase() ? { kind: "verified", name } : { kind: "unverified", name, pointsTo };
 }
 
 // src/skills/profile.ts
@@ -6644,17 +6648,17 @@ function parseTransfers(body) {
   return listOf(isObj(body) ? body.items : null).flatMap((i) => {
     if (!isObj(i)) return [];
     const token = objAt(i, "token");
-    const address = strOf(token.address_hash);
+    const address2 = strOf(token.address_hash);
     const from = strOf(objAt(i, "from").hash);
     const to = strOf(objAt(i, "to").hash);
     const raw = bigOf(objAt(i, "total").value);
     const decimals = numOf(objAt(i, "total").decimals) ?? numOf(token.decimals);
-    if (!address || !from || !to || raw === null || decimals === null) return [];
+    if (!address2 || !from || !to || raw === null || decimals === null) return [];
     const at = Date.parse(strOf(i.timestamp) ?? "");
     return [
       {
         at: Number.isNaN(at) ? null : new Date(at),
-        token: address,
+        token: address2,
         symbol: strOf(token.symbol) ?? "?",
         decimals,
         from,
@@ -6666,8 +6670,8 @@ function parseTransfers(body) {
     ];
   });
 }
-async function transfersOf(address) {
-  return parseTransfers(await getJson("Blockscout", `${BLOCKSCOUT}/addresses/${address}/token-transfers?type=ERC-20`));
+async function transfersOf(address2) {
+  return parseTransfers(await getJson("Blockscout", `${BLOCKSCOUT}/addresses/${address2}/token-transfers?type=ERC-20`));
 }
 var REAL = /* @__PURE__ */ new Map([
   ["ETH", null],
@@ -6690,9 +6694,9 @@ async function resolveTarget(text, label) {
     return { address: toChecksumAddress(assertChecksummedAddress(trimmed, label)), via: null };
   }
   const name = fullName(trimmed);
-  const address = await addressOf(name);
-  if (address === null) throw new Error(`${label}: no Basename called ${name} points to an address.`);
-  return { address: toChecksumAddress(address), via: name };
+  const address2 = await addressOf(name);
+  if (address2 === null) throw new Error(`${label}: no Basename called ${name} points to an address.`);
+  return { address: toChecksumAddress(address2), via: name };
 }
 
 // src/skills/sendcheck.ts
@@ -6761,24 +6765,24 @@ async function sendCheck(recipientText, senderText = "") {
     );
   }
   const target = await resolveTarget(typed, "Recipient");
-  const address = target.address;
+  const address2 = target.address;
   const sender = senderText.trim() === "" ? null : toChecksumAddress((await resolveTarget(senderText, "Your address")).address);
   const [kind, name, moved] = await Promise.all([
-    settled2(accountKind(address)),
-    settled2(nameOf(address)),
+    settled2(accountKind(address2)),
+    settled2(nameOf(address2)),
     sender ? settled2(transfersOf(sender)) : Promise.resolve(null)
   ]);
-  const token = kind?.kind === "contract" ? await chainToken(address).then((t) => ({ symbol: t.symbol }), () => null) : null;
+  const token = kind?.kind === "contract" ? await chainToken(address2).then((t) => ({ symbol: t.symbol }), () => null) : null;
   if (target.via) body.push(row("Name", `${target.via} resolves to this address`));
   body.push(kind ? kindRow(kind, token) : notChecked("What is there", "the account's code"));
   body.push(name ? nameRow(name) : notChecked("Basename", "the reverse record"));
   if (sender) {
-    if (address.toLowerCase() === sender.toLowerCase()) body.push(row("Your history", "this is your own address", { tone: "warn" }));
-    else body.push(moved ? historyRow(address, historyOf(sender, moved)) : notChecked("Your history", "your token history"));
+    if (address2.toLowerCase() === sender.toLowerCase()) body.push(row("Your history", "this is your own address", { tone: "warn" }));
+    else body.push(moved ? historyRow(address2, historyOf(sender, moved)) : notChecked("Your history", "your token history"));
   }
   return {
-    title: `Send Check \u2014 ${address}`,
-    rows: [decisionRow(body), row("Recipient", address, { href: explorer.address(address) }), ...body],
+    title: `Send Check \u2014 ${address2}`,
+    rows: [decisionRow(body), row("Recipient", address2, { href: explorer.address(address2) }), ...body],
     notes: [
       "Address poisoning sends you fake transfers from look-alike addresses so that you copy one from your history. Copy an address from where it was given to you, never from a list of past transactions.",
       ...sender ? ["Your history is the newest page of your token transfers; a look-alike of an older counterparty can be missed."] : ["Give your own address too, and the check also looks for look-alikes of the addresses you really pay."],
@@ -6787,8 +6791,8 @@ async function sendCheck(recipientText, senderText = "") {
     sources: ["EIP-55 (computed here)", "Base (account code, Basenames)", ...sender ? ["Blockscout (your token transfers)"] : []],
     next: [
       // no button to pay an address the check says not to pay
-      ...body.some((r) => r.tone === "bad") ? [] : [{ label: "Send to it", command: `send ${address}` }],
-      { label: "Its profile", command: `profile ${address}` }
+      ...body.some((r) => r.tone === "bad") ? [] : [{ label: "Send to it", command: `send ${address2}` }],
+      { label: "Its profile", command: `profile ${address2}` }
     ]
   };
 }
@@ -6922,12 +6926,12 @@ function parseBaseStocks(body) {
   for (const t of listOf(isObj(body) ? body.tokens : null)) {
     if (!isObj(t)) continue;
     const symbol = strOf(t.symbol);
-    const address = strOf(t.contract_address);
+    const address2 = strOf(t.contract_address);
     const decimals = numOf(t.decimals);
     const multiplier = numOf(t.multiplier);
-    if (!symbol || !address || !/^0x[0-9a-fA-F]{40}$/.test(address) || decimals === null || !Number.isInteger(decimals) || multiplier === null) continue;
+    if (!symbol || !address2 || !/^0x[0-9a-fA-F]{40}$/.test(address2) || decimals === null || !Number.isInteger(decimals) || multiplier === null) continue;
     const ticker = symbol.replace(/c$/, "");
-    const checksummed = toChecksumAddress(address.toLowerCase());
+    const checksummed = toChecksumAddress(address2.toLowerCase());
     const navAt = new Date(strOf(t.nav_price_updated_at) ?? NaN);
     out.set(ticker, {
       ticker,
@@ -7012,8 +7016,8 @@ function newSalt() {
 function launchFactory() {
   const v3 = CONTRACTS.launchFactoryV3;
   if (v3) return { address: toChecksumAddress(v3), version: 3 };
-  const address = CONTRACTS.launchFactory;
-  return address ? { address: toChecksumAddress(address), version: 2 } : {
+  const address2 = CONTRACTS.launchFactory;
+  return address2 ? { address: toChecksumAddress(address2), version: 2 } : {
     waiting: "The launchpad's version 2 \u2014 ETH and stock pairs \u2014 is not deployed yet; it waits on the owner's deploy (contracts/README.md). Coins launched on version 1 are still listed below and their fees can be collected."
   };
 }
@@ -7119,18 +7123,18 @@ async function pairOf(factory, asked) {
     return ETH_PAIR(q.startTick);
   }
   if (hasAddressShape(text)) {
-    const address = toChecksumAddress(assertChecksummedAddress(text, "Pair"));
-    const q = await quoteOf(factory, address);
-    if (!q.enabled) throw new Error(`The launchpad does not pair with ${address}: its quote admin has not enabled it.`);
-    const t = await chainToken(address);
-    return { address, symbol: t.symbol, name: t.name, decimals: t.decimals, startTick: q.startTick };
+    const address2 = toChecksumAddress(assertChecksummedAddress(text, "Pair"));
+    const q = await quoteOf(factory, address2);
+    if (!q.enabled) throw new Error(`The launchpad does not pair with ${address2}: its quote admin has not enabled it.`);
+    const t = await chainToken(address2);
+    return { address: address2, symbol: t.symbol, name: t.name, decimals: t.decimals, startTick: q.startTick };
   }
-  const { pairs, problem: problem4 } = await launchPairs(factory);
+  const { pairs, problem: problem6 } = await launchPairs(factory);
   const found = pairs.find((p) => p.symbol.toLowerCase() === text.toLowerCase());
   if (found) return found;
   const offered = pairs.map((p) => p.symbol).join(", ");
   throw new Error(
-    problem4 ? `The list of stocks could not be read (${problem4}) \u2014 give the stock token's address instead of "${text}".` : `The launchpad does not pair with "${text}". It pairs with: ${offered}.`
+    problem6 ? `The list of stocks could not be read (${problem6}) \u2014 give the stock token's address instead of "${text}".` : `The launchpad does not pair with "${text}". It pairs with: ${offered}.`
   );
 }
 function feeOf(text, version3) {
@@ -7469,7 +7473,7 @@ async function cdpJwt(creds, method, host, path, now = Date.now()) {
 }
 function cdpFacilitator(creds, fetchImpl = fetch, base = CDP_FACILITATOR) {
   const url = new URL(base);
-  const call = async (op, paymentPayload, paymentRequirements) => {
+  const call2 = async (op, paymentPayload, paymentRequirements) => {
     const path = `${url.pathname.replace(/\/$/, "")}/${op}`;
     const jwt = await cdpJwt(creds, "POST", url.host, path);
     let res;
@@ -7492,15 +7496,435 @@ function cdpFacilitator(creds, fetchImpl = fetch, base = CDP_FACILITATOR) {
   };
   return {
     async verify(paymentPayload, paymentRequirements) {
-      const b = await call("verify", paymentPayload, paymentRequirements);
+      const b = await call2("verify", paymentPayload, paymentRequirements);
       if (typeof b !== "object" || b === null || typeof b.isValid !== "boolean") throw new Error("Coinbase's x402 facilitator gave no verdict on the payment.");
       return b;
     },
     async settle(paymentPayload, paymentRequirements) {
-      const b = await call("settle", paymentPayload, paymentRequirements);
+      const b = await call2("settle", paymentPayload, paymentRequirements);
       if (typeof b !== "object" || b === null || typeof b.success !== "boolean") throw new Error("Coinbase's x402 facilitator gave no settlement result.");
       return { transaction: "", network: "", ...b };
     }
+  };
+}
+
+// src/server/indexerPath.ts
+var INDEXER_PATH = "/api/launchpad";
+
+// src/server/indexStore.ts
+var STATE_VERSION = 1;
+var STATE_PATH = "launchpad/index.json";
+var BIG = "$big:";
+var replacer = (_, v) => typeof v === "bigint" ? `${BIG}${v.toString()}` : v;
+var reviver = (_, v) => typeof v === "string" && v.startsWith(BIG) ? BigInt(v.slice(BIG.length)) : v;
+function encodeState(state) {
+  const body = {
+    v: STATE_VERSION,
+    syncedTo: state.syncedTo,
+    coins: [...state.coins],
+    swaps: [...state.swaps],
+    traders: [...state.traders],
+    quotes: [...state.quotes],
+    referrers: [...state.referrers]
+  };
+  return JSON.stringify(body, replacer);
+}
+function decodeState(text) {
+  if (text === null) return null;
+  let body;
+  try {
+    body = JSON.parse(text, reviver);
+  } catch {
+    return null;
+  }
+  if (typeof body !== "object" || body === null || body.v !== STATE_VERSION || typeof body.syncedTo !== "number") return null;
+  const state = emptyState();
+  state.syncedTo = body.syncedTo;
+  for (const [k, c] of body.coins ?? []) state.coins.set(k, c);
+  for (const [k, s] of body.swaps ?? []) state.swaps.set(k, s);
+  for (const [k, t] of body.traders ?? []) state.traders.set(k, t);
+  for (const [k, q] of body.quotes ?? []) state.quotes.set(k, q);
+  for (const [k, r] of body.referrers ?? []) state.referrers.set(k, r);
+  return state;
+}
+function blobStore(calls, token, access = "private") {
+  return {
+    load: async () => {
+      const found = await calls.get(STATE_PATH, { access, useCache: false, token });
+      return found?.stream ? await new Response(found.stream).text() : null;
+    },
+    save: async (text) => {
+      await calls.put(STATE_PATH, text, { access, allowOverwrite: true, addRandomSuffix: false, contentType: "application/json", token });
+    }
+  };
+}
+
+// src/server/indexer.ts
+var SWAP_TOPIC = toHex(keccak256(utf8("Swap(bytes32,address,int128,int128,uint160,uint128,int24,uint24)")));
+var FIRST_BLOCK = 52066273;
+var CHUNK = 1e3;
+var MAX_CHUNKS = 10;
+var ID_BATCH = 100;
+var MAX_DETAILS = 10;
+var MAX_TRADERS = 40;
+var BLOCK_SECONDS3 = 2;
+var DAY = 86400;
+var ETH2 = "0x0000000000000000000000000000000000000000";
+function emptyState() {
+  return { syncedTo: FIRST_BLOCK - 1, coins: /* @__PURE__ */ new Map(), swaps: /* @__PURE__ */ new Map(), traders: /* @__PURE__ */ new Map(), quotes: /* @__PURE__ */ new Map(), referrers: /* @__PURE__ */ new Map() };
+}
+var address = (topic) => toChecksumAddress(`0x${topic.slice(-40)}`);
+var hexNum = (v) => typeof v === "string" && /^0x[0-9a-fA-F]+$/.test(v) ? Number(v) : null;
+var topicsOf = (log) => listOf(log.topics).filter((t) => typeof t === "string");
+function applyLaunches(state, logs, clock) {
+  let added = 0;
+  for (const log of listOf(logs)) {
+    if (!isObj(log)) continue;
+    const topics = topicsOf(log);
+    const block = hexNum(log.blockNumber);
+    const data = strOf(log.data);
+    if (topics[0] !== LAUNCHED_TOPIC || topics.length !== 4 || block === null || data === null) continue;
+    const poolId = topics[3].toLowerCase();
+    if (state.coins.has(poolId)) continue;
+    const [devBuyIn, devBuyTokens] = decodeAbiParameters([{ type: "uint256" }, { type: "uint256" }], data);
+    state.coins.set(poolId, {
+      token: address(topics[1]),
+      factory: toChecksumAddress(String(log.address)),
+      creator: address(topics[2]),
+      poolId,
+      block,
+      at: hexNum(log.blockTimestamp) ?? clock(block),
+      tx: strOf(log.transactionHash) ?? "",
+      devBuyIn,
+      devBuyTokens,
+      detail: null
+    });
+    added++;
+  }
+  return added;
+}
+function applyReferrals(state, logs) {
+  let added = 0;
+  for (const log of listOf(logs)) {
+    if (!isObj(log)) continue;
+    const topics = topicsOf(log);
+    if (topics[0] !== REFERRED_TOPIC || topics.length !== 3) continue;
+    const token = address(topics[1]).toLowerCase();
+    if (state.referrers.has(token)) continue;
+    state.referrers.set(token, address(topics[2]));
+    added++;
+  }
+  return added;
+}
+function applySwaps(state, logs, clock) {
+  let added = 0;
+  for (const log of listOf(logs)) {
+    if (!isObj(log)) continue;
+    const topics = topicsOf(log);
+    const block = hexNum(log.blockNumber);
+    const data = strOf(log.data);
+    const tx = strOf(log.transactionHash);
+    if (topics[0] !== SWAP_TOPIC || topics.length !== 3 || block === null || data === null || tx === null) continue;
+    const poolId = topics[1].toLowerCase();
+    if (!state.coins.has(poolId)) continue;
+    const key = `${tx}:${String(log.logIndex)}`;
+    const list2 = state.swaps.get(poolId) ?? [];
+    if (list2.some((s) => s.key === key)) continue;
+    const [amount0, amount1, sqrtPriceX96, , tick, fee] = decodeAbiParameters(
+      [{ type: "int128" }, { type: "int128" }, { type: "uint160" }, { type: "uint128" }, { type: "int24" }, { type: "uint24" }],
+      data
+    );
+    list2.push({ key, block, at: hexNum(log.blockTimestamp) ?? clock(block), tx, amount0, amount1, sqrtPriceX96, tick, fee });
+    state.swaps.set(poolId, list2);
+    added++;
+  }
+  return added;
+}
+var abs = (v) => v < 0n ? -v : v;
+var units = (raw, decimals) => Number(raw) / 10 ** decimals;
+function rowOf(state, coin, now) {
+  const swaps = [...state.swaps.get(coin.poolId) ?? []].sort((a, b) => a.block - b.block || a.key.localeCompare(b.key));
+  const recent = swaps.filter((s) => s.at > now - DAY && s.at <= now);
+  const d = coin.detail;
+  const side = (s) => (d.tokenIs0 ? s.amount0 : s.amount1) > 0n;
+  const quoteOf2 = (s) => abs(d.tokenIs0 ? s.amount1 : s.amount0);
+  const volumeOf = (list2) => list2.reduce((sum, s) => sum + quoteOf2(s), 0n);
+  const last = swaps.at(-1);
+  const price2 = d && last ? quotePerToken(last.sqrtPriceX96, d.tokenIs0, d.quoteDecimals) : null;
+  const known = recent.map((s) => state.traders.get(s.tx));
+  return {
+    token: coin.token,
+    factory: coin.factory,
+    creator: coin.creator,
+    poolId: coin.poolId,
+    launchBlock: coin.block,
+    launchedAt: coin.at,
+    launchTx: coin.tx,
+    name: d?.name ?? null,
+    symbol: d?.symbol ?? null,
+    quote: d?.quote ?? null,
+    quoteSymbol: d?.quoteSymbol ?? null,
+    quoteDecimals: d?.quoteDecimals ?? null,
+    feeBps: d ? d.fee / 100 : isV3(coin.factory) ? null : LAUNCHPAD_EXPECTS.lpFee / 100,
+    opening: d?.opening ? { fromBps: d.opening.startFee / 100, seconds: d.opening.window } : null,
+    referrer: state.referrers.get(coin.token.toLowerCase()) ?? null,
+    price: price2,
+    tick: last?.tick ?? null,
+    mcapInQuote: price2 === null ? null : price2 * Number(LAUNCHPAD_EXPECTS.supply / 10n ** 18n),
+    trades: swaps.length,
+    buys: d ? swaps.filter(side).length : null,
+    sells: d ? swaps.filter((s) => !side(s)).length : null,
+    volume: d ? units(volumeOf(swaps), d.quoteDecimals) : null,
+    volumeRaw: d ? volumeOf(swaps).toString() : null,
+    trades24h: recent.length,
+    buys24h: d ? recent.filter(side).length : null,
+    sells24h: d ? recent.filter((s) => !side(s)).length : null,
+    volume24h: d ? units(volumeOf(recent), d.quoteDecimals) : null,
+    traders24h: new Set(known.filter((t) => t !== void 0)).size,
+    tradersPending24h: known.filter((t) => t === void 0).length,
+    firstTradeAt: swaps[0]?.at ?? null,
+    lastTradeAt: last?.at ?? null
+  };
+}
+var TRADES_SHOWN = 100;
+var HOUR = 3600;
+function coinDetail(state, token, now) {
+  const coin = [...state.coins.values()].find((c) => c.token.toLowerCase() === token.toLowerCase());
+  if (!coin) return null;
+  const row2 = rowOf(state, coin, now);
+  const d = coin.detail;
+  const feeBps = row2.feeBps;
+  if (!d) return { coin: row2, trades: [], candles: [], points: [], feesQuote: null, feesToken: null, feeBps, maxPaidBps: null };
+  const swaps = [...state.swaps.get(coin.poolId) ?? []].sort((a, b) => a.block - b.block || a.key.localeCompare(b.key));
+  const tokenDelta = (s) => d.tokenIs0 ? s.amount0 : s.amount1;
+  const quoteDelta = (s) => d.tokenIs0 ? s.amount1 : s.amount0;
+  const fee = (paid, lpFee) => paid * BigInt(lpFee) / 1000000n;
+  let feesQuote = 0n;
+  let feesToken = 0n;
+  const trades = swaps.map((s) => {
+    const buy = tokenDelta(s) > 0n;
+    const paid = abs(buy ? quoteDelta(s) : tokenDelta(s));
+    const f = fee(paid, s.fee);
+    if (buy) feesQuote += f;
+    else feesToken += f;
+    return {
+      at: s.at,
+      tx: s.tx,
+      side: buy ? "buy" : "sell",
+      price: quotePerToken(s.sqrtPriceX96, d.tokenIs0, d.quoteDecimals),
+      tokens: units(abs(tokenDelta(s)), 18),
+      quote: units(abs(quoteDelta(s)), d.quoteDecimals),
+      fee: buy ? units(f, d.quoteDecimals) : units(f, 18),
+      feeIn: buy ? "quote" : "token",
+      trader: state.traders.get(s.tx) ?? null
+    };
+  });
+  const candles = [];
+  for (const t of trades) {
+    const at = t.at - t.at % HOUR;
+    const c = candles.at(-1);
+    if (c && c.at === at) candles[candles.length - 1] = { ...c, high: Math.max(c.high, t.price), low: Math.min(c.low, t.price), close: t.price, trades: c.trades + 1 };
+    else candles.push({ at, open: t.price, high: t.price, low: t.price, close: t.price, trades: 1 });
+  }
+  const maxPaidBps = swaps.length === 0 ? null : Math.max(...swaps.map((s) => s.fee)) / 100;
+  const open = d.openSqrt === null ? [] : [{ at: coin.at, price: quotePerToken(d.openSqrt, d.tokenIs0, d.quoteDecimals) }];
+  const points = [...open, ...trades.map((t) => ({ at: t.at, price: t.price }))];
+  return { coin: row2, trades: trades.reverse().slice(0, TRADES_SHOWN), candles, points, feesQuote: units(feesQuote, d.quoteDecimals), feesToken: units(feesToken, 18), feeBps, maxPaidBps };
+}
+function snapshot(state, now, head = null, error = null) {
+  const coins = [...state.coins.values()].sort((a, b) => b.block - a.block || a.token.localeCompare(b.token)).map((c) => rowOf(state, c, now));
+  const byCreator = /* @__PURE__ */ new Map();
+  for (const c of coins) {
+    const seen = byCreator.get(c.creator);
+    byCreator.set(c.creator, {
+      creator: c.creator,
+      launches: (seen?.launches ?? 0) + 1,
+      tokens: [...seen?.tokens ?? [], c.token],
+      lastLaunchAt: Math.max(seen?.lastLaunchAt ?? 0, c.launchedAt)
+    });
+  }
+  const creators = [...byCreator.values()].sort((a, b) => b.launches - a.launches || b.lastLaunchAt - a.lastLaunchAt);
+  return {
+    source: "Base: the launchpad factories' Launched and Referred logs and the v4 PoolManager's Swap logs for their pools",
+    syncedTo: state.syncedTo,
+    head,
+    behind: head === null ? null : Math.max(0, head - state.syncedTo),
+    generatedAt: now,
+    error,
+    totals: {
+      coins: coins.length,
+      creators: creators.length,
+      trades: coins.reduce((n, c) => n + c.trades, 0),
+      trades24h: coins.reduce((n, c) => n + c.trades24h, 0)
+    },
+    coins,
+    creators
+  };
+}
+var INDEXER_RPC = [...ARCHIVE_RPC, "https://gateway.tenderly.co/public/base"];
+var archiveRpc = (method, params) => rpcOn(BASE.name, INDEXER_RPC, method, params);
+async function readHead(rpc2) {
+  const block = await rpc2("eth_getBlockByNumber", ["latest", false]);
+  const number = isObj(block) ? hexNum(block.number) : null;
+  const timestamp = isObj(block) ? hexNum(block.timestamp) : null;
+  if (number === null || timestamp === null) throw new Error("The Base RPC sent a latest block without a number or a time.");
+  return { number, timestamp };
+}
+var hex = (n) => `0x${n.toString(16)}`;
+var call = async (rpc2, to, data) => String(await rpc2("eth_call", [{ to, data }, "latest"]));
+async function readDetail(state, rpc2, coin) {
+  const data = encodeFunctionData({ abi: LAUNCHPAD_ABI, functionName: "launches", args: [coin.token] });
+  const { key } = decodeFunctionResult({ abi: LAUNCHPAD_ABI, functionName: "launches", data: await call(rpc2, coin.factory, data) });
+  const tokenIs0 = key.currency0.toLowerCase() === coin.token.toLowerCase();
+  const quote = toChecksumAddress(tokenIs0 ? key.currency1 : key.currency0);
+  const read4 = async (to, functionName) => decodeFunctionResult({ abi: erc20Abi, functionName, data: await call(rpc2, to, encodeFunctionData({ abi: erc20Abi, functionName })) });
+  const lower = quote.toLowerCase();
+  if (!state.quotes.has(lower)) {
+    state.quotes.set(
+      lower,
+      lower === ETH2 ? { symbol: "ETH", decimals: 18 } : { symbol: String(await read4(quote, "symbol")), decimals: Number(await read4(quote, "decimals")) }
+    );
+  }
+  const q = state.quotes.get(lower);
+  const fees = key.fee === DYNAMIC_FEE_FLAG ? await hookFee(rpc2, key.hooks, poolIdOf(key)) : { fee: key.fee, opening: null };
+  const openSqrt = await openingSqrt(rpc2, coin).catch(() => null);
+  return { quote, tokenIs0, name: String(await read4(coin.token, "name")), symbol: String(await read4(coin.token, "symbol")), quoteSymbol: q.symbol, quoteDecimals: q.decimals, ...fees, openSqrt };
+}
+var INITIALIZE_TOPIC2 = toHex(keccak256(utf8("Initialize(bytes32,address,address,uint24,int24,address,uint160,int24)")));
+async function openingSqrt(rpc2, coin) {
+  const block = `0x${coin.block.toString(16)}`;
+  const logs = listOf(await rpc2("eth_getLogs", [{ address: UNISWAP_V4_POOL_MANAGER, topics: [INITIALIZE_TOPIC2, coin.poolId], fromBlock: block, toBlock: block }]));
+  const data = logs.map((l) => isObj(l) ? strOf(l.data) : null).find((d) => d !== null && d.length >= 2 + 64 * 5);
+  return data ? BigInt(`0x${data.slice(2 + 64 * 3, 2 + 64 * 4)}`) : null;
+}
+async function hookFee(rpc2, hook, id) {
+  const [fee] = decodeFunctionResult({ abi: LAUNCH_HOOK_ABI, functionName: "schedules", data: await call(rpc2, hook, encodeFunctionData({ abi: LAUNCH_HOOK_ABI, functionName: "schedules", args: [id] })) });
+  if (fee === 0) throw new Error(`The launchpad hook ${hook} has no fee schedule for pool ${id}.`);
+  const startFee = decodeFunctionResult({ abi: LAUNCH_HOOK_ABI, functionName: "startFee", data: await call(rpc2, hook, encodeFunctionData({ abi: LAUNCH_HOOK_ABI, functionName: "startFee" })) });
+  const window = decodeFunctionResult({ abi: LAUNCH_HOOK_ABI, functionName: "window", data: await call(rpc2, hook, encodeFunctionData({ abi: LAUNCH_HOOK_ABI, functionName: "window" })) });
+  return { fee, opening: { startFee, window } };
+}
+async function syncOnce(state, rpc2, head, maxChunks = MAX_CHUNKS) {
+  const clock = (block) => head.timestamp - (head.number - block) * BLOCK_SECONDS3;
+  let chunks = 0;
+  let launches = 0;
+  let swaps = 0;
+  try {
+    while (chunks < maxChunks && state.syncedTo < head.number) {
+      const from = state.syncedTo + 1;
+      const to = Math.min(from + CHUNK - 1, head.number);
+      const range = { fromBlock: hex(from), toBlock: hex(to) };
+      const logs = await rpc2("eth_getLogs", [{ address: factories(), topics: [[LAUNCHED_TOPIC, REFERRED_TOPIC]], ...range }]);
+      launches += applyLaunches(state, logs, clock);
+      applyReferrals(state, logs);
+      const ids = [...state.coins.keys()];
+      for (let i = 0; i < ids.length; i += ID_BATCH) {
+        const logs2 = await rpc2("eth_getLogs", [{ address: UNISWAP_V4_POOL_MANAGER, topics: [SWAP_TOPIC, ids.slice(i, i + ID_BATCH)], ...range }]);
+        swaps += applySwaps(state, logs2, clock);
+      }
+      state.syncedTo = to;
+      chunks++;
+    }
+    for (const coin of [...state.coins.values()].filter((c) => c.detail === null).slice(0, MAX_DETAILS)) {
+      coin.detail = await readDetail(state, rpc2, coin);
+    }
+    const since = head.timestamp - DAY;
+    const pending = new Set([...state.swaps.values()].flat().filter((s) => s.at > since && !state.traders.has(s.tx)).map((s) => s.tx));
+    for (const tx of [...pending].slice(0, MAX_TRADERS)) {
+      const body = await rpc2("eth_getTransactionByHash", [tx]);
+      const from = isObj(body) ? strOf(body.from) : null;
+      if (from === null) throw new Error(`The Base RPC sent no sender for transaction ${tx}.`);
+      state.traders.set(tx, toChecksumAddress(from));
+    }
+  } catch (e) {
+    return { chunks, launches, swaps, error: messageOf(e) };
+  }
+  return { chunks, launches, swaps, error: null };
+}
+var FRESH_MS2 = 15e3;
+var CATCH_UP_MS = 1500;
+function problem4(status, detail) {
+  return new Response(JSON.stringify({ status, detail, origin: "quadra-server" }), {
+    status,
+    headers: { "content-type": "application/problem+json" }
+  });
+}
+var STORE_BUDGET_MS = 2e4;
+function adopt(state, from) {
+  state.syncedTo = from.syncedTo;
+  for (const key of ["coins", "swaps", "traders", "quotes", "referrers"]) {
+    const target = state[key];
+    target.clear();
+    for (const [k, v] of from[key]) target.set(k, v);
+  }
+}
+function indexerHandler(deps = {}) {
+  const rpc2 = deps.rpc ?? archiveRpc;
+  const now = deps.now ?? Date.now;
+  const state = deps.state ?? emptyState();
+  const maxChunks = deps.maxChunks ?? MAX_CHUNKS;
+  const later = deps.later ?? ((step2, ms) => void setTimeout(step2, ms));
+  let last = null;
+  let inFlight = null;
+  const store = deps.store ?? null;
+  const budgetMs = deps.budgetMs ?? STORE_BUDGET_MS;
+  const step = async () => {
+    if (store) {
+      const saved = decodeState(await store.load().catch(() => null));
+      if (saved && saved.syncedTo > state.syncedTo) adopt(state, saved);
+    }
+    let head;
+    try {
+      head = await readHead(rpc2);
+    } catch (e) {
+      last = { at: now(), head: last?.head ?? null, error: messageOf(e) };
+      return;
+    }
+    const started = now();
+    const before = state.syncedTo;
+    let result = await syncOnce(state, rpc2, head, maxChunks);
+    while (store && result.error === null && state.syncedTo < head.number && now() - started < budgetMs) result = await syncOnce(state, rpc2, head, maxChunks);
+    last = { at: now(), head: head.number, error: result.error };
+    if (store) {
+      if (state.syncedTo > before) {
+        try {
+          await store.save(encodeState(state));
+        } catch (e) {
+          last = { ...last, error: last.error ?? `the index could not be saved: ${messageOf(e)}` };
+        }
+      }
+    } else if (result.error === null && state.syncedTo < head.number) later(() => void sync(), CATCH_UP_MS);
+  };
+  const sync = () => {
+    inFlight ??= step().finally(() => inFlight = null);
+    return inFlight;
+  };
+  return async (request) => {
+    const path = new URL(request.url).pathname.slice(INDEXER_PATH.length);
+    if (request.headers.get("x-quadra") !== "1") return problem4(403, "Requests to this server need the x-quadra: 1 header.");
+    if (path !== "/coins" && path !== "/creators" && path !== "/coin") return problem4(404, `${path} is not a route of the launchpad index.`);
+    if (request.method !== "GET") return problem4(405, `${path} takes GET.`);
+    if (last === null || now() - last.at >= FRESH_MS2) await sync();
+    const { head, error } = last;
+    if (state.syncedTo < FIRST_BLOCK) {
+      return problem4(502, `The launchpad index has read nothing from Base yet: ${error ?? "the chain is still being read"}`);
+    }
+    if (path === "/coin") {
+      const token = new URL(request.url).searchParams.get("token") ?? "";
+      if (!/^0x[0-9a-fA-F]{40}$/.test(token)) return problem4(400, "/coin takes ?token=0x\u2026 \u2014 a 20-byte address.");
+      const detail = coinDetail(state, token, Math.floor(now() / 1e3));
+      if (detail === null) return problem4(404, `${token} is not a coin of this launchpad, or the index has not reached its launch yet.`);
+      return new Response(JSON.stringify({ ...detail, syncedTo: state.syncedTo, head, behind: head === null ? null : Math.max(0, head - state.syncedTo), error }), {
+        status: 200,
+        headers: { "content-type": "application/json", "cache-control": "public, max-age=10, s-maxage=15, stale-while-revalidate=60" }
+      });
+    }
+    const snap = snapshot(state, Math.floor(now() / 1e3), head, error);
+    const body = path === "/coins" ? snap : { ...snap, coins: void 0 };
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "content-type": "application/json", "cache-control": "public, max-age=10, s-maxage=15, stale-while-revalidate=60" }
+    });
   };
 }
 
@@ -7508,17 +7932,29 @@ function cdpFacilitator(creds, fetchImpl = fetch, base = CDP_FACILITATOR) {
 function cdpFrom(env) {
   return env.CDP_API_KEY_ID && env.CDP_API_KEY_SECRET ? { keyId: env.CDP_API_KEY_ID, secret: env.CDP_API_KEY_SECRET } : null;
 }
-function routes(env, fetchImpl = fetch) {
+function problem5(status, detail) {
+  return new Response(JSON.stringify({ status, detail, origin: "quadra-server" }), { status, headers: { "content-type": "application/problem+json" } });
+}
+function routes(env, fetchImpl = fetch, blob2 = null, indexer = {}) {
   const creds = cdpFrom(env);
+  const token = env.BLOB_READ_WRITE_TOKEN;
+  const launchpad = token && blob2 ? indexerHandler({ ...indexer, store: blobStore(blob2, token, env.BLOB_ACCESS === "public" ? "public" : "private") }) : async () => problem5(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN).");
   return {
     stocks: stocksHandler(fetchImpl),
     charts: chartsHandler(fetchImpl),
-    skills: apiHandler({ facilitator: creds ? cdpFacilitator(creds, fetchImpl) : null })
+    skills: apiHandler({ facilitator: creds ? cdpFacilitator(creds, fetchImpl) : null }),
+    launchpad,
+    /** Vercel Cron's daily call: the index stepped forward with nobody asking. Vercel sends `CRON_SECRET` as a bearer. */
+    cron: async (request) => {
+      if (env.CRON_SECRET && request.headers.get("authorization") !== `Bearer ${env.CRON_SECRET}`) return problem5(401, "Only Vercel Cron may run the index step.");
+      return launchpad(new Request(new URL(`${INDEXER_PATH}/creators`, request.url), { headers: { "x-quadra": "1" } }));
+    }
   };
 }
 
 // api/skills.js
-var handle = routes(process.env).skills;
+var blob = { get: (path, options) => get(path, options), put: (path, body, options) => put(path, body, options) };
+var handle = routes(process.env, fetch, blob).skills;
 function GET(request) {
   return handle(request);
 }

@@ -78,16 +78,16 @@ function Grid({ label, items, status }: { label: string; items: readonly Item[];
 function AppDialog({ app, onClose }: { app: BaseApp; onClose: () => void }) {
   const domain = domainOf(app.url);
   return (
-    <div className="explore__dialog" role="dialog" aria-label={`${app.name}.exe`}>
-      <p className="explore__dialog-title">{app.name}.exe</p>
+    <div className="explore__dialog" role="dialog" aria-label={app.name}>
+      <p className="explore__dialog-title">{app.name}</p>
       <div className="explore__dialog-body">
         <Logo src={app.logo} />
         <div>
           <p>
-            <strong>{app.name}.exe</strong> — {app.line}
+            <strong>{app.name}</strong> — {app.line}
           </p>
           <p>
-            {app.name}.exe wants to open <strong>{domain}</strong> in a new window.
+            {app.name} wants to open <strong>{domain}</strong> in a new window.
           </p>
         </div>
       </div>
@@ -105,8 +105,8 @@ function AppDialog({ app, onClose }: { app: BaseApp; onClose: () => void }) {
 
 function AddDialog({ onClose }: { onClose: () => void }) {
   return (
-    <div className="explore__dialog" role="dialog" aria-label="Add yours.exe">
-      <p className="explore__dialog-title">Add yours.exe</p>
+    <div className="explore__dialog" role="dialog" aria-label="Add yours">
+      <p className="explore__dialog-title">Add yours</p>
       <div className="explore__dialog-body">
         <Glyph />
         <div>
@@ -136,12 +136,12 @@ export function ExplorePanel() {
     ? [
         ...appsIn(here.key).map((a) => ({
           id: a.name,
-          label: `${a.name}.exe`,
+          label: a.name,
           blurb: a.line,
           icon: <Logo src={a.logo} />,
           run: () => setDialog({ kind: "app", app: a }),
         })),
-        { id: "add-yours", label: "Add yours.exe", blurb: "how to get a project in here", icon: <Glyph />, run: () => setDialog({ kind: "add" }) },
+        { id: "add-yours", label: "Add yours", blurb: "how to get a project in here", icon: <Glyph />, run: () => setDialog({ kind: "add" }) },
       ]
     : FOLDERS_OF_BASE.map((f) => ({
         id: f.key,

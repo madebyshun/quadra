@@ -28,7 +28,7 @@ import { PulseContext } from "@/ui/usePulse";
 import { fakePulse } from "./pulseFake";
 
 /**
- * The desktop reorganised into folders (2026-10-21): the Control Panel's settings, README.TXT and
+ * The desktop reorganised into folders (2026-10-21): the Control Panel's settings, the Read Me and
  * an empty folder. The folders themselves are driven through the whole app in `app.test.tsx`.
  */
 
@@ -179,13 +179,13 @@ describe("the screen saver's settings", () => {
   });
 });
 
-describe("README.TXT", () => {
-  it("opens in Notepad from My Computer, in the product's own name", async () => {
+describe("the Read Me", () => {
+  it("opens from My Computer, in the product's own name", async () => {
     renderAt("/?do=readme");
-    const text = screen.getByLabelText("README.TXT", { selector: "pre" });
+    const text = screen.getByLabelText("Read Me", { selector: "pre" });
     expect(text.textContent).toBe(README);
     expect(README.startsWith(`${BRAND.name.toUpperCase()} FOR BASE 8453\n${"=".repeat(`${BRAND.name} FOR BASE 8453`.length)}\n`)).toBe(true);
-    expect(screen.getByLabelText("README.TXT - Notepad", { selector: "section" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Read Me", { selector: "section" })).toBeInTheDocument();
   });
 
   it("names every icon on the desktop, and the folders inside My Computer", () => {

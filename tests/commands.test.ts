@@ -119,7 +119,7 @@ describe("the desktop's folders (2026-10-21)", () => {
     expect(lines[money]).toContain("Money — send, swap, trade");
     expect(lines[money + 1]).toMatch(/^ {4}send /);
     expect(windowsText()).toMatch(/^ {2}wallet +Wallet — connect one you control$/m);
-    expect(windowsText()).toMatch(/^ {4}(open )?readme +README\.TXT — start here$/m);
+    expect(windowsText()).toMatch(/^ {4}(open )?readme +Read Me — start here$/m);
     expect(windowsText()).toMatch(/^ {2}trash +Trash/m);
     // a program with no shortcut word of its own is opened by id
     expect(windowsText()).toMatch(/^ {4}open soon +Coming Soon/m);

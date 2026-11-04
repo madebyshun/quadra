@@ -71,9 +71,9 @@ describe("Task Manager — Processes", () => {
     expect(screen.getByText("Counting the launchpads running on Base…")).toBeInTheDocument();
     await settle();
     expect(screen.getByText(/7 pools opened on Uniswap v4 in the last 10 min \(to block 36,500,000\)/)).toBeInTheDocument();
-    expect(screen.getByText("clanker.exe")).toBeInTheDocument();
-    expect(screen.getByText("quadralaunchpad.exe").closest("tr")).toHaveClass("tm__ours");
-    expect(screen.getByText("clanker.exe").closest("tr")).not.toHaveClass("tm__ours");
+    expect(screen.getByText("Clanker")).toBeInTheDocument();
+    expect(screen.getByText("Quadra launchpad").closest("tr")).toHaveClass("tm__ours");
+    expect(screen.getByText("Clanker").closest("tr")).not.toHaveClass("tm__ours");
     expect(launchActivity).toHaveBeenCalledTimes(1);
     await act(async () => void vi.advanceTimersByTime(PROCESS_REFRESH_MS));
     expect(launchActivity).toHaveBeenCalledTimes(2);

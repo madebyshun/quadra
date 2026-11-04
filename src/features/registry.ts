@@ -270,7 +270,7 @@ export const FEATURES: readonly Feature[] = [
   { id: "folder-games", title: "Games", blurb: "real mines, and trophies", window: "Games" },
   { id: "folder-agents", title: "Agents", blurb: "tools your AI agent can use", window: "Agents" },
   { id: "control", title: "Control Panel", blurb: "desktop pattern, sound, screen saver", window: "Control Panel" },
-  { id: "readme", title: "README.TXT", blurb: "start here", window: "README.TXT - Notepad" },
+  { id: "readme", title: "Read Me", blurb: "start here", window: "Read Me" },
 ] as const;
 
 export const DOC_PAGES: readonly DocPage[] = [

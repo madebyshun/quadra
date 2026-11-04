@@ -26,17 +26,24 @@ export const FUNCTIONS = [
   // the list at /api/skills, and each skill at /api/skills/<id>: a catch-all needs a segment
   { file: "api/skills.js", route: "skills", methods: ["GET", "OPTIONS"] },
   { file: "api/skills/[...path].js", route: "skills", methods: ["GET", "OPTIONS"] },
+  // the launchpad index, kept in the project's Blob store, and the daily cron that steps it forward
+  { file: "api/launchpad/[...path].js", route: "launchpad", methods: ["GET"] },
+  { file: "api/cron/index.js", route: "cron", methods: ["GET"] },
 ];
 
 /** One function's text. */
 export async function bundleFunction(fn) {
   const contents =
+    `import { get, put } from "@vercel/blob";\n` +
     `import { routes } from "./src/server/vercel";\n` +
-    `const handle = routes(process.env).${fn.route};\n` +
+    `const blob = { get: (path, options) => get(path, options), put: (path, body, options) => put(path, body, options) };\n` +
+    `const handle = routes(process.env, fetch, blob).${fn.route};\n` +
     fn.methods.map((m) => `export function ${m}(request) { return handle(request); }\n`).join("");
   const result = await build({
     stdin: { contents, resolveDir: ROOT, sourcefile: fn.file, loader: "js" },
     bundle: true,
+    // installed on Vercel with the project's dependencies, and traced from node_modules there
+    external: ["@vercel/blob"],
     format: "esm",
     platform: "node",
     target: "node20",

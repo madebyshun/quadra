@@ -155,7 +155,7 @@ const GLYPHS: Record<IconId, JSX.Element> = {
   ),
   readme: (
     <>
-      {/* a Notepad page, ruled, with its spiral */}
+      {/* a text page, ruled, with its spiral */}
       <g {...BODY} fill="#ffffcc">
         <rect x="5" y="3.6" width="14" height="17.6" rx="0.8" />
       </g>

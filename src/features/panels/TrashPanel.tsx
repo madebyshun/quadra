@@ -23,9 +23,9 @@ type State = { readonly kind: "reading" } | { readonly kind: "ok"; readonly bin:
  * (MEASURED 2026-10-14: a "USDC" at 0x1698… was in the bin).
  */
 export function fileName(symbol: string, token = ""): string {
-  if (token && lureOf(symbol, token)) return `FAKE-${symbol.replace(/[^A-Za-z0-9]/g, "").slice(0, 10) || "TOKEN"}.exe`;
+  if (token && lureOf(symbol, token)) return `FAKE-${symbol.replace(/[^A-Za-z0-9]/g, "").slice(0, 10) || "TOKEN"}`;
   const clean = symbol.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 16);
-  return `${clean || "UNNAMED"}.exe`;
+  return clean || "UNNAMED";
 }
 
 export function TrashPanel() {

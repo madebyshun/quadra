@@ -69,35 +69,35 @@ describe("the Explore Base window", () => {
     expect(screen.getByRole("list", { name: "Explore Base" })).toBeInTheDocument();
   });
 
-  it("a folder holds <name>.exe icons with base.org's logos, and Add yours.exe; a click selects", () => {
+  it("a folder holds program icons with base.org's logos, and Add yours; a click selects", () => {
     render(<ExplorePanel />);
     open("Wallets");
     const grid = screen.getByRole("list", { name: "Wallets" });
     const labels = within(grid).getAllByRole("button").map((b) => b.textContent);
-    expect(labels).toEqual([...appsIn("wallets").map((a) => `${a.name}.exe`), "Add yours.exe"]);
+    expect(labels).toEqual([...appsIn("wallets").map((a) => a.name), "Add yours"]);
     expect(screen.getByRole("status")).toHaveTextContent(`${appsIn("wallets").length} programs`);
-    const rabby = screen.getByRole("button", { name: "Rabby Wallet.exe" });
+    const rabby = screen.getByRole("button", { name: "Rabby Wallet" });
     expect(rabby.querySelector("img")).toHaveAttribute("src", "https://www.base.org/images/partners/rabby_wallet.webp");
     fireEvent.click(rabby);
     expect(rabby).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("status")).toHaveTextContent("Rabby Wallet.exe — Shows what a transaction will do");
+    expect(screen.getByRole("status")).toHaveTextContent("Rabby Wallet — Shows what a transaction will do");
   });
 
   it("a logo that will not load becomes the generic program glyph", () => {
     render(<ExplorePanel />);
     open("Wallets");
-    const img = screen.getByRole("button", { name: "Rabby Wallet.exe" }).querySelector("img")!;
+    const img = screen.getByRole("button", { name: "Rabby Wallet" }).querySelector("img")!;
     fireEvent.error(img);
-    expect(screen.getByRole("button", { name: "Rabby Wallet.exe" }).querySelector("img")).toBeNull();
+    expect(screen.getByRole("button", { name: "Rabby Wallet" }).querySelector("img")).toBeNull();
   });
 
   it("running a project only opens the dialog; Open is a new-window link with no opener, Cancel closes", () => {
     render(<ExplorePanel />);
     open("Wallets");
-    open("Rabby Wallet.exe");
-    const dialog = screen.getByRole("dialog", { name: "Rabby Wallet.exe" });
-    expect(dialog).toHaveTextContent("Rabby Wallet.exe — Shows what a transaction will do before you sign it.");
-    expect(dialog).toHaveTextContent("Rabby Wallet.exe wants to open rabby.io in a new window.");
+    open("Rabby Wallet");
+    const dialog = screen.getByRole("dialog", { name: "Rabby Wallet" });
+    expect(dialog).toHaveTextContent("Rabby Wallet — Shows what a transaction will do before you sign it.");
+    expect(dialog).toHaveTextContent("Rabby Wallet wants to open rabby.io in a new window.");
     const go = within(dialog).getByRole("link", { name: "Open" });
     expect(go).toHaveAttribute("href", "https://rabby.io");
     expect(go).toHaveAttribute("target", "_blank");
@@ -105,13 +105,13 @@ describe("the Explore Base window", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     // Open closes it too, and Escape does
-    open("Rabby Wallet.exe");
+    open("Rabby Wallet");
     fireEvent.click(screen.getByRole("link", { name: "Open" }));
     expect(screen.queryByRole("dialog")).toBeNull();
-    open("Rabby Wallet.exe");
+    open("Rabby Wallet");
     fireEvent.keyDown(screen.getByRole("button", { name: "Cancel" }), { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
-    open("Rabby Wallet.exe");
+    open("Rabby Wallet");
     fireEvent.keyDown(screen.getByRole("button", { name: "Cancel" }), { key: "a" });
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
@@ -124,11 +124,11 @@ describe("the Explore Base window", () => {
     expect(screen.getByRole("list", { name: "DeFi" })).toBeInTheDocument();
   });
 
-  it("Add yours.exe explains how to get listed and sends nothing", () => {
+  it("Add yours explains how to get listed and sends nothing", () => {
     render(<ExplorePanel />);
     open("Dev");
-    open("Add yours.exe");
-    const dialog = screen.getByRole("dialog", { name: "Add yours.exe" });
+    open("Add yours");
+    const dialog = screen.getByRole("dialog", { name: "Add yours" });
     expect(dialog).toHaveTextContent("base/web");
     expect(dialog).toHaveTextContent(BRAND.x);
     expect(dialog).toHaveTextContent("Nothing is sent from here");

@@ -26,12 +26,12 @@ const bin = (over: Partial<Bin> = {}): Bin => ({ latest: 1, minutes: 180, remova
 
 describe("fileName", () => {
   it("is ASCII, names a famous ticker at the wrong contract FAKE-, and never comes out empty", () => {
-    expect(fileName("USDC", TOKEN)).toBe("FAKE-USDC.exe");
-    expect(fileName("USDC", USDC.address)).toBe("USDC.exe");
-    expect(fileName("ꓴ឵ՏᎠ឵Ꮳ", TOKEN)).toBe("FAKE-TOKEN.exe");
-    expect(fileName("E឵Τ឵H", TOKEN)).toBe("FAKE-EH.exe");
-    expect(fileName("ꓴ឵ՏᎠ")).toBe("UNNAMED.exe");
-    expect(fileName("my_coin-2")).toBe("my_coin-2.exe");
+    expect(fileName("USDC", TOKEN)).toBe("FAKE-USDC");
+    expect(fileName("USDC", USDC.address)).toBe("USDC");
+    expect(fileName("ꓴ឵ՏᎠ឵Ꮳ", TOKEN)).toBe("FAKE-TOKEN");
+    expect(fileName("E឵Τ឵H", TOKEN)).toBe("FAKE-EH");
+    expect(fileName("ꓴ឵ՏᎠ")).toBe("UNNAMED");
+    expect(fileName("my_coin-2")).toBe("my_coin-2");
   });
 });
 
@@ -54,7 +54,7 @@ describe("TrashPanel", () => {
     await settle();
     expect(screen.getByText(/1 more emptied pool could not be read/)).toBeInTheDocument();
     expect(screen.getByText(/item — pools/)).toBeInTheDocument();
-    expect(screen.getAllByText(/FAKE-USDC\.exe/).length).toBe(2);
+    expect(screen.getAllByText(/FAKE-USDC/).length).toBe(2);
     expect(document.querySelector(".bin__why")!.textContent).toMatch(/traded \$1,234(\.00)? in 24h/);
     fireEvent.click(screen.getByRole("button", { name: "Why?" }));
     expect(screen.getByRole("status")).toHaveTextContent("Windows open from the desktop.");

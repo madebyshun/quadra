@@ -24,6 +24,7 @@ import {
   MAX_TRADERS,
   readHead,
   snapshot,
+  STORE_BUDGET_MS,
   SWAP_TOPIC,
   syncOnce,
   TRADES_SHOWN,
@@ -33,6 +34,7 @@ import {
   type Rpc,
   type Snapshot,
 } from "@/server/indexer";
+import { blobStore, decodeState, encodeState, STATE_PATH, STATE_VERSION, type Store } from "@/server/indexStore";
 import { INDEXER_ABSENT, launchpadCoin, launchpadCoins, parseCoinPage, parseIndex } from "@/adapters/http/indexer";
 import { COINS, IX } from "./fixtures/indexer";
 import { json, net, useNet } from "./net";
@@ -682,5 +684,129 @@ describe("the browser client: a coin's page", () => {
     expect(parseCoinPage({ ...s, points: undefined }).points).toEqual([]);
     expect(() => parseCoinPage({ ...s, coin: null })).toThrow("The launchpad index answered without the coin.");
     expect(() => parseCoinPage("nonsense")).toThrow("without the coin");
+  });
+});
+
+describe("the index kept between function runs (T3, 2026-11-04)", () => {
+  const get = (path: string) => new Request(`http://localhost${INDEXER_PATH}${path}`, { headers: { "x-quadra": "1" } });
+  const atHead = (number: number) => ({ number: `0x${number.toString(16)}`, timestamp: `0x${clock(number).toString(16)}` });
+  const memory = (text: string | null = null) => {
+    const box = { text, saves: 0 };
+    const store: Store = { load: async () => box.text, save: async (t) => void ((box.text = t), box.saves++) };
+    return { box, store };
+  };
+
+  it("encodes the state with its bigints and Maps, and reads it back exactly", async () => {
+    const state = { ...emptyState(), syncedTo: 52_066_246 };
+    await syncOnce(state, fakeNode().rpc, { number: 52_071_446, timestamp: clock(52_071_446) }, 100);
+    state.referrers.set(COINS.eth.toLowerCase(), "0x884FBdd5cF193E7F87CBA76419e526D8F4dF7A9B");
+    const back = decodeState(encodeState(state))!;
+    expect([...back.referrers]).toEqual([...state.referrers]);
+    expect([...back.quotes]).toEqual([...state.quotes]);
+    expect(back.syncedTo).toBe(state.syncedTo);
+    expect([...back.coins]).toEqual([...state.coins]);
+    expect([...back.swaps]).toEqual([...state.swaps]);
+    expect([...back.traders]).toEqual([...state.traders]);
+    expect(typeof [...back.swaps.values()][0]![0]!.amount0).toBe("bigint");
+  });
+
+  it("refuses what it cannot use: nothing, junk, another version, no block", () => {
+    expect(decodeState(null)).toBeNull();
+    expect(decodeState("{nope")).toBeNull();
+    expect(decodeState("null")).toBeNull();
+    expect(decodeState(JSON.stringify({ v: STATE_VERSION + 1, syncedTo: 1 }))).toBeNull();
+    expect(decodeState(JSON.stringify({ v: STATE_VERSION }))).toBeNull();
+    // the lists may be absent: an empty index at that block
+    expect(decodeState(JSON.stringify({ v: STATE_VERSION, syncedTo: 7 }))).toMatchObject({ syncedTo: 7 });
+  });
+
+  it("keeps the index in a Blob at one path, private by default, read past the CDN's cache", async () => {
+    const calls: unknown[][] = [];
+    const blob = {
+      get: async (...a: unknown[]) => (calls.push(["get", ...a]), { stream: new Response("saved").body }),
+      put: async (...a: unknown[]) => void calls.push(["put", ...a]),
+    };
+    const store = blobStore(blob, "tok");
+    expect(await store.load()).toBe("saved");
+    await store.save("next");
+    expect(calls).toEqual([
+      ["get", STATE_PATH, { access: "private", useCache: false, token: "tok" }],
+      ["put", STATE_PATH, "next", { access: "private", allowOverwrite: true, addRandomSuffix: false, contentType: "application/json", token: "tok" }],
+    ]);
+    const none = blobStore({ get: async () => null, put: async () => undefined }, "tok", "public");
+    expect(await none.load()).toBeNull();
+    expect(await blobStore({ get: async () => ({ stream: null }), put: async () => undefined }, "tok").load()).toBeNull();
+  });
+
+  it("steps forward for up to its budget, then saves; the next run starts where the last saved", async () => {
+    let t = 0;
+    const node = fakeNode({ fail: (m) => (m === "eth_getBlockByNumber" ? atHead(52_071_446) : undefined) });
+    const { box, store } = memory(encodeState({ ...emptyState(), syncedTo: 52_066_246 }));
+    // each chunk step costs a second of the clock; the budget allows two
+    const rpc: Rpc = async (m, p) => {
+      if (m === "eth_getLogs") t += 1000;
+      return node.rpc(m, p);
+    };
+    const later = vi.fn();
+    const handle = indexerHandler({ rpc, now: () => t, store, budgetMs: 2_500, maxChunks: 1, later });
+    expect((await handle(get("/coins"))).status).toBe(200);
+    expect(later).not.toHaveBeenCalled();
+    expect(box.saves).toBe(1);
+    const saved = decodeState(box.text)!;
+    expect(saved.syncedTo).toBeGreaterThan(52_066_246);
+    expect(saved.syncedTo).toBeLessThan(52_071_446);
+    // a fresh run (another function instance) reads the saved index and carries on from it
+    const next = indexerHandler({ rpc: node.rpc, now: () => t + FRESH_MS, store, maxChunks: 100 });
+    expect(((await (await next(get("/coins"))).json()) as Snapshot).behind).toBe(0);
+    expect(decodeState(box.text)!.syncedTo).toBe(52_071_446);
+    expect(STORE_BUDGET_MS).toBeGreaterThan(0);
+  });
+
+  it("saves nothing when nothing moved, starts from memory when the store cannot be read, and says when it cannot save", async () => {
+    let t = 0;
+    const node = fakeNode({ fail: (m) => (m === "eth_getBlockByNumber" ? atHead(52_071_446) : undefined) });
+    const caught = { ...emptyState(), syncedTo: 52_071_446 };
+    const quiet = memory(encodeState(caught));
+    await indexerHandler({ rpc: node.rpc, now: () => t, store: quiet.store, maxChunks: 100 })(get("/creators"));
+    expect(quiet.box.saves).toBe(0);
+    const broken: Store = { load: async () => Promise.reject(new Error("blob down")), save: async () => Promise.reject(new Error("blob full")) };
+    const res = (await (await indexerHandler({ rpc: node.rpc, now: () => t, state: { ...emptyState(), syncedTo: 52_066_246 }, store: broken, maxChunks: 100 })(get("/coins"))).json()) as Snapshot;
+    expect(res.behind).toBe(0);
+    expect(res.error).toBe("the index could not be saved: blob full");
+    // an OLDER stored index never replaces a newer one in memory
+    const older = memory(encodeState({ ...emptyState(), syncedTo: 52_066_246 }));
+    const state = { ...emptyState(), syncedTo: 52_071_446 };
+    t = 5;
+    await indexerHandler({ rpc: node.rpc, now: () => t, state, store: older.store })(get("/coins"));
+    expect(state.syncedTo).toBe(52_071_446);
+  });
+
+  it("stops stepping at a refusal, and saves what it got before it", async () => {
+    // the second chunk's logs are refused: the first chunk is kept, and saved
+    const node = fakeNode({
+      fail: (m, p) => {
+        if (m === "eth_getBlockByNumber") return atHead(52_071_446);
+        if (m === "eth_getLogs" && Number((p[0] as { fromBlock: string }).fromBlock) >= 52_067_247) return new Error("logs refused");
+        return undefined;
+      },
+    });
+    const { box, store } = memory(null);
+    const snap = (await (await indexerHandler({ rpc: node.rpc, state: { ...emptyState(), syncedTo: 52_066_246 }, store, maxChunks: 1 })(get("/coins"))).json()) as Snapshot;
+    expect(snap.error).toMatch(/logs refused/);
+    expect(box.saves).toBe(1);
+  });
+
+  it("keeps the step's own refusal when the save fails too", async () => {
+    let first = true;
+    const node = fakeNode({
+      fail: (m) => {
+        if (m === "eth_getBlockByNumber") return atHead(52_071_446);
+        if (m === "eth_getTransactionByHash" && first) return ((first = false), new Error("node refused"));
+        return undefined;
+      },
+    });
+    const broken: Store = { load: async () => null, save: async () => Promise.reject(new Error("blob full")) };
+    const snap = (await (await indexerHandler({ rpc: node.rpc, state: { ...emptyState(), syncedTo: 52_066_246 }, store: broken, maxChunks: 100 })(get("/coins"))).json()) as Snapshot;
+    expect(snap.error).toMatch(/node refused/);
   });
 });

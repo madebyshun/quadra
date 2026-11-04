@@ -1,6 +1,6 @@
 import { BRAND } from "@/brand";
 
-/** README.TXT, as the era shipped one: plain text in Notepad. Every line is true of the app today. */
+/** The Read Me, as the era shipped one: plain text in a plain window. Every line is true of the app today. */
 export const README = `${BRAND.name.toUpperCase()} FOR BASE 8453
 ${"=".repeat(BRAND.name.length + 14)}
 
@@ -59,7 +59,7 @@ export function ReadmePanel() {
         <span>Search</span>
         <span>Help</span>
       </div>
-      <pre className="notepad__text" tabIndex={0} aria-label="README.TXT">
+      <pre className="notepad__text" tabIndex={0} aria-label="Read Me">
         {README}
       </pre>
     </div>

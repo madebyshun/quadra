@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@coinbase/wallet-sdk": "^4.4.0",
+    "@vercel/blob": "^2.8.2",
     "@walletconnect/ethereum-provider": "^2.25.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

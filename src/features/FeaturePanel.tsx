@@ -37,7 +37,7 @@ import { ExplorePanel } from "@/features/panels/ExplorePanel";
 /**
  * How each window explains itself before you touch anything. Second person,
  * no jargon, and it says what the thing actually does rather than what it is. A folder, the Control
- * Panel and README.TXT have none: like the era's, they are the window and nothing else.
+ * Panel and the Read Me have none: like the era's, they are the window and nothing else.
  */
 const EXPLAIN: Partial<Record<Feature["id"], string>> = {
   wallet:

@@ -1,5 +1,5 @@
 /**
- * Explore Base — a directory of projects on Base, as folders of `.exe` icons (2026-10-22, the owner,
+ * Explore Base — a directory of projects on Base, as folders of program icons (2026-10-22, the owner,
  * after solana95.com's "Solana Directory").
  *
  * 🔴 SOURCE: base.org's own ecosystem list, the file behind https://www.base.org/ecosystem —

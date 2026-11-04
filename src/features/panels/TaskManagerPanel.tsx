@@ -94,7 +94,7 @@ function Processes() {
         <table className="tm__procs">
           <thead>
             <tr>
-              <th>Image name</th>
+              <th>Launchpad</th>
               <th>Launches</th>
               <th aria-hidden="true" />
             </tr>
@@ -102,7 +102,7 @@ function Processes() {
           <tbody>
             {activity.processes.map((p) => (
               <tr key={p.name} className={p.ours ? "tm__ours" : ""}>
-                <td className="mono">{p.name.replace(/\s+/g, "").toLowerCase()}.exe</td>
+                <td className="mono">{p.name}</td>
                 <td className="mono">{p.launches}</td>
                 <td>
                   <span className="tm__meter" style={{ width: `${(p.launches / top) * 100}%` }} />

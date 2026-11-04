@@ -12,7 +12,7 @@ export type IconMenuProps = {
 };
 
 /**
- * The left-hand icon column (2026-10-21): the folders, the four most-used programs and README.TXT.
+ * The left-hand icon column (2026-10-21): the folders, the four most-used programs and the Read Me.
  * Everything else lives in a folder — the desktop of ~20 icons read like a settings page.
  */
 export function IconMenu({ onOpen }: IconMenuProps) {

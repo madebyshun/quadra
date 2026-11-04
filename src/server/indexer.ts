@@ -9,6 +9,7 @@ import { rpcOn } from "@/skills/http";
 import { isObj, listOf, strOf } from "@/skills/json";
 import { ARCHIVE_RPC } from "@/skills/origin";
 import { INDEXER_PATH } from "@/server/indexerPath";
+import { decodeState, encodeState, type Store } from "@/server/indexStore";
 
 /**
  * A small indexer for this app's OWN launchpad: every launch on both factories, and every trade on
@@ -573,7 +574,27 @@ export type IndexerDeps = {
   readonly maxChunks?: number;
   /** runs a catch-up step later — `setTimeout` on a server; a test collects them */
   readonly later?: (step: () => void, ms: number) => void;
+  /**
+   * Where the index is kept between runs (a Vercel Blob, `server/indexStore.ts`). With a store there is
+   * no background catch-up — a function is frozen once it answers — so each step reads the stored index,
+   * steps forward for up to `budgetMs`, and writes it back.
+   */
+  readonly store?: Store;
+  readonly budgetMs?: number;
 };
+
+/** How long one stored step may spend reading the chain before it answers. */
+export const STORE_BUDGET_MS = 20_000;
+
+/** Take over a newer stored index in place: the handler keeps one state object for its life. */
+function adopt(state: IndexState, from: IndexState): void {
+  state.syncedTo = from.syncedTo;
+  for (const key of ["coins", "swaps", "traders", "quotes", "referrers"] as const) {
+    const target = state[key] as Map<string, unknown>;
+    target.clear();
+    for (const [k, v] of from[key] as Map<string, unknown>) target.set(k, v);
+  }
+}
 
 /**
  * GET /api/launchpad/coins and /api/launchpad/creators — the same snapshot, the second without the
@@ -588,7 +609,15 @@ export function indexerHandler(deps: IndexerDeps = {}) {
   let last: { at: number; head: number | null; error: string | null } | null = null;
   let inFlight: Promise<void> | null = null;
 
+  const store = deps.store ?? null;
+  const budgetMs = deps.budgetMs ?? STORE_BUDGET_MS;
+
   const step = async (): Promise<void> => {
+    // another run may have stepped further and saved; an unreadable store is "start from memory"
+    if (store) {
+      const saved = decodeState(await store.load().catch(() => null));
+      if (saved && saved.syncedTo > state.syncedTo) adopt(state, saved);
+    }
     let head: Head;
     try {
       head = await readHead(rpc);
@@ -596,9 +625,20 @@ export function indexerHandler(deps: IndexerDeps = {}) {
       last = { at: now(), head: last?.head ?? null, error: messageOf(e) };
       return;
     }
-    const result = await syncOnce(state, rpc, head, maxChunks);
+    const started = now();
+    const before = state.syncedTo;
+    let result = await syncOnce(state, rpc, head, maxChunks);
+    while (store && result.error === null && state.syncedTo < head.number && now() - started < budgetMs) result = await syncOnce(state, rpc, head, maxChunks);
     last = { at: now(), head: head.number, error: result.error };
-    if (result.error === null && state.syncedTo < head.number) later(() => void sync(), CATCH_UP_MS);
+    if (store) {
+      if (state.syncedTo > before) {
+        try {
+          await store.save(encodeState(state));
+        } catch (e) {
+          last = { ...last, error: last.error ?? `the index could not be saved: ${messageOf(e)}` };
+        }
+      }
+    } else if (result.error === null && state.syncedTo < head.number) later(() => void sync(), CATCH_UP_MS);
   };
   const sync = (): Promise<void> => {
     inFlight ??= step().finally(() => (inFlight = null));
