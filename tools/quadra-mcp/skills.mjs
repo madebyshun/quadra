@@ -3933,7 +3933,7 @@ async function rpcOn(chain, endpoints, method, params) {
     }
     if (res.ok) return readRpc(chain, method, await res.json());
     last = `The ${chain} RPC answered ${res.status} to ${method}.`;
-    if (res.status !== 429 && res.status !== 403 && res.status < 500) break;
+    if (res.status !== 429 && res.status !== 403 && res.status !== 400 && res.status < 500) break;
   }
   throw new Error(last);
 }

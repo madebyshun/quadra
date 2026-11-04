@@ -3995,7 +3995,7 @@ async function rpcOn(chain, endpoints, method, params) {
     }
     if (res.ok) return readRpc(chain, method, await res.json());
     last = `The ${chain} RPC answered ${res.status} to ${method}.`;
-    if (res.status !== 429 && res.status !== 403 && res.status < 500) break;
+    if (res.status !== 429 && res.status !== 403 && res.status !== 400 && res.status < 500) break;
   }
   throw new Error(last);
 }
@@ -7762,7 +7762,7 @@ function snapshot(state, now, head = null, error = null) {
     creators
   };
 }
-var INDEXER_RPC = [...ARCHIVE_RPC, "https://gateway.tenderly.co/public/base"];
+var INDEXER_RPC = [...ARCHIVE_RPC, "https://gateway.tenderly.co/public/base", "https://base-rpc.publicnode.com"];
 var archiveRpc = (method, params) => rpcOn(BASE.name, INDEXER_RPC, method, params);
 async function readHead(rpc2) {
   const block = await rpc2("eth_getBlockByNumber", ["latest", false]);

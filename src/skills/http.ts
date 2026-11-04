@@ -73,7 +73,9 @@ export async function rpcOn(chain: string, endpoints: readonly string[], method:
     // 403: MEASURED 2026-10-14 — publicnode refuses archive-backed methods such as
     // eth_getTransactionReceipt with HTTP 403 ("requires a personal token") while mainnet.base.org
     // answers; the refusal is the endpoint's, not the chain's, so the next endpoint is asked
-    if (res.status !== 429 && res.status !== 403 && res.status < 500) break;
+    // 400: MEASURED 2026-11-04 — Alchemy's free tier answers eth_getLogs over more than 10 blocks with
+    // HTTP 400, and the indexer on Vercel stopped dead on it; that too is one endpoint's limit, not the chain's
+    if (res.status !== 429 && res.status !== 403 && res.status !== 400 && res.status < 500) break;
   }
   throw new Error(last);
 }
