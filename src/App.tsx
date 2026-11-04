@@ -137,7 +137,15 @@ function Home() {
    */
   const pending = useRef<Record<string, string>>({});
 
+  /** set by Home: the next sync writes the bare page, whatever the router still reports (it lags a transition) */
+  const homing = useRef(false);
+
   useEffect(() => {
+    if (homing.current) {
+      homing.current = false;
+      if (params.toString() !== "") setParams(new URLSearchParams(), { replace: true });
+      return;
+    }
     const current = params.get("do");
     if (topId === current && Object.keys(pending.current).length === 0) return;
     const next = new URLSearchParams(params);
@@ -180,17 +188,30 @@ function Home() {
     [setParams],
   );
   const showDesktop = useCallback(() => dispatch({ type: "minimizeAll" }), []);
-  /** Home: every window out of the way, and the Welcome screen — the front door — open again */
+  /**
+   * Home: every window CLOSED, the URL back to the bare page, and the Welcome screen — the front door —
+   * open again. MEASURED 2026-11-04 on the deploy: minimising left `?t=0x…` in the address bar, so Home
+   * read as "still on that coin"; a window's state lives in the URL (`t`, `a`), so Home clears it all.
+   */
   const goHome = useCallback(() => {
-    dispatch({ type: "minimizeAll" });
+    // the router applies a param change in a transition, so the do= sync below would write the OLD
+    // parameters back (MEASURED: `?t=` survived Home in the full suite); `homing` makes it write none
+    // — set only when a window closes, because only then does that sync run (and clear the flag)
+    pending.current = {};
+    if (state.windows.length > 0) {
+      homing.current = true;
+      for (const w of state.windows) dispatch({ type: "close", id: w.id });
+    } else if (params.toString() !== "") {
+      setParams(new URLSearchParams(), { replace: true });
+    }
     setWelcome(true);
-  }, []);
+  }, [state.windows, params, setParams]);
   const openMarkets = useCallback(() => dispatch(openAction("markets")), []);
 
   return (
     <MarketsProvider onOpen={openMarkets}>
       <OpenWindowProvider open={openWith}>
-      <Desktop onOpen={openFeature} />
+      <Desktop onOpen={openFeature} onHome={goHome} />
       {/* `w.id: WindowId` is exactly the key space the two resolvers were built from — every open window resolves to one or the other. */}
       {state.windows.map((w) => {
         const doc = resolveDoc(w.id);

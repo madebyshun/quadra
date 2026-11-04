@@ -3278,3 +3278,13 @@
   height: auto;
   border: 1px solid #777;
 }
+
+/* the desktop's name is the way home too (2026-11-04): it looks like the title, not a button */
+.home__brand-link {
+  all: unset;
+  cursor: pointer;
+}
+.home__brand-link:focus-visible {
+  outline: 2px solid var(--pt-ink, #000);
+  outline-offset: 4px;
+}

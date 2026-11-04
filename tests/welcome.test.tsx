@@ -10,7 +10,9 @@ import { HELLO_MS } from "@/ui/Assistant";
 import type { Activity } from "@/skills/activity";
 import type { Bin } from "@/skills/rugs";
 import { fakePulse } from "./pulseFake";
-import { renderAt, settle } from "./helpers";
+import { renderAt, ROUTER_FUTURE, settle } from "./helpers";
+import { MemoryRouter, useLocation } from "react-router-dom";
+import { App } from "@/App";
 
 const launchActivity = vi.fn<() => Promise<Activity>>();
 const recycleBin = vi.fn<() => Promise<Bin>>();
@@ -108,6 +110,10 @@ describe("the Welcome screen", () => {
   });
 });
 
+function Where() {
+  return <output aria-label="url">{useLocation().search}</output>;
+}
+
 describe("the Welcome screen on the desktop", () => {
   it("shows on a bare load, keeps Q's hello to itself, and Esc closes it without closing a window", async () => {
     vi.useFakeTimers();
@@ -129,13 +135,47 @@ describe("the Welcome screen on the desktop", () => {
     expect(screen.queryByText(GREETING.text)).toBeNull();
   });
 
-  it("comes back from Home in the menu bar, with every window out of the way (2026-10-29)", async () => {
+  it("comes back from Home in the menu bar, with every window closed and the URL bare (2026-11-04)", async () => {
+    render(
+      <MemoryRouter initialEntries={["/?do=coins&t=0xb200000000000000000000d096efba9896ab0816"]} future={ROUTER_FUTURE}>
+        <App />
+        <Where />
+      </MemoryRouter>,
+    );
+    await settle();
+    expect(screen.getByLabelText("url")).toHaveTextContent("t=0xb2");
+    fireEvent.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: "Home" }));
+    await settle();
+    expect(screen.getByRole("dialog", { name: `Welcome to ${BRAND.name}` })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Coins", { selector: "section" })).toBeNull();
+    expect(screen.getByLabelText("url").textContent).toBe("");
+  });
+
+  it("Home with no window open leaves the next window's do= alone, and clears a leftover parameter", async () => {
+    render(
+      <MemoryRouter initialEntries={["/?t=0xb200000000000000000000d096efba9896ab0816"]} future={ROUTER_FUTURE}>
+        <App />
+        <Where />
+      </MemoryRouter>,
+    );
+    await settle();
+    fireEvent.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: "Home" }));
+    await settle();
+    expect(screen.getByLabelText("url").textContent).toBe("");
+    fireEvent.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: "Home" }));
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Coins/ }));
+    await settle();
+    expect(screen.getByLabelText("url")).toHaveTextContent("do=coins");
+  });
+
+  it("comes back from the desktop's name too", async () => {
     renderAt("/?do=coins");
     await settle();
-    expect(screen.queryByRole("dialog", { name: `Welcome to ${BRAND.name}` })).toBeNull();
-    fireEvent.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: "Home" }));
+    fireEvent.click(screen.getByRole("button", { name: `${BRAND.name} — home` }));
+    await settle();
     expect(screen.getByRole("dialog", { name: `Welcome to ${BRAND.name}` })).toBeInTheDocument();
-    expect(screen.getByLabelText("Coins", { selector: "section" })).not.toBeVisible();
+    expect(screen.queryByLabelText("Coins", { selector: "section" })).toBeNull();
   });
 
   it("does not show once turned off, and Q greets", async () => {

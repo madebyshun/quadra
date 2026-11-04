@@ -6,13 +6,19 @@ import { Icon } from "@/ui/icons";
 export type DesktopProps = {
   /** a feature icon was clicked: open (or re-focus) its window */
   onOpen: (id: WindowId) => void;
+  /** the name was clicked: back to the front page, as the menu bar's Home does */
+  onHome: () => void;
 };
 
-export function Desktop({ onOpen }: DesktopProps) {
+export function Desktop({ onOpen, onHome }: DesktopProps) {
   return (
     <div className="home stack">
       <header className="home__head">
-        <h1 className="home__brand">{BRAND.name}</h1>
+        <h1 className="home__brand">
+          <button type="button" className="home__brand-link" onClick={onHome} aria-label={`${BRAND.name} — home`}>
+            {BRAND.name}
+          </button>
+        </h1>
         {/*
           Three status chips used to sit here — the feature count, "holds no key"
           and the pool's deployment state. Removed on the owner's call: the

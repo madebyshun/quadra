@@ -3,7 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { App } from "@/App";
 
 /** Match main.tsx, so tests exercise the same router behaviour production has. */
-const ROUTER_FUTURE = { v7_startTransition: true, v7_relativeSplatPath: true } as const;
+export const ROUTER_FUTURE = { v7_startTransition: true, v7_relativeSplatPath: true } as const;
 
 /**
  * Mount the real app at a url. MemoryRouter rather than BrowserRouter because
