@@ -24,7 +24,7 @@ export type PulseState =
   | { readonly kind: "live"; readonly pulse: Pulse; readonly history: readonly Pulse[] }
   | { readonly kind: "stale"; readonly pulse: Pulse | null; readonly history: readonly Pulse[]; readonly why: string };
 
-/** Base makes a block every 2 s; asking twice a block would only measure the RPC. */
+/** Base makes five blocks a second (blocktime.ts); polling faster would only measure the RPC. */
 export const PULSE_MS = 4000;
 /** How many pulses Task Manager's graphs keep. */
 export const HISTORY = 30;

@@ -4,7 +4,9 @@ import { DYNAMIC_FEE_FLAG, LAUNCH_HOOK_ABI, LAUNCHPAD_ABI, LAUNCHPAD_EXPECTS } f
 import { toChecksumAddress } from "@/lib/address";
 import { messageOf } from "@/lib/errors";
 import { keccak256, toHex, utf8 } from "@/lib/keccak";
-import { factories, isV3, LAUNCHED_TOPIC, poolIdOf, quotePerToken, REFERRED_TOPIC } from "@/skills/launchpad";
+import { factories,
+ isV3, LAUNCHED_TOPIC, poolIdOf, quotePerToken, REFERRED_TOPIC } from "@/skills/launchpad";
+import { timeOf } from "@/skills/blocktime";
 import { rpcOn } from "@/skills/http";
 import { isObj, listOf, strOf } from "@/skills/json";
 import { ARCHIVE_RPC } from "@/skills/origin";
@@ -52,8 +54,6 @@ export const ID_BATCH = 100;
 export const MAX_DETAILS = 10;
 /** Transactions one sync looks up for their sender (a trader) at most. */
 export const MAX_TRADERS = 40;
-/** Base's block time, MEASURED exact (CLAUDE.md, origin.ts): a block's time is the head's minus 2 s a block. */
-export const BLOCK_SECONDS = 2;
 const DAY = 86_400;
 const ETH = "0x0000000000000000000000000000000000000000";
 
@@ -518,7 +518,8 @@ export type SyncResult = { readonly chunks: number; readonly launches: number; r
  * returned as `error`; what was applied before it stays applied.
  */
 export async function syncOnce(state: IndexState, rpc: Rpc, head: Head, maxChunks = MAX_CHUNKS): Promise<SyncResult> {
-  const clock: Clock = (block) => head.timestamp - (head.number - block) * BLOCK_SECONDS;
+  // Base's block clock (skills/blocktime.ts), anchored on the head so a clock off by a second stays right near it
+  const clock: Clock = (block) => head.timestamp - (timeOf(head.number) - timeOf(block));
   let chunks = 0;
   let launches = 0;
   let swaps = 0;

@@ -6,6 +6,7 @@ import { deepest, markets, type Market } from "@/skills/dexscreener";
 import { explorer, short } from "@/skills/format";
 import { ethCall, quantity, rpc, rpcOn } from "@/skills/http";
 import { isObj, listOf, strOf } from "@/skills/json";
+import { blockAt, blocksAgo, minutesBetween, timeOf } from "@/skills/blocktime";
 import { ARCHIVE_RPC, BLOCK_SLACK } from "@/skills/origin";
 import { TRANSFER_TOPIC } from "@/skills/simulate";
 import { row, type Report, type Row, type Skill, type Tone } from "@/skills/types";
@@ -15,7 +16,7 @@ import { row, type Report, type Row, type Skill, type Tone } from "@/skills/type
  * the x402 tools the owner chose on 2026-10-02: launch forensics sells on Solana (Deepnets, $0.15)
  * and nobody sells it for Base.
  *
- * Read from the token's own Transfer logs over the first `WINDOW` blocks after its pool opened, on
+ * Read from the token's own Transfer logs over the first hour (`WINDOW_SECONDS`) after its pool opened, on
  * the archive node (publicnode refuses old logs — origin.ts). MEASURED that day on a live launch
  * (VAMP, a "no hook" v4 pool, 13 minutes old):
  *   - 96.8% of the supply moved to one wallet the block after launch, outside the pool, and that
@@ -26,12 +27,14 @@ import { row, type Report, type Row, type Skill, type Tone } from "@/skills/type
  * router → buyer; the router nets to zero), and an operator by a shared delegate or shared code.
  */
 
-/** Blocks read after the pool opened — one archive call (mainnet.base.org caps a range at 2,000). */
+/** Blocks per archive call (mainnet.base.org caps a range at 2,000) — a whole hour of 2 s blocks. */
 export const WINDOW = 1_800;
+/** How long after the pool opened is read: an hour, however many blocks that is (0.2 s blocks: 18,000 — ten calls). */
+export const WINDOW_SECONDS = 3_600;
 /** The first buyers looked at closely (code, nonce, balance now). */
 export const EARLY = 20;
-/** A buy this many blocks after launch or sooner is a snipe (2 s blocks: four seconds). */
-export const SNIPE_BLOCKS = 2;
+/** A buy this many seconds after launch or sooner is a snipe (two 2 s blocks, twenty 0.2 s ones). */
+export const SNIPE_SECONDS = 4;
 /** A wallet with at most this many transactions sent is fresh. */
 export const FRESH_NONCE = 5;
 /** One transaction sending the token to at least this many addresses is a spray. */
@@ -149,10 +152,10 @@ const share = (n: number) => (n > 0 && n < 0.01 ? "<0.01%" : `${n.toLocaleString
 export function forensicRows(f: Findings, wallets: readonly Wallet[], supply: bigint, symbol: string, token: string): Row[] {
   const rows: Row[] = [];
   const early = f.buys.slice(0, EARLY);
-  const sniped = f.buys.filter((b) => b.block - f.launchBlock <= SNIPE_BLOCKS).reduce((s, b) => s + b.amount, 0n);
+  const sniped = f.buys.filter((b) => timeOf(b.block) - timeOf(f.launchBlock) <= SNIPE_SECONDS).reduce((s, b) => s + b.amount, 0n);
   const snipedPct = pct(sniped, supply);
   rows.push(
-    row("Sniped", f.buys.length === 0 ? "no buy through a pool in the window" : `${share(snipedPct)} of the supply bought within ${SNIPE_BLOCKS} blocks of launch`, {
+    row("Sniped", f.buys.length === 0 ? "no buy through a pool in the window" : `${share(snipedPct)} of the supply bought within ${SNIPE_SECONDS} seconds of launch`, {
       tone: snipedPct >= 20 ? "bad" : snipedPct >= 5 ? "warn" : "ok",
     }),
   );
@@ -215,13 +218,13 @@ export function verdictOf(rows: readonly Row[]): Row {
   return row("Launch", tone === "bad" ? "Red flags — see the red lines" : tone === "warn" ? "Caution — see the amber lines" : "No red flags found in the first hour", { tone });
 }
 
-/** Where to read: from the pool's creation time on DexScreener, as a block (MEASURED exact at 2 s — origin.ts), to at most the chain's head. */
+/** Where to read: from the pool's creation time on DexScreener, as a block (Base's block clock, blocktime.ts), to at most the chain's head. */
 async function rangeOf(pairs: readonly Market[], now: number): Promise<{ readonly from: number; readonly to: number } | null> {
   const created = pairs.map((p) => p.createdAt).filter((t): t is number => t !== null).sort((a, b) => a - b)[0];
   if (created === undefined) return null;
   const latest = Number(quantity(await rpc("eth_blockNumber"), "the latest block"));
-  const from = Math.max(0, latest - Math.round((now - created) / 2000) - BLOCK_SLACK);
-  return { from, to: Math.min(latest, from + WINDOW) };
+  const from = Math.max(0, blocksAgo(latest, (now - created) / 60_000) - BLOCK_SLACK);
+  return { from, to: Math.min(latest, blockAt(timeOf(from) + WINDOW_SECONDS) - 1) };
 }
 
 async function walletOf(address: string, token: string): Promise<Wallet> {
@@ -242,9 +245,13 @@ export async function forensics(input: string, now: number): Promise<Report> {
   if (supply === null || supply === 0n) throw new Error(`${token}'s supply could not be read — shares of it cannot be measured.`);
   const range = await rangeOf(pairs, now);
   if (range === null) throw new Error(`${token} has no pool on record — there is no launch to read.`);
-  const logs = parseLogs(
-    await rpcOn("Base", ARCHIVE_RPC, "eth_getLogs", [{ address: token, topics: [TRANSFER_TOPIC], fromBlock: `0x${range.from.toString(16)}`, toBlock: `0x${range.to.toString(16)}` }]),
-  );
+  // one chunk at a time, oldest first: a burst of archive calls is what public RPCs refuse first
+  const pages: unknown[] = [];
+  for (let a = range.from; a <= range.to; a += WINDOW) {
+    const b = Math.min(range.to, a + WINDOW - 1);
+    pages.push(...listOf(await rpcOn("Base", ARCHIVE_RPC, "eth_getLogs", [{ address: token, topics: [TRANSFER_TOPIC], fromBlock: `0x${a.toString(16)}`, toBlock: `0x${b.toString(16)}` }])));
+  }
+  const logs = parseLogs(pages);
   const pools = new Set([UNISWAP_V4_POOL_MANAGER.toLowerCase(), ...pairs.flatMap((p) => (p.pair && p.pair.length === 42 ? [p.pair.toLowerCase()] : []))]);
   // the launch is the first time tokens leave a pool, or the window's first transfer when none has
   const launchBlock = logs.find((l) => pools.has(l.from))?.block ?? logs[0]?.block ?? range.from;
@@ -260,7 +267,7 @@ export async function forensics(input: string, now: number): Promise<Report> {
     rows: [
       verdictOf(body),
       row("Token", `${info.name} (${info.symbol})`, { href: explorer.token(token) }),
-      row("Window", `${WINDOW} blocks (~${Math.round((WINDOW * 2) / 60)} min) from block ${launchBlock.toLocaleString("en-US")}, pool on ${pool.dex} vs ${pool.quote} — ${found.buys.length} buys`),
+      row("Window", `${(range.to - range.from + 1).toLocaleString("en-US")} blocks (~${minutesBetween(range.from, range.to + 1)} min) from block ${launchBlock.toLocaleString("en-US")}, pool on ${pool.dex} vs ${pool.quote} — ${found.buys.length} buys`),
       ...body,
     ],
     notes: [

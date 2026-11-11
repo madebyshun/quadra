@@ -74,7 +74,7 @@ describe("judging what was found", () => {
     // variants: a snipe, a single big holder that is a wallet, nothing found, nothing read
     const sniped: Findings = { launchBlock: 1, buys: [{ block: 2, tx: "0x1", buyer: A, amount: SUPPLY / 4n }], holders: [{ address: B, amount: SUPPLY / 4n }], sprays: [] };
     const s = forensicRows(sniped, [wallet(A, { nonce: null, delegate: undefined, codeTag: undefined, holds: null })], SUPPLY, "X", VAMP);
-    expect(s.find((r) => r.label === "Sniped")).toMatchObject({ tone: "bad", value: "25% of the supply bought within 2 blocks of launch" });
+    expect(s.find((r) => r.label === "Sniped")).toMatchObject({ tone: "bad", value: "25% of the supply bought within 4 seconds of launch" });
     expect(s.find((r) => r.label === "Held outside the pool")).toMatchObject({ tone: "bad", value: `largest 25% — ${short(toChecksumAddress(B))} — at the hour's end` });
     expect(s.find((r) => r.label === "One operator")).toMatchObject({ tone: "warn", value: "not checked — the buyers' code could not be read" });
     expect(s.find((r) => r.label === "Fresh wallets")).toBeUndefined();
@@ -137,7 +137,7 @@ describe("the skill", () => {
     expect(report.title).toBe("VAMP — Launch Forensics");
     const by = (l: string) => report.rows.find((r) => r.label === l)!;
     expect(by("Launch").tone).toBe("bad");
-    expect(by("Window").value).toMatch(new RegExp(`^${WINDOW} blocks \\(~60 min\\) from block 52,073,\\d{3}, pool on uniswap vs \\w+ — \\d+ buys$`));
+    expect(by("Window").value).toMatch(new RegExp(`^${WINDOW.toLocaleString("en-US")} blocks \\(~60 min\\) from block 52,073,\\d{3}, pool on uniswap vs \\w+ — \\d+ buys$`));
     // MEASURED: all but one of the first buyers delegate to the same contract
     expect(by("One operator")).toMatchObject({ tone: "bad", value: expect.stringMatching(/^1[89] of the first 19 buyers share an EIP-7702 delegate, 0x54c6…230A$/) });
     expect(report.sources).toEqual(["Base (Transfer logs on the archive node, wallet code and nonces, balances)", "DexScreener (the pool and its creation time)"]);

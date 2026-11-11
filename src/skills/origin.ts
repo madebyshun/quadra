@@ -1,7 +1,8 @@
 import { BASE, UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
 import { BLOCKSCOUT } from "@/skills/blockscout";
+import { blockAt } from "@/skills/blocktime";
 import type { Market } from "@/skills/dexscreener";
-import { getJson, quantity, rpc, rpcOn } from "@/skills/http";
+import { getJson, rpc, rpcOn } from "@/skills/http";
 import { isObj, listOf, strOf } from "@/skills/json";
 import { INITIALIZE_TOPIC } from "@/skills/radar";
 import type { Proven } from "@/skills/launchpads";
@@ -21,7 +22,7 @@ import type { Proven } from "@/skills/launchpads";
  * 2. For a token a launchpad's factory made inside a call it names none — six launchpad tokens of
  *    six. When the token trades on a Uniswap v4 pool, the launchpad created the token and the pool
  *    in ONE transaction: the pool's `Initialize` log. DexScreener's pool id and creation time find
- *    it — Base makes a block every 2 seconds, so the time gives the block (MEASURED: exact, 0 off)
+ *    it — the time gives the block through Base's block clock (`blocktime.ts`; MEASURED: exact, 0 off)
  *    and one `eth_getLogs` over ±30 blocks returns it. 🔴 base.publicnode.com refuses logs older
  *    than its recent window ("Archive requests require a personal token"); mainnet.base.org
  *    answers them, so that one query goes there.
@@ -45,7 +46,6 @@ export const PAGE = 50;
 export const BLOCK_SLACK = 30;
 /** The one public endpoint MEASURED to answer `eth_getLogs` for old blocks. */
 export const ARCHIVE_RPC: readonly string[] = [BASE.rpcFallback];
-const BLOCK_SECONDS = 2n;
 /** Calls that take liquidity OUT: Uniswap v2's router and v3's position manager. */
 const PULLS = /^(removeLiquidity|decreaseLiquidity)/i;
 
@@ -137,11 +137,7 @@ export function summarize(address: string, factory: string | null, history: Hist
 
 /** The transaction that initialized a v4 pool, found from its id and DexScreener's creation time. */
 async function poolLaunch(pool: string, createdAt: number): Promise<string | null> {
-  const latest = await rpc("eth_getBlockByNumber", ["latest", false]);
-  const head = isObj(latest) ? latest : {};
-  const number = quantity(head.number, "the latest block number");
-  const time = quantity(head.timestamp, "the latest block's time");
-  const block = number - (time - BigInt(Math.floor(createdAt / 1000))) / BLOCK_SECONDS;
+  const block = BigInt(blockAt(Math.floor(createdAt / 1000)));
   const hex = (n: bigint) => `0x${(n < 0n ? 0n : n).toString(16)}`;
   const logs = await rpcOn(BASE.name, ARCHIVE_RPC, "eth_getLogs", [
     { address: UNISWAP_V4_POOL_MANAGER, topics: [INITIALIZE_TOPIC, pool], fromBlock: hex(block - BigInt(BLOCK_SLACK)), toBlock: hex(block + BigInt(BLOCK_SLACK)) },

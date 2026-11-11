@@ -466,9 +466,7 @@ describe("where a token came from", () => {
     expect(await originOf(TOKENS.boar, [])).toBeNull();
   });
 
-  it("refuses to guess a block when the chain sends no latest block, and reads a missing token record as no creation", async () => {
-    net({ get: origins(), rpc: (m) => (m === "eth_getBlockByNumber" ? null : undefined) });
-    await expect(originOf(TOKENS.boar, boarPairs)).rejects.toThrow(/the latest block number/);
+  it("reads a missing token record as no creation", async () => {
     net({ get: origins({ [`${BLOCKSCOUT}/addresses/${TOKENS.boar}`]: new Response("", { status: 404 }) }) });
     expect(await originOf(TOKENS.boar, [])).toBeNull();
   });

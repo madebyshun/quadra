@@ -114,7 +114,7 @@ export const EASTER: Readonly<Record<string, string>> = {
   exit: "There is no exit. Only Base.",
   fortune: "A token whose sell is simulated is worth two in the honeypot. — run `verdict 0x…` before you buy",
   wen: "Soon. Everything in the Coming Soon folder is waiting on something real.",
-  ping: "pong — from Base, every 2 seconds.",
+  ping: "pong — from Base, five blocks a second.",
 };
 
 /** A window by a shortcut, its id, or its title — `open Markets`, `open coins`. */

@@ -1,5 +1,6 @@
+import { timeOf } from "@/skills/blocktime";
 import { decodeAbiParameters, encodeAbiParameters, parseAbiParameters } from "viem";
-import { applyLaunches, applySwaps, BLOCK_SECONDS, coinDetail, emptyState, type Clock } from "@/server/indexer";
+import { applyLaunches, applySwaps, coinDetail, emptyState, type Clock } from "@/server/indexer";
 import { COINS, IX } from "./fixtures/indexer";
 
 /**
@@ -7,7 +8,7 @@ import { COINS, IX } from "./fixtures/indexer";
  * `coinDetail` from the REAL captures in tests/fixtures/indexer — never typed.
  */
 const HEAD = { number: Number(IX.head.number), timestamp: Number(IX.head.timestamp) };
-const clock: Clock = (block) => HEAD.timestamp - (HEAD.number - block) * BLOCK_SECONDS;
+const clock: Clock = (block) => HEAD.timestamp - (timeOf(HEAD.number) - timeOf(block));
 const ethSwap = IX.swapsV1.swaps[0]!.result[0]!;
 export const AT = Number(ethSwap.blockTimestamp);
 const SWAP_DATA = parseAbiParameters("int128, int128, uint160, uint128, int24, uint24");

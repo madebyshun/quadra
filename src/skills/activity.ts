@@ -5,7 +5,8 @@ import { getJson, quantity, rpc } from "@/skills/http";
 import { launchedBetween } from "@/skills/launchpad";
 import { BATCH, marketsOf, type Market } from "@/skills/dexscreener";
 import { short } from "@/skills/format";
-import { BLOCK_SECONDS, INITIALIZE_TOPIC, padName, parseHookInfo, parseLaunches, scoreLaunch, type HookInfo } from "@/skills/radar";
+import { blocksAgo } from "@/skills/blocktime";
+import { INITIALIZE_TOPIC, padName, parseHookInfo, parseLaunches, scoreLaunch, type HookInfo } from "@/skills/radar";
 
 /**
  * Task Manager's "Processes": which launchpads are opening pools on Base right now, counted from the
@@ -36,7 +37,7 @@ export function forgetHookNames(): void {
 
 export async function launchActivity(minutes = ACTIVITY_MINUTES): Promise<Activity> {
   const latest = Number(quantity(await rpc("eth_blockNumber"), "the latest block"));
-  const from = Math.max(0, latest - Math.round((minutes * 60) / BLOCK_SECONDS));
+  const from = blocksAgo(latest, minutes);
   const [logs, ours] = await Promise.all([
     rpc("eth_getLogs", [{ address: UNISWAP_V4_POOL_MANAGER, topics: [INITIALIZE_TOPIC], fromBlock: `0x${from.toString(16)}`, toBlock: `0x${latest.toString(16)}` }]),
     launchedBetween(from, latest).catch(() => new Set<string>()),
@@ -73,7 +74,7 @@ export const FIELD_MINUTES = 30;
  */
 export async function minefield(cells: number, minutes = FIELD_MINUTES): Promise<Field[]> {
   const latest = Number(quantity(await rpc("eth_blockNumber"), "the latest block"));
-  const from = Math.max(0, latest - Math.round((minutes * 60) / BLOCK_SECONDS));
+  const from = blocksAgo(latest, minutes);
   const logs = await rpc("eth_getLogs", [
     { address: UNISWAP_V4_POOL_MANAGER, topics: [INITIALIZE_TOPIC], fromBlock: `0x${from.toString(16)}`, toBlock: `0x${latest.toString(16)}` },
   ]);

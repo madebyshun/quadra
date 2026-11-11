@@ -1,3 +1,4 @@
+import { timeOf } from "@/skills/blocktime";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,7 +9,6 @@ import {
   applyLaunches,
   applySwaps,
   archiveRpc,
-  BLOCK_SECONDS,
   CATCH_UP_MS,
   CHUNK,
   coinDetail,
@@ -50,7 +50,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PM = "0x498581ff718922c3f8e6a244956af099b2652b2b";
 const HEAD = { number: Number(IX.head.number), timestamp: Number(IX.head.timestamp) };
 /** The clock syncOnce builds — the head's time minus 2 s a block. */
-const clock: Clock = (block) => HEAD.timestamp - (HEAD.number - block) * BLOCK_SECONDS;
+const clock: Clock = (block) => HEAD.timestamp - (timeOf(HEAD.number) - timeOf(block));
 
 type Log = { blockNumber: string; topics: string[]; logIndex: string; transactionHash: string; blockTimestamp?: string; data: string; address: string };
 const LAUNCH_LOGS: Log[] = [...IX.launchedV1.result, ...IX.launchedV2.result];

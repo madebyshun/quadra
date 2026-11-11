@@ -4093,6 +4093,24 @@ async function topHolders(token) {
   return parseHolders(await getJson(SERVICE, `${BLOCKSCOUT}/tokens/${token}/holders`));
 }
 
+// src/skills/blocktime.ts
+var FAST_BLOCK = 53556127;
+var FAST_TIME = 1793901601;
+var SLOW_SECONDS = 2;
+var FAST_PER_SECOND = 5;
+function timeOf(block) {
+  return block <= FAST_BLOCK ? FAST_TIME - (FAST_BLOCK - block) * SLOW_SECONDS : FAST_TIME + Math.floor((block - FAST_BLOCK) / FAST_PER_SECOND);
+}
+function blockAt(seconds) {
+  return seconds <= FAST_TIME ? FAST_BLOCK - Math.floor((FAST_TIME - seconds) / SLOW_SECONDS) : FAST_BLOCK + Math.ceil((seconds - FAST_TIME) * FAST_PER_SECOND);
+}
+function blocksAgo(latest, minutes) {
+  return Math.max(0, Math.min(latest, blockAt(timeOf(latest) - minutes * 60)));
+}
+function minutesBetween(from, to) {
+  return Math.round((timeOf(to) - timeOf(from)) / 60);
+}
+
 // node_modules/viem/_esm/index.js
 init_exports();
 
@@ -4214,7 +4232,6 @@ function feePercent(fee) {
 var SERVICE2 = "Blockscout";
 var BLOCK_SLACK = 30;
 var ARCHIVE_RPC = [BASE.rpcFallback];
-var BLOCK_SECONDS = 2n;
 var PULLS = /^(removeLiquidity|decreaseLiquidity)/i;
 function parseHistory(body) {
   if (!isObj(body) || !Array.isArray(body.items)) throw new Error("Blockscout did not send the launcher's history.");
@@ -4252,11 +4269,7 @@ function summarize(address2, factory, history) {
   };
 }
 async function poolLaunch(pool, createdAt) {
-  const latest = await rpc("eth_getBlockByNumber", ["latest", false]);
-  const head = isObj(latest) ? latest : {};
-  const number = quantity(head.number, "the latest block number");
-  const time = quantity(head.timestamp, "the latest block's time");
-  const block = number - (time - BigInt(Math.floor(createdAt / 1e3))) / BLOCK_SECONDS;
+  const block = BigInt(blockAt(Math.floor(createdAt / 1e3)));
   const hex2 = (n) => `0x${(n < 0n ? 0n : n).toString(16)}`;
   const logs = await rpcOn(BASE.name, ARCHIVE_RPC, "eth_getLogs", [
     { address: UNISWAP_V4_POOL_MANAGER, topics: [INITIALIZE_TOPIC, pool], fromBlock: hex2(block - BigInt(BLOCK_SLACK)), toBlock: hex2(block + BigInt(BLOCK_SLACK)) }
@@ -4740,7 +4753,6 @@ function row(label, value, extra = {}) {
 }
 
 // src/skills/radar.ts
-var BLOCK_SECONDS2 = 2;
 var DEFAULT_MINUTES = 60;
 var MAX_MINUTES = 180;
 var SHOWN = 15;
@@ -4802,7 +4814,7 @@ var plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 var activity = (m) => m ? (m.buys24h ?? 0) + (m.sells24h ?? 0) : 0;
 function launchRow(s, pad3, latest) {
   const m = s.market;
-  const ago = Math.max(1, Math.round((latest - s.launch.block) * BLOCK_SECONDS2 / 60));
+  const ago = Math.max(1, minutesBetween(s.launch.block, latest));
   const tone = s.flags.some((f) => f.tone === "bad") ? "bad" : s.flags.length ? "warn" : "ok";
   const parts = [
     `score ${riskScore(s)}/100`,
@@ -4815,9 +4827,9 @@ function launchRow(s, pad3, latest) {
 }
 async function radar(minutes) {
   const latest = Number(quantity(await rpc("eth_blockNumber"), "the latest block"));
-  const blocks = Math.round(minutes * 60 / BLOCK_SECONDS2);
+  const from = blocksAgo(latest, minutes);
   const logs = await rpc("eth_getLogs", [
-    { address: UNISWAP_V4_POOL_MANAGER, topics: [INITIALIZE_TOPIC], fromBlock: `0x${Math.max(0, latest - blocks).toString(16)}`, toBlock: `0x${latest.toString(16)}` }
+    { address: UNISWAP_V4_POOL_MANAGER, topics: [INITIALIZE_TOPIC], fromBlock: `0x${from.toString(16)}`, toBlock: `0x${latest.toString(16)}` }
   ]);
   const launches = parseLaunches(logs).reverse();
   const newest = [...new Map(launches.map((l) => [l.token, l])).values()];
@@ -4842,8 +4854,8 @@ async function radar(minutes) {
     )
   );
   const [ours, pads] = await Promise.all([
-    launchedBetween(Math.max(0, latest - blocks), latest).catch(() => /* @__PURE__ */ new Set()),
-    padsBetween(Math.max(0, latest - blocks), latest).catch(() => /* @__PURE__ */ new Map())
+    launchedBetween(from, latest).catch(() => /* @__PURE__ */ new Set()),
+    padsBetween(from, latest).catch(() => /* @__PURE__ */ new Map())
   ]);
   const pad3 = (l) => ours.has(l.token) ? `${BRAND.name} launchpad` : pads.get(l.token) ?? padName(l.hook, infos.get(l.hook) ?? null);
   const traded = newest.filter((l) => activity(marketOf(l)) > 0).length;
@@ -5605,8 +5617,9 @@ var gateSkill = {
 
 // src/skills/forensics.ts
 var WINDOW = 1800;
+var WINDOW_SECONDS = 3600;
 var EARLY = 20;
-var SNIPE_BLOCKS = 2;
+var SNIPE_SECONDS = 4;
 var FRESH_NONCE = 5;
 var SPRAY = 20;
 var HOLDER_WARN = 10;
@@ -5668,10 +5681,10 @@ var share = (n) => n > 0 && n < 0.01 ? "<0.01%" : `${n.toLocaleString("en-US", {
 function forensicRows(f, wallets, supply, symbol, token) {
   const rows = [];
   const early = f.buys.slice(0, EARLY);
-  const sniped = f.buys.filter((b) => b.block - f.launchBlock <= SNIPE_BLOCKS).reduce((s, b) => s + b.amount, 0n);
+  const sniped = f.buys.filter((b) => timeOf(b.block) - timeOf(f.launchBlock) <= SNIPE_SECONDS).reduce((s, b) => s + b.amount, 0n);
   const snipedPct = pct3(sniped, supply);
   rows.push(
-    row("Sniped", f.buys.length === 0 ? "no buy through a pool in the window" : `${share(snipedPct)} of the supply bought within ${SNIPE_BLOCKS} blocks of launch`, {
+    row("Sniped", f.buys.length === 0 ? "no buy through a pool in the window" : `${share(snipedPct)} of the supply bought within ${SNIPE_SECONDS} seconds of launch`, {
       tone: snipedPct >= 20 ? "bad" : snipedPct >= 5 ? "warn" : "ok"
     })
   );
@@ -5730,8 +5743,8 @@ async function rangeOf(pairs, now) {
   const created = pairs.map((p) => p.createdAt).filter((t) => t !== null).sort((a, b) => a - b)[0];
   if (created === void 0) return null;
   const latest = Number(quantity(await rpc("eth_blockNumber"), "the latest block"));
-  const from = Math.max(0, latest - Math.round((now - created) / 2e3) - BLOCK_SLACK);
-  return { from, to: Math.min(latest, from + WINDOW) };
+  const from = Math.max(0, blocksAgo(latest, (now - created) / 6e4) - BLOCK_SLACK);
+  return { from, to: Math.min(latest, blockAt(timeOf(from) + WINDOW_SECONDS) - 1) };
 }
 async function walletOf(address2, token) {
   const [nonce, code, holds] = await Promise.all([
@@ -5750,9 +5763,12 @@ async function forensics(input, now) {
   if (supply === null || supply === 0n) throw new Error(`${token}'s supply could not be read \u2014 shares of it cannot be measured.`);
   const range = await rangeOf(pairs, now);
   if (range === null) throw new Error(`${token} has no pool on record \u2014 there is no launch to read.`);
-  const logs = parseLogs(
-    await rpcOn("Base", ARCHIVE_RPC, "eth_getLogs", [{ address: token, topics: [TRANSFER_TOPIC], fromBlock: `0x${range.from.toString(16)}`, toBlock: `0x${range.to.toString(16)}` }])
-  );
+  const pages = [];
+  for (let a = range.from; a <= range.to; a += WINDOW) {
+    const b = Math.min(range.to, a + WINDOW - 1);
+    pages.push(...listOf(await rpcOn("Base", ARCHIVE_RPC, "eth_getLogs", [{ address: token, topics: [TRANSFER_TOPIC], fromBlock: `0x${a.toString(16)}`, toBlock: `0x${b.toString(16)}` }])));
+  }
+  const logs = parseLogs(pages);
   const pools = /* @__PURE__ */ new Set([UNISWAP_V4_POOL_MANAGER.toLowerCase(), ...pairs.flatMap((p) => p.pair && p.pair.length === 42 ? [p.pair.toLowerCase()] : [])]);
   const launchBlock = logs.find((l) => pools.has(l.from))?.block ?? logs[0]?.block ?? range.from;
   const found = analyze(logs, pools, launchBlock);
@@ -5766,7 +5782,7 @@ async function forensics(input, now) {
     rows: [
       verdictOf(body),
       row("Token", `${info.name} (${info.symbol})`, { href: explorer.token(token) }),
-      row("Window", `${WINDOW} blocks (~${Math.round(WINDOW * 2 / 60)} min) from block ${launchBlock.toLocaleString("en-US")}, pool on ${pool.dex} vs ${pool.quote} \u2014 ${found.buys.length} buys`),
+      row("Window", `${(range.to - range.from + 1).toLocaleString("en-US")} blocks (~${minutesBetween(range.from, range.to + 1)} min) from block ${launchBlock.toLocaleString("en-US")}, pool on ${pool.dex} vs ${pool.quote} \u2014 ${found.buys.length} buys`),
       ...body
     ],
     notes: [
@@ -7628,7 +7644,6 @@ var MAX_CHUNKS = 10;
 var ID_BATCH = 100;
 var MAX_DETAILS = 10;
 var MAX_TRADERS = 40;
-var BLOCK_SECONDS3 = 2;
 var DAY = 86400;
 var ETH2 = "0x0000000000000000000000000000000000000000";
 function emptyState() {
@@ -7866,7 +7881,7 @@ async function hookFee(rpc2, hook, id) {
   return { fee, opening: { startFee, window } };
 }
 async function syncOnce(state, rpc2, head, maxChunks = MAX_CHUNKS) {
-  const clock = (block) => head.timestamp - (head.number - block) * BLOCK_SECONDS3;
+  const clock = (block) => head.timestamp - (timeOf(head.number) - timeOf(block));
   let chunks = 0;
   let launches = 0;
   let swaps = 0;

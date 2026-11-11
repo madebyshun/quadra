@@ -163,16 +163,11 @@ function chain(r: Route = {}) {
 }
 
 describe("recycleBin", () => {
-  it("reads three hours in 1800-block pages, oldest first, under the RPC's cap", async () => {
+  it("reads three hours of 2 s blocks in one page — a page is an hour of 0.2 s blocks", async () => {
     const { ranges } = chain();
     await recycleBin();
     const from = RUGS_LATEST - (BIN_MINUTES * 60) / 2;
-    expect(ranges).toEqual([
-      [from, from + LOG_CHUNK - 1],
-      [from + LOG_CHUNK, from + 2 * LOG_CHUNK - 1],
-      [from + 2 * LOG_CHUNK, from + 3 * LOG_CHUNK - 1],
-      [from + 3 * LOG_CHUNK, RUGS_LATEST],
-    ]);
+    expect(ranges).toEqual([[from, RUGS_LATEST]]);
     for (const [a, b] of ranges) expect(b - a + 1).toBeLessThanOrEqual(LOG_CHUNK);
   });
 

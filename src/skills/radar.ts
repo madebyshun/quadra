@@ -2,6 +2,7 @@ import { UNISWAP_V4_POOL_MANAGER, USDC, WETH } from "@/config/chain";
 import { readHookAddress } from "@/lib/hooks";
 import { keccak256, toHex, utf8 } from "@/lib/keccak";
 import { BLOCKSCOUT } from "@/skills/blockscout";
+import { blocksAgo, minutesBetween } from "@/skills/blocktime";
 import { launchedBetween } from "@/skills/launchpad";
 import { padsBetween } from "@/skills/launchpads";
 import { BRAND } from "@/brand";
@@ -30,8 +31,6 @@ import { row, type Report, type Row, type Skill, type Tone } from "@/skills/type
  * yet is counted, not listed. The radar is a first look — `verdict <token>` is the full check.
  */
 
-/** Base makes a block every 2 seconds, so 1,800 blocks is an hour. */
-export const BLOCK_SECONDS = 2;
 export const DEFAULT_MINUTES = 60;
 export const MAX_MINUTES = 180;
 /** How many launches the report lists. */
@@ -133,7 +132,7 @@ const activity = (m: Market | null) => (m ? (m.buys24h ?? 0) + (m.sells24h ?? 0)
 
 export function launchRow(s: Scored, pad: string, latest: number): Row {
   const m = s.market!;
-  const ago = Math.max(1, Math.round(((latest - s.launch.block) * BLOCK_SECONDS) / 60));
+  const ago = Math.max(1, minutesBetween(s.launch.block, latest));
   const tone: Tone = s.flags.some((f) => f.tone === "bad") ? "bad" : s.flags.length ? "warn" : "ok";
   const parts = [
     `score ${riskScore(s)}/100`,
@@ -149,9 +148,9 @@ export function launchRow(s: Scored, pad: string, latest: number): Row {
 /** The radar over the last `minutes`, as of the chain's latest block. */
 export async function radar(minutes: number): Promise<Report> {
   const latest = Number(quantity(await rpc("eth_blockNumber"), "the latest block"));
-  const blocks = Math.round((minutes * 60) / BLOCK_SECONDS);
+  const from = blocksAgo(latest, minutes);
   const logs = await rpc("eth_getLogs", [
-    { address: UNISWAP_V4_POOL_MANAGER, topics: [INITIALIZE_TOPIC], fromBlock: `0x${Math.max(0, latest - blocks).toString(16)}`, toBlock: `0x${latest.toString(16)}` },
+    { address: UNISWAP_V4_POOL_MANAGER, topics: [INITIALIZE_TOPIC], fromBlock: `0x${from.toString(16)}`, toBlock: `0x${latest.toString(16)}` },
   ]);
   const launches = parseLaunches(logs).reverse(); // newest first
   const newest = [...new Map(launches.map((l) => [l.token, l])).values()];
@@ -183,8 +182,8 @@ export async function radar(minutes: number): Promise<Report> {
   // this app's own launches are named as such — the factory's events for the same window
   // and basepad's and Doppler's launches by their factories' logs — one eth_getLogs for both
   const [ours, pads] = await Promise.all([
-    launchedBetween(Math.max(0, latest - blocks), latest).catch(() => new Set<string>()),
-    padsBetween(Math.max(0, latest - blocks), latest).catch(() => new Map<string, string>()),
+    launchedBetween(from, latest).catch(() => new Set<string>()),
+    padsBetween(from, latest).catch(() => new Map<string, string>()),
   ]);
   const pad = (l: Launch) => (ours.has(l.token) ? `${BRAND.name} launchpad` : (pads.get(l.token) ?? padName(l.hook, infos.get(l.hook) ?? null)));
 

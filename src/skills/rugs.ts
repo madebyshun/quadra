@@ -7,7 +7,7 @@ import { chainToken } from "@/skills/chaintoken";
 import { marketsOf, type Market } from "@/skills/dexscreener";
 import { ethCall, quantity, rpc } from "@/skills/http";
 import { isObj, listOf, strOf } from "@/skills/json";
-import { BLOCK_SECONDS } from "@/skills/radar";
+import { blocksAgo, minutesBetween } from "@/skills/blocktime";
 
 /**
  * The Recycle Bin's contents: Uniswap v4 pools EMPTIED in the last three hours — at least 90% of
@@ -30,8 +30,12 @@ export const MODIFY_LIQUIDITY_TOPIC = toHex(keccak256(utf8("ModifyLiquidity(byte
 const POOLS_SLOT = 6n;
 const LIQUIDITY_OFFSET = 3n;
 export const BIN_MINUTES = 180;
-/** Blocks per `eth_getLogs` — under mainnet.base.org's 2,000-block cap (MEASURED). */
-export const LOG_CHUNK = 1800;
+/**
+ * Blocks per `eth_getLogs`: an hour of 0.2 s blocks. MEASURED 2026-11-11: base.publicnode.com
+ * answers 18,000 blocks of ModifyLiquidity (3,264 logs) in one call; mainnet.base.org caps a range
+ * at 2,000, so at the old 1,800 three hours became 30 parallel calls — a rate limit by itself.
+ */
+export const LOG_CHUNK = 18_000;
 /** Emptied pools whose coin is looked up — the bin is a list for a person, not an index. */
 export const BIN_MAX = 12;
 
@@ -114,7 +118,7 @@ export type Bin = { readonly latest: number; readonly minutes: number; readonly 
 
 export async function recycleBin(minutes = BIN_MINUTES): Promise<Bin> {
   const latest = Number(quantity(await rpc("eth_blockNumber"), "the latest block"));
-  const from = Math.max(0, latest - Math.round((minutes * 60) / BLOCK_SECONDS));
+  const from = blocksAgo(latest, minutes);
   const chunks: [number, number][] = [];
   for (let start = from; start <= latest; start += LOG_CHUNK) chunks.push([start, Math.min(latest, start + LOG_CHUNK - 1)]);
   const pages = await Promise.all(
@@ -152,7 +156,7 @@ export async function recycleBin(minutes = BIN_MINUTES): Promise<Bin> {
       symbol: bySymbol.get(f.token.toLowerCase()) ?? (await chainToken(f.token).then((t) => t.symbol, () => "unnamed")),
       by: f.by,
       tx: f.tx,
-      minutesAgo: Math.round(((latest - f.block) * BLOCK_SECONDS) / 60),
+      minutesAgo: minutesBetween(f.block, latest),
       market: byPool.get(f.pool) ?? null,
     })),
   );

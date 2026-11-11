@@ -58,7 +58,7 @@ export function blocksTip(first: number, latest: number): string {
   const made = latest - first;
   return made > 0
     ? `Base has made ${n(made)} ${made === 1 ? "block" : "blocks"} since you opened this page. The latest is #${n(latest)}.`
-    : `The latest Base block is #${n(latest)}, read from the chain a moment ago. A new one comes every 2 seconds.`;
+    : `The latest Base block is #${n(latest)}, read from the chain a moment ago. A new one comes five times a second.`;
 }
 
 /** Pools opened on Uniswap v4 in the last minutes, and the busiest launchpad among them. */
