@@ -6,6 +6,7 @@ import { short } from "@/skills/format";
 import { codeLabels, LAUNCHPAD_CODE } from "@/skills/verdict";
 import type { Report, Row, Tone } from "@/skills/types";
 import { CARD_H, CARD_W, drawCard } from "@/features/panels/BaseCard";
+import { DotsPattern, Footer, HalftoneSky, KIT, Lcd, MONO, Qr, SANS, Selected, Win } from "@/features/panels/cardKit";
 import { usePulse } from "@/ui/usePulse";
 import { Gel } from "@/ui/Gel";
 
@@ -140,116 +141,100 @@ export async function logoOf(token: string): Promise<string | null> {
   return `data:${type};base64,${btoa(text)}`;
 }
 
-const SANS = "Inter, Helvetica, Arial, sans-serif";
-const TILE_W = 350;
+const FILL: Record<Tone, string> = { bad: "#fdecec", warn: "#fdf3e6", ok: "#eef6ee" };
 
 export function VerdictSvg({ c, logo = null, when, block = null }: { c: VerdictCard; logo?: string | null; when: string; block?: number | null }) {
   const ink = INK[c.tone];
   const red = c.tone === "bad";
   const qr = qrCells(verdictLink(c.token));
-  
-  const tilesY = red ? 548 : 500;
-  const tileH = red ? 184 : 200;
+  const lead = c.reason ? `✕ ${c.reason}` : c.score ? `${c.headline.toLowerCase()} — ${c.score}` : c.headline.toLowerCase();
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${CARD_W} ${CARD_H}`} width={CARD_W} height={CARD_H} role="img" aria-label={`Token Verdict card for ${c.symbol}`}>
-      <rect width={CARD_W} height={CARD_H} fill={red ? "#7a1414" : "#4a6fa5"} />
-      <rect x="86" y="86" width={CARD_W - 160} height={CARD_H - 160} fill="#555" />
-      <rect x="80" y="80" width={CARD_W - 160} height={CARD_H - 160} fill="#dddddd" stroke="#000" strokeWidth="4" />
-      {[0, 1, 2, 3, 4, 5].map((i) => (
-        <rect key={i} x="100" y={96 + i * 8} width={CARD_W - 200} height="3" fill="#aaa" />
-      ))}
-      <rect x={CARD_W / 2 - 230} y="86" width="460" height="52" fill="#dddddd" />
-      <text x={CARD_W / 2} y="124" textAnchor="middle" fontFamily={SANS} fontWeight="700" fontSize="30">
-        Token Verdict · {BRAND.name}
-      </text>
-      <rect x="110" y="160" width={CARD_W - 220} height={CARD_H - 270} fill="#fff" stroke="#555" strokeWidth="2" />
+      <defs>
+        <DotsPattern />
+        <clipPath id="vc-logo">
+          <circle cx="190" cy="196" r="44" />
+        </clipPath>
+      </defs>
+      <HalftoneSky w={CARD_W} h={CARD_H} alarm={red} />
 
-      {/* the token: its logo, else its first letter */}
-      <clipPath id="vc-logo">
-        <circle cx="210" cy="250" r="56" />
-      </clipPath>
-      <circle cx="210" cy="250" r="58" fill="#eeeeee" stroke="#000" strokeWidth="3" />
-      {logo ? (
-        <image href={logo} x="154" y="194" width="112" height="112" clipPath="url(#vc-logo)" />
-      ) : (
-        <text x="210" y="272" textAnchor="middle" fontFamily={SANS} fontWeight="800" fontSize="60">
-          {c.symbol.slice(0, 1).toUpperCase()}
+      <Win x={90} y={70} w={1060} h={720} title={`Token Verdict — $${cut(c.symbol, 12)}`} dotted>
+        <circle cx="190" cy="196" r="46" fill="#eee" stroke="#000" strokeWidth="3" />
+        {logo ? (
+          <image href={logo} x="146" y="152" width="88" height="88" clipPath="url(#vc-logo)" />
+        ) : (
+          <text x="190" y="214" textAnchor="middle" fontFamily={SANS} fontWeight="800" fontSize="48">
+            {c.symbol.slice(0, 1).toUpperCase()}
+          </text>
+        )}
+        <text x="262" y="230" fontFamily={SANS} fontWeight="800" fontSize="104" fill={KIT.blue} letterSpacing="-3">
+          ${cut(c.symbol, 10)}
         </text>
-      )}
-      <text x="290" y="276" fontFamily={SANS} fontWeight="700" fontSize="88">
-        ${cut(c.symbol, 10)}
-      </text>
-      <text x="294" y="330" fontFamily="JetBrains Mono, Menlo, monospace" fontSize="30" fill="#444">
-        {short(c.token)} · Base
-      </text>
-
-      <g transform="rotate(-4 1180 260)">
-        <rect x="900" y="185" width="560" height="150" fill={red ? "#fdecec" : "none"} stroke={ink} strokeWidth="10" rx="14" />
-        <text x="1180" y="282" textAnchor="middle" fontFamily={SANS} fontWeight="800" fontSize={c.headline.length > 10 ? 52 : 84} fill={ink}>
-          {c.headline}
+        <text x="266" y="270" fontFamily={MONO} fontSize="22" fill={KIT.dim}>
+          {short(c.token)} · Base
         </text>
-      </g>
-      <text x="1180" y="395" textAnchor="middle" fontFamily={SANS} fontWeight="700" fontSize="44" fill={ink}>
-        {c.score}
-      </text>
+        <Selected x={150} y={346} text={lead} size={c.reason ? 30 : 40} color={red ? KIT.red : KIT.blue} />
 
-      {c.figures.map((f, i) => (
-        <g key={f.label}>
-          <text x={164 + i * 330} y="395" fontFamily={SANS} fontSize="26" fill="#555">
-            {f.label}
-          </text>
-          <text x={164 + i * 330} y="440" fontFamily={SANS} fontWeight="700" fontSize="40">
-            {f.value}
-          </text>
-        </g>
-      ))}
-
-      {c.reason ? (
-        <g>
-          <rect x="150" y="466" width="1300" height="64" fill="#c62828" />
-          <text x="176" y="510" fontFamily={SANS} fontWeight="800" fontSize="38" fill="#fff">
-            ✕ {c.reason}
-          </text>
-        </g>
-      ) : null}
-
-      {c.tiles.map((t, i) => {
-        const x = 150 + i * (TILE_W + 20);
-        return (
-          <g key={t.title}>
-            <rect x={x} y={tilesY} width={TILE_W} height={tileH} fill={t.tone === "ok" ? "#eef6ee" : t.tone === "bad" ? "#fdecec" : "#fdf3e6"} stroke={INK[t.tone]} strokeWidth="4" />
-            <circle cx={x + 50} cy={tilesY + 56} r="28" fill={INK[t.tone]} />
-            <text x={x + 50} y={tilesY + 68} textAnchor="middle" fontFamily={SANS} fontWeight="800" fontSize="34" fill="#fff">
-              {MARK[t.tone]}
+        {c.figures.map((f, i) => (
+          <g key={f.label}>
+            <text x={150 + i * 300} y="420" fontFamily={SANS} fontSize="22" fill={KIT.dim}>
+              {f.label}
             </text>
-            <text x={x + 28} y={tilesY + tileH - 64} fontFamily={SANS} fontWeight="800" fontSize="36">
-              {t.title}
-            </text>
-            <text x={x + 28} y={tilesY + tileH - 24} fontFamily={SANS} fontSize="24" fill="#333">
-              {t.sub}
+            <text x={150 + i * 300} y="458" fontFamily={SANS} fontWeight="800" fontSize="36" fill={KIT.ink}>
+              {f.value}
             </text>
           </g>
-        );
-      })}
-
-      {/* the way back, and when */}
-      <rect x="1290" y={tilesY} width="160" height={tileH} fill="#fff" stroke="#000" strokeWidth="3" />
-      <g transform={`translate(${1370 - (tileH - 50) / 2} ${tilesY + 5})`}>
-        {qr.cells.map(([x, y]) => (
-          <rect key={`${x}-${y}`} x={(x * (tileH - 50)) / qr.size} y={(y * (tileH - 50)) / qr.size} width={(tileH - 50) / qr.size + 0.2} height={(tileH - 50) / qr.size + 0.2} fill="#000" />
         ))}
-      </g>
-      <text x="1370" y={tilesY + tileH - 12} textAnchor="middle" fontFamily={SANS} fontWeight="700" fontSize="20">
-        scan to check
-      </text>
-      <text x="150" y="780" fontFamily={SANS} fontSize="24" fill="#555">
-        Checked {when}
-        {block !== null ? ` · block ${block.toLocaleString("en-US")}` : ""} · a buy and a sell simulated on Base · not advice
-      </text>
 
-      <text x="120" y={CARD_H - 30} fontFamily={SANS} fontWeight="700" fontSize="34" fill="#fff">
-        Check any token free → {window.location.host}
-      </text>
+        {c.tiles.map((t, i) => {
+          const x = 130 + i * 335;
+          return (
+            <g key={t.title}>
+              <rect x={x} y={490} width="315" height="210" fill={FILL[t.tone]} stroke={INK[t.tone]} strokeWidth="4" />
+              <circle cx={x + 46} cy={540} r="26" fill={INK[t.tone]} />
+              <text x={x + 46} y={552} textAnchor="middle" fontFamily={SANS} fontWeight="800" fontSize="32" fill="#fff">
+                {MARK[t.tone]}
+              </text>
+              <text x={x + 24} y={630} fontFamily={SANS} fontWeight="800" fontSize="34" fill={KIT.ink}>
+                {t.title}
+              </text>
+              <text x={x + 24} y={670} fontFamily={SANS} fontSize="21" fill="#333">
+                {t.sub}
+              </text>
+            </g>
+          );
+        })}
+
+        <text x="150" y="760" fontFamily={SANS} fontSize="20" fill={KIT.dim}>
+          Checked {when}
+          {block !== null ? ` · block ${block.toLocaleString("en-US")}` : ""} · a buy and a sell simulated on Base · not advice
+        </text>
+      </Win>
+
+      <Win x={1190} y={70} w={330} h={240} title="Verdict">
+        <g transform="rotate(-5 1355 180)">
+          <rect x="1214" y="128" width="282" height="96" fill="none" stroke={ink} strokeWidth="8" rx="10" />
+          <text x="1355" y="194" textAnchor="middle" fontFamily={SANS} fontWeight="900" fontSize={c.headline.length > 10 ? 26 : 50} fill={ink}>
+            {c.headline}
+          </text>
+        </g>
+        <text x="1355" y="282" textAnchor="middle" fontFamily={SANS} fontWeight="800" fontSize="40" fill={ink}>
+          {c.score}
+        </text>
+      </Win>
+      {block !== null ? (
+        <Win x={1190} y={340} w={330} h={150} title="Base">
+          <Lcd x={1212} y={386} w={286} label="block" value={block.toLocaleString("en-US")} />
+        </Win>
+      ) : null}
+      <Win x={1190} y={520} w={330} h={270} title="Scan to check">
+        <Qr x={1275} y={566} size={160} qr={qr} />
+        <text x="1355" y="766" textAnchor="middle" fontFamily={SANS} fontWeight="700" fontSize="18" fill={KIT.dim}>
+          runs this check for you
+        </text>
+      </Win>
+
+      <Footer x={90} y={CARD_H - 34} text={`Check any token free → ${window.location.host}`} />
     </svg>
   );
 }

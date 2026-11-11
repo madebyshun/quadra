@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { row, type Report } from "@/skills/types";
-import { depthCard, depthLink, depthPost, DepthShare, DepthSvg } from "@/features/panels/DepthShare";
+import { depthCard, depthLink, depthPost, DepthShare, DepthSvg, leadOf } from "@/features/panels/DepthShare";
 import { ReportView } from "@/features/panels/ReportView";
 import { settle } from "./helpers";
 import { PulseContext } from "@/ui/usePulse";
@@ -60,6 +60,16 @@ describe("the Trade Depth card", () => {
     expect(decodeURIComponent(depthPost(c))).toContain("$PDDc on Base: a $100,000 order is refused at 74.24% price impact");
     const deep = depthCard({ ...pddc, rows: [row("Depth", "No size", { tone: "ok" }), pddc.rows[1]!, row("Buy $1,000", "0.01% impact", { tone: "ok" })] })!;
     expect(decodeURIComponent(depthPost(deep))).toContain("$PDDc on Base: deep enough —");
+  });
+
+  it("leads with the refused size, else what the largest buy costs, else that it was quoted", () => {
+    const c = depthCard(pddc)!;
+    expect(leadOf(c)).toBe("a $100,000 buy is refused at 74.24%");
+    const ok = { ...c, buys: c.buys.slice(0, 2), sells: [] };
+    expect(leadOf(ok)).toBe("a $10,000 buy moves it 0.20%");
+    expect(leadOf({ ...c, buys: [{ ...c.buys[0]!, figure: "—", note: "not quoted" }], sells: [] })).toBe("every size, quoted on chain");
+    expect(leadOf({ ...c, buys: [], sells: [] })).toBe("every size, quoted on chain");
+    expect(leadOf({ ...c, buys: [], sells: [{ ...c.buys[2]! }] })).toBe("a $100,000 sell is refused at 74.24%");
   });
 
   it("draws the stamp, the sizes, a logo or the first letter, and the block", () => {
