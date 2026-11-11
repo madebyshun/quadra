@@ -84,7 +84,7 @@ describe("what the API charges", () => {
 
   /** Priced per skill since 2026-10-02, from the market as measured on the Bazaar and x402scan. */
   it("prices each skill on its own, and anything unnamed at the base price", () => {
-    expect(SKILL_PRICES).toEqual({ verdict: 50_000n, gate: 10_000n, sendcheck: 5_000n, forensics: 100_000n, launcher: 50_000n, radar: 20_000n, launch: 50_000n, collateral: 20_000n });
+    expect(SKILL_PRICES).toEqual({ verdict: 50_000n, gate: 10_000n, sendcheck: 5_000n, forensics: 100_000n, launcher: 50_000n, radar: 20_000n, launch: 50_000n, collateral: 20_000n, depth: 10_000n });
     expect(priceOf("verdict")).toBe(50_000n);
     expect(priceOf("anything-else")).toBe(API_PRICE);
     expect(apiRequirements()!.amount).toBe(API_PRICE.toString());

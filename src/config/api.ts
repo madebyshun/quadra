@@ -22,6 +22,7 @@ export const SKILL_PRICES: Readonly<Record<string, bigint>> = {
   radar: 20_000n,
   launch: 50_000n,
   collateral: 20_000n,
+  depth: 10_000n,
 };
 
 /** What one call to `skill` costs, in USDC base units. */

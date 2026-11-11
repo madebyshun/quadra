@@ -1,0 +1,4033 @@
+{
+ "token": "0xb20000000000000000000078ee7ce2fE4908108C",
+ "capturedAt": "2026-11-11T18:00:33.139Z",
+ "calls": {
+  "0xb20000000000000000000078ee7ce2fe4908108c 0x313ce567": "0x0000000000000000000000000000000000000000000000000000000000000008",
+  "0xb20000000000000000000078ee7ce2fe4908108c 0x95d89b41": "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000054e56444163000000000000000000000000000000000000000000000000000000",
+  "0xb20000000000000000000078ee7ce2fe4908108c 0x18160ddd": "0x000000000000000000000000000000000000000000000000000003c95cf89719",
+  "0xb20000000000000000000078ee7ce2fe4908108c 0x06fdde03": "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000124e564944494120436f72706f726174696f6e0000000000000000000000000000"
+ },
+ "gets": {
+  "https://api.dexscreener.com/token-pairs/v1/base/0xb20000000000000000000078ee7ce2fE4908108C": [
+   {
+    "chainId": "base",
+    "dexId": "aero",
+    "url": "https://dexscreener.com/base/0xf668e21993f0acd7ab00bb1cfbaed0df28a3c8ec",
+    "pairAddress": "0xF668e21993f0ACd7ab00BB1cFbAeD0df28A3C8EC",
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "176.6722",
+    "priceUsd": "176.67",
+    "txns": {
+     "m5": {
+      "buys": 16,
+      "sells": 15
+     },
+     "h1": {
+      "buys": 290,
+      "sells": 227
+     },
+     "h6": {
+      "buys": 2070,
+      "sells": 1671
+     },
+     "h24": {
+      "buys": 6113,
+      "sells": 5021
+     }
+    },
+    "volume": {
+     "h24": 10660163.69,
+     "h6": 3331803.71,
+     "h1": 447473.18,
+     "m5": 38057.49
+    },
+    "priceChange": {
+     "m5": -0.02,
+     "h1": 0.26,
+     "h6": 0.28,
+     "h24": 5.26
+    },
+    "liquidity": {
+     "usd": 1791445.19,
+     "base": 4393.5942,
+     "quote": 1015219
+    },
+    "fdv": 7369121,
+    "marketCap": 7369121,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "aero",
+    "url": "https://dexscreener.com/base/0xce56168c09f4b7fca30523822c48008705c01156",
+    "pairAddress": "0xCe56168C09f4B7FCa30523822C48008705C01156",
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x4200000000000000000000000000000000000006",
+     "name": "Wrapped Ether",
+     "symbol": "WETH"
+    },
+    "priceNative": "0.08453",
+    "priceUsd": "176.66",
+    "txns": {
+     "m5": {
+      "buys": 18,
+      "sells": 7
+     },
+     "h1": {
+      "buys": 225,
+      "sells": 245
+     },
+     "h6": {
+      "buys": 1612,
+      "sells": 1670
+     },
+     "h24": {
+      "buys": 4984,
+      "sells": 4870
+     }
+    },
+    "volume": {
+     "h24": 1916783.6,
+     "h6": 558456.04,
+     "h1": 58836.88,
+     "m5": 3250.94
+    },
+    "priceChange": {
+     "m5": 0.05,
+     "h1": 0.38,
+     "h6": 0.24,
+     "h24": 5.26
+    },
+    "liquidity": {
+     "usd": 90353.89,
+     "base": 299.7124,
+     "quote": 17.8992
+    },
+    "fdv": 7368831,
+    "marketCap": 7368831,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "aerodrome",
+    "url": "https://dexscreener.com/base/0x853f5f1b92b16714fe6cda67caad0856b83c7ab9",
+    "pairAddress": "0x853F5f1B92b16714Fe6CDA67CAad0856B83C7ab9",
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "176.8516",
+    "priceUsd": "176.85",
+    "txns": {
+     "m5": {
+      "buys": 2,
+      "sells": 3
+     },
+     "h1": {
+      "buys": 97,
+      "sells": 103
+     },
+     "h6": {
+      "buys": 683,
+      "sells": 696
+     },
+     "h24": {
+      "buys": 1517,
+      "sells": 1468
+     }
+    },
+    "volume": {
+     "h24": 38434.04,
+     "h6": 21293.24,
+     "h1": 4467.01,
+     "m5": 170.72
+    },
+    "priceChange": {
+     "m5": 0.08,
+     "h1": 0.28,
+     "h6": 0.33,
+     "h24": 5.36
+    },
+    "liquidity": {
+     "usd": 432136.96,
+     "base": 2335.9682,
+     "quote": 19017
+    },
+    "fdv": 7376606,
+    "marketCap": 7376606,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xe82fa069a5e01a6dc36c6736b5de4f721d726291b080c69b48e21b9c5a11a2ad",
+    "pairAddress": "0xe82fa069a5e01a6dc36c6736b5de4f721d726291b080c69b48e21b9c5a11a2ad",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "172.6662",
+    "priceUsd": "172.66",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 7,
+      "sells": 4
+     }
+    },
+    "volume": {
+     "h24": 20.85,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h24": 0.39
+    },
+    "liquidity": {
+     "usd": 169304.29,
+     "base": 980.2755,
+     "quote": 43.7943
+    },
+    "fdv": 7202029,
+    "marketCap": 7202029,
+    "pairCreatedAt": 1787124861000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xb21769526e3a0814752628ec6c6e08efc883a025a18c64ee3ad376aa67728a18",
+    "pairAddress": "0xb21769526e3a0814752628ec6c6e08efc883a025a18c64ee3ad376aa67728a18",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "175.1746",
+    "priceUsd": "175.17",
+    "txns": {
+     "m5": {
+      "buys": 1,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 10,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 26,
+      "sells": 28
+     },
+     "h24": {
+      "buys": 138,
+      "sells": 33
+     }
+    },
+    "volume": {
+     "h24": 2765.84,
+     "h6": 1083.59,
+     "h1": 128.58,
+     "m5": 0.07
+    },
+    "priceChange": {
+     "h1": 0.38,
+     "h6": -0.69,
+     "h24": 4.17
+    },
+    "liquidity": {
+     "usd": 69543.23,
+     "base": 393.3648,
+     "quote": 635.6812
+    },
+    "fdv": 7306657,
+    "marketCap": 7306657,
+    "pairCreatedAt": 1787662217000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xc8c52ec416fe9d3b6e70a2e4ccde7cece3b8318d109a1aa1bbc7e0980c4fe985",
+    "pairAddress": "0xc8c52ec416fe9d3b6e70a2e4ccde7cece3b8318d109a1aa1bbc7e0980c4fe985",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "176.6618",
+    "priceUsd": "176.66",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 2,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 13,
+      "sells": 13
+     },
+     "h24": {
+      "buys": 58,
+      "sells": 35
+     }
+    },
+    "volume": {
+     "h24": 174.02,
+     "h6": 57.31,
+     "h1": 2.89,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": 0.4,
+     "h6": 0.11,
+     "h24": 5.36
+    },
+    "liquidity": {
+     "usd": 38013.82,
+     "base": 214.2765,
+     "quote": 159.3373
+    },
+    "fdv": 7368690,
+    "marketCap": 7368690,
+    "pairCreatedAt": 1793594335000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "nami",
+    "url": "https://dexscreener.com/base/0x337bea70489cd71a8c3951c1aa49c637b4b9b122",
+    "pairAddress": "0x337beA70489CD71a8C3951C1Aa49C637b4b9B122",
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "176.7425",
+    "priceUsd": "176.74",
+    "txns": {
+     "m5": {
+      "buys": 3,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 46,
+      "sells": 39
+     },
+     "h6": {
+      "buys": 361,
+      "sells": 319
+     },
+     "h24": {
+      "buys": 1076,
+      "sells": 895
+     }
+    },
+    "volume": {
+     "h24": 223244.85,
+     "h6": 66319.3,
+     "h1": 11733.34,
+     "m5": 216.66
+    },
+    "priceChange": {
+     "m5": 0.04,
+     "h1": 0.23,
+     "h6": 0.26,
+     "h24": 5.34
+    },
+    "liquidity": {
+     "usd": 19787.74,
+     "base": 50.9031,
+     "quote": 10790
+    },
+    "fdv": 7372055,
+    "marketCap": 7372055,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x60661b315553eb81872deea9a66d567cf0ccd33b",
+    "pairAddress": "0x60661b315553EB81872deEA9a66d567Cf0CCd33B",
+    "labels": [
+     "v3"
+    ],
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "176.6292",
+    "priceUsd": "176.62",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 12,
+      "sells": 3
+     },
+     "h6": {
+      "buys": 152,
+      "sells": 143
+     },
+     "h24": {
+      "buys": 373,
+      "sells": 295
+     }
+    },
+    "volume": {
+     "h24": 12090.64,
+     "h6": 4451.55,
+     "h1": 190.06,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": 0.4,
+     "h6": 0.24,
+     "h24": 5.35
+    },
+    "liquidity": {
+     "usd": 16877.31,
+     "base": 76.7371,
+     "quote": 3323.2975
+    },
+    "fdv": 7367328,
+    "marketCap": 7367328,
+    "pairCreatedAt": 1787069479000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x8e740d5fa742b763cd82159894b9919ed57e4f70",
+    "pairAddress": "0x8e740D5Fa742B763cD82159894b9919eD57E4f70",
+    "labels": [
+     "v3"
+    ],
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x4200000000000000000000000000000000000006",
+     "name": "Wrapped Ether",
+     "symbol": "WETH"
+    },
+    "priceNative": "0.08452",
+    "priceUsd": "176.57",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 19,
+      "sells": 21
+     },
+     "h6": {
+      "buys": 181,
+      "sells": 163
+     },
+     "h24": {
+      "buys": 388,
+      "sells": 311
+     }
+    },
+    "volume": {
+     "h24": 13885.25,
+     "h6": 7588.42,
+     "h1": 830.69,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": 0.57,
+     "h6": 0.22,
+     "h24": 5.29
+    },
+    "liquidity": {
+     "usd": 15133.19,
+     "base": 64.8658,
+     "quote": 1.7612
+    },
+    "fdv": 7365169,
+    "marketCap": 7365169,
+    "pairCreatedAt": 1787654421000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "aerodrome",
+    "url": "https://dexscreener.com/base/0x20e5fad2661ee9eb0c04824524030af31943b62d",
+    "pairAddress": "0x20E5fAd2661Ee9Eb0c04824524030AF31943B62D",
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x4200000000000000000000000000000000000006",
+     "name": "Wrapped Ether",
+     "symbol": "WETH"
+    },
+    "priceNative": "0.08464",
+    "priceUsd": "176.88",
+    "txns": {
+     "m5": {
+      "buys": 2,
+      "sells": 1
+     },
+     "h1": {
+      "buys": 45,
+      "sells": 61
+     },
+     "h6": {
+      "buys": 348,
+      "sells": 375
+     },
+     "h24": {
+      "buys": 772,
+      "sells": 749
+     }
+    },
+    "volume": {
+     "h24": 8018.4,
+     "h6": 4394.97,
+     "h1": 986.5,
+     "m5": 46.4
+    },
+    "priceChange": {
+     "m5": 0.11,
+     "h1": 0.44,
+     "h6": 0.32,
+     "h24": 5.42
+    },
+    "liquidity": {
+     "usd": 8948.37,
+     "base": 43.616,
+     "quote": 0.5902
+    },
+    "fdv": 7377810,
+    "marketCap": 7377810,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x91a34c94c5a2f34fbc7e2c0b2f1c6419dffea5c631289a35ce0a4be1759c52b6",
+    "pairAddress": "0x91a34c94c5a2f34fbc7e2c0b2f1c6419dffea5c631289a35ce0a4be1759c52b6",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x0000000000000000000000000000000000000000",
+     "name": "Ether",
+     "symbol": "ETH"
+    },
+    "priceNative": "0.08445",
+    "priceUsd": "176.50",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 4,
+      "sells": 7
+     },
+     "h6": {
+      "buys": 50,
+      "sells": 61
+     },
+     "h24": {
+      "buys": 120,
+      "sells": 87
+     }
+    },
+    "volume": {
+     "h24": 6534.86,
+     "h6": 4290.56,
+     "h1": 505.02,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": 0.41,
+     "h6": 0.27,
+     "h24": 5.39
+    },
+    "liquidity": {
+     "usd": 8844.95,
+     "base": 43.4988,
+     "quote": 0.5585
+    },
+    "fdv": 7362013,
+    "marketCap": 7362013,
+    "pairCreatedAt": 1787823355000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "hydrex",
+    "url": "https://dexscreener.com/base/0x3e8126a4a5df68dd9cca675e8dc925b5fed70ca9",
+    "pairAddress": "0x3e8126A4a5DF68DD9cCA675E8dc925B5FED70CA9",
+    "labels": [
+     "CLAMM"
+    ],
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0xFb5B41acdbA20a3230F84BE995173CFb98b8D6E7",
+     "name": "Wrapped NVIDIA Corporation ST0x",
+     "symbol": "wtNVDA"
+    },
+    "priceNative": "1.002013",
+    "priceUsd": "176.80",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 5,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 29,
+      "sells": 25
+     },
+     "h24": {
+      "buys": 83,
+      "sells": 44
+     }
+    },
+    "volume": {
+     "h24": 2464.52,
+     "h6": 634.07,
+     "h1": 35.18,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": 0.42,
+     "h6": 0.69,
+     "h24": 5.27
+    },
+    "liquidity": {
+     "usd": 3120.59,
+     "base": 6.8926,
+     "quote": 10.7789
+    },
+    "fdv": 5799500,
+    "marketCap": 5799500,
+    "pairCreatedAt": 1787784421000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xae47f9b40f865c470ff2f4a5428e7bd14979fef5ba17f80ee568734b1a5fdd5e",
+    "pairAddress": "0xae47f9b40f865c470ff2f4a5428e7bd14979fef5ba17f80ee568734b1a5fdd5e",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x0000000000000000000000000000000000000000",
+     "name": "Ether",
+     "symbol": "ETH"
+    },
+    "priceNative": "0.08155",
+    "priceUsd": "167.45",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 6,
+      "sells": 6
+     },
+     "h24": {
+      "buys": 51,
+      "sells": 49
+     }
+    },
+    "volume": {
+     "h24": 10.89,
+     "h6": 1.12,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": -0.68,
+     "h24": 0.48
+    },
+    "liquidity": {
+     "usd": 2125.31,
+     "base": 10.799,
+     "quote": 0.1543
+    },
+    "fdv": 6984801,
+    "marketCap": 6984801,
+    "pairCreatedAt": 1791345187000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xc5777a43c9c6961fe88bb3d6a6fbcfc43ce7264ef5cca37dc43c2bf404391ca0",
+    "pairAddress": "0xc5777a43c9c6961fe88bb3d6a6fbcfc43ce7264ef5cca37dc43c2bf404391ca0",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x0000000000000000000000000000000000000000",
+     "name": "Ether",
+     "symbol": "ETH"
+    },
+    "priceNative": "0.08483",
+    "priceUsd": "177.26",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 5,
+      "sells": 5
+     },
+     "h6": {
+      "buys": 45,
+      "sells": 34
+     },
+     "h24": {
+      "buys": 89,
+      "sells": 56
+     }
+    },
+    "volume": {
+     "h24": 10469.89,
+     "h6": 6245.29,
+     "h1": 838.13,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": 0.97,
+     "h6": -2.25,
+     "h24": 3.4
+    },
+    "liquidity": {
+     "usd": 995.56,
+     "base": 0.1122,
+     "quote": 0.4669
+    },
+    "fdv": 7393961,
+    "marketCap": 7393961,
+    "pairCreatedAt": 1787588255000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xe5168844164adb1908ef7eff5ea71205064a0c43a0cf0fd047b3d6199939c4b7",
+    "pairAddress": "0xe5168844164adb1908ef7eff5ea71205064a0c43a0cf0fd047b3d6199939c4b7",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "174.08456",
+    "priceUsd": "174.084",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 1,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 2,
+      "sells": 2
+     },
+     "h24": {
+      "buys": 27,
+      "sells": 3
+     }
+    },
+    "volume": {
+     "h24": 92.35,
+     "h6": 12.16,
+     "h1": 2.57,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": 0.11,
+     "h24": 3.3
+    },
+    "liquidity": {
+     "usd": 1507.83,
+     "base": 0.00001646,
+     "quote": 1507.8285
+    },
+    "fdv": 7261188,
+    "marketCap": 7261188,
+    "pairCreatedAt": 1794305065000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x2a53b9864409314d120744d99767bb9175a5738258c717aa264c841b2fc227de",
+    "pairAddress": "0x2a53b9864409314d120744d99767bb9175a5738258c717aa264c841b2fc227de",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "176.5662",
+    "priceUsd": "176.56",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 3,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 10,
+      "sells": 4
+     },
+     "h24": {
+      "buys": 28,
+      "sells": 6
+     }
+    },
+    "volume": {
+     "h24": 21.83,
+     "h6": 10.63,
+     "h1": 1.29,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": 0.87,
+     "h6": -0.06,
+     "h24": 5.42
+    },
+    "liquidity": {
+     "usd": 94.44,
+     "base": 0.215,
+     "quote": 56.4688
+    },
+    "fdv": 7364700,
+    "marketCap": 7364700,
+    "pairCreatedAt": 1788827281000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xbf07b8fba9d4729b1460c2c382cbdec5f7ffc17e11b01ab70fa3740a581f1e8e",
+    "pairAddress": "0xbf07b8fba9d4729b1460c2c382cbdec5f7ffc17e11b01ab70fa3740a581f1e8e",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x0000000000000000000000000000000000000000",
+     "name": "Ether",
+     "symbol": "ETH"
+    },
+    "priceNative": "0.08480",
+    "priceUsd": "175.51",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 2,
+      "sells": 3
+     },
+     "h24": {
+      "buys": 9,
+      "sells": 6
+     }
+    },
+    "volume": {
+     "h24": 34.52,
+     "h6": 11.3,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": -0.17,
+     "h24": 4.26
+    },
+    "liquidity": {
+     "usd": 206.94,
+     "base": 0.01698,
+     "quote": 0.09855
+    },
+    "fdv": 7320870,
+    "marketCap": 7320870,
+    "pairCreatedAt": 1787761437000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x393c3df71a9cb64f63aa9120eb7584ddc2dc38712df320999dc5b9a1ad56ee13",
+    "pairAddress": "0x393c3df71a9cb64f63aa9120eb7584ddc2dc38712df320999dc5b9a1ad56ee13",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x0000000000000000000000000000000000000000",
+     "name": "Ether",
+     "symbol": "ETH"
+    },
+    "priceNative": "0.08491",
+    "priceUsd": "176.085",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 4
+     },
+     "h24": {
+      "buys": 7,
+      "sells": 6
+     }
+    },
+    "volume": {
+     "h24": 2.69,
+     "h6": 0.46,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": -0.22,
+     "h24": 4.2
+    },
+    "liquidity": {
+     "usd": 54.5,
+     "base": 0.2312,
+     "quote": 0.006647
+    },
+    "fdv": 7344669,
+    "marketCap": 7344669,
+    "pairCreatedAt": 1787126613000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x8e6c06c99a75b6e43c32d46fa7d981b8c8804522fc077a07ab690262f4988bcd",
+    "pairAddress": "0x8e6c06c99a75b6e43c32d46fa7d981b8c8804522fc077a07ab690262f4988bcd",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "177.8857",
+    "priceUsd": "177.88",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 1,
+      "sells": 1
+     }
+    },
+    "volume": {
+     "h24": 1.99,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h24": -0.35
+    },
+    "fdv": 7419740,
+    "marketCap": 7419740,
+    "pairCreatedAt": 1794262146000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x73429136d60ad9fb734c9e51db90bf30acbebdb78a7b029053ba8fefd89d78a1",
+    "pairAddress": "0x73429136d60ad9fb734c9e51db90bf30acbebdb78a7b029053ba8fefd89d78a1",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "172.5334",
+    "priceUsd": "172.53",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 5,
+      "sells": 1
+     }
+    },
+    "volume": {
+     "h24": 0.02,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h24": 6.75
+    },
+    "liquidity": {
+     "usd": 1.31,
+     "base": 0.003806,
+     "quote": 0.6567
+    },
+    "fdv": 7196490,
+    "marketCap": 7196490,
+    "pairCreatedAt": 1787666151000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "equalizer",
+    "url": "https://dexscreener.com/base/0xaf37c58baad0df59bbae19b7ee17afc93db8bdf5",
+    "pairAddress": "0xaf37c58BAaD0dF59bBAe19B7Ee17afC93Db8bDF5",
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf",
+     "name": "Venice Token",
+     "symbol": "VVV"
+    },
+    "priceNative": "8.5490",
+    "priceUsd": "167.68",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 2
+     },
+     "h24": {
+      "buys": 1,
+      "sells": 2
+     }
+    },
+    "volume": {
+     "h24": 0.59,
+     "h6": 0.37,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": -3.33,
+     "h24": -3.33
+    },
+    "liquidity": {
+     "usd": 21.95,
+     "base": 0.06547,
+     "quote": 0.5597
+    },
+    "fdv": 6994336,
+    "marketCap": 6994336,
+    "pairCreatedAt": 1789001837000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "equalizer",
+    "url": "https://dexscreener.com/base/0x345d4337134a718b0f62c56ed5b82af033e4237d",
+    "pairAddress": "0x345D4337134A718B0F62C56ed5b82aF033e4237D",
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "176.2713",
+    "priceUsd": "176.27",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 1,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 1,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 1,
+      "sells": 0
+     }
+    },
+    "volume": {
+     "h24": 0.13,
+     "h6": 0.13,
+     "h1": 0.13,
+     "m5": 0
+    },
+    "priceChange": {},
+    "liquidity": {
+     "usd": 17.58,
+     "base": 0.04988,
+     "quote": 8.794
+    },
+    "fdv": 7352401,
+    "marketCap": 7352401,
+    "pairCreatedAt": 1788444869000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "pancakeswap",
+    "url": "https://dexscreener.com/base/0xa079011895452e7fd1e4dc4b5546124d10a47203",
+    "pairAddress": "0xa079011895452e7fd1E4dC4B5546124d10a47203",
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "198.1763",
+    "priceUsd": "198.17",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 0,
+      "sells": 1
+     }
+    },
+    "volume": {
+     "h24": 0,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {},
+    "liquidity": {
+     "usd": 0.92,
+     "base": 0.004655,
+     "quote": 0.002125
+    },
+    "fdv": 8266074,
+    "marketCap": 8266074,
+    "pairCreatedAt": 1787186937000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "aerodrome",
+    "url": "https://dexscreener.com/base/0xccb9d8152fe783fada0f86e87551a1423ea69577",
+    "pairAddress": "0xCcb9d8152Fe783FaDa0f86e87551a1423eA69577",
+    "baseToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "quoteToken": {
+     "address": "0xb200000000000000000000C2e324d24d7eEcd1fb",
+     "name": "Apple Inc.",
+     "symbol": "AAPLc"
+    },
+    "priceNative": "0.4985",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 1,
+      "sells": 4
+     },
+     "h24": {
+      "buys": 6,
+      "sells": 5
+     }
+    },
+    "volume": {
+     "h24": 0,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": -2.18,
+     "h24": 3.51
+    },
+    "pairCreatedAt": 1787923847000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://www.coinbase.com/tokenize",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/coinbase",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x41084f2d35b54dc0d070fbf76aa52c46f5d9c7e36c163252064b6b184d9429d9",
+    "pairAddress": "0x41084f2d35b54dc0d070fbf76aa52c46f5d9c7e36c163252064b6b184d9429d9",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xB200000000000000000000cFbdF64a8706a94a01",
+     "name": "BLUE CHIP",
+     "symbol": "BLUECHIP"
+    },
+    "quoteToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "priceNative": "0.00001548",
+    "priceUsd": "0.002713",
+    "txns": {
+     "m5": {
+      "buys": 11,
+      "sells": 2
+     },
+     "h1": {
+      "buys": 91,
+      "sells": 23
+     },
+     "h6": {
+      "buys": 149,
+      "sells": 58
+     },
+     "h24": {
+      "buys": 270,
+      "sells": 187
+     }
+    },
+    "volume": {
+     "h24": 46391.08,
+     "h6": 16671.94,
+     "h1": 11651.7,
+     "m5": 2192.12
+    },
+    "priceChange": {
+     "m5": 1.9,
+     "h1": 17.57,
+     "h6": 15.51,
+     "h24": 27.46
+    },
+    "liquidity": {
+     "usd": 183706.87,
+     "base": 34445389,
+     "quote": 515.1644
+    },
+    "fdv": 2713371,
+    "marketCap": 2713371,
+    "pairCreatedAt": 1787236973000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/3wufTt_xNIBYdSgO?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/z4GUlntyO_YYifaN?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb200000000000000000000cfbdf64a8706a94a01?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://basebluechip.com/",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/o1bluechip",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x9849c9b8e9dc57a7966bb5d5267b9b2a1192e3c12d7b90e828918a89e5cff7f3",
+    "pairAddress": "0x9849c9b8e9dc57a7966bb5d5267b9b2a1192e3c12d7b90e828918a89e5cff7f3",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xca18A528Ea897040f715edC92e6e4572780c5ca1",
+     "name": "Kairence",
+     "symbol": "KAI"
+    },
+    "quoteToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "priceNative": "0.000001783",
+    "priceUsd": "0.0003118",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 0,
+      "sells": 6
+     }
+    },
+    "volume": {
+     "h24": 13.83,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h24": 1.95
+    },
+    "liquidity": {
+     "usd": 19617.16,
+     "base": 44247733,
+     "quote": 33.2877
+    },
+    "fdv": 294090,
+    "marketCap": 803839,
+    "pairCreatedAt": 1789332585000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/rTasPF-PT2G052tG?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/xJCdak941M0SKcpl?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xca18a528ea897040f715edc92e6e4572780c5ca1?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://kairence.ai",
+       "label": "Website"
+      },
+      {
+       "url": "https://docs.kairence.ai",
+       "label": "Docs"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/kairence_ai",
+       "type": "twitter"
+      },
+      {
+       "url": "https://t.me/kairence_ai",
+       "type": "telegram"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x58ac468ebebf53906ac4ee3fe9e5b988fc904813d9ee41fc4a9c86394b6b276e",
+    "pairAddress": "0x58ac468ebebf53906ac4ee3fe9e5b988fc904813d9ee41fc4a9c86394b6b276e",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0x6CB927b413068609853A539016F31DEff6E9AbA3",
+     "name": "PrinterInkCoin",
+     "symbol": "PrinterInkCoin"
+    },
+    "quoteToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "priceNative": "176.5132",
+    "priceUsd": "31116.19",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 1,
+      "sells": 3
+     },
+     "h24": {
+      "buys": 3,
+      "sells": 7
+     }
+    },
+    "volume": {
+     "h24": 5.91,
+     "h6": 5.82,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": 4.74,
+     "h24": 4.75
+    },
+    "liquidity": {
+     "usd": 29979.35,
+     "base": 0.7439,
+     "quote": 38.746
+    },
+    "fdv": 31116,
+    "marketCap": 31116,
+    "pairCreatedAt": 1787623385000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/Bjrr6A2jdu3rv-jv?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/R3CMlzydSQT2XaXu?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0x6cb927b413068609853a539016f31deff6e9aba3?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://printerinkcoin.com/",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/PrinterInkCoin",
+       "type": "twitter"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xa3fe6f4820e80449a5d6952901058c2748a999bb3a84bee298b88e61e84825c6",
+    "pairAddress": "0xa3fe6f4820e80449a5d6952901058c2748a999bb3a84bee298b88e61e84825c6",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0x48B3E8510d6C43B109960Cc56d2c27A72e19FDB4",
+     "name": "Uranus Moon 8",
+     "symbol": "🌙8"
+    },
+    "quoteToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "priceNative": "0.0003724",
+    "priceUsd": "0.06471",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 1,
+      "sells": 1
+     }
+    },
+    "volume": {
+     "h24": 0.78,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h24": 0.79
+    },
+    "liquidity": {
+     "usd": 68.16,
+     "base": 526.6927,
+     "quote": 0.1961
+    },
+    "fdv": 62443,
+    "marketCap": 62443,
+    "pairCreatedAt": 1791229933000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/Fz7OJhQCMVsN-G99?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/bBGL6dggzIUmLiWv?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0x48b3e8510d6c43b109960cc56d2c27a72e19fdb4?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://uranus28.win/",
+       "label": "Website"
+      },
+      {
+       "url": "https://zibars-organization.gitbook.io/the-moons-of-uranus",
+       "label": "Docs"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/Moon8onBASE",
+       "type": "twitter"
+      },
+      {
+       "url": "https://t.me/ExploreUranus",
+       "type": "telegram"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0xe9f61a0beb0f9a8a646d0666a526b5582477a6b002aa0b0afc4234608e1d43b0",
+    "pairAddress": "0xe9f61a0beb0f9a8a646d0666a526b5582477a6b002aa0b0afc4234608e1d43b0",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xd193604529Ac73f252C8c9e1b8BbC45db260Dca1",
+     "name": "WOOF",
+     "symbol": "WOOF"
+    },
+    "quoteToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "priceNative": "0.0000001896",
+    "priceUsd": "0.00003192",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h24": {
+      "buys": 1,
+      "sells": 0
+     }
+    },
+    "volume": {
+     "h24": 3.08,
+     "h6": 0,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {},
+    "liquidity": {
+     "usd": 5195.04,
+     "base": 139009540,
+     "quote": 4.5003
+    },
+    "fdv": 27873,
+    "marketCap": 27873,
+    "pairCreatedAt": 1791330923000,
+    "info": {
+     "imageUrl": "https://cdn.dexscreener.com/cms/images/rKxQH4dL5vKTJrl6?width=800&height=800&quality=95&format=auto",
+     "header": "https://cdn.dexscreener.com/cms/images/5atGYvNfTHBDlZRw?width=1500&height=500&quality=95&format=auto",
+     "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xd193604529ac73f252c8c9e1b8bbc45db260dca1?timestamp=1794420000000",
+     "websites": [
+      {
+       "url": "https://kairence.ai/agent/0xd193604529Ac73f252C8c9e1b8BbC45db260Dca1",
+       "label": "Website"
+      }
+     ],
+     "socials": [
+      {
+       "url": "https://x.com/woof_kairence",
+       "type": "twitter"
+      },
+      {
+       "url": "https://t.me/kairence_ai",
+       "type": "telegram"
+      }
+     ]
+    }
+   },
+   {
+    "chainId": "base",
+    "dexId": "uniswap",
+    "url": "https://dexscreener.com/base/0x4bc898b46d24e6d725caf1a6728d37d85737c2d78fc4c9e13df1c39cd1c97971",
+    "pairAddress": "0x4bc898b46d24e6d725caf1a6728d37d85737c2d78fc4c9e13df1c39cd1c97971",
+    "labels": [
+     "v4"
+    ],
+    "baseToken": {
+     "address": "0xb2000000000000000000007b9fcbd005511aCBd5",
+     "name": "Space Exploration Technologies Corp.",
+     "symbol": "SPCXc"
+    },
+    "quoteToken": {
+     "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+     "name": "NVIDIA Corporation",
+     "symbol": "NVDAc"
+    },
+    "priceNative": "0.8166",
+    "priceUsd": "142.63",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 0,
+      "sells": 2
+     },
+     "h24": {
+      "buys": 0,
+      "sells": 3
+     }
+    },
+    "volume": {
+     "h24": 0.55,
+     "h6": 0.28,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h6": -1.33,
+     "h24": -1.33
+    },
+    "liquidity": {
+     "usd": 89.15,
+     "base": 0.3125,
+     "quote": 0.2552
+    },
+    "fdv": 3463400,
+    "marketCap": 3463400,
+    "pairCreatedAt": 1793375333000
+   }
+  ]
+ },
+ "relay": [
+  {
+   "request": {
+    "user": "0x000000000000000000000000000000000000dEaD",
+    "recipient": "0x000000000000000000000000000000000000dEaD",
+    "originChainId": 8453,
+    "destinationChainId": 8453,
+    "originCurrency": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "destinationCurrency": "0xb20000000000000000000078ee7ce2fE4908108C",
+    "amount": "1000000000",
+    "tradeType": "EXACT_INPUT"
+   },
+   "status": 200,
+   "body": {
+    "requestId": "0x1794420028ce3ca1a9a67364512e514e1a9ac91d334543de7e55c510282286e0",
+    "steps": [
+     {
+      "id": "approve",
+      "action": "Confirm transaction in your wallet",
+      "description": "Sign an approval for USDC",
+      "kind": "transaction",
+      "items": [
+       {
+        "status": "incomplete",
+        "data": {
+         "from": "0x000000000000000000000000000000000000dEaD",
+         "to": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+         "data": "0x095ea7b30000000000000000000000005567954cd026cebfe486062cb75848e0f1c12e58000000000000000000000000000000000000000000000000000000003b9aca00",
+         "value": "0",
+         "chainId": 8453,
+         "gas": "73112",
+         "maxFeePerGas": "6822500",
+         "maxPriorityFeePerGas": "1322500"
+        }
+       }
+      ],
+      "requestId": "0x1794420028ce3ca1a9a67364512e514e1a9ac91d334543de7e55c510282286e0"
+     },
+     {
+      "id": "swap",
+      "action": "Confirm transaction in your wallet",
+      "description": "Swapping USDC for NVDAc",
+      "kind": "transaction",
+      "items": [
+       {
+        "status": "incomplete",
+        "data": {
+         "from": "0x000000000000000000000000000000000000dEaD",
+         "to": "0x5567954cd026cebfe486062cb75848e0f1c12e58",
+         "data": "0xf9e4bab400000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000dead000000000000000000000000000000000000000000000000000000000000dead0000000000000000000000000000000000000000000000000000000000000f000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000003b9aca0000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000003e00000000000000000000000000000000000000000000000000000000000000b40000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000044095ea7b30000000000000000000000000000000000001ff3684f28c67538d4d072c22734000000000000000000000000000000000000000000000000000000003b9aca00000000000000000000000000000000000000000000000000000000000000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001a49bb43718000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000001000000000000000000000000f70da97812cb96acdf810712aa562db8dfa3dbef0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000016e36000000000000000000000000000000000000000000000000000000000000000210e682282015c55e7ed345433d19ca9a1e415e21546376a9a1ac3ec82002449710100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001ff3684f28c67538d4d072c2273400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000006a42213bc0b000000000000000000000000103502909141f7025a94b7b99a276dcd128e21a8000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000000000000000000000000000000000003b83e6a0000000000000000000000000103502909141f7025a94b7b99a276dcd128e21a800000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000005c41fff991f0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7000000000000000000000000b20000000000000000000078ee7ce2fe4908108c00000000000000000000000000000000000000000000000000000000215b309300000000000000000000000000000000000000000000000000000000000000a0fa3b307a9dfa943cf4db27450af43c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000042000000000000000000000000000000000000000000000000000000000000000e4c1fb425e000000000000000000000000103502909141f7025a94b7b99a276dcd128e21a8000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000000000000000000000000000000000003b83e6a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006af4ae6800000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000026438c9c147000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda0291300000000000000000000000000000000000000000000000000000000000f424000000000000000000000000002201e6f13c41506c7bb635d7543f98826229ab700000000000000000000000000000000000000000000000000000000000000a400000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000184865f50930000000000000000000000000000000000000000000000000000000000000020000000000000000000000000a78e6f3477c500db55a3af09e5fc5462c0b74d9c000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000b20000000000000000000078ee7ce2fe4908108c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001e52e657000000000000000000000000103502909141f7025a94b7b99a276dcd128e21a8000000000000000000000000000000000000000000000000000000006af4ae6800000000000000000000000000000000ffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a45f80abae000000000000000000000000f5c4f3dc02c3fb9279495a8fef7b0741da956157000000000000000000000000b20000000000000000000078ee7ce2fe4908108c0000000000000000000000000000000000000000000000000000000021b172d000000000000000000000000000000000000000000000000000000000000f424000000000000000000000000000000000000000000000000000000000000f42400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001a49bb43718000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000b20000000000000000000078ee7ce2fe4908108c0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000dead0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000210e682282015c55e7ed345433d19ca9a1e415e21546376a9a1ac3ec820024497100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000210e682282015c55e7ed345433d19ca9a1e415e21546376a9a1ac3ec820024497100000000000000000000000000000000000000000000000000000000000000001794420028ce3ca1a9a67364512e514e1a9ac91d334543de7e55c510282286e0",
+         "value": "0",
+         "chainId": 8453,
+         "gas": "814656",
+         "maxFeePerGas": "6822500",
+         "maxPriorityFeePerGas": "1322500"
+        },
+        "check": {
+         "endpoint": "/intents/status?requestId=0x1794420028ce3ca1a9a67364512e514e1a9ac91d334543de7e55c510282286e0",
+         "method": "GET"
+        }
+       }
+      ],
+      "requestId": "0x1794420028ce3ca1a9a67364512e514e1a9ac91d334543de7e55c510282286e0"
+     }
+    ],
+    "fees": {
+     "gas": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "Ether",
+       "decimals": 18,
+       "metadata": {
+        "logoURI": "https://assets.relay.link/icons/1/light.png",
+        "verified": true
+       }
+      },
+      "amount": "5568592201830",
+      "amountFormatted": "0.00000556859220183",
+      "amountUsd": "0.011630",
+      "minimumAmount": "5568592201830"
+     },
+     "relayer": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "1499999",
+      "amountFormatted": "1.499999",
+      "amountUsd": "1.499581",
+      "minimumAmount": "1499999"
+     },
+     "relayerGas": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "0",
+      "amountFormatted": "0.0",
+      "amountUsd": "0",
+      "minimumAmount": "0"
+     },
+     "relayerService": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "1499999",
+      "amountFormatted": "1.499999",
+      "amountUsd": "1.499581",
+      "minimumAmount": "1499999"
+     },
+     "app": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "0",
+      "amountFormatted": "0.0",
+      "amountUsd": "0",
+      "minimumAmount": "0"
+     }
+    },
+    "details": {
+     "operation": "swap",
+     "sender": "0x000000000000000000000000000000000000dEaD",
+     "recipient": "0x000000000000000000000000000000000000dEaD",
+     "currencyIn": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "1000000000",
+      "amountFormatted": "1000.0",
+      "amountUsd": "999.721000",
+      "minimumAmount": "1000000000"
+     },
+     "currencyOut": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+       "symbol": "NVDAc",
+       "name": "NVIDIA Corporation",
+       "decimals": 8,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+        "verified": false
+       }
+      },
+      "amount": "565277110",
+      "amountFormatted": "5.6527711",
+      "amountUsd": "998.893640",
+      "minimumAmount": "559624339"
+     },
+     "totalImpact": {
+      "usd": "-0.827360",
+      "percent": "-0.08"
+     },
+     "swapImpact": {
+      "usd": "0.672221",
+      "percent": "0.07"
+     },
+     "expandedPriceImpact": {
+      "swap": {
+       "usd": "0"
+      },
+      "execution": {
+       "usd": "0"
+      },
+      "relay": {
+       "usd": "-1.499581"
+      },
+      "app": {
+       "usd": "0"
+      },
+      "sponsored": {
+       "usd": "0"
+      }
+     },
+     "rate": "0.0056612629944917375",
+     "slippageTolerance": {
+      "total": "100",
+      "origin": {
+       "usd": "9.889047",
+       "value": "5652771",
+       "percent": "0.99"
+      },
+      "destination": {
+       "usd": "0",
+       "value": "0",
+       "percent": "0"
+      }
+     },
+     "timeEstimate": 0.2,
+     "userBalance": "0",
+     "isFixedRate": false,
+     "route": {
+      "origin": {
+       "inputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+         "symbol": "USDC",
+         "name": "USD Coin",
+         "decimals": 6,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+          "verified": true
+         }
+        },
+        "amount": "1000000000",
+        "amountFormatted": "1000.0",
+        "amountUsd": "999.721000",
+        "minimumAmount": "1000000000"
+       },
+       "outputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+         "symbol": "NVDAc",
+         "name": "NVIDIA Corporation",
+         "decimals": 8,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+          "verified": false
+         }
+        },
+        "amount": "565277110",
+        "amountFormatted": "5.6527711",
+        "amountUsd": "998.893640",
+        "minimumAmount": "559624339"
+       },
+       "router": "0x"
+      },
+      "destination": {
+       "inputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+         "symbol": "USDC",
+         "name": "USD Coin",
+         "decimals": 6,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+          "verified": true
+         }
+        },
+        "amount": "1000000000",
+        "amountFormatted": "1000.0",
+        "amountUsd": "999.721000",
+        "minimumAmount": "1000000000"
+       },
+       "outputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+         "symbol": "NVDAc",
+         "name": "NVIDIA Corporation",
+         "decimals": 8,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+          "verified": false
+         }
+        },
+        "amount": "565277110",
+        "amountFormatted": "5.6527711",
+        "amountUsd": "998.893640",
+        "minimumAmount": "559624339"
+       },
+       "router": "0x"
+      }
+     }
+    }
+   }
+  },
+  {
+   "request": {
+    "user": "0x000000000000000000000000000000000000dEaD",
+    "recipient": "0x000000000000000000000000000000000000dEaD",
+    "originChainId": 8453,
+    "destinationChainId": 8453,
+    "originCurrency": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "destinationCurrency": "0xb20000000000000000000078ee7ce2fE4908108C",
+    "amount": "10000000000",
+    "tradeType": "EXACT_INPUT"
+   },
+   "status": 200,
+   "body": {
+    "requestId": "0x1794420029df190faeef55f0bd9a4c07704c5cb8faf2b685d903dfb525d060d1",
+    "steps": [
+     {
+      "id": "approve",
+      "action": "Confirm transaction in your wallet",
+      "description": "Sign an approval for USDC",
+      "kind": "transaction",
+      "items": [
+       {
+        "status": "incomplete",
+        "data": {
+         "from": "0x000000000000000000000000000000000000dEaD",
+         "to": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+         "data": "0x095ea7b30000000000000000000000005567954cd026cebfe486062cb75848e0f1c12e5800000000000000000000000000000000000000000000000000000002540be400",
+         "value": "0",
+         "chainId": 8453,
+         "gas": "73127",
+         "maxFeePerGas": "6822500",
+         "maxPriorityFeePerGas": "1322500"
+        }
+       }
+      ],
+      "requestId": "0x1794420029df190faeef55f0bd9a4c07704c5cb8faf2b685d903dfb525d060d1"
+     },
+     {
+      "id": "swap",
+      "action": "Confirm transaction in your wallet",
+      "description": "Swapping USDC for NVDAc",
+      "kind": "transaction",
+      "items": [
+       {
+        "status": "incomplete",
+        "data": {
+         "from": "0x000000000000000000000000000000000000dEaD",
+         "to": "0x5567954cd026cebfe486062cb75848e0f1c12e58",
+         "data": "0xf9e4bab400000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000dead000000000000000000000000000000000000000000000000000000000000dead0000000000000000000000000000000000000000000000000000000000000b200000000000000000000000000000000000000000000000000000000000000001000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000002540be40000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000003e00000000000000000000000000000000000000000000000000000000000000760000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000044095ea7b3000000000000000000000000c87de04e2ec1f4282dff2933a2d58199f688fc3d00000000000000000000000000000000000000000000000000000002540be400000000000000000000000000000000000000000000000000000000000000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001a49bb43718000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000001000000000000000000000000f70da97812cb96acdf810712aa562db8dfa3dbef00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000e4e1c000000000000000000000000000000000000000000000000000000000000000211d060d525bfd309d586b2faf8bc5c40770c4a9db0f55feeaf091fd9200244971010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c87de04e2ec1f4282dff2933a2d58199f688fc3d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000002dd3f0bde25fa18939e398d2c31b0757d009222de99c6e461d3de15000000000000000000000002532702400000000000000000000000014d7ede1d0d939e398d2c31b0757d009222de99c6e461d3de150729e2a4716d9f7dd17858d5d504426d228697f7833589fcd6edb6e08f4c7c32d4f71b54bda02913b20000000000000000000078ee7ce2fe4908108ca78e6f3477c500db55a3af09e5fc5462c0b74d9c71c2ed90cc288229be59f26b8b3eef3c07d7ab990b3e328455c4059eeb9e3f84b5543f74e24e7e1b792f465e0434fb1028ea3bfeb05240cb839c4e04c200f21efe67c7f41b81a854c26f9cda805930659c087eb773291e50cf6c6a90ef0f4500e349b903ce56168c09f4b7fca30523822c48008705c0115642000000000000000000000000000000000000062bfd1fc5e25a8f55c2e849492ad7966ea8a0dd9ef804f302f2f7c190020124e24f0884000000000000000000000000939e398d2c31b0757d009222de99c6e461d3de150000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000019d37ac04b05833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000000000000000000000000000000000000000000000000000000000f805f102f302eb02066af4ad3d0d513b0041f1b2ac2a10f8808608407d3c4ba945d41b1200d730c67db2755e1ba02282528e288b32bf751ae6af8484cdf0bc87ef55e4d7e0faa28f2e2546e21bdda17f2f5a1c4e070677434e0806a53b460906460a0bf90950dd3edb030c710301ff0000000000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001a49bb43718000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000b20000000000000000000078ee7ce2fe4908108c0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000dead0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000211d060d525bfd309d586b2faf8bc5c40770c4a9db0f55feeaf091fd920024497100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000211d060d525bfd309d586b2faf8bc5c40770c4a9db0f55feeaf091fd920024497100000000000000000000000000000000000000000000000000000000000000001794420029df190faeef55f0bd9a4c07704c5cb8faf2b685d903dfb525d060d1",
+         "value": "0",
+         "chainId": 8453,
+         "gas": "3230299",
+         "maxFeePerGas": "6822500",
+         "maxPriorityFeePerGas": "1322500"
+        },
+        "check": {
+         "endpoint": "/intents/status?requestId=0x1794420029df190faeef55f0bd9a4c07704c5cb8faf2b685d903dfb525d060d1",
+         "method": "GET"
+        }
+       }
+      ],
+      "requestId": "0x1794420029df190faeef55f0bd9a4c07704c5cb8faf2b685d903dfb525d060d1"
+     }
+    ],
+    "fees": {
+     "gas": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "Ether",
+       "decimals": 18,
+       "metadata": {
+        "logoURI": "https://assets.relay.link/icons/1/light.png",
+        "verified": true
+       }
+      },
+      "amount": "22050024955568",
+      "amountFormatted": "0.000022050024955568",
+      "amountUsd": "0.046053",
+      "minimumAmount": "22050024955568"
+     },
+     "relayer": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "15000000",
+      "amountFormatted": "15.0",
+      "amountUsd": "14.995815",
+      "minimumAmount": "15000000"
+     },
+     "relayerGas": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "0",
+      "amountFormatted": "0.0",
+      "amountUsd": "0",
+      "minimumAmount": "0"
+     },
+     "relayerService": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "15000000",
+      "amountFormatted": "15.0",
+      "amountUsd": "14.995815",
+      "minimumAmount": "15000000"
+     },
+     "app": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "0",
+      "amountFormatted": "0.0",
+      "amountUsd": "0",
+      "minimumAmount": "0"
+     }
+    },
+    "details": {
+     "operation": "swap",
+     "sender": "0x000000000000000000000000000000000000dEaD",
+     "recipient": "0x000000000000000000000000000000000000dEaD",
+     "currencyIn": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "10000000000",
+      "amountFormatted": "10000.0",
+      "amountUsd": "9997.210000",
+      "minimumAmount": "10000000000"
+     },
+     "currencyOut": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+       "symbol": "NVDAc",
+       "name": "NVIDIA Corporation",
+       "decimals": 8,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+        "verified": false
+       }
+      },
+      "amount": "5651643762",
+      "amountFormatted": "56.51643762",
+      "amountUsd": "9986.944299",
+      "minimumAmount": "5595127324"
+     },
+     "totalImpact": {
+      "usd": "-10.265701",
+      "percent": "-0.10"
+     },
+     "swapImpact": {
+      "usd": "4.730114",
+      "percent": "0.05"
+     },
+     "expandedPriceImpact": {
+      "swap": {
+       "usd": "0"
+      },
+      "execution": {
+       "usd": "0"
+      },
+      "relay": {
+       "usd": "-14.995815"
+      },
+      "app": {
+       "usd": "0"
+      },
+      "sponsored": {
+       "usd": "0"
+      }
+     },
+     "rate": "0.005660133962944416",
+     "slippageTolerance": {
+      "total": "100",
+      "origin": {
+       "usd": "99.869443",
+       "value": "56516438",
+       "percent": "1.00"
+      },
+      "destination": {
+       "usd": "0",
+       "value": "0",
+       "percent": "0"
+      }
+     },
+     "timeEstimate": 0.2,
+     "userBalance": "0",
+     "isFixedRate": false,
+     "route": {
+      "origin": {
+       "inputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+         "symbol": "USDC",
+         "name": "USD Coin",
+         "decimals": 6,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+          "verified": true
+         }
+        },
+        "amount": "10000000000",
+        "amountFormatted": "10000.0",
+        "amountUsd": "9997.210000",
+        "minimumAmount": "10000000000"
+       },
+       "outputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+         "symbol": "NVDAc",
+         "name": "NVIDIA Corporation",
+         "decimals": 8,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+          "verified": false
+         }
+        },
+        "amount": "5651643762",
+        "amountFormatted": "56.51643762",
+        "amountUsd": "9986.944299",
+        "minimumAmount": "5595127324"
+       },
+       "router": "nordstern"
+      },
+      "destination": {
+       "inputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+         "symbol": "USDC",
+         "name": "USD Coin",
+         "decimals": 6,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+          "verified": true
+         }
+        },
+        "amount": "10000000000",
+        "amountFormatted": "10000.0",
+        "amountUsd": "9997.210000",
+        "minimumAmount": "10000000000"
+       },
+       "outputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+         "symbol": "NVDAc",
+         "name": "NVIDIA Corporation",
+         "decimals": 8,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+          "verified": false
+         }
+        },
+        "amount": "5651643762",
+        "amountFormatted": "56.51643762",
+        "amountUsd": "9986.944299",
+        "minimumAmount": "5595127324"
+       },
+       "router": "nordstern"
+      }
+     }
+    }
+   }
+  },
+  {
+   "request": {
+    "user": "0x000000000000000000000000000000000000dEaD",
+    "recipient": "0x000000000000000000000000000000000000dEaD",
+    "originChainId": 8453,
+    "destinationChainId": 8453,
+    "originCurrency": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "destinationCurrency": "0xb20000000000000000000078ee7ce2fE4908108C",
+    "amount": "100000000000",
+    "tradeType": "EXACT_INPUT"
+   },
+   "status": 200,
+   "body": {
+    "requestId": "0x1794420029bf38b8c9305e60ea20f8c8563bf1170d128d6618bb639cbb051cdc",
+    "steps": [
+     {
+      "id": "approve",
+      "action": "Confirm transaction in your wallet",
+      "description": "Sign an approval for USDC",
+      "kind": "transaction",
+      "items": [
+       {
+        "status": "incomplete",
+        "data": {
+         "from": "0x000000000000000000000000000000000000dEaD",
+         "to": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+         "data": "0x095ea7b30000000000000000000000005567954cd026cebfe486062cb75848e0f1c12e58000000000000000000000000000000000000000000000000000000174876e800",
+         "value": "0",
+         "chainId": 8453,
+         "gas": "73127",
+         "maxFeePerGas": "6501818",
+         "maxPriorityFeePerGas": "1000000"
+        }
+       }
+      ],
+      "requestId": "0x1794420029bf38b8c9305e60ea20f8c8563bf1170d128d6618bb639cbb051cdc"
+     },
+     {
+      "id": "swap",
+      "action": "Confirm transaction in your wallet",
+      "description": "Swapping USDC for NVDAc",
+      "kind": "transaction",
+      "items": [
+       {
+        "status": "incomplete",
+        "data": {
+         "from": "0x000000000000000000000000000000000000dEaD",
+         "to": "0x5567954cd026cebfe486062cb75848e0f1c12e58",
+         "data": "0xf9e4bab400000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000dead000000000000000000000000000000000000000000000000000000000000dead0000000000000000000000000000000000000000000000000000000000000f800000000000000000000000000000000000000000000000000000000000000001000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000174876e80000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000003e00000000000000000000000000000000000000000000000000000000000000bc0000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000044095ea7b3000000000000000000000000c87de04e2ec1f4282dff2933a2d58199f688fc3d000000000000000000000000000000000000000000000000000000174876e800000000000000000000000000000000000000000000000000000000000000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001a49bb43718000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000001000000000000000000000000f70da97812cb96acdf810712aa562db8dfa3dbef00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000008f0d1800000000000000000000000000000000000000000000000000000000000000021cdc150bbc936bb8166d821d0711fb3658c8f02ae06e5039c8b83fb9200244971010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c87de04e2ec1f4282dff2933a2d58199f688fc3d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000007233f0bde25ed87939e398d2c31b0757d009222de99c6e461d3de150000000000000000000000173f86168000000000000000000000000d00fa85ab15939e398d2c31b0757d009222de99c6e461d3de150729e2a4716d9f7dd17858d5d504426d228697f7833589fcd6edb6e08f4c7c32d4f71b54bda02913b20000000000000000000078ee7ce2fe4908108ca78e6f3477c500db55a3af09e5fc5462c0b74d9c04d253ccc589d20ba91756b08cdd8f01f4b4709df668e21993f0acd7ab00bb1cfbaed0df28a3c8ec337bea70489cd71a8c3951c1aa49c637b4b9b12230bfa3b501c8f83114c1a789febb6281a0bcd75171c2ed90cc288229be59f26b8b3eef3c07d7ab990b3e328455c4059eeb9e3f84b5543f74e24e7e1b792f465e0434fb1028ea3bfeb05240cb839c4e04ce56168c09f4b7fca30523822c48008705c011564200000000000000000000000000000000000006853f5f1b92b16714fe6cda67caad0856b83c7ab9c200f21efe67c7f41b81a854c26f9cda80593065498581ff718922c3f8e6a244956af099b2652b2b71def100007a540305dd65d1034d10e809679fd58e740d5fa742b763cd82159894b9919ed57e4f7060661b315553eb81872deea9a66d567cf0ccd33b2bfd1fc5e25a8f55c2e849492ad7966ea8a0dd9ef804f302f24f4b90020124e24f0884000000000000000000000000939e398d2c31b0757d009222de99c6e461d3de150000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000019d37ac04b05833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000000000000000000000000000000000000000000000000000000000f805f302f20e8490020124e24f0884000000000000000000000000939e398d2c31b0757d009222de99c6e461d3de150000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000019d37ac04b05833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000000000000000000004e0602eaaf4e07025ff7f808f102f302f244fd900100c4ad73d32e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000de0b5cad2bef00000000000000000000000000000000000ffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000001fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff809f102f302f2cf2deb020a6af4ad3e1006410041f071b22457bd3a850c40e118759aad01c2bdb0c959564949196c86a69ff75e4f093b7cac309c6fbaed80fa2dda16b2ab8b534070f5123f24857dc7c53cee27211c4e0b0aedf3460c0d4e0e023ffc460f0a690dfa100050030000000000000000000000000000000000000000b20000000000000000000078ee7ce2fe4908108cbbf0b679aee2d9e158730280a29e31e3875065c7f500f48f79000180000000000102f7018c01fffa10006804833589fcd6edb6e08f4c7c32d4f71b54bda02913498581ff718922c3f8e6a244956af099b2652b2bb20000000000000000000078ee7ce2fe4908108c0000000000000000000000000000000000000000f5007300014efc8e7900020026ac00006303f7028c02fff811f102f302f28e99900200c46a33d28e000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000420000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000939e398d2c31b0757d009222de99c6e461d3de1546120d461302f90ca4535adb0314710301ff00000000000000000000000000000000000000000000000000000000000000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001a49bb43718000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000b20000000000000000000078ee7ce2fe4908108c0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000dead000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000021cdc150bbc936bb8166d821d0711fb3658c8f02ae06e5039c8b83fb92002449710000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000021cdc150bbc936bb8166d821d0711fb3658c8f02ae06e5039c8b83fb920024497100000000000000000000000000000000000000000000000000000000000000001794420029bf38b8c9305e60ea20f8c8563bf1170d128d6618bb639cbb051cdc",
+         "value": "0",
+         "chainId": 8453,
+         "gas": "6960761",
+         "maxFeePerGas": "6501818",
+         "maxPriorityFeePerGas": "1000000"
+        },
+        "check": {
+         "endpoint": "/intents/status?requestId=0x1794420029bf38b8c9305e60ea20f8c8563bf1170d128d6618bb639cbb051cdc",
+         "method": "GET"
+        }
+       }
+      ],
+      "requestId": "0x1794420029bf38b8c9305e60ea20f8c8563bf1170d128d6618bb639cbb051cdc"
+     }
+    ],
+    "fees": {
+     "gas": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "Ether",
+       "decimals": 18,
+       "metadata": {
+        "logoURI": "https://assets.relay.link/icons/1/light.png",
+        "verified": true
+       }
+      },
+      "amount": "45273806646456",
+      "amountFormatted": "0.000045273806646456",
+      "amountUsd": "0.094557",
+      "minimumAmount": "45273806646456"
+     },
+     "relayer": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "150000000",
+      "amountFormatted": "150.0",
+      "amountUsd": "149.958150",
+      "minimumAmount": "150000000"
+     },
+     "relayerGas": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "0",
+      "amountFormatted": "0.0",
+      "amountUsd": "0",
+      "minimumAmount": "0"
+     },
+     "relayerService": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "150000000",
+      "amountFormatted": "150.0",
+      "amountUsd": "149.958150",
+      "minimumAmount": "150000000"
+     },
+     "app": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "0",
+      "amountFormatted": "0.0",
+      "amountUsd": "0",
+      "minimumAmount": "0"
+     }
+    },
+    "details": {
+     "operation": "swap",
+     "sender": "0x000000000000000000000000000000000000dEaD",
+     "recipient": "0x000000000000000000000000000000000000dEaD",
+     "currencyIn": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "100000000000",
+      "amountFormatted": "100000.0",
+      "amountUsd": "99972.100000",
+      "minimumAmount": "100000000000"
+     },
+     "currencyOut": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+       "symbol": "NVDAc",
+       "name": "NVIDIA Corporation",
+       "decimals": 8,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+        "verified": false
+       }
+      },
+      "amount": "56415144512",
+      "amountFormatted": "564.15144512",
+      "amountUsd": "99690.449289",
+      "minimumAmount": "55850993066"
+     },
+     "totalImpact": {
+      "usd": "-281.650711",
+      "percent": "-0.28"
+     },
+     "swapImpact": {
+      "usd": "-131.692561",
+      "percent": "-0.13"
+     },
+     "expandedPriceImpact": {
+      "swap": {
+       "usd": "0"
+      },
+      "execution": {
+       "usd": "0"
+      },
+      "relay": {
+       "usd": "-149.95815"
+      },
+      "app": {
+       "usd": "0"
+      },
+      "sponsored": {
+       "usd": "0"
+      }
+     },
+     "rate": "0.005649989435353029",
+     "slippageTolerance": {
+      "total": "100",
+      "origin": {
+       "usd": "996.904493",
+       "value": "564151446",
+       "percent": "1.00"
+      },
+      "destination": {
+       "usd": "0",
+       "value": "0",
+       "percent": "0"
+      }
+     },
+     "timeEstimate": 0.2,
+     "userBalance": "0",
+     "isFixedRate": false,
+     "route": {
+      "origin": {
+       "inputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+         "symbol": "USDC",
+         "name": "USD Coin",
+         "decimals": 6,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+          "verified": true
+         }
+        },
+        "amount": "100000000000",
+        "amountFormatted": "100000.0",
+        "amountUsd": "99972.100000",
+        "minimumAmount": "100000000000"
+       },
+       "outputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+         "symbol": "NVDAc",
+         "name": "NVIDIA Corporation",
+         "decimals": 8,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+          "verified": false
+         }
+        },
+        "amount": "56415144512",
+        "amountFormatted": "564.15144512",
+        "amountUsd": "99690.449289",
+        "minimumAmount": "55850993066"
+       },
+       "router": "nordstern"
+      },
+      "destination": {
+       "inputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+         "symbol": "USDC",
+         "name": "USD Coin",
+         "decimals": 6,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+          "verified": true
+         }
+        },
+        "amount": "100000000000",
+        "amountFormatted": "100000.0",
+        "amountUsd": "99972.100000",
+        "minimumAmount": "100000000000"
+       },
+       "outputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+         "symbol": "NVDAc",
+         "name": "NVIDIA Corporation",
+         "decimals": 8,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+          "verified": false
+         }
+        },
+        "amount": "56415144512",
+        "amountFormatted": "564.15144512",
+        "amountUsd": "99690.449289",
+        "minimumAmount": "55850993066"
+       },
+       "router": "nordstern"
+      }
+     }
+    }
+   }
+  },
+  {
+   "request": {
+    "user": "0x000000000000000000000000000000000000dEaD",
+    "recipient": "0x000000000000000000000000000000000000dEaD",
+    "originChainId": 8453,
+    "destinationChainId": 8453,
+    "originCurrency": "0xb20000000000000000000078ee7ce2fE4908108C",
+    "destinationCurrency": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "amount": "566027056",
+    "tradeType": "EXACT_INPUT"
+   },
+   "status": 200,
+   "body": {
+    "requestId": "0x17944200318e8201e4c697ba90d18c1ffad854f598f82ebeb8a88b7ab345402a",
+    "steps": [
+     {
+      "id": "approve",
+      "action": "Confirm transaction in your wallet",
+      "description": "Sign an approval for NVDAc",
+      "kind": "transaction",
+      "items": [
+       {
+        "status": "incomplete",
+        "data": {
+         "from": "0x000000000000000000000000000000000000dEaD",
+         "to": "0xb20000000000000000000078ee7ce2fe4908108c",
+         "data": "0x095ea7b30000000000000000000000005567954cd026cebfe486062cb75848e0f1c12e580000000000000000000000000000000000000000000000000000000021bce330",
+         "value": "0",
+         "chainId": 8453,
+         "gas": "59751",
+         "maxFeePerGas": "6500000",
+         "maxPriorityFeePerGas": "1000000"
+        }
+       }
+      ],
+      "requestId": "0x17944200318e8201e4c697ba90d18c1ffad854f598f82ebeb8a88b7ab345402a"
+     },
+     {
+      "id": "swap",
+      "action": "Confirm transaction in your wallet",
+      "description": "Swapping NVDAc for USDC",
+      "kind": "transaction",
+      "items": [
+       {
+        "status": "incomplete",
+        "data": {
+         "from": "0x000000000000000000000000000000000000dEaD",
+         "to": "0x5567954cd026cebfe486062cb75848e0f1c12e58",
+         "data": "0xf9e4bab400000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000dead000000000000000000000000000000000000000000000000000000000000dead0000000000000000000000000000000000000000000000000000000000001ea00000000000000000000000000000000000000000000000000000000000000001000000000000000000000000b20000000000000000000078ee7ce2fe4908108c00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000021bce33000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000018800000000000000000000000000000000000000000000000000000000000001ae0000000000000000000000000b20000000000000000000078ee7ce2fe4908108c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000044095ea7b30000000000000000000000006131b5fae19ea4f9d964eac0408e4408b66337b50000000000000000000000000000000000000000000000000000000021bce330000000000000000000000000000000000000000000000000000000000000000000000000000000006131b5fae19ea4f9d964eac0408e4408b66337b50000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000001644e21fd0e900000000000000000000000000000000000000000000000000000000000000200000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f996000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000130000000000000000000000000000000000000000000000000000000000000015400000000000000000000000000000000000000000000000000000000000001234d7a5c6b52756e795f680b0f7e0c2f21281dde6ef00000000000000000000000021bce33000000000000000000000000021bce330000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000041a338da6224ea64851cc7e1572998e5a6f373818f9cadad0fd0317f8852047cf60226803faac57820995dca37b0ab888c0d37c3cb7da8e881b62f3e5cc98ed7761c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011200000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f700000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000180000000000000000000000000200d0b07000000000000000000000000236cbb5800000000000000000000000021bce3300000000000000000000000003b92fbf000000000000000000000000000000000000000000003e70000000f42400000000000000000000000000000001111110f0f73c0b2ef09ec012eae758b3e03a9020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006af4b1ef0000000000000000000000000000000000000000000000000000000000001100000000000000000000000000000000000000000000000000000000000000000161f598cd00000000000000007b0e2e8300899b647d5ebc66f9d4fa3f16c540610000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000007800000000000000000000000000000000000000000000000000000000000000ee0000000000000000000000000b20000000000000000000078ee7ce2fe4908108c8000000000000000000000000000023600000000000000000000000021bce3300000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000260000000000000000000000000000000000000000000000000000000000000034000000000000000000000000000000000000000000000000000000000000004200000000000000000000000000000000000000000000000000000000006bf60a86efd106f00000000000000020c3b706efa1da39450c968e669fdc442fc37502100000000000000000000000000000000000000000000000000000000000000800000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f9960000000000000000000000000000000000000000000000000000000000000040000000000000000000000000337bea70489cd71a8c3951c1aa49c637b4b9b1220000000000000000000000000000000000000000cf68740f4d9bda9326055445000000000000000000000000000000000000000000000000000000000565e6e83b9d6e0900000000000000011caddfdb133eab253bd9ce697caea8e7f75774ca00000000000000000000000000000000000000000000000000000000000000800000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f9960000000000000000000000000000000000000000000000000000000000000040000000000000000000000000ce56168c09f4b7fca30523822c48008705c01156000000000000000000000000ffb57e36d5b8bf4597abf0bbcfe764cfe8b121120000000000000000000000000000000000000000000000000000000015979ba03b9d6e0900000000000000021caddfdb133eab253bd9ce697caea8e7f75774ca00000000000000000000000000000000000000000000000000000000000000800000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f9960000000000000000000000000000000000000000000000000000000000000040000000000000000000000000f668e21993f0acd7ab00bb1cfbaed0df28a3c8ec000000000000000000000000fff6fbe64b68d618d47c209fe40b0d8ee6e23c906000000000000000000000000000000000000000000000000000000015979ba03b9d6e0900000000000000021caddfdb133eab253bd9ce697caea8e7f75774ca00000000000000000000000000000000000000000000000000000000000000800000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f9960000000000000000000000000000000000000000000000000000000000000040000000000000000000000000f668e21993f0acd7ab00bb1cfbaed0df28a3c8ec000000000000000000000000fff6fbe64b68d618d47c209fe40b0d8ee6e23c906000000000000000000000000000000000000000000000000000000006bf60a88bc041a80000000000000002beb7242f6fcb2ad767d5f6cb79542dbc2a9d215f00000000000000000000000000000000000000000000000000000000000000800000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f99600000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000a78e6f3477c500db55a3af09e5fc5462c0b74d9c0000000000000000000000000000000000000000000000440000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000124e24f08840000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f99600000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000b20000000000000000000078ee7ce2fe4908108c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004200000000000000000000000000000000000006800000000000000000000011d0c5ad720000000000000000010fd7dc51d64c000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000620000000000000000000000000000000000000000000000000010fd7dc51d64c004f2d31ea0000000000010002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f99600000000000000000000000000000000000000000000000000000000000005400000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000988053a00000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000002e000000000000000000000000000000000000000000000000000000000000003c0000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000002608bc041a80000000000010000beb7242f6fcb2ad767d5f6cb79542dbc2a9d215f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001c000000000000000000000000021ca650b2f1acf5b3098aba3c79109f594a6ae01600000000000000000000000000000000000000000000084000000000000000000000000000000000000000021ca650b2f1acf5b3098aba3c79109f594a6ae01000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001045c6507403c3d7b1b3f1024a4538562b741644a05e9d3efa556ce70f6d98adcd507b3718800000000000000000000000000000000000000000000000000000000000000010000000000000000000000004200000000000000000000000000000000000006000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000000000000000000000000000010fd7dc51d64c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003c0000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f996000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0340b4d370000000000010000a55e98c88cb2193ee1ea950e6caff936b2355aa700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000290e41f7b52dbd2dc1e3009fe19e6a824f296a420000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000e03b9d6e0900000000000000001caddfdb133eab253bd9ce697caea8e7f75774ca00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000b2cc224c1c9fee385f8ad6a55b4d94e92359dc590000000000000000000000000000000000000000000000000000000100eed0b50000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000010fd7dc51d64c00340b4d370000000000010002a55e98c88cb2193ee1ea950e6caff936b2355aa700000000000000000000000000000000000000000000000000000000000000800000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f9960000000000000000000000000000000000000000000000000000000000000020000000000000000000000000290e41f7b52dbd2dc1e3009fe19e6a824f296a42000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029138000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b20000000000000000000078ee7ce2fe4908108c000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f70000000000000000000000000000000000000000000000000000000021bce330000000000000000000000000000000000000000000000000000000003afa796a0000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000022000000000000000000000000000000000000000000000000000000000000000010000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f99600000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000021bce33000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a87b22536f75726365223a2272656c6179222c22416d6f756e74496e555344223a22313030302e373530353031222c22416d6f756e744f7574555344223a22313030302e323338313037222c22416d6f756e744f7574223a22393939343838343935222c22526f7574654944223a223461376335343337596f78457871725f3a3461376335343337596f78457871725f222c2254696d657374616d70223a313739343432303033317d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001a49bb43718000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000001000000000000000000000000f70da97812cb96acdf810712aa562db8dfa3dbef0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000016a5d00000000000000000000000000000000000000000000000000000000000000021a204543ba7b88a8bebe28f895f458daff1c81d09ab796c4e1028e813002449710100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001a49bb43718000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000dead000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000021a204543ba7b88a8bebe28f895f458daff1c81d09ab796c4e1028e813002449710000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000021a204543ba7b88a8bebe28f895f458daff1c81d09ab796c4e1028e81300244971000000000000000000000000000000000000000000000000000000000000000017944200318e8201e4c697ba90d18c1ffad854f598f82ebeb8a88b7ab345402a",
+         "value": "0",
+         "chainId": 8453,
+         "maxFeePerGas": "6500000",
+         "maxPriorityFeePerGas": "1000000"
+        },
+        "check": {
+         "endpoint": "/intents/status?requestId=0x17944200318e8201e4c697ba90d18c1ffad854f598f82ebeb8a88b7ab345402a",
+         "method": "GET"
+        }
+       }
+      ],
+      "requestId": "0x17944200318e8201e4c697ba90d18c1ffad854f598f82ebeb8a88b7ab345402a"
+     }
+    ],
+    "fees": {
+     "gas": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "Ether",
+       "decimals": 18,
+       "metadata": {
+        "logoURI": "https://assets.relay.link/icons/1/light.png",
+        "verified": true
+       }
+      },
+      "amount": "166643538451",
+      "amountFormatted": "0.000000166643538451",
+      "amountUsd": "0.000348",
+      "minimumAmount": "166643538451"
+     },
+     "relayer": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "1500746",
+      "amountFormatted": "1.500746",
+      "amountUsd": "1.500327",
+      "minimumAmount": "1500746"
+     },
+     "relayerGas": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "0",
+      "amountFormatted": "0.0",
+      "amountUsd": "0",
+      "minimumAmount": "0"
+     },
+     "relayerService": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "1500746",
+      "amountFormatted": "1.500746",
+      "amountUsd": "1.500327",
+      "minimumAmount": "1500746"
+     },
+     "app": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "0",
+      "amountFormatted": "0.0",
+      "amountUsd": "0",
+      "minimumAmount": "0"
+     }
+    },
+    "details": {
+     "operation": "swap",
+     "sender": "0x000000000000000000000000000000000000dEaD",
+     "recipient": "0x000000000000000000000000000000000000dEaD",
+     "currencyIn": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+       "symbol": "NVDAc",
+       "name": "NVIDIA Corporation",
+       "decimals": 8,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+        "verified": false
+       }
+      },
+      "amount": "566027056",
+      "amountFormatted": "5.66027056",
+      "amountUsd": "1000.218860",
+      "minimumAmount": "566027056"
+     },
+     "currencyOut": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "998004255",
+      "amountFormatted": "998.004255",
+      "amountUsd": "997.725812",
+      "minimumAmount": "988009370"
+     },
+     "totalImpact": {
+      "usd": "-2.493048",
+      "percent": "-0.25"
+     },
+     "swapImpact": {
+      "usd": "-0.992721",
+      "percent": "-0.10"
+     },
+     "expandedPriceImpact": {
+      "swap": {
+       "usd": "0"
+      },
+      "execution": {
+       "usd": "0"
+      },
+      "relay": {
+       "usd": "-1.500327"
+      },
+      "app": {
+       "usd": "0"
+      },
+      "sponsored": {
+       "usd": "0"
+      }
+     },
+     "rate": "176.31741175990712",
+     "slippageTolerance": {
+      "total": "100",
+      "origin": {
+       "usd": "9.977258",
+       "value": "9994885",
+       "percent": "1.00"
+      },
+      "destination": {
+       "usd": "0",
+       "value": "0",
+       "percent": "0"
+      }
+     },
+     "timeEstimate": 0.2,
+     "userBalance": "0",
+     "isFixedRate": false,
+     "route": {
+      "origin": {
+       "inputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+         "symbol": "NVDAc",
+         "name": "NVIDIA Corporation",
+         "decimals": 8,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+          "verified": false
+         }
+        },
+        "amount": "566027056",
+        "amountFormatted": "5.66027056",
+        "amountUsd": "1000.218860",
+        "minimumAmount": "566027056"
+       },
+       "outputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+         "symbol": "USDC",
+         "name": "USD Coin",
+         "decimals": 6,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+          "verified": true
+         }
+        },
+        "amount": "998004255",
+        "amountFormatted": "998.004255",
+        "amountUsd": "997.725812",
+        "minimumAmount": "988009370"
+       },
+       "router": "kyberswap"
+      },
+      "destination": {
+       "inputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+         "symbol": "NVDAc",
+         "name": "NVIDIA Corporation",
+         "decimals": 8,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+          "verified": false
+         }
+        },
+        "amount": "566027056",
+        "amountFormatted": "5.66027056",
+        "amountUsd": "1000.218860",
+        "minimumAmount": "566027056"
+       },
+       "outputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+         "symbol": "USDC",
+         "name": "USD Coin",
+         "decimals": 6,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+          "verified": true
+         }
+        },
+        "amount": "998004255",
+        "amountFormatted": "998.004255",
+        "amountUsd": "997.725812",
+        "minimumAmount": "988009370"
+       },
+       "router": "kyberswap"
+      }
+     }
+    }
+   }
+  },
+  {
+   "request": {
+    "user": "0x000000000000000000000000000000000000dEaD",
+    "recipient": "0x000000000000000000000000000000000000dEaD",
+    "originChainId": 8453,
+    "destinationChainId": 8453,
+    "originCurrency": "0xb20000000000000000000078ee7ce2fE4908108C",
+    "destinationCurrency": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "amount": "5660270560",
+    "tradeType": "EXACT_INPUT"
+   },
+   "status": 200,
+   "body": {
+    "requestId": "0x1794420031825bf36477fa1336cc7b82e48ef0c8ddb25e8e9446e4ac945d8f11",
+    "steps": [
+     {
+      "id": "approve",
+      "action": "Confirm transaction in your wallet",
+      "description": "Sign an approval for NVDAc",
+      "kind": "transaction",
+      "items": [
+       {
+        "status": "incomplete",
+        "data": {
+         "from": "0x000000000000000000000000000000000000dEaD",
+         "to": "0xb20000000000000000000078ee7ce2fe4908108c",
+         "data": "0x095ea7b30000000000000000000000005567954cd026cebfe486062cb75848e0f1c12e58000000000000000000000000000000000000000000000000000000015160dfe0",
+         "value": "0",
+         "chainId": 8453,
+         "gas": "59767",
+         "maxFeePerGas": "6500000",
+         "maxPriorityFeePerGas": "1000000"
+        }
+       }
+      ],
+      "requestId": "0x1794420031825bf36477fa1336cc7b82e48ef0c8ddb25e8e9446e4ac945d8f11"
+     },
+     {
+      "id": "swap",
+      "action": "Confirm transaction in your wallet",
+      "description": "Swapping NVDAc for USDC",
+      "kind": "transaction",
+      "items": [
+       {
+        "status": "incomplete",
+        "data": {
+         "from": "0x000000000000000000000000000000000000dEaD",
+         "to": "0x5567954cd026cebfe486062cb75848e0f1c12e58",
+         "data": "0xf9e4bab400000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000dead000000000000000000000000000000000000000000000000000000000000dead00000000000000000000000000000000000000000000000000000000000025000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000b20000000000000000000078ee7ce2fe4908108c0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000015160dfe00000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000001ee00000000000000000000000000000000000000000000000000000000000002140000000000000000000000000b20000000000000000000078ee7ce2fe4908108c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000044095ea7b30000000000000000000000006131b5fae19ea4f9d964eac0408e4408b66337b5000000000000000000000000000000000000000000000000000000015160dfe0000000000000000000000000000000000000000000000000000000000000000000000000000000006131b5fae19ea4f9d964eac0408e4408b66337b50000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000001ca4e21fd0e900000000000000000000000000000000000000000000000000000000000000200000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f996000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000019600000000000000000000000000000000000000000000000000000000000001ba00000000000000000000000000000000000000000000000000000000000001894d7a5c6b52756e795f680b0f7e0c2f21281dde6ef0000000000000000000000015160dfe00000000000000000000000015160dfe0000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000004168538c1ed72a9065e56b2e5dd8a6f67bfd1cf44ec5dc32643594996be9cfc153461b904b74b0e8f9e1327491550fd792857758ed9ee56b2ebc53d026dd8683561b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000017800000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000140826e48000000000000000000000001623f51780000000000000000000000015160dfe000000000000000000000000253a19c4100000000000000000000000000000000000000000027090000000f42400000000000000000000000000000001111110f0f73c0b2ef09ec012eae758b3e03a9020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006af4b1ef0000000000000000000000000000000000000000000000000000000000001760000000000000000000000000000000000000000000000000000000000000000261f598cd00000000000000007b0e2e8300899b647d5ebc66f9d4fa3f16c5406161f598cd00000000000000007b0e2e8300899b647d5ebc66f9d4fa3f16c54061000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000dc00000000000000000000000000000000000000000000000000000000000001520000000000000000000000000b20000000000000000000078ee7ce2fe4908108c8000000000000000000000000000161c0000000000000000000000015160dfe00000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000007c000000000000000000000000000000000000000000000000000000000000008a000000000000000000000000000000000000000000000000000000000000009800000000000000000000000000000000000000000000000000000000000000a60000000000000000000000000000000000000000000000000000000007b7d5c1c3b9d6e0900000000000000021caddfdb133eab253bd9ce697caea8e7f75774ca00000000000000000000000000000000000000000000000000000000000000800000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f9960000000000000000000000000000000000000000000000000000000000000040000000000000000000000000f668e21993f0acd7ab00bb1cfbaed0df28a3c8ec000000000000000000000000fff6fbe64b68d618d47c209fe40b0d8ee6e23c9000000000000000000000000000000000000000000000000000000000bae601384f2d31ea0000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f996000000000000000000000000000000000000000000000000000000000000058000000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000149f4ab7000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000260000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000e03b9d6e0900000000000000001caddfdb133eab253bd9ce697caea8e7f75774ca00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000f668e21993f0acd7ab00bb1cfbaed0df28a3c8ec000000000000000000000000fff6fbe64b68d618d47c209fe40b0d8ee6e23c900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000e06efd106f00000000000000000c3b706efa1da39450c968e669fdc442fc37502100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000337bea70489cd71a8c3951c1aa49c637b4b9b1220000000000000000000000000000000000000000cf68740f4d9bda93260554450000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000002808bc041a80000000000000000beb7242f6fcb2ad767d5f6cb79542dbc2a9d215f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000a78e6f3477c500db55a3af09e5fc5462c0b74d9c0000000000000000000000000000000000000000000000440000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000124e24f08840000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f99600000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000b20000000000000000000078ee7ce2fe4908108c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000bae601383b9d6e0900000000000000021caddfdb133eab253bd9ce697caea8e7f75774ca00000000000000000000000000000000000000000000000000000000000000800000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f9960000000000000000000000000000000000000000000000000000000000000040000000000000000000000000f668e21993f0acd7ab00bb1cfbaed0df28a3c8ec000000000000000000000000fff6fbe64b68d618d47c209fe40b0d8ee6e23c90000000000000000000000000000000000000000000000000000000000b2e7bcf6efd106f00000000000000020c3b706efa1da39450c968e669fdc442fc37502100000000000000000000000000000000000000000000000000000000000000800000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f9960000000000000000000000000000000000000000000000000000000000000040000000000000000000000000337bea70489cd71a8c3951c1aa49c637b4b9b1220000000000000000000000000000000000000000cf68740f4d9bda9326055445000000000000000000000000000000000000000000000000000000000fcf06bd3b9d6e0900000000000000011caddfdb133eab253bd9ce697caea8e7f75774ca00000000000000000000000000000000000000000000000000000000000000800000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f9960000000000000000000000000000000000000000000000000000000000000040000000000000000000000000ce56168c09f4b7fca30523822c48008705c01156000000000000000000000000ffb57e36d5b8bf4597abf0bbcfe764cfe8b1211260000000000000000000000000000000000000000000000000000000bae601388bc041a80000000000000002beb7242f6fcb2ad767d5f6cb79542dbc2a9d215f00000000000000000000000000000000000000000000000000000000000000800000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f99600000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000a78e6f3477c500db55a3af09e5fc5462c0b74d9c0000000000000000000000000000000000000000000000440000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000124e24f08840000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f99600000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000b20000000000000000000078ee7ce2fe4908108c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000042000000000000000000000000000000000000068000000000000000000000342ae46b080000000000000000031c037be22f18c00000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000620000000000000000000000000000000000000000000000000031c037be22f18c04f2d31ea0000000000010002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f99600000000000000000000000000000000000000000000000000000000000005400000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000001be8774000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000240000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000e03b9d6e0900000000000000001caddfdb133eab253bd9ce697caea8e7f75774ca00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000b2cc224c1c9fee385f8ad6a55b4d94e92359dc590000000000000000000000000000000000000000000000000000000100eed0b50000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0340b4d370000000000010000a55e98c88cb2193ee1ea950e6caff936b2355aa700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000290e41f7b52dbd2dc1e3009fe19e6a824f296a420000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000002608bc041a80000000000010000beb7242f6fcb2ad767d5f6cb79542dbc2a9d215f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001c000000000000000000000000021ca650b2f1acf5b3098aba3c79109f594a6ae01600000000000000000000000000000000000000000000084000000000000000000000000000000000000000021ca650b2f1acf5b3098aba3c79109f594a6ae01000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001045c6507403c3d7b1b3f1024a4538562b741644a05e9d3efa556ce70f6d98adcd507b3718800000000000000000000000000000000000000000000000000000000000000010000000000000000000000004200000000000000000000000000000000000006000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000000000000000000000000000031c037be22f18c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002f0000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f996000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000031c037be22f18c0340b4d370000000000010002a55e98c88cb2193ee1ea950e6caff936b2355aa700000000000000000000000000000000000000000000000000000000000000800000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f9960000000000000000000000000000000000000000000000000000000000000020000000000000000000000000290e41f7b52dbd2dc1e3009fe19e6a824f296a42000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029138000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b20000000000000000000078ee7ce2fe4908108c000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7000000000000000000000000000000000000000000000000000000015160dfe0000000000000000000000000000000000000000000000000000000024daccb530000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000022000000000000000000000000000000000000000000000000000000000000000010000000000000000000000008f10b468b06c6fd214b65f87778827f7d113f9960000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000015160dfe000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab7b22536f75726365223a2272656c6179222c22416d6f756e74496e555344223a2231303030372e353035303134222c22416d6f756e744f7574555344223a2231303030302e353239353439222c22416d6f756e744f7574223a2239393933303334383136222c22526f7574654944223a223766656134653832736b6c4f4d4956473a3766656134653832736b6c4f4d495647222c2254696d657374616d70223a313739343432303033317d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001a49bb43718000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000001000000000000000000000000f70da97812cb96acdf810712aa562db8dfa3dbef00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000e26f68000000000000000000000000000000000000000000000000000000000000002111f8d549ca4e6449e8e52bdd8c0fe84e28b7cc6331af77463fb52813002449710100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001a49bb43718000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000dead00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002111f8d549ca4e6449e8e52bdd8c0fe84e28b7cc6331af77463fb5281300244971000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002111f8d549ca4e6449e8e52bdd8c0fe84e28b7cc6331af77463fb528130024497100000000000000000000000000000000000000000000000000000000000000001794420031825bf36477fa1336cc7b82e48ef0c8ddb25e8e9446e4ac945d8f11",
+         "value": "0",
+         "chainId": 8453,
+         "maxFeePerGas": "6500000",
+         "maxPriorityFeePerGas": "1000000"
+        },
+        "check": {
+         "endpoint": "/intents/status?requestId=0x1794420031825bf36477fa1336cc7b82e48ef0c8ddb25e8e9446e4ac945d8f11",
+         "method": "GET"
+        }
+       }
+      ],
+      "requestId": "0x1794420031825bf36477fa1336cc7b82e48ef0c8ddb25e8e9446e4ac945d8f11"
+     }
+    ],
+    "fees": {
+     "gas": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "Ether",
+       "decimals": 18,
+       "metadata": {
+        "logoURI": "https://assets.relay.link/icons/1/light.png",
+        "verified": true
+       }
+      },
+      "amount": "168414504045",
+      "amountFormatted": "0.000000168414504045",
+      "amountUsd": "0.000352",
+      "minimumAmount": "168414504045"
+     },
+     "relayer": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "15007469",
+      "amountFormatted": "15.007469",
+      "amountUsd": "15.003282",
+      "minimumAmount": "15007469"
+     },
+     "relayerGas": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "0",
+      "amountFormatted": "0.0",
+      "amountUsd": "0",
+      "minimumAmount": "0"
+     },
+     "relayerService": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "15007469",
+      "amountFormatted": "15.007469",
+      "amountUsd": "15.003282",
+      "minimumAmount": "15007469"
+     },
+     "app": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "0",
+      "amountFormatted": "0.0",
+      "amountUsd": "0",
+      "minimumAmount": "0"
+     }
+    },
+    "details": {
+     "operation": "swap",
+     "sender": "0x000000000000000000000000000000000000dEaD",
+     "recipient": "0x000000000000000000000000000000000000dEaD",
+     "currencyIn": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+       "symbol": "NVDAc",
+       "name": "NVIDIA Corporation",
+       "decimals": 8,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+        "verified": false
+       }
+      },
+      "amount": "5660270560",
+      "amountFormatted": "56.6027056",
+      "amountUsd": "10002.188599",
+      "minimumAmount": "5660270560"
+     },
+     "currencyOut": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "9978195160",
+      "amountFormatted": "9978.19516",
+      "amountUsd": "9975.411244",
+      "minimumAmount": "9878264811"
+     },
+     "totalImpact": {
+      "usd": "-26.777355",
+      "percent": "-0.27"
+     },
+     "swapImpact": {
+      "usd": "-11.774073",
+      "percent": "-0.12"
+     },
+     "expandedPriceImpact": {
+      "swap": {
+       "usd": "0"
+      },
+      "execution": {
+       "usd": "0"
+      },
+      "relay": {
+       "usd": "-15.003282"
+      },
+      "app": {
+       "usd": "0"
+      },
+      "sponsored": {
+       "usd": "0"
+      }
+     },
+     "rate": "176.28477392077173",
+     "slippageTolerance": {
+      "total": "100",
+      "origin": {
+       "usd": "99.754112",
+       "value": "99930349",
+       "percent": "1.00"
+      },
+      "destination": {
+       "usd": "0",
+       "value": "0",
+       "percent": "0"
+      }
+     },
+     "timeEstimate": 0.2,
+     "userBalance": "0",
+     "isFixedRate": false,
+     "route": {
+      "origin": {
+       "inputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+         "symbol": "NVDAc",
+         "name": "NVIDIA Corporation",
+         "decimals": 8,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+          "verified": false
+         }
+        },
+        "amount": "5660270560",
+        "amountFormatted": "56.6027056",
+        "amountUsd": "10002.188599",
+        "minimumAmount": "5660270560"
+       },
+       "outputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+         "symbol": "USDC",
+         "name": "USD Coin",
+         "decimals": 6,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+          "verified": true
+         }
+        },
+        "amount": "9978195160",
+        "amountFormatted": "9978.19516",
+        "amountUsd": "9975.411244",
+        "minimumAmount": "9878264811"
+       },
+       "router": "kyberswap"
+      },
+      "destination": {
+       "inputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+         "symbol": "NVDAc",
+         "name": "NVIDIA Corporation",
+         "decimals": 8,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+          "verified": false
+         }
+        },
+        "amount": "5660270560",
+        "amountFormatted": "56.6027056",
+        "amountUsd": "10002.188599",
+        "minimumAmount": "5660270560"
+       },
+       "outputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+         "symbol": "USDC",
+         "name": "USD Coin",
+         "decimals": 6,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+          "verified": true
+         }
+        },
+        "amount": "9978195160",
+        "amountFormatted": "9978.19516",
+        "amountUsd": "9975.411244",
+        "minimumAmount": "9878264811"
+       },
+       "router": "kyberswap"
+      }
+     }
+    }
+   }
+  },
+  {
+   "request": {
+    "user": "0x000000000000000000000000000000000000dEaD",
+    "recipient": "0x000000000000000000000000000000000000dEaD",
+    "originChainId": 8453,
+    "destinationChainId": 8453,
+    "originCurrency": "0xb20000000000000000000078ee7ce2fE4908108C",
+    "destinationCurrency": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "amount": "56602705609",
+    "tradeType": "EXACT_INPUT"
+   },
+   "status": 200,
+   "body": {
+    "requestId": "0x17944200326d68780c77f34d1934cee978a5ccbef63c519db1cddfff4012fa5b",
+    "steps": [
+     {
+      "id": "approve",
+      "action": "Confirm transaction in your wallet",
+      "description": "Sign an approval for NVDAc",
+      "kind": "transaction",
+      "items": [
+       {
+        "status": "incomplete",
+        "data": {
+         "from": "0x000000000000000000000000000000000000dEaD",
+         "to": "0xb20000000000000000000078ee7ce2fe4908108c",
+         "data": "0x095ea7b30000000000000000000000005567954cd026cebfe486062cb75848e0f1c12e580000000000000000000000000000000000000000000000000000000d2dc8bec9",
+         "value": "0",
+         "chainId": 8453,
+         "gas": "59767",
+         "maxFeePerGas": "6500000",
+         "maxPriorityFeePerGas": "1000000"
+        }
+       }
+      ],
+      "requestId": "0x17944200326d68780c77f34d1934cee978a5ccbef63c519db1cddfff4012fa5b"
+     },
+     {
+      "id": "swap",
+      "action": "Confirm transaction in your wallet",
+      "description": "Swapping NVDAc for USDC",
+      "kind": "transaction",
+      "items": [
+       {
+        "status": "incomplete",
+        "data": {
+         "from": "0x000000000000000000000000000000000000dEaD",
+         "to": "0x5567954cd026cebfe486062cb75848e0f1c12e58",
+         "data": "0xf9e4bab400000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000dead000000000000000000000000000000000000000000000000000000000000dead00000000000000000000000000000000000000000000000000000000000020a00000000000000000000000000000000000000000000000000000000000000001000000000000000000000000b20000000000000000000078ee7ce2fe4908108c00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000d2dc8bec90000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000001a800000000000000000000000000000000000000000000000000000000000001ce0000000000000000000000000b20000000000000000000078ee7ce2fe4908108c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000044095ea7b30000000000000000000000000000000000001ff3684f28c67538d4d072c227340000000000000000000000000000000000000000000000000000000d2dc8bec9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001ff3684f28c67538d4d072c2273400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000018442213bc0b000000000000000000000000103502909141f7025a94b7b99a276dcd128e21a8000000000000000000000000b20000000000000000000078ee7ce2fe4908108c0000000000000000000000000000000000000000000000000000000d2dc8bec9000000000000000000000000103502909141f7025a94b7b99a276dcd128e21a800000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000017641fff991f0000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f7000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda0291300000000000000000000000000000000000000000000000000000016fc09b02c00000000000000000000000000000000000000000000000000000000000000a0404c78989b286e7c874bbeb40af43c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000d00000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000002c000000000000000000000000000000000000000000000000000000000000003e000000000000000000000000000000000000000000000000000000000000005c000000000000000000000000000000000000000000000000000000000000008600000000000000000000000000000000000000000000000000000000000000a600000000000000000000000000000000000000000000000000000000000000b800000000000000000000000000000000000000000000000000000000000000ca00000000000000000000000000000000000000000000000000000000000000e800000000000000000000000000000000000000000000000000000000000001160000000000000000000000000000000000000000000000000000000000000132000000000000000000000000000000000000000000000000000000000000014e000000000000000000000000000000000000000000000000000000000000015c000000000000000000000000000000000000000000000000000000000000000e4c1fb425e000000000000000000000000103502909141f7025a94b7b99a276dcd128e21a8000000000000000000000000b20000000000000000000078ee7ce2fe4908108c0000000000000000000000000000000000000000000000000000000d2dc8bec90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006af4ae6c00000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e48d68a156000000000000000000000000103502909141f7025a94b7b99a276dcd128e21a80000000000000000000000000000000000000000000000000000000000008b5e000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040b20000000000000000000078ee7ce2fe4908108c32000032fffd8963efd1fc6a506488495d951d5263988d2542000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001a4d92aadfb000000000000000000000000103502909141f7025a94b7b99a276dcd128e21a80000000000000000000000004200000000000000000000000000000000000006000000000000000000000000000000000000000000000000a8706ae309df87aa487376909c62024252f2878b87474ba7c757787042952776c2b1647410507bbe000000000000000000000000000000000000000000000000000000006af4ad7c0000000000000000000000004446adc0b8136ffc55ddb7a488ba5509ace2a5ef0000000000000000000000000000000000000000000000000000000000000120000000000000000000000000b20000000000000000000078ee7ce2fe4908108c000000000000000000000000000000000000000000000000000000035ba51f5f000000000000000000000000000000000000000000000000000000000000004110c2a1f587d81cb3504596c7e9307c676547a3a450609aebeffd5655841693484c9a9c8d664def7b2f00d21524f6ffa9b628f2e0a68130d88355f8361ef3d7641b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000026438c9c147000000000000000000000000b20000000000000000000078ee7ce2fe4908108c000000000000000000000000000000000000000000000000000000000004954700000000000000000000000002201e6f13c41506c7bb635d7543f98826229ab700000000000000000000000000000000000000000000000000000000000000a400000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000184865f50930000000000000000000000000000000000000000000000000000000000000020000000000000000000000000a78e6f3477c500db55a3af09e5fc5462c0b74d9c000000000000000000000000b20000000000000000000078ee7ce2fe4908108c000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000475dd7b8b000000000000000000000000103502909141f7025a94b7b99a276dcd128e21a8000000000000000000000000000000000000000000000000000000006af4ae6c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001c438c9c147000000000000000000000000b20000000000000000000078ee7ce2fe4908108c0000000000000000000000000000000000000000000000000000000000001f6400000000000000000000000071def1fee62224622ad0755a2887edd4d6b2ccd1000000000000000000000000000000000000000000000000000000000000004400000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e4ac317963000000000000000000000000b20000000000000000000078ee7ce2fe4908108c000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000155f1dd8ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000103502909141f7025a94b7b99a276dcd128e21a80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e48d68a156000000000000000000000000103502909141f7025a94b7b99a276dcd128e21a800000000000000000000000000000000000000000000000000000000000d1001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040b20000000000000000000078ee7ce2fe4908108c3200000afffd8963efd1fc6a506488495d951d5263988d25833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e48d68a156000000000000000000000000103502909141f7025a94b7b99a276dcd128e21a800000000000000000000000000000000000000000000000000000000000598ec000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040b20000000000000000000078ee7ce2fe4908108c31000000fffd8963efd1fc6a506488495d951d5263988d25833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001a4d92aadfb000000000000000000000000103502909141f7025a94b7b99a276dcd128e21a8000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000000000000000000000000000000000010b7317dbd860aa44c30e7f47ad467be5de33d738d3890639d07c39c8252c911c670e2e8e000000000000000000000000000000000000000000000000000000006af4ad7c0000000000000000000000004446adc0b8136ffc55ddb7a488ba5509ace2a5ef0000000000000000000000000000000000000000000000000000000000000120000000000000000000000000b20000000000000000000078ee7ce2fe4908108c0000000000000000000000000000000000000000000000000000000097f8e600000000000000000000000000000000000000000000000000000000000000004134a3215d8ba97865a59bba5ab6c8718d4c33810dc36fdcedc9de3adbe68b9f6a1a65a22e74dd6fab42963ed959d0455abd4ec156ef445349c2ac5e68e47817a01b000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002a438c9c14700000000000000000000000042000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000099ce100000000000000000000000071c2ed90cc288229be59f26b8b3eef3c07d7ab99000000000000000000000000000000000000000000000000000000000000002400000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000001c4ecd47daa00000000000000000000000042000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda0291300000000000000000000000000000000000000000000000000000003c868f7af000000000000000000000000000000000000000000000000000000006af4ad4000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000f2009ed075c1edfa00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000004180c9749e01f4a96b21e1570beebef52e11495a2a5a2065456f254ff1966bb08e3e784d6735ffeb39d93a681182979e77062ceb4d6b1d17689d2034afaace2e9b1b000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000018438c9c14700000000000000000000000042000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000010bf500000000000000000000000098c1d9e102eb2806d902b13186bdc7892ac4ffba000000000000000000000000000000000000000000000000000000000000004400000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000a4f50c05c40000000000000000000000004200000000000000000000000000000000000006000000000000000000000000420000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000027049607000000000000000000000000103502909141f7025a94b7b99a276dcd128e21a80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000018438c9c147000000000000000000000000420000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000e228d000000000000000000000000290e41f7b52dbd2dc1e3009fe19e6a824f296a42000000000000000000000000000000000000000000000000000000000000004400000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000a400799aff0000000000000000000000004200000000000000000000000000000000000006000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000003d5185662a836e1700000000000000000000000000000000000000000000000000000001eac7d2e3000000000000000000000000103502909141f7025a94b7b99a276dcd128e21a8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a4b6eb3931000000000000000000000000420000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000f42403c3d7b1b3f1024a4538562b741644a05e9d3efa556ce70f6d98adcd507b371880000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000002704850e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a45f80abae000000000000000000000000f5c4f3dc02c3fb9279495a8fef7b0741da956157000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000000000000000000000000000000000173778fb0a00000000000000000000000000000000000000000000000000000000000f424000000000000000000000000000000000000000000000000000000000000f42400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001a49bb43718000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000001000000000000000000000000f70da97812cb96acdf810712aa562db8dfa3dbef00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000008d378740000000000000000000000000000000000000000000000000000000000000021b5af2104fffddc1bd915c36febcc5a879eec4391d43f77c08786d623002449710100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000729e2a4716d9f7dd17858d5d504426d228697f700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001a49bb43718000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000dead000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000021b5af2104fffddc1bd915c36febcc5a879eec4391d43f77c08786d623002449710000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000021b5af2104fffddc1bd915c36febcc5a879eec4391d43f77c08786d62300244971000000000000000000000000000000000000000000000000000000000000000017944200326d68780c77f34d1934cee978a5ccbef63c519db1cddfff4012fa5b",
+         "value": "0",
+         "chainId": 8453,
+         "maxFeePerGas": "6500000",
+         "maxPriorityFeePerGas": "1000000"
+        },
+        "check": {
+         "endpoint": "/intents/status?requestId=0x17944200326d68780c77f34d1934cee978a5ccbef63c519db1cddfff4012fa5b",
+         "method": "GET"
+        }
+       }
+      ],
+      "requestId": "0x17944200326d68780c77f34d1934cee978a5ccbef63c519db1cddfff4012fa5b"
+     }
+    ],
+    "fees": {
+     "gas": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x0000000000000000000000000000000000000000",
+       "symbol": "ETH",
+       "name": "Ether",
+       "decimals": 18,
+       "metadata": {
+        "logoURI": "https://assets.relay.link/icons/1/light.png",
+        "verified": true
+       }
+      },
+      "amount": "166592939434",
+      "amountFormatted": "0.000000166592939434",
+      "amountUsd": "0.000348",
+      "minimumAmount": "166592939434"
+     },
+     "relayer": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "150074699",
+      "amountFormatted": "150.074699",
+      "amountUsd": "150.032828",
+      "minimumAmount": "150074699"
+     },
+     "relayerGas": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "0",
+      "amountFormatted": "0.0",
+      "amountUsd": "0",
+      "minimumAmount": "0"
+     },
+     "relayerService": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "150074699",
+      "amountFormatted": "150.074699",
+      "amountUsd": "150.032828",
+      "minimumAmount": "150074699"
+     },
+     "app": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "0",
+      "amountFormatted": "0.0",
+      "amountUsd": "0",
+      "minimumAmount": "0"
+     }
+    },
+    "details": {
+     "operation": "swap",
+     "sender": "0x000000000000000000000000000000000000dEaD",
+     "recipient": "0x000000000000000000000000000000000000dEaD",
+     "currencyIn": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+       "symbol": "NVDAc",
+       "name": "NVIDIA Corporation",
+       "decimals": 8,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+        "verified": false
+       }
+      },
+      "amount": "56602705609",
+      "amountFormatted": "566.02705609",
+      "amountUsd": "100021.886002",
+      "minimumAmount": "56602705609"
+     },
+     "currencyOut": {
+      "currency": {
+       "chainId": 8453,
+       "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+       "symbol": "USDC",
+       "name": "USD Coin",
+       "decimals": 6,
+       "metadata": {
+        "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+        "verified": true
+       }
+      },
+      "amount": "99566846439",
+      "amountFormatted": "99566.846439",
+      "amountUsd": "99539.067289",
+      "minimumAmount": "98569697208"
+     },
+     "totalImpact": {
+      "usd": "-482.818713",
+      "percent": "-0.48"
+     },
+     "swapImpact": {
+      "usd": "-332.785885",
+      "percent": "-0.33"
+     },
+     "expandedPriceImpact": {
+      "swap": {
+       "usd": "0"
+      },
+      "execution": {
+       "usd": "0"
+      },
+      "relay": {
+       "usd": "-150.032828"
+      },
+      "app": {
+       "usd": "0"
+      },
+      "sponsored": {
+       "usd": "0"
+      }
+     },
+     "rate": "175.90474760480103",
+     "slippageTolerance": {
+      "total": "100",
+      "origin": {
+       "usd": "995.390673",
+       "value": "997149231",
+       "percent": "1.00"
+      },
+      "destination": {
+       "usd": "0",
+       "value": "0",
+       "percent": "0"
+      }
+     },
+     "timeEstimate": 0.2,
+     "userBalance": "0",
+     "isFixedRate": false,
+     "route": {
+      "origin": {
+       "inputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+         "symbol": "NVDAc",
+         "name": "NVIDIA Corporation",
+         "decimals": 8,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+          "verified": false
+         }
+        },
+        "amount": "56602705609",
+        "amountFormatted": "566.02705609",
+        "amountUsd": "100021.886002",
+        "minimumAmount": "56602705609"
+       },
+       "outputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+         "symbol": "USDC",
+         "name": "USD Coin",
+         "decimals": 6,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+          "verified": true
+         }
+        },
+        "amount": "99566846439",
+        "amountFormatted": "99566.846439",
+        "amountUsd": "99539.067289",
+        "minimumAmount": "98569697208"
+       },
+       "router": "0x"
+      },
+      "destination": {
+       "inputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0xb20000000000000000000078ee7ce2fe4908108c",
+         "symbol": "NVDAc",
+         "name": "NVIDIA Corporation",
+         "decimals": 8,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/102175596/large/nvda_200x200.png?1787068801",
+          "verified": false
+         }
+        },
+        "amount": "56602705609",
+        "amountFormatted": "566.02705609",
+        "amountUsd": "100021.886002",
+        "minimumAmount": "56602705609"
+       },
+       "outputCurrency": {
+        "currency": {
+         "chainId": 8453,
+         "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+         "symbol": "USDC",
+         "name": "USD Coin",
+         "decimals": 6,
+         "metadata": {
+          "logoURI": "https://coin-images.coingecko.com/coins/images/6319/large/usdc.png?1696506694",
+          "verified": true
+         }
+        },
+        "amount": "99566846439",
+        "amountFormatted": "99566.846439",
+        "amountUsd": "99539.067289",
+        "minimumAmount": "98569697208"
+       },
+       "router": "0x"
+      }
+     }
+    }
+   }
+  }
+ ]
+}

@@ -3517,7 +3517,8 @@ var SKILL_PRICES = {
   launcher: 50000n,
   radar: 20000n,
   launch: 50000n,
-  collateral: 20000n
+  collateral: 20000n,
+  depth: 10000n
 };
 function priceOf(skill) {
   return SKILL_PRICES[skill] ?? API_PRICE;
@@ -4506,23 +4507,23 @@ async function poolValue(factory, token, usdOf = quoteUsd) {
   const data = encodeFunctionData({ abi: LAUNCHPAD_ABI, functionName: "launches", args: [token] });
   const { key } = decodeFunctionResult({ abi: LAUNCHPAD_ABI, functionName: "launches", data: await ethCall(factory, data) });
   const tokenIs0 = key.currency0.toLowerCase() === token.toLowerCase();
-  const quote = tokenIs0 ? key.currency1 : key.currency0;
-  const eth = quote.toLowerCase() === ETH_QUOTE;
+  const quote2 = tokenIs0 ? key.currency1 : key.currency0;
+  const eth = quote2.toLowerCase() === ETH_QUOTE;
   const word2 = await ethCall(UNISWAP_V4_POOL_MANAGER, encodeFunctionData({ abi: EXTSLOAD, functionName: "extsload", args: [slot0Of(key)] }));
   const sqrtPriceX96 = BigInt(word2) & (1n << 160n) - 1n;
   if (sqrtPriceX96 === 0n) throw new Error("its pool is not initialized");
-  const read4 = async (functionName) => decodeFunctionResult({ abi: erc20Abi, functionName, data: await ethCall(quote, encodeFunctionData({ abi: erc20Abi, functionName })) });
+  const read4 = async (functionName) => decodeFunctionResult({ abi: erc20Abi, functionName, data: await ethCall(quote2, encodeFunctionData({ abi: erc20Abi, functionName })) });
   const [decimals, symbol] = eth ? [18, "ETH"] : await Promise.all([read4("decimals"), read4("symbol")]);
   return {
-    quote: toChecksumAddress(quote),
+    quote: toChecksumAddress(quote2),
     quoteSymbol: symbol,
     quoteDecimals: decimals,
     supplyInQuote: quotePerToken(sqrtPriceX96, tokenIs0, decimals) * Number(LAUNCHPAD_EXPECTS.supply / 10n ** 18n),
-    quoteUsd: await usdOf(quote)
+    quoteUsd: await usdOf(quote2)
   };
 }
-async function quoteUsd(quote) {
-  return quote.toLowerCase() === ETH_QUOTE ? ethUsd() : markets(quote).then((m) => deepest(m)?.priceUsd ?? null, () => null);
+async function quoteUsd(quote2) {
+  return quote2.toLowerCase() === ETH_QUOTE ? ethUsd() : markets(quote2).then((m) => deepest(m)?.priceUsd ?? null, () => null);
 }
 
 // src/config/launchpads.ts
@@ -5090,12 +5091,12 @@ function quoteFrom(answer2) {
   const [amountOut, gasEstimate] = decodeFunctionResult({ abi: QUOTER_ABI, functionName: "quoteExactInputSingle", data: answer2 });
   return { amountOut, gasEstimate };
 }
-function minOutFor(quote, slippageBps) {
+function minOutFor(quote2, slippageBps) {
   if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps >= 1e4) {
     throw new Error(`Slippage must be a whole number of basis points from 0 to 9999; it was ${slippageBps}.`);
   }
-  if (quote < 0n) throw new Error("A quote cannot be negative.");
-  return quote * BigInt(1e4 - slippageBps) / 10000n;
+  if (quote2 < 0n) throw new Error("A quote cannot be negative.");
+  return quote2 * BigInt(1e4 - slippageBps) / 10000n;
 }
 var ROUTER_ABI = parseAbi(["function execute(bytes commands, bytes[] inputs, uint256 deadline) payable"]);
 var PERMIT2_ABI = parseAbi([
@@ -7079,8 +7080,8 @@ function launchTx2(factory, m, salt, pair, firstBuy, fee, referrer = ETH_QUOTE2)
     data: fee === void 0 ? encodeFunctionData({ abi: LAUNCHPAD_ABI, functionName: "launch", args: [...args] }) : encodeFunctionData({ abi: LAUNCHPAD_V3_ABI, functionName: "launch", args: [...args, fee, referrer] })
   };
 }
-async function quoteOf(factory, quote) {
-  const data = encodeFunctionData({ abi: LAUNCHPAD_ABI, functionName: "quotes", args: [quote] });
+async function quoteOf(factory, quote2) {
+  const data = encodeFunctionData({ abi: LAUNCHPAD_ABI, functionName: "quotes", args: [quote2] });
   const [enabled, startTick] = decodeFunctionResult({ abi: LAUNCHPAD_ABI, functionName: "quotes", data: await ethCall(factory, data) });
   return { enabled, startTick };
 }
@@ -7251,12 +7252,12 @@ async function prepareLaunch(args) {
     ] : []
   ];
   const launch = launchTx2(factory, meta, salt, pair, firstBuy, fee, referrer ?? void 0);
-  const pct5 = fee === void 0 ? "1%" : feePercent(fee);
+  const pct6 = fee === void 0 ? "1%" : feePercent(fee);
   const v3Rows = fee !== void 0 && check.opening ? [
-    row("Fee", `${pct5} of every trade, chosen for this coin (1% or 3%)`),
+    row("Fee", `${pct6} of every trade, chosen for this coin (1% or 3%)`),
     row(
       "Opening protection",
-      `for the first ${check.opening.window} s the fee falls from ${feePercent(check.opening.startFee)} to ${pct5} \u2014 a sniper pays most of it; the creator's own first buy inside the launch pays only ${pct5}`,
+      `for the first ${check.opening.window} s the fee falls from ${feePercent(check.opening.startFee)} to ${pct6} \u2014 a sniper pays most of it; the creator's own first buy inside the launch pays only ${pct6}`,
       { tone: "ok" }
     )
   ] : [];
@@ -7288,7 +7289,7 @@ async function prepareLaunch(args) {
     notes: [
       "Nothing was signed or sent. Send each step from the creator's own wallet, in order, waiting for each to confirm \u2014 and simulate it first (eth_call), as this app does before every transaction.",
       "The salt is random and binds the token's address to this creator: anyone else sending this calldata gets a different token, or none.",
-      referrer !== null && approved === true ? `Public: the token, the creator's address, its referrer and every trade are visible on Base. The creator earns 80% of the pool's ${pct5} fee, the referrer 5%, ${BRAND.name} the rest (~15%).` : `Public: the token, the creator's address and every trade are visible on Base. The creator earns 80% of the pool's ${pct5} fee; ${BRAND.name} 20%.`,
+      referrer !== null && approved === true ? `Public: the token, the creator's address, its referrer and every trade are visible on Base. The creator earns 80% of the pool's ${pct6} fee, the referrer 5%, ${BRAND.name} the rest (~15%).` : `Public: the token, the creator's address and every trade are visible on Base. The creator earns 80% of the pool's ${pct6} fee; ${BRAND.name} 20%.`,
       ...stock ? [`${pair.symbol} is a Coinbase stock token: Coinbase restricts who may hold it (eligible persons outside the U.S.).`] : []
     ],
     sources: [`Base (the launchpad${stock ? ", the pair's token" : ""} and the creator's balances, read directly)`],
@@ -7532,8 +7533,108 @@ var collateralSkill = {
   run: ([input = ""]) => collateralReport(input, Date.now())
 };
 
+// src/skills/depth.ts
+var SIZES = [1e3, 1e4, 1e5];
+var LOUD = 2;
+var QUIET = 0.5;
+var QUOTE_ACCOUNT = "0x000000000000000000000000000000000000dEaD";
+var TOKEN_PAIRS = "https://api.dexscreener.com/token-pairs/v1/base";
+var POOLS_SHOWN = 4;
+function parseQuote(body) {
+  const details = isObj(body) && isObj(body.details) ? body.details : {};
+  const out = isObj(details.currencyOut) ? strOf(details.currencyOut.amount) : null;
+  if (out === null || !/^\d+$/.test(out)) throw new Error("Relay: its quote has no amount out.");
+  const percent = (k) => {
+    const v = isObj(details[k]) ? Number(strOf(details[k].percent)) : NaN;
+    return Number.isFinite(v) ? v : null;
+  };
+  return { out: BigInt(out), swapImpact: percent("swapImpact"), totalImpact: percent("totalImpact") };
+}
+async function quote(sell, buy, amount) {
+  return parseQuote(
+    await askQuote("Relay", `${RELAY.api}/quote`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        user: QUOTE_ACCOUNT,
+        recipient: QUOTE_ACCOUNT,
+        originChainId: BASE.id,
+        destinationChainId: BASE.id,
+        originCurrency: sell,
+        destinationCurrency: buy,
+        amount: amount.toString(),
+        tradeType: "EXACT_INPUT"
+      })
+    })
+  );
+}
+var loud = (impact) => impact === null ? "warn" : Math.abs(impact) > LOUD ? "bad" : Math.abs(impact) > QUIET ? "warn" : "ok";
+var pct5 = (n) => n === null ? "not given" : `${Math.abs(n).toFixed(2)}%`;
+var DEX_NAMES = { aero: "Aerodrome Slipstream", aerodrome: "Aerodrome", uniswap: "Uniswap" };
+var venue = (m) => `${DEX_NAMES[m.dex] ?? m.dex} vs ${m.quote}`;
+async function depthReport(input) {
+  const token = toChecksumAddress(assertChecksummedAddress(input.trim(), "Token"));
+  const [info, pairs] = await Promise.all([chainToken(token), getJson("DexScreener", `${TOKEN_PAIRS}/${token}`).then(
+    // only pools that price THIS token (a pool pricing another coin in it is that coin's market)
+    (body) => parseMarkets(body).filter((m) => m.base?.toLowerCase() === token.toLowerCase()),
+    () => null
+  )]);
+  const best = pairs === null ? null : deepest(pairs.filter((m) => m.priceUsd !== null));
+  const rows = [row("Token", `${info.name} (${info.symbol})`, { href: explorer.token(token) })];
+  for (const size2 of SIZES) {
+    const label = `Buy ${usd(size2).replace(".00", "")}`;
+    try {
+      const q = await quote(USDC.address, token, BigInt(size2) * 10n ** 6n);
+      rows.push(row(label, `${pct5(q.swapImpact)} impact (${pct5(q.totalImpact)} with fees) \xB7 ${tokenAmount(q.out, info.decimals, 4)} ${info.symbol}`, { tone: loud(q.swapImpact) }));
+    } catch (e) {
+      rows.push(row(label, `not quoted \u2014 ${e.message}`, { tone: "warn" }));
+    }
+  }
+  for (const size2 of SIZES) {
+    const label = `Sell ${usd(size2).replace(".00", "")}`;
+    if (best === null) {
+      rows.push(row(label, "not quoted \u2014 no market price to size the sell from", { tone: "warn" }));
+      continue;
+    }
+    const amount = BigInt(Math.floor(size2 / best.priceUsd * 10 ** info.decimals));
+    try {
+      const q = await quote(token, USDC.address, amount);
+      rows.push(row(label, `${pct5(q.swapImpact)} impact (${pct5(q.totalImpact)} with fees) \xB7 ${tokenAmount(q.out, 6, 2)} USDC`, { tone: loud(q.swapImpact) }));
+    } catch (e) {
+      rows.push(row(label, `not quoted \u2014 ${e.message}`, { tone: "warn" }));
+    }
+  }
+  if (pairs === null) rows.push(row("Pools", "not checked \u2014 DexScreener could not be reached", { tone: "warn" }));
+  else if (pairs.length === 0) rows.push(row("Pools", "none listed on Base", { tone: "warn" }));
+  else {
+    const top = [...pairs].sort((a, b) => (b.liquidityUsd ?? -1) - (a.liquidityUsd ?? -1)).slice(0, POOLS_SHOWN);
+    for (const m of top) rows.push(row(`Pool \xB7 ${venue(m)}`, m.liquidityUsd === null ? "liquidity not reported" : `${usd(m.liquidityUsd)} liquidity`, m.url ? { href: m.url } : {}));
+  }
+  const worst = rows.filter((r) => r.tone === "bad");
+  const quoted = rows.some((r) => /^(Buy|Sell) /.test(r.label) && !r.value.startsWith("not quoted"));
+  return {
+    title: `${info.symbol} \u2014 Trade Depth`,
+    rows: [
+      !quoted ? row("Depth", "not checked \u2014 no size could be quoted", { tone: "warn" }) : worst.length > 0 ? row("Depth", `Thin \u2014 ${worst.map((r) => r.label.toLowerCase()).join(", ")} moves the price more than ${LOUD}%`, { tone: "bad" }) : row("Depth", `No size here moves the price more than ${LOUD}%`, { tone: rows.some((r) => r.tone === "warn") ? "warn" : "ok" }),
+      ...rows
+    ],
+    notes: [
+      "Quoted by Relay for an address nobody holds \u2014 the route a swap in this app would take at this moment, across Base's DEXes. Nothing was signed. A quote moves with every trade.",
+      "Impact is how far the pools' prices move for that size; 'with fees' adds the pools' and the route's fees. Past 2% a market order is paying through the book \u2014 split it or use a limit."
+    ],
+    sources: ["Relay (quotes)", "DexScreener (pools and the price a sell is sized from)", "Base (the token's name and decimals)"]
+  };
+}
+var depthSkill = {
+  id: "depth",
+  title: "Trade Depth",
+  summary: "What a $1k / $10k / $100k buy or sell of a token costs on Base \u2014 price impact per size, red past 2%, and the pools behind it.",
+  args: [{ name: "token", hint: "0x\u2026 (a stock such as NVDAc)" }],
+  run: ([input = ""]) => depthReport(input)
+};
+
 // src/skills/index.ts
-var SKILLS = [verdictSkill, gateSkill, radarSkill, forensicsSkill, launcherSkill, sendCheckSkill, collateralSkill, prepareLaunchSkill];
+var SKILLS = [verdictSkill, gateSkill, radarSkill, forensicsSkill, launcherSkill, sendCheckSkill, collateralSkill, depthSkill, prepareLaunchSkill];
 var ALIASES = {
   token: "verdict",
   scan: "verdict",
@@ -7550,7 +7651,9 @@ var ALIASES = {
   recipient: "sendcheck",
   prepare: "launch",
   liquidation: "collateral",
-  loans: "collateral"
+  loans: "collateral",
+  impact: "depth",
+  slippage: "depth"
 };
 function findSkill(word2) {
   const id = ALIASES[word2] ?? word2;
@@ -8084,19 +8187,19 @@ async function readDetail(state, rpc2, coin) {
   const data = encodeFunctionData({ abi: LAUNCHPAD_ABI, functionName: "launches", args: [coin.token] });
   const { key } = decodeFunctionResult({ abi: LAUNCHPAD_ABI, functionName: "launches", data: await call2(rpc2, coin.factory, data) });
   const tokenIs0 = key.currency0.toLowerCase() === coin.token.toLowerCase();
-  const quote = toChecksumAddress(tokenIs0 ? key.currency1 : key.currency0);
+  const quote2 = toChecksumAddress(tokenIs0 ? key.currency1 : key.currency0);
   const read4 = async (to, functionName) => decodeFunctionResult({ abi: erc20Abi, functionName, data: await call2(rpc2, to, encodeFunctionData({ abi: erc20Abi, functionName })) });
-  const lower = quote.toLowerCase();
+  const lower = quote2.toLowerCase();
   if (!state.quotes.has(lower)) {
     state.quotes.set(
       lower,
-      lower === ETH2 ? { symbol: "ETH", decimals: 18 } : { symbol: String(await read4(quote, "symbol")), decimals: Number(await read4(quote, "decimals")) }
+      lower === ETH2 ? { symbol: "ETH", decimals: 18 } : { symbol: String(await read4(quote2, "symbol")), decimals: Number(await read4(quote2, "decimals")) }
     );
   }
   const q = state.quotes.get(lower);
   const fees = key.fee === DYNAMIC_FEE_FLAG ? await hookFee(rpc2, key.hooks, poolIdOf(key)) : { fee: key.fee, opening: null };
   const openSqrt = await openingSqrt(rpc2, coin).catch(() => null);
-  return { quote, tokenIs0, name: String(await read4(coin.token, "name")), symbol: String(await read4(coin.token, "symbol")), quoteSymbol: q.symbol, quoteDecimals: q.decimals, ...fees, openSqrt };
+  return { quote: quote2, tokenIs0, name: String(await read4(coin.token, "name")), symbol: String(await read4(coin.token, "symbol")), quoteSymbol: q.symbol, quoteDecimals: q.decimals, ...fees, openSqrt };
 }
 var INITIALIZE_TOPIC2 = toHex(keccak256(utf8("Initialize(bytes32,address,address,uint24,int24,address,uint160,int24)")));
 async function openingSqrt(rpc2, coin) {

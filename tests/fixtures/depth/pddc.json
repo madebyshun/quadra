@@ -1,0 +1,220 @@
+{
+ "token": "0xB200000000000000000000c8A7223510467D8563",
+ "capturedAt": "2026-11-11T18:00:54.818Z",
+ "calls": {
+  "0xb200000000000000000000c8a7223510467d8563 0x06fdde03": "0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001150444420486f6c64696e677320496e632e000000000000000000000000000000",
+  "0xb200000000000000000000c8a7223510467d8563 0x313ce567": "0x0000000000000000000000000000000000000000000000000000000000000008",
+  "0xb200000000000000000000c8a7223510467d8563 0x18160ddd": "0x00000000000000000000000000000000000000000000000000000009502f9000",
+  "0xb200000000000000000000c8a7223510467d8563 0x95d89b41": "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000045044446300000000000000000000000000000000000000000000000000000000"
+ },
+ "gets": {
+  "https://api.dexscreener.com/token-pairs/v1/base/0xB200000000000000000000c8A7223510467D8563": [
+   {
+    "chainId": "base",
+    "dexId": "aero",
+    "url": "https://dexscreener.com/base/0x39449c01de2d20ae6c3165142306d3b1f962ba60",
+    "pairAddress": "0x39449c01De2D20aE6c3165142306d3b1F962Ba60",
+    "baseToken": {
+     "address": "0xB200000000000000000000c8A7223510467D8563",
+     "name": "PDD Holdings Inc.",
+     "symbol": "PDDc"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "79.6112",
+    "priceUsd": "79.61",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 1,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 1,
+      "sells": 1
+     },
+     "h24": {
+      "buys": 1,
+      "sells": 1
+     }
+    },
+    "volume": {
+     "h24": 4.97,
+     "h6": 4.97,
+     "h1": 2.57,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": 0.98,
+     "h6": 0.98,
+     "h24": 0.98
+    },
+    "liquidity": {
+     "usd": 120.7,
+     "base": 0.8047,
+     "quote": 56.637
+    },
+    "fdv": 31845,
+    "marketCap": 31845
+   },
+   {
+    "chainId": "base",
+    "dexId": "aerodrome",
+    "url": "https://dexscreener.com/base/0x84608be6d655ee05032303fe7f0d6f3a51c2cf51",
+    "pairAddress": "0x84608BE6d655ee05032303FE7f0D6F3A51c2CF51",
+    "baseToken": {
+     "address": "0xB200000000000000000000c8A7223510467D8563",
+     "name": "PDD Holdings Inc.",
+     "symbol": "PDDc"
+    },
+    "quoteToken": {
+     "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+     "name": "USD Coin",
+     "symbol": "USDC"
+    },
+    "priceNative": "79.02639",
+    "priceUsd": "79.026",
+    "txns": {
+     "m5": {
+      "buys": 0,
+      "sells": 0
+     },
+     "h1": {
+      "buys": 2,
+      "sells": 0
+     },
+     "h6": {
+      "buys": 19,
+      "sells": 12
+     },
+     "h24": {
+      "buys": 20,
+      "sells": 13
+     }
+    },
+    "volume": {
+     "h24": 75.5,
+     "h6": 75.5,
+     "h1": 0,
+     "m5": 0
+    },
+    "priceChange": {
+     "h1": 0.21,
+     "h6": -0.29,
+     "h24": -0.22
+    },
+    "liquidity": {
+     "usd": 50789.02,
+     "base": 321.3146,
+     "quote": 25396
+    },
+    "fdv": 31611,
+    "marketCap": 31611
+   }
+  ]
+ },
+ "relay": [
+  {
+   "request": {
+    "user": "0x000000000000000000000000000000000000dEaD",
+    "recipient": "0x000000000000000000000000000000000000dEaD",
+    "originChainId": 8453,
+    "destinationChainId": 8453,
+    "originCurrency": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "destinationCurrency": "0xB200000000000000000000c8A7223510467D8563",
+    "amount": "1000000000",
+    "tradeType": "EXACT_INPUT"
+   },
+   "status": 429,
+   "body": {
+    "message": "Could not process request. Please try again later."
+   }
+  },
+  {
+   "request": {
+    "user": "0x000000000000000000000000000000000000dEaD",
+    "recipient": "0x000000000000000000000000000000000000dEaD",
+    "originChainId": 8453,
+    "destinationChainId": 8453,
+    "originCurrency": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "destinationCurrency": "0xB200000000000000000000c8A7223510467D8563",
+    "amount": "10000000000",
+    "tradeType": "EXACT_INPUT"
+   },
+   "status": 429,
+   "body": {
+    "message": "Could not process request. Please try again later."
+   }
+  },
+  {
+   "request": {
+    "user": "0x000000000000000000000000000000000000dEaD",
+    "recipient": "0x000000000000000000000000000000000000dEaD",
+    "originChainId": 8453,
+    "destinationChainId": 8453,
+    "originCurrency": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "destinationCurrency": "0xB200000000000000000000c8A7223510467D8563",
+    "amount": "100000000000",
+    "tradeType": "EXACT_INPUT"
+   },
+   "status": 429,
+   "body": {
+    "message": "Could not process request. Please try again later."
+   }
+  },
+  {
+   "request": {
+    "user": "0x000000000000000000000000000000000000dEaD",
+    "recipient": "0x000000000000000000000000000000000000dEaD",
+    "originChainId": 8453,
+    "destinationChainId": 8453,
+    "originCurrency": "0xB200000000000000000000c8A7223510467D8563",
+    "destinationCurrency": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "amount": "1265406321",
+    "tradeType": "EXACT_INPUT"
+   },
+   "status": 429,
+   "body": {
+    "message": "Could not process request. Please try again later."
+   }
+  },
+  {
+   "request": {
+    "user": "0x000000000000000000000000000000000000dEaD",
+    "recipient": "0x000000000000000000000000000000000000dEaD",
+    "originChainId": 8453,
+    "destinationChainId": 8453,
+    "originCurrency": "0xB200000000000000000000c8A7223510467D8563",
+    "destinationCurrency": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "amount": "12654063219",
+    "tradeType": "EXACT_INPUT"
+   },
+   "status": 429,
+   "body": {
+    "message": "Could not process request. Please try again later."
+   }
+  },
+  {
+   "request": {
+    "user": "0x000000000000000000000000000000000000dEaD",
+    "recipient": "0x000000000000000000000000000000000000dEaD",
+    "originChainId": 8453,
+    "destinationChainId": 8453,
+    "originCurrency": "0xB200000000000000000000c8A7223510467D8563",
+    "destinationCurrency": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "amount": "126540632196",
+    "tradeType": "EXACT_INPUT"
+   },
+   "status": 429,
+   "body": {
+    "message": "Could not process request. Please try again later."
+   }
+  }
+ ]
+}

@@ -10,6 +10,7 @@ import { checkAddress } from "@/lib/address";
 import { TRANSFER_TOPIC } from "@/lib/transact";
 import { STOCKS_PATH } from "@/server/stocks";
 import { TradePanel, transfersPaused } from "@/features/panels/TradePanel";
+import { OpenWindowProvider } from "@/features/openWindow";
 import { WalletProvider } from "@/ui/WalletProvider";
 import type { Eip1193Provider, Eip1193Request } from "@/lib/wallet";
 import { copy } from "./fixtures/base";
@@ -260,6 +261,23 @@ describe("TradePanel: buying and selling", () => {
     expect(facts).toHaveTextContent("Reference (NAV)$231.28 per token — Chainlink; not a trade price");
     expect(within(facts).getByRole("link", { name: NVDA_ON_BASE })).toHaveAttribute("href", `https://basescan.org/token/${NVDA_ON_BASE}`);
     expect(facts).toHaveTextContent("Sources: Coinbase Tokenized Stocks API, DexScreener (price)");
+  });
+
+  it("opens Trade Depth for the picked stock — and offers it only where a window can be opened", async () => {
+    world();
+    wallet();
+    const open = vi.fn();
+    render(
+      <OpenWindowProvider open={open}>
+        <WalletProvider>
+          <TradePanel />
+        </WalletProvider>
+      </OpenWindowProvider>,
+    );
+    await settle();
+    await pick("Stocks", "NVDA");
+    await userEvent.click(screen.getByRole("button", { name: "Price impact at $1k / $10k / $100k →" }));
+    expect(open).toHaveBeenCalledWith("research", { "run-research": `depth ${NVDA_ON_BASE}` });
   });
 
   it("says a multiplier that is not one in shares, and a missing NAV as such", async () => {

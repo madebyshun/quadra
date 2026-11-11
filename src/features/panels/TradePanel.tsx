@@ -11,6 +11,7 @@ import { formatChange } from "@/features/markets/Chart";
 import { depth } from "@/features/markets/Rows";
 import { pausedText } from "@/features/panels/MarketsPanel";
 import { ReportView } from "@/features/panels/ReportView";
+import { useRunCommand } from "@/features/openWindow";
 import { SwapPanel, type Picked } from "@/features/panels/SwapPanel";
 import { choiceFor } from "@/features/panels/TokenPicker";
 
@@ -144,6 +145,7 @@ export function TradePanel() {
   const [query, setQuery] = useState("");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [side, setSide] = useState<Side>("buy");
+  const run = useRunCommand();
   const [counter, setCounter] = useState<Counter>("USDC");
   const { rows, problem } = useTradeList(tab);
 
@@ -216,6 +218,11 @@ export function TradePanel() {
               {selected.stock ? ` · 1 token = ${selected.stock.multiplier} share${selected.stock.multiplier === 1 ? "" : "s"} · ${pausedText(selected.stock.paused)}` : ""}
             </span>
             {selected.stock ? <small>Coinbase tokenized stocks are only for persons in eligible jurisdictions outside the U.S.</small> : null}
+            {run && selected.address ? (
+              <button type="button" className="gel gel--quiet trade__depth" onClick={() => run(`depth ${selected.address}`)}>
+                Price impact at $1k / $10k / $100k →
+              </button>
+            ) : null}
           </div>
           {transfersPaused(selected.stock) ? (
             <Crt label="Trading paused">

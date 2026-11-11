@@ -6,6 +6,7 @@ import { launcherSkill } from "@/skills/launcher";
 import { sendCheckSkill } from "@/skills/sendcheck";
 import { prepareLaunchSkill } from "@/skills/prepare";
 import { collateralSkill } from "@/skills/collateral";
+import { depthSkill } from "@/skills/depth";
 import type { Report, Skill, Tone } from "@/skills/types";
 
 /**
@@ -18,7 +19,7 @@ import type { Report, Skill, Tone } from "@/skills/types";
  * Basescan has every one of them. What they shared (Basename resolution for Send, token balances
  * and the ETH price for the wallet's assets) stays as library code beside the skills.
  */
-export const SKILLS: readonly Skill[] = [verdictSkill, gateSkill, radarSkill, forensicsSkill, launcherSkill, sendCheckSkill, collateralSkill, prepareLaunchSkill];
+export const SKILLS: readonly Skill[] = [verdictSkill, gateSkill, radarSkill, forensicsSkill, launcherSkill, sendCheckSkill, collateralSkill, depthSkill, prepareLaunchSkill];
 
 /** Other words people type for the same skill. */
 export const ALIASES: Readonly<Record<string, string>> = {
@@ -38,6 +39,8 @@ export const ALIASES: Readonly<Record<string, string>> = {
   prepare: "launch",
   liquidation: "collateral",
   loans: "collateral",
+  impact: "depth",
+  slippage: "depth",
 };
 
 export function findSkill(word: string): Skill | null {

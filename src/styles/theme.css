@@ -1968,6 +1968,11 @@
   color: var(--xp-ink-dim);
   font-size: 10px;
 }
+.trade__pick .trade__depth {
+  justify-self: start;
+  margin-top: 2px;
+  font-size: 11px;
+}
 .trade__sep {
   align-self: center;
   font-size: 11px;

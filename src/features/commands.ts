@@ -40,6 +40,7 @@ export const SKILL_HOME: Readonly<Record<string, WindowId>> = {
   launcher: "safety",
   launch: "terminal",
   collateral: "research",
+  depth: "research",
 };
 
 type Shortcut = { readonly window: WindowId; readonly param?: string; readonly usage: string };

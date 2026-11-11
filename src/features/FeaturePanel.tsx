@@ -28,6 +28,7 @@ import { LeaderboardPanel } from "@/features/panels/LeaderboardPanel";
 import { CardPanel } from "@/features/panels/BaseCard";
 import { radarSkill } from "@/skills/radar";
 import { collateralSkill } from "@/skills/collateral";
+import { depthSkill } from "@/skills/depth";
 import { verdictSkill } from "@/skills/verdict";
 import { gateSkill } from "@/skills/gate";
 import { forensicsSkill } from "@/skills/forensics";
@@ -85,7 +86,7 @@ const EXPLAIN: Partial<Record<Feature["id"], string>> = {
 const BUILT: Partial<Record<Feature["id"], () => ReactNode>> = {
   wallet: () => <WalletPanel />,
   terminal: () => <TerminalPanel />,
-  research: () => <SkillWindow label="Research" window="research" skills={[radarSkill, collateralSkill]} />,
+  research: () => <SkillWindow label="Research" window="research" skills={[radarSkill, collateralSkill, depthSkill]} />,
   // ONE window to check anything (2026-10-29): a token, a recipient, a launch, a launcher
   safety: () => <SkillWindow label="Check" window="safety" skills={[verdictSkill, sendCheckSkill, forensicsSkill, launcherSkill, gateSkill]} />,
   markets: () => <MarketsPanel />,
