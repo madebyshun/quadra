@@ -3,6 +3,7 @@ import { cdpFacilitator, type CdpCredentials } from "@/server/cdp";
 import { chartsHandler } from "@/server/charts";
 import { stocksHandler } from "@/server/stocks";
 import { logoHandler } from "@/server/logo";
+import { weekendHandler } from "@/server/weekend";
 import { indexerHandler, INDEXER_RPC, type IndexerDeps, type Rpc } from "@/server/indexer";
 import { BASE } from "@/config/chain";
 import { rpcOn } from "@/skills/http";
@@ -79,11 +80,13 @@ export function routes(env: Env, fetchImpl: typeof fetch = fetch, blob: BlobCall
   const stocks = stocksHandler(fetchImpl);
   const charts = chartsHandler(fetchImpl);
   const logo = logoHandler(fetchImpl);
+  const weekend = weekendHandler(fetchImpl);
   const skills = apiHandler({ facilitator: creds ? cdpFacilitator(creds, fetchImpl) : null });
   return {
     stocks: (request: Request) => stocks(asSent(request)),
     charts: (request: Request) => charts(asSent(request)),
     logo: (request: Request) => logo(asSent(request)),
+    weekend: (request: Request) => weekend(asSent(request)),
     skills: (request: Request) => skills(asSent(request)),
     launchpad: (request: Request) => launchpad(asSent(request)),
     /** Vercel Cron's daily call: the index stepped forward with nobody asking. Vercel sends `CRON_SECRET` as a bearer. */

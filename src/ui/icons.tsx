@@ -234,6 +234,20 @@ const GLYPHS: Record<IconId, JSX.Element> = {
       </g>
     </>
   ),
+  weekend: (
+    <>
+      {/* a calendar page with a line that keeps moving past the weekend */}
+      <g {...BODY}>
+        <path d="M4 5.5h16v14.5H4Z" />
+      </g>
+      <g {...INK}>
+        <path d="M4 5.5h16v3.2H4Z" />
+      </g>
+      <g {...LINE} strokeWidth={1.3}>
+        <path d="M6.5 17 10 13.5l2.6 2 4.9-5" />
+      </g>
+    </>
+  ),
   explore: (
     <>
       {/* a globe: the wider Base, outside this app */}

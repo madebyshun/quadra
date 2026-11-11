@@ -190,6 +190,8 @@ export const FLAGS = {
   leaderboard: true,
   /** "Make my Base card" — a 1995 Paint card of a wallet, drawn from the chain (2026-10-21) */
   card: true,
+  /** Blue Agent's weekend scorecard and diary, shown and credited (2026-11-12) — reads blueagent.dev through /api/weekend */
+  weekend: true,
   /**
    * Robinhood Chain (4663), HIDDEN on the owner's call of 2026-10-02: "build on Base first, Robinhood
    * Chain after". Off hides every surface that needs it — the Bridge window and the Robinhood Chain

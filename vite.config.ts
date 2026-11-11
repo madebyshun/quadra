@@ -6,6 +6,7 @@ import { anyPublicHttps, forward, FORWARD_PATH } from "./src/server/forward";
 import { stocksHandler, STOCKS_PATH } from "./src/server/stocks";
 import { chartsHandler, CHARTS_PATH } from "./src/server/charts";
 import { logoHandler, LOGO_PATH } from "./src/server/logo";
+import { weekendHandler, WEEKEND_PATH } from "./src/server/weekend";
 import { cdpFacilitator, type CdpCredentials } from "./src/server/cdp";
 import { API_PATH } from "./src/server/apiPath";
 import type { apiHandler } from "./src/server/api";
@@ -52,6 +53,8 @@ function devRoutes(): Plugin {
       server.middlewares.use(CHARTS_PATH, asMiddleware(CHARTS_PATH, chartsHandler()));
       /** A token's logo for the share card, from this origin — `src/server/logo.ts`. */
       server.middlewares.use(LOGO_PATH, asMiddleware(LOGO_PATH, logoHandler()));
+      /** Blue Agent's weekend record, which sends no CORS header — `src/server/weekend.ts`. */
+      server.middlewares.use(WEEKEND_PATH, asMiddleware(WEEKEND_PATH, weekendHandler()));
     },
   };
 }

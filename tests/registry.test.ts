@@ -53,6 +53,7 @@ const SHIPPED_IDS = [
   "card",
   // a directory of projects on Base, 2026-10-22
   "explore",
+  "weekend",
   "x402",
   "mcp",
   "inference",
