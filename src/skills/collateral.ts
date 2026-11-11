@@ -1,5 +1,5 @@
 import { decodeFunctionResult, encodeFunctionData } from "viem";
-import { AAVE_V4, AAVE_V4_APP, BPS, FEED_ABI, ORACLE_ABI, PRICE_DECIMALS, SPOKE_ABI, WAD } from "@/config/collateral";
+import { AAVE_V4, AAVE_V4_APP, BPS, FEED_ABI, MORPHO, MORPHO_ABI, MORPHO_ORACLE_ABI, MORPHO_STOCK_MARKETS, ORACLE_ABI, PRICE_DECIMALS, SPOKE_ABI, WAD } from "@/config/collateral";
 import { deepest, marketsOf, type Market } from "@/skills/dexscreener";
 import { explorer, short, tokenAmount, usd } from "@/skills/format";
 import { ethCall } from "@/skills/http";
@@ -60,7 +60,65 @@ export type Snapshot = {
   readonly positions: readonly Position[];
   /** the deepest Base DEX market per token (lowercase), when DexScreener answered */
   readonly dex: ReadonlyMap<string, Market> | null;
+  /** positions in Morpho's stock markets (`MORPHO_STOCK_MARKETS`); `null` when Morpho could not be read */
+  readonly morpho: readonly MorphoPosition[] | null;
 };
+
+export type MorphoPosition = {
+  readonly market: `0x${string}`;
+  readonly token: string;
+  readonly symbol: string;
+  readonly decimals: number;
+  /** collateral, base units */
+  readonly collateral: bigint;
+  /** borrowed USDC, base units (shares → assets rounded UP, as Morpho does for a borrower) */
+  readonly borrowed: bigint;
+  /** the market's oracle: USDC per stock token */
+  readonly price: number;
+  /** liquidation LTV, 0..1 */
+  readonly lltv: number;
+};
+
+/** Morpho's virtual shares and assets (SharesMathLib): 1e6 shares and 1 asset added to each side. */
+const VIRTUAL_SHARES = 10n ** 6n;
+const USDC_DECIMALS = 6;
+
+/** A borrower's debt from its shares, rounded up — what Morpho itself charges. */
+export function borrowAssets(shares: bigint, totalAssets: bigint, totalShares: bigint): bigint {
+  const num = shares * (totalAssets + 1n);
+  const den = totalShares + VIRTUAL_SHARES;
+  return (num + den - 1n) / den;
+}
+
+async function morphoOf(user: `0x${string}`): Promise<MorphoPosition[]> {
+  const read = <F extends "position" | "market" | "idToMarketParams">(functionName: F, args: readonly unknown[]) =>
+    call(MORPHO, encodeFunctionData({ abi: MORPHO_ABI, functionName, args } as never), (data) => decodeFunctionResult({ abi: MORPHO_ABI, functionName, data } as never) as unknown);
+  const found = await Promise.all(
+    MORPHO_STOCK_MARKETS.map(async (m) => {
+      const [, borrowShares, collateral] = (await read("position", [m.id, user])) as readonly [bigint, bigint, bigint];
+      if (borrowShares === 0n && collateral === 0n) return null;
+      const [mk, params] = (await Promise.all([read("market", [m.id]), read("idToMarketParams", [m.id])])) as [readonly bigint[], readonly [string, string, string, string, bigint]];
+      const [, collateralToken, oracle, , lltv] = params;
+      const [raw, info] = await Promise.all([
+        call(oracle, encodeFunctionData({ abi: MORPHO_ORACLE_ABI, functionName: "price" }), (data) => decodeFunctionResult({ abi: MORPHO_ORACLE_ABI, functionName: "price", data })),
+        chainToken(collateralToken),
+      ]);
+      const position: MorphoPosition = {
+        market: m.id,
+        token: collateralToken,
+        symbol: info.symbol,
+        decimals: info.decimals,
+        collateral,
+        borrowed: borrowAssets(borrowShares, mk[2]!, mk[3]!),
+        // loan base units per collateral base unit × 1e36 → USDC per whole token
+        price: (Number(raw) / 1e36) * 10 ** (info.decimals - USDC_DECIMALS),
+        lltv: Number(lltv) / 1e18,
+      };
+      return position;
+    }),
+  );
+  return found.filter((p): p is MorphoPosition => p !== null);
+}
 
 const call = async <T>(to: string, data: `0x${string}`, decode: (d: `0x${string}`) => T): Promise<T> => decode(await ethCall(to, data));
 
@@ -108,7 +166,8 @@ export async function snapshot(input: string): Promise<Snapshot> {
       };
     }),
   );
-  const stocks = positions.filter((p) => p.collateral && p.supplied > 0n).map((p) => p.token);
+  const morpho = await morphoOf(user).catch(() => null);
+  const stocks = [...new Set([...positions.filter((p) => p.collateral && p.supplied > 0n).map((p) => p.token), ...(morpho ?? []).map((p) => p.token)])];
   const dex =
     stocks.length === 0
       ? new Map<string, Market>()
@@ -123,7 +182,7 @@ export async function snapshot(input: string): Promise<Snapshot> {
           () => null,
         );
   const health = acct.borrowCount === 0n ? null : acct.healthFactor;
-  return { user: target.address, via: target.via, health, positions, dex };
+  return { user: target.address, via: target.via, health, positions, dex, morpho };
 }
 
 /** The feed behind a reserve's price, and when it last set one — `null` when it could not be read. */
@@ -249,7 +308,8 @@ export function collateralRows(s: Snapshot, now: number): { rows: Row[]; notes: 
           continue;
         }
         at.set(p.token.toLowerCase(), d.priceUsd);
-        parts.push(`${p.symbol} ${usd(d.priceUsd)} (${d.priceUsd >= priceUsd(p) ? "+" : ""}${pct(d.priceUsd / priceUsd(p) - 1)} vs Aave)`);
+        const gap = d.priceUsd / priceUsd(p) - 1;
+        parts.push(`${p.symbol} ${usd(d.priceUsd)} (${Math.abs(gap) < 0.0005 ? "0.0%" : `${gap > 0 ? "+" : ""}${pct(gap)}`} vs Aave)`);
       }
       if (at.size === 0) rows.push(row("At Base DEX prices", `not checked — ${parts.join(", ")}`, { tone: "warn" }));
       else {
@@ -268,15 +328,35 @@ export function collateralRows(s: Snapshot, now: number): { rows: Row[]; notes: 
   return { rows, notes };
 }
 
+/** Each Morpho position: its own health and liquidation price, and the same at Base's DEX price. */
+export function morphoRows(s: Snapshot): Row[] {
+  if (s.morpho === null) return [row("Morpho", "not checked — its stock markets could not be read just now", { tone: "warn" })];
+  if (s.morpho.length === 0) return [row("Morpho", "no stock collateral and no debt in its stock markets", { tone: "ok" })];
+  return s.morpho.map((p) => {
+    const tokens = Number(p.collateral) / 10 ** p.decimals;
+    const debt = Number(p.borrowed) / 10 ** USDC_DECIMALS;
+    const label = `Morpho · ${p.symbol}`;
+    const held = `${tokenAmount(p.collateral, p.decimals, 2)} ${p.symbol} (${usd(tokens * p.price)})`;
+    if (debt === 0) return row(label, `${held}, nothing borrowed`, { tone: "ok" });
+    const health = (tokens * p.price * p.lltv) / debt;
+    const liq = debt / (tokens * p.lltv);
+    const dist = 1 - liq / p.price;
+    const dex = s.dex?.get(p.token.toLowerCase())?.priceUsd ?? null;
+    const atDex = dex === null ? "" : ` · at Base's ${usd(dex)}: health ${((tokens * dex * p.lltv) / debt).toFixed(2)}`;
+    const where = dist <= 0 ? "can be liquidated now" : `liquidated at ${usd(liq)}, ${pct(dist)} below its oracle's ${usd(p.price)}`;
+    return row(label, `${held} backing ${tokenAmount(p.borrowed, USDC_DECIMALS, 2)} USDC · health ${health.toFixed(2)} · ${where}${atDex}`, { tone: dist <= 0 ? "bad" : hfTone(health) === "ok" ? distTone(dist) : hfTone(health) });
+  });
+}
+
 export async function collateralReport(input: string, now: number): Promise<Report> {
   const s = await snapshot(input);
   const { rows, notes } = collateralRows(s, now);
   const who = s.via ?? short(s.user);
   return {
     title: `${who} — Collateral Watch`,
-    rows: [row("Wallet", s.via ? `${s.via} (${s.user})` : s.user, { href: explorer.address(s.user) }), ...rows, row("Morpho", "not checked — stock markets on Morpho are not read yet", { tone: "warn" })],
-    notes,
-    sources: ["Aave V4 on Base (the MAG7 spoke and its oracle)", "Coinbase price feeds (when each last set a price)", "DexScreener (Base DEX prices)"],
+    rows: [row("Wallet", s.via ? `${s.via} (${s.user})` : s.user, { href: explorer.address(s.user) }), ...rows, ...morphoRows(s)],
+    notes: [...notes, `Morpho: the ${MORPHO_STOCK_MARKETS.length} stock markets holding $1k or more of collateral when this was built (${MORPHO_STOCK_MARKETS.map((m) => m.symbol).join(", ")} against USDC). Each is its own loan, liquidated on its own.`],
+    sources: ["Aave V4 on Base (the MAG7 spoke and its oracle)", "Morpho Blue on Base (positions, markets, their oracles)", "Coinbase price feeds (when each last set a price)", "DexScreener (Base DEX prices)"],
   };
 }
 

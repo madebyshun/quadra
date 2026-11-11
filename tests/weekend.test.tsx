@@ -105,6 +105,8 @@ describe("the diary, worded", () => {
     expect(r.rows.map((x) => x.label)).toEqual(["Rule", "Backtest", "Since it went live"]);
     expect(r.rows[1]).toMatchObject({ tone: "bad", value: "35 trades over 11 weekends, 14 won, −$276 — in-sample, before the rule went live" });
     expect(r.rows[2]).toEqual({ label: "Since it went live", value: "no weekend closed yet — the first entry is taken Sunday 22:00 UTC" });
+    expect(r.notes[1]).toBe(`Blue Agent on the backtest: ${DIARY.backtest.note}`);
+    expect(diaryReport({ backtest: {} }).notes).toHaveLength(1);
   });
 
   it("shows live results and each entry, open or closed, with its note", () => {

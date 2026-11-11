@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { decodeFunctionData } from "viem";
-import { AAVE_V4, FEED_ABI, ORACLE_ABI } from "@/config/collateral";
+import { AAVE_V4, FEED_ABI, MORPHO, ORACLE_ABI } from "@/config/collateral";
 import {
   AGREE,
   collateralReport,
   collateralRows,
   collateralSkill,
+  borrowAssets,
+  morphoRows,
   liquidationPrice,
   marketShut,
   mathAt,
@@ -16,6 +18,7 @@ import {
 import { findSkill } from "@/skills/index";
 import TWO from "./fixtures/collateral/two-stocks.json";
 import EMPTY from "./fixtures/collateral/empty.json";
+import MORPHO_FX from "./fixtures/collateral/morpho.json";
 import { basenames, DOWN, net, RpcError, useNet, type Answer } from "./net";
 
 useNet();
@@ -117,9 +120,9 @@ describe("the report", () => {
     expect(by("Liquidation · NVDAc")).toMatchObject({ tone: "ok", value: expect.stringMatching(/^\$86\.\d\d — 51\.\d% below Aave's \$176\.80 \(other holdings unchanged\)$/) });
     expect(by("Price feed · NVDAc")).toMatchObject({ value: expect.stringMatching(/^Coinbase NVDA, last set 2026-11-11 17:01 UTC \(\d+ h ago\)$/) });
     expect(by("Price feed · NVDAc").tone).toBeUndefined();
-    expect(by("At Base's DEX prices")).toMatchObject({ tone: "ok", value: expect.stringMatching(/^health 1\.48 \(now 1\.48\) — GOOGLc \$294\.\d\d \([+-]\d\.\d% vs Aave\), NVDAc \$176\.\d\d \(-0\.1% vs Aave\)$/) });
-    expect(by("Morpho").tone).toBe("warn");
-    expect(r.notes).toHaveLength(2);
+    expect(by("At Base's DEX prices")).toMatchObject({ tone: "ok", value: expect.stringMatching(/^health 1\.48 \(now 1\.48\) — GOOGLc \$294\.\d\d \([+-]\d\.\d% vs Aave\), NVDAc \$176\.\d\d \((0\.0|[+-]\d\.\d)% vs Aave\)$/) });
+    expect(by("Morpho")).toMatchObject({ tone: "ok", value: "no stock collateral and no debt in its stock markets" });
+    expect(r.notes).toHaveLength(3);
   });
 
   it("on a Sunday says the feed is frozen and asks what a reopening at Base's prices would do", async () => {
@@ -127,7 +130,7 @@ describe("the report", () => {
     const r = await collateralReport(TWO.wallet, SUNDAY);
     expect(r.rows.find((x) => x.label === "Price feed · NVDAc")).toMatchObject({ tone: "warn", value: expect.stringMatching(/the US market is shut, so this price stays until it reopens$/) });
     expect(r.rows.some((x) => x.label === "If the market reopened at Base's prices")).toBe(true);
-    expect(r.notes).toHaveLength(3);
+    expect(r.notes).toHaveLength(4);
   });
 
   it("is reached as `collateral`, `liquidation` and `loans`", () => {
@@ -183,6 +186,7 @@ const snap = (positions: Position[], health: number | null, dex: Snapshot["dex"]
   health: health === null ? null : BigInt(Math.round(health * 1e6)) * 10n ** 12n,
   positions,
   dex,
+  morpho: [],
 });
 
 describe("the arithmetic", () => {
@@ -235,6 +239,8 @@ describe("the arithmetic", () => {
     expect(none.at(-1)).toMatchObject({ label: "At Base DEX prices", tone: "warn", value: "not checked — aaa has no DEX price" });
     const some = collateralRows(snap([a, b, usdcDebt(7000)], 2, new Map([[a.token, market(110)]])), SUNDAY).rows;
     expect(some.at(-1)).toMatchObject({ label: "If the market reopened at Base's prices", tone: "ok", value: "health 2.10 (now 2.00) — aaa $110.00 (+10.0% vs Aave), bbb has no DEX price" });
+    const down = collateralRows(snap([a, usdcDebt(7000)], 1, new Map([[a.token, market(95)]])), OPEN).rows;
+    expect(down.at(-1)!.value).toBe("health 0.95 (now 1.00) — aaa $95.00 (-5.0% vs Aave)");
   });
 
   it("says a supplied stock that is not collateral, and words a feed set long ago or just now", () => {
@@ -246,5 +252,48 @@ describe("the arithmetic", () => {
     expect(rows.find((r) => r.label === "Supplied · aaa")!.value).toMatch(/supplied, NOT used as collateral$/);
     expect(rows.find((r) => r.label === "Price feed · bbb")!.value).toMatch(/\(10 min ago\)$/);
     expect(rows.find((r) => r.label === "Price feed · ccc")!.value).toMatch(/^0x0000…0001, last set .* \(5 days ago\)$/);
+  });
+});
+
+describe("Morpho's stock markets", () => {
+  it("reads a wallet borrowing USDC against AAPLc, METAc and NVDAc, each its own loan", async () => {
+    chain(MORPHO_FX as never);
+    const r = await collateralReport(MORPHO_FX.wallet, OPEN);
+    const rows = r.rows.filter((x) => x.label.startsWith("Morpho · "));
+    expect(rows.map((x) => x.label)).toEqual(["Morpho · AAPLc", "Morpho · METAc", "Morpho · NVDAc"]);
+    expect(rows[2]).toMatchObject({
+      tone: "warn",
+      value: expect.stringMatching(/^109\.8\d NVDAc \(\$19,\d{3}\.\d\d\) backing 10,21\d\.\d\d USDC · health 1\.19 · liquidated at \$148\.\d\d, 15\.\d% below its oracle's \$176\.80 · at Base's \$176\.\d\d: health 1\.19$/),
+    });
+    expect(r.rows.find((x) => x.label === "Aave V4 · MAG7")!.value).toBe("no stock supplied and nothing borrowed");
+    expect(r.sources).toContain("Morpho Blue on Base (positions, markets, their oracles)");
+  });
+
+  it("says Morpho could not be read rather than that nothing is there", async () => {
+    chain(MORPHO_FX as never, { rpc: (to) => (to === MORPHO.toLowerCase() ? new RpcError("busy") : undefined) });
+    const r = await collateralReport(MORPHO_FX.wallet, OPEN);
+    expect(r.rows.find((x) => x.label === "Morpho")).toMatchObject({ tone: "warn", value: "not checked — its stock markets could not be read just now" });
+  });
+
+  it("works out a borrower's debt from shares as Morpho does, rounding up", () => {
+    // 1e6 virtual shares and 1 virtual asset: an empty market prices a share at 1e-6 of an asset
+    expect(borrowAssets(1_000_000n, 0n, 0n)).toBe(1n);
+    expect(borrowAssets(1_999_000_000n, 999n, 1_998_000_000n)).toBe(1000n); // exact
+    expect(borrowAssets(2_000_000n, 999n, 1_998_000_000n)).toBe(2n); // 1.0005, rounded up
+    expect(borrowAssets(0n, 10n, 10n)).toBe(0n);
+  });
+
+  const base = { market: "0x01" as const, token: "0x00000000000000000000000000000000000000aa", symbol: "AAA", decimals: 8, price: 100, lltv: 0.625 };
+  const one = (borrowed: number, extra: Record<string, unknown> = {}) => ({ ...base, collateral: 10n * 10n ** 8n, borrowed: BigInt(borrowed * 1e6), ...extra });
+
+  it("colours each loan by its health and distance, and says collateral with nothing borrowed", () => {
+    const at = (p: ReturnType<typeof one>, dex: Snapshot["dex"] = null) => morphoRows({ ...snap([], null, dex), morpho: [p] });
+    expect(at(one(0))[0]).toEqual({ label: "Morpho · AAA", value: "10 AAA ($1,000.00), nothing borrowed", tone: "ok" });
+    expect(at(one(300))[0]).toMatchObject({ tone: "ok", value: expect.stringMatching(/health 2\.08 · liquidated at \$48\.00, 52\.0% below its oracle's \$100\.00$/) });
+    expect(at(one(550))[0]!.tone).toBe("warn");
+    expect(at(one(620))[0]!.tone).toBe("bad");
+    expect(at(one(700))[0]).toMatchObject({ tone: "bad", value: expect.stringMatching(/· can be liquidated now$/) });
+    const dex = new Map([[base.token, { priceUsd: 90 } as never]]);
+    expect(at(one(300), dex)[0]!.value).toMatch(/· at Base's \$90\.00: health 1\.88$/);
   });
 });

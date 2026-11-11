@@ -7337,6 +7337,20 @@ var FEED_ABI = parseAbi(["function latestRoundData() view returns (uint80, int25
 var BPS = 10000n;
 var WAD = 10n ** 18n;
 var PRICE_DECIMALS = 8;
+var MORPHO = "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb";
+var MORPHO_STOCK_MARKETS = [
+  { id: "0xae1a30486234bf7e7ac166c7c03d9bc5f2cd8a39be2c48e73c665ac7148c3c28", symbol: "AAPLc" },
+  { id: "0x44b343b5087c0bd34207cb5c199f12030777bf6b8c0a128438246f1212f37ca5", symbol: "METAc" },
+  { id: "0xb4b42dd66cef25614b94510a910d54b2c148e7621d22b4271566724beda63d13", symbol: "NVDAc" },
+  { id: "0xce983b9ee6344e16ebbcc66812f23caafc63ae83fcc14fa29b66c7e69e9cecf6", symbol: "SPCXc" },
+  { id: "0xa3913d896b7e9c0e0a84f1be27d376cf2065616101cb7c44674af8a154e684cc", symbol: "GOOGLc" }
+];
+var MORPHO_ABI = parseAbi([
+  "function position(bytes32 id, address user) view returns (uint256 supplyShares, uint128 borrowShares, uint128 collateral)",
+  "function market(bytes32 id) view returns (uint128 totalSupplyAssets, uint128 totalSupplyShares, uint128 totalBorrowAssets, uint128 totalBorrowShares, uint128 lastUpdate, uint128 fee)",
+  "function idToMarketParams(bytes32 id) view returns (address loanToken, address collateralToken, address oracle, address irm, uint256 lltv)"
+]);
+var MORPHO_ORACLE_ABI = parseAbi(["function price() view returns (uint256)"]);
 
 // src/skills/collateral.ts
 var AGREE = 5e-3;
@@ -7344,6 +7358,41 @@ var HF_BAD = 1.05;
 var HF_WARN = 1.25;
 var DIST_BAD = 0.1;
 var DIST_WARN = 0.25;
+var VIRTUAL_SHARES = 10n ** 6n;
+var USDC_DECIMALS = 6;
+function borrowAssets(shares, totalAssets, totalShares) {
+  const num = shares * (totalAssets + 1n);
+  const den = totalShares + VIRTUAL_SHARES;
+  return (num + den - 1n) / den;
+}
+async function morphoOf(user) {
+  const read4 = (functionName, args) => call(MORPHO, encodeFunctionData({ abi: MORPHO_ABI, functionName, args }), (data) => decodeFunctionResult({ abi: MORPHO_ABI, functionName, data }));
+  const found = await Promise.all(
+    MORPHO_STOCK_MARKETS.map(async (m) => {
+      const [, borrowShares, collateral] = await read4("position", [m.id, user]);
+      if (borrowShares === 0n && collateral === 0n) return null;
+      const [mk, params] = await Promise.all([read4("market", [m.id]), read4("idToMarketParams", [m.id])]);
+      const [, collateralToken, oracle, , lltv] = params;
+      const [raw, info] = await Promise.all([
+        call(oracle, encodeFunctionData({ abi: MORPHO_ORACLE_ABI, functionName: "price" }), (data) => decodeFunctionResult({ abi: MORPHO_ORACLE_ABI, functionName: "price", data })),
+        chainToken(collateralToken)
+      ]);
+      const position = {
+        market: m.id,
+        token: collateralToken,
+        symbol: info.symbol,
+        decimals: info.decimals,
+        collateral,
+        borrowed: borrowAssets(borrowShares, mk[2], mk[3]),
+        // loan base units per collateral base unit × 1e36 → USDC per whole token
+        price: Number(raw) / 1e36 * 10 ** (info.decimals - USDC_DECIMALS),
+        lltv: Number(lltv) / 1e18
+      };
+      return position;
+    })
+  );
+  return found.filter((p) => p !== null);
+}
 var call = async (to, data, decode) => decode(await ethCall(to, data));
 async function snapshot(input) {
   const target = await resolveTarget(input, "Wallet");
@@ -7385,7 +7434,8 @@ async function snapshot(input) {
       };
     })
   );
-  const stocks = positions.filter((p) => p.collateral && p.supplied > 0n).map((p) => p.token);
+  const morpho = await morphoOf(user).catch(() => null);
+  const stocks = [.../* @__PURE__ */ new Set([...positions.filter((p) => p.collateral && p.supplied > 0n).map((p) => p.token), ...(morpho ?? []).map((p) => p.token)])];
   const dex = stocks.length === 0 ? /* @__PURE__ */ new Map() : await marketsOf(stocks).then(
     (all) => new Map(
       stocks.flatMap((t) => {
@@ -7396,7 +7446,7 @@ async function snapshot(input) {
     () => null
   );
   const health = acct.borrowCount === 0n ? null : acct.healthFactor;
-  return { user: target.address, via: target.via, health, positions, dex };
+  return { user: target.address, via: target.via, health, positions, dex, morpho };
 }
 async function feedOf(id) {
   try {
@@ -7497,7 +7547,8 @@ function collateralRows(s, now) {
           continue;
         }
         at.set(p.token.toLowerCase(), d.priceUsd);
-        parts.push(`${p.symbol} ${usd(d.priceUsd)} (${d.priceUsd >= priceUsd(p) ? "+" : ""}${pct4(d.priceUsd / priceUsd(p) - 1)} vs Aave)`);
+        const gap = d.priceUsd / priceUsd(p) - 1;
+        parts.push(`${p.symbol} ${usd(d.priceUsd)} (${Math.abs(gap) < 5e-4 ? "0.0%" : `${gap > 0 ? "+" : ""}${pct4(gap)}`} vs Aave)`);
       }
       if (at.size === 0) rows.push(row("At Base DEX prices", `not checked \u2014 ${parts.join(", ")}`, { tone: "warn" }));
       else {
@@ -7514,15 +7565,33 @@ function collateralRows(s, now) {
   if (shut) notes.push("While the US market is shut the feed does not move, but the tokens still trade on Base \u2014 that gap is the weekend risk. US holidays are not known to this build.");
   return { rows, notes };
 }
+function morphoRows(s) {
+  if (s.morpho === null) return [row("Morpho", "not checked \u2014 its stock markets could not be read just now", { tone: "warn" })];
+  if (s.morpho.length === 0) return [row("Morpho", "no stock collateral and no debt in its stock markets", { tone: "ok" })];
+  return s.morpho.map((p) => {
+    const tokens = Number(p.collateral) / 10 ** p.decimals;
+    const debt = Number(p.borrowed) / 10 ** USDC_DECIMALS;
+    const label = `Morpho \xB7 ${p.symbol}`;
+    const held = `${tokenAmount(p.collateral, p.decimals, 2)} ${p.symbol} (${usd(tokens * p.price)})`;
+    if (debt === 0) return row(label, `${held}, nothing borrowed`, { tone: "ok" });
+    const health = tokens * p.price * p.lltv / debt;
+    const liq = debt / (tokens * p.lltv);
+    const dist = 1 - liq / p.price;
+    const dex = s.dex?.get(p.token.toLowerCase())?.priceUsd ?? null;
+    const atDex = dex === null ? "" : ` \xB7 at Base's ${usd(dex)}: health ${(tokens * dex * p.lltv / debt).toFixed(2)}`;
+    const where = dist <= 0 ? "can be liquidated now" : `liquidated at ${usd(liq)}, ${pct4(dist)} below its oracle's ${usd(p.price)}`;
+    return row(label, `${held} backing ${tokenAmount(p.borrowed, USDC_DECIMALS, 2)} USDC \xB7 health ${health.toFixed(2)} \xB7 ${where}${atDex}`, { tone: dist <= 0 ? "bad" : hfTone(health) === "ok" ? distTone(dist) : hfTone(health) });
+  });
+}
 async function collateralReport(input, now) {
   const s = await snapshot(input);
   const { rows, notes } = collateralRows(s, now);
   const who = s.via ?? short(s.user);
   return {
     title: `${who} \u2014 Collateral Watch`,
-    rows: [row("Wallet", s.via ? `${s.via} (${s.user})` : s.user, { href: explorer.address(s.user) }), ...rows, row("Morpho", "not checked \u2014 stock markets on Morpho are not read yet", { tone: "warn" })],
-    notes,
-    sources: ["Aave V4 on Base (the MAG7 spoke and its oracle)", "Coinbase price feeds (when each last set a price)", "DexScreener (Base DEX prices)"]
+    rows: [row("Wallet", s.via ? `${s.via} (${s.user})` : s.user, { href: explorer.address(s.user) }), ...rows, ...morphoRows(s)],
+    notes: [...notes, `Morpho: the ${MORPHO_STOCK_MARKETS.length} stock markets holding $1k or more of collateral when this was built (${MORPHO_STOCK_MARKETS.map((m) => m.symbol).join(", ")} against USDC). Each is its own loan, liquidated on its own.`],
+    sources: ["Aave V4 on Base (the MAG7 spoke and its oracle)", "Morpho Blue on Base (positions, markets, their oracles)", "Coinbase price feeds (when each last set a price)", "DexScreener (Base DEX prices)"]
   };
 }
 var collateralSkill = {

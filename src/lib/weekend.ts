@@ -112,7 +112,11 @@ export function diaryReport(body: unknown): Report {
   return {
     title: "Blue Agent's weekend diary — $1,000 paper positions",
     rows,
-    notes: ["Paper money: nothing is traded. Positions, prices and P&L are computed in code; each diary note is written by a model from those numbers."],
+    notes: [
+      "Paper money: nothing is traded. Positions, prices and P&L are computed in code; each diary note is written by a model from those numbers.",
+      // Blue Agent's own words on its backtest — e.g. why a right call can still lose (2026-11-12)
+      ...(strOf(back.note) ? [`Blue Agent on the backtest: ${strOf(back.note)}`] : []),
+    ],
     sources: [SOURCE],
   };
 }
