@@ -118,7 +118,7 @@ describe("a report's next steps in a window", () => {
     offline();
     renderAt("/?do=research&run-research=radar%205");
     await settle();
-    const research = win("Radar")!;
+    const research = win("Radar · Collateral · Depth")!;
     // the instruction ran the window's one skill
     expect(within(research).getByLabelText("Stand-in radar")).toBeInTheDocument();
     const next = within(research).getByRole("group", { name: "Next" });
@@ -153,12 +153,12 @@ describe("a report's next steps in a window", () => {
     offline();
     const first = renderAt(`/?do=research&run-research=gate%20${TOKEN}`);
     await settle();
-    expect(within(win("Radar")!).queryByLabelText("Stand-in radar")).not.toBeInTheDocument();
+    expect(within(win("Radar · Collateral · Depth")!).queryByLabelText("Stand-in radar")).not.toBeInTheDocument();
     first.unmount();
     offline();
     renderAt("/?do=research&run-research=frobnicate");
     await settle();
-    expect(within(win("Radar")!).queryByLabelText("Stand-in radar")).not.toBeInTheDocument();
+    expect(within(win("Radar · Collateral · Depth")!).queryByLabelText("Stand-in radar")).not.toBeInTheDocument();
   });
 });
 

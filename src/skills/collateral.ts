@@ -363,7 +363,7 @@ export async function collateralReport(input: string, now: number): Promise<Repo
 export const collateralSkill: Skill = {
   id: "collateral",
   title: "Collateral Watch",
-  summary: "A wallet's stocks borrowed against on Aave V4: health, how far each can fall before liquidation, and the weekend gap between Aave's frozen price and Base's market.",
+  summary: "A wallet's stocks borrowed against on Aave V4 and Morpho: health, how far each can fall before liquidation, and the weekend gap between the frozen oracle price and Base's market.",
   args: [{ name: "wallet", hint: "0x… or name.base.eth" }],
   run: ([input = ""]) => collateralReport(input, Date.now()),
 };

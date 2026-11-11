@@ -44,7 +44,7 @@ describe("Trade Depth", () => {
     expect(r.rows[0]).toMatchObject({ label: "Depth", tone: "ok", value: `No size here moves the price more than ${LOUD}%` });
     expect(r.rows.filter((x) => /^(Buy|Sell) /.test(x.label)).map((x) => x.label)).toEqual(["Buy $1,000", "Buy $10,000", "Buy $100,000", "Sell $1,000", "Sell $10,000", "Sell $100,000"]);
     expect(r.rows.find((x) => x.label === "Buy $100,000")).toMatchObject({ tone: "ok", value: "0.13% impact (0.28% with fees) · 564.1514 NVDAc" });
-    expect(r.rows.find((x) => x.label === "Sell $100,000")!.value).toBe("0.33% impact (0.48% with fees) · 99,566.84 USDC");
+    expect(r.rows.find((x) => x.label === "Sell $100,000")!.value).toBe("0.33% impact (0.48% with fees) · $99,566.84 in USDC");
     expect(r.rows.find((x) => x.label === "Pool · Aerodrome Slipstream vs USDC")!.value).toBe("$1,791,445.19 liquidity");
     expect(r.rows.filter((x) => x.label.startsWith("Pool ·"))).toHaveLength(4);
   });
@@ -81,6 +81,19 @@ describe("Trade Depth", () => {
     const r = await depthReport(PDDC.token);
     expect(r.rows[0]).toMatchObject({ tone: "warn", value: "not checked — no size could be quoted" });
     expect(r.rows.find((x) => x.label === "Sell $10,000")!.value).toBe("not quoted — Relay: Could not process request. Please try again later..");
+  });
+
+  it("reads Relay's 'impact is too high' as the worst measurement, red — never as not quoted (MEASURED on PDDc)", async () => {
+    chain(fx, { relay: (i, body) => (i === 2 ? json({ message: "Swap impact is too high: -74.28%" }, 400) : body) });
+    const r = await depthReport(fx.token);
+    expect(r.rows.find((x) => x.label === "Buy $100,000")).toMatchObject({ tone: "bad", value: "74.28% impact — too much for the pools; Relay will not route it" });
+    expect(r.rows[0]).toMatchObject({ tone: "bad", value: "Thin — buy $100,000 moves the price more than 2%" });
+  });
+
+  it("never says no size moves the price while a size went unquoted", async () => {
+    chain(fx, { relay: (i, body) => (i === 5 ? json({ message: "Could not process request. Please try again later." }, 500) : body) });
+    const r = await depthReport(fx.token);
+    expect(r.rows[0]).toMatchObject({ tone: "warn", value: "No quoted size moves the price more than 2% — sell $100,000 not quoted" });
   });
 
   it("cannot size a sell without a market price, and says when DexScreener is down or lists nothing", async () => {

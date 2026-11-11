@@ -7432,7 +7432,7 @@ async function collateralReport(input, now) {
 var collateralSkill = {
   id: "collateral",
   title: "Collateral Watch",
-  summary: "A wallet's stocks borrowed against on Aave V4: health, how far each can fall before liquidation, and the weekend gap between Aave's frozen price and Base's market.",
+  summary: "A wallet's stocks borrowed against on Aave V4 and Morpho: health, how far each can fall before liquidation, and the weekend gap between the frozen oracle price and Base's market.",
   args: [{ name: "wallet", hint: "0x\u2026 or name.base.eth" }],
   run: ([input = ""]) => collateralReport(input, Date.now())
 };
@@ -7472,6 +7472,13 @@ async function quote(sell, buy, amount) {
     })
   );
 }
+var TOO_HIGH = /impact is too high:\s*-?(\d+(?:\.\d+)?)%/i;
+function refusal2(label, e) {
+  const said = e.message;
+  const high = TOO_HIGH.exec(said);
+  if (high) return row(label, `${Number(high[1]).toFixed(2)}% impact \u2014 too much for the pools; Relay will not route it`, { tone: "bad" });
+  return row(label, `not quoted \u2014 ${said}`, { tone: "warn" });
+}
 var loud = (impact) => impact === null ? "warn" : Math.abs(impact) > LOUD ? "bad" : Math.abs(impact) > QUIET ? "warn" : "ok";
 var pct5 = (n) => n === null ? "not given" : `${Math.abs(n).toFixed(2)}%`;
 var DEX_NAMES = { aero: "Aerodrome Slipstream", aerodrome: "Aerodrome", uniswap: "Uniswap" };
@@ -7491,7 +7498,7 @@ async function depthReport(input) {
       const q = await quote(USDC.address, token, BigInt(size2) * 10n ** 6n);
       rows.push(row(label, `${pct5(q.swapImpact)} impact (${pct5(q.totalImpact)} with fees) \xB7 ${tokenAmount(q.out, info.decimals, 4)} ${info.symbol}`, { tone: loud(q.swapImpact) }));
     } catch (e) {
-      rows.push(row(label, `not quoted \u2014 ${e.message}`, { tone: "warn" }));
+      rows.push(refusal2(label, e));
     }
   }
   for (const size2 of SIZES) {
@@ -7503,9 +7510,9 @@ async function depthReport(input) {
     const amount = BigInt(Math.floor(size2 / best.priceUsd * 10 ** info.decimals));
     try {
       const q = await quote(token, USDC.address, amount);
-      rows.push(row(label, `${pct5(q.swapImpact)} impact (${pct5(q.totalImpact)} with fees) \xB7 ${tokenAmount(q.out, 6, 2)} USDC`, { tone: loud(q.swapImpact) }));
+      rows.push(row(label, `${pct5(q.swapImpact)} impact (${pct5(q.totalImpact)} with fees) \xB7 ${usd(Number(q.out / 10000n) / 100)} in USDC`, { tone: loud(q.swapImpact) }));
     } catch (e) {
-      rows.push(row(label, `not quoted \u2014 ${e.message}`, { tone: "warn" }));
+      rows.push(refusal2(label, e));
     }
   }
   if (pairs === null) rows.push(row("Pools", "not checked \u2014 DexScreener could not be reached", { tone: "warn" }));
@@ -7515,11 +7522,13 @@ async function depthReport(input) {
     for (const m of top) rows.push(row(`Pool \xB7 ${venue(m)}`, m.liquidityUsd === null ? "liquidity not reported" : `${usd(m.liquidityUsd)} liquidity`, m.url ? { href: m.url } : {}));
   }
   const worst = rows.filter((r) => r.tone === "bad");
-  const quoted = rows.some((r) => /^(Buy|Sell) /.test(r.label) && !r.value.startsWith("not quoted"));
+  const sizes = rows.filter((r) => /^(Buy|Sell) /.test(r.label));
+  const unquoted = sizes.filter((r) => r.value.startsWith("not quoted"));
+  const quoted = unquoted.length < sizes.length;
   return {
     title: `${info.symbol} \u2014 Trade Depth`,
     rows: [
-      !quoted ? row("Depth", "not checked \u2014 no size could be quoted", { tone: "warn" }) : worst.length > 0 ? row("Depth", `Thin \u2014 ${worst.map((r) => r.label.toLowerCase()).join(", ")} moves the price more than ${LOUD}%`, { tone: "bad" }) : row("Depth", `No size here moves the price more than ${LOUD}%`, { tone: rows.some((r) => r.tone === "warn") ? "warn" : "ok" }),
+      !quoted ? row("Depth", "not checked \u2014 no size could be quoted", { tone: "warn" }) : worst.length > 0 ? row("Depth", `Thin \u2014 ${worst.map((r) => r.label.toLowerCase()).join(", ")} moves the price more than ${LOUD}%`, { tone: "bad" }) : unquoted.length > 0 ? row("Depth", `No quoted size moves the price more than ${LOUD}% \u2014 ${unquoted.map((r) => r.label.toLowerCase()).join(", ")} not quoted`, { tone: "warn" }) : row("Depth", `No size here moves the price more than ${LOUD}%`, { tone: rows.some((r) => r.tone === "warn") ? "warn" : "ok" }),
       ...rows
     ],
     notes: [

@@ -106,8 +106,8 @@ export const FEATURES: readonly Feature[] = [
   {
     id: "research",
     title: "Radar",
-    blurb: "new launches and stock loans, read from the chain",
-    window: "Radar",
+    blurb: "new launches, stock loans, trade depth",
+    window: "Radar · Collateral · Depth",
     flag: "research",
   },
   {
