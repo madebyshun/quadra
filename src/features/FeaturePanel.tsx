@@ -27,6 +27,7 @@ import { AchievementsPanel } from "@/features/panels/AchievementsPanel";
 import { LeaderboardPanel } from "@/features/panels/LeaderboardPanel";
 import { CardPanel } from "@/features/panels/BaseCard";
 import { radarSkill } from "@/skills/radar";
+import { collateralSkill } from "@/skills/collateral";
 import { verdictSkill } from "@/skills/verdict";
 import { gateSkill } from "@/skills/gate";
 import { forensicsSkill } from "@/skills/forensics";
@@ -44,7 +45,7 @@ const EXPLAIN: Partial<Record<Feature["id"], string>> = {
     "Connect a wallet you control. Nothing here ever holds a key: anything that moves money is signed in your own wallet. Looking things up needs no wallet at all.",
   terminal: "Type a command, get an answer read straight from Base. `help` lists every skill.",
   research:
-    "See what launched on Base in the last hour, read straight from the chain and flagged, then put any token through a full verdict.",
+    "See what launched on Base in the last hour, or how far a wallet's stock loans are from liquidation — read straight from the chain.",
   safety:
     "Before you buy: a real buy and sell of the token, run on Base without sending anything, plus what its owner can do, who really holds it, who launched it and how deep its market is.",
   markets:
@@ -84,7 +85,7 @@ const EXPLAIN: Partial<Record<Feature["id"], string>> = {
 const BUILT: Partial<Record<Feature["id"], () => ReactNode>> = {
   wallet: () => <WalletPanel />,
   terminal: () => <TerminalPanel />,
-  research: () => <SkillWindow label="Radar" window="research" skills={[radarSkill]} />,
+  research: () => <SkillWindow label="Research" window="research" skills={[radarSkill, collateralSkill]} />,
   // ONE window to check anything (2026-10-29): a token, a recipient, a launch, a launcher
   safety: () => <SkillWindow label="Check" window="safety" skills={[verdictSkill, sendCheckSkill, forensicsSkill, launcherSkill, gateSkill]} />,
   markets: () => <MarketsPanel />,

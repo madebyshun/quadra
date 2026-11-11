@@ -105,7 +105,7 @@ export const FEATURES: readonly Feature[] = [
   {
     id: "research",
     title: "Radar",
-    blurb: "new launches, read from the chain",
+    blurb: "new launches and stock loans, read from the chain",
     window: "Radar",
     flag: "research",
   },

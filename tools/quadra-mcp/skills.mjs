@@ -930,12 +930,12 @@ var init_formatAbiItem2 = __esm({
 });
 
 // node_modules/viem/_esm/utils/data/isHex.js
-function isHex(value, { strict = true } = {}) {
-  if (!value)
+function isHex(value2, { strict = true } = {}) {
+  if (!value2)
     return false;
-  if (typeof value !== "string")
+  if (typeof value2 !== "string")
     return false;
-  return strict ? /^0x[0-9a-fA-F]*$/.test(value) : value.startsWith("0x");
+  return strict ? /^0x[0-9a-fA-F]*$/.test(value2) : value2.startsWith("0x");
 }
 var init_isHex = __esm({
   "node_modules/viem/_esm/utils/data/isHex.js"() {
@@ -944,10 +944,10 @@ var init_isHex = __esm({
 });
 
 // node_modules/viem/_esm/utils/data/size.js
-function size(value) {
-  if (isHex(value, { strict: false }))
-    return Math.ceil((value.length - 2) / 2);
-  return value.length;
+function size(value2) {
+  if (isHex(value2, { strict: false }))
+    return Math.ceil((value2.length - 2) / 2);
+  return value2.length;
 }
 var init_size = __esm({
   "node_modules/viem/_esm/utils/data/size.js"() {
@@ -1114,8 +1114,8 @@ var init_abi = __esm({
       }
     };
     AbiEncodingBytesSizeMismatchError = class extends BaseError2 {
-      constructor({ expectedSize, value }) {
-        super(`Size of bytes "${value}" (bytes${size(value)}) does not match expected size (bytes${expectedSize}).`, { name: "AbiEncodingBytesSizeMismatchError" });
+      constructor({ expectedSize, value: value2 }) {
+        super(`Size of bytes "${value2}" (bytes${size(value2)}) does not match expected size (bytes${expectedSize}).`, { name: "AbiEncodingBytesSizeMismatchError" });
       }
     };
     AbiEncodingLengthMismatchError = class extends BaseError2 {
@@ -1181,8 +1181,8 @@ var init_abi = __esm({
       }
     };
     InvalidArrayError = class extends BaseError2 {
-      constructor(value) {
-        super([`Value "${value}" is not a valid array.`].join("\n"), {
+      constructor(value2) {
+        super([`Value "${value2}" is not a valid array.`].join("\n"), {
           name: "InvalidArrayError"
         });
       }
@@ -1265,8 +1265,8 @@ var init_encoding = __esm({
     "use strict";
     init_base();
     IntegerOutOfRangeError = class extends BaseError2 {
-      constructor({ max, min, signed: signed2, size: size2, value }) {
-        super(`Number "${value}" is not in safe ${size2 ? `${size2 * 8}-bit ${signed2 ? "signed" : "unsigned"} ` : ""}integer range ${max ? `(${min} to ${max})` : `(above ${min})`}`, { name: "IntegerOutOfRangeError" });
+      constructor({ max, min, signed: signed2, size: size2, value: value2 }) {
+        super(`Number "${value2}" is not in safe ${size2 ? `${size2 * 8}-bit ${signed2 ? "signed" : "unsigned"} ` : ""}integer range ${max ? `(${min} to ${max})` : `(above ${min})`}`, { name: "IntegerOutOfRangeError" });
       }
     };
     InvalidBytesBooleanError = class extends BaseError2 {
@@ -1320,25 +1320,25 @@ function hexToBigInt(hex, opts = {}) {
   const { signed: signed2 } = opts;
   if (opts.size)
     assertSize(hex, { size: opts.size });
-  const value = BigInt(hex);
+  const value2 = BigInt(hex);
   if (!signed2)
-    return value;
+    return value2;
   const size2 = Math.ceil((hex.length - 2) / 2);
   const max = (1n << BigInt(size2) * 8n - 1n) - 1n;
-  if (value <= max)
-    return value;
-  return value - BigInt(`0x${"f".padStart(size2 * 2, "f")}`) - 1n;
+  if (value2 <= max)
+    return value2;
+  return value2 - BigInt(`0x${"f".padStart(size2 * 2, "f")}`) - 1n;
 }
 function hexToNumber(hex, opts = {}) {
-  const value = hexToBigInt(hex, opts);
-  const number = Number(value);
+  const value2 = hexToBigInt(hex, opts);
+  const number = Number(value2);
   if (!Number.isSafeInteger(number))
     throw new IntegerOutOfRangeError({
       max: `${Number.MAX_SAFE_INTEGER}`,
       min: `${Number.MIN_SAFE_INTEGER}`,
       signed: opts.signed,
       size: opts.size,
-      value: `${value}n`
+      value: `${value2}n`
     });
   return number;
 }
@@ -1351,28 +1351,28 @@ var init_fromHex = __esm({
 });
 
 // node_modules/viem/_esm/utils/encoding/toHex.js
-function toHex2(value, opts = {}) {
-  if (typeof value === "number" || typeof value === "bigint")
-    return numberToHex(value, opts);
-  if (typeof value === "string") {
-    return stringToHex(value, opts);
+function toHex2(value2, opts = {}) {
+  if (typeof value2 === "number" || typeof value2 === "bigint")
+    return numberToHex(value2, opts);
+  if (typeof value2 === "string") {
+    return stringToHex(value2, opts);
   }
-  if (typeof value === "boolean")
-    return boolToHex(value, opts);
-  return bytesToHex(value, opts);
+  if (typeof value2 === "boolean")
+    return boolToHex(value2, opts);
+  return bytesToHex(value2, opts);
 }
-function boolToHex(value, opts = {}) {
-  const hex = `0x${Number(value)}`;
+function boolToHex(value2, opts = {}) {
+  const hex = `0x${Number(value2)}`;
   if (typeof opts.size === "number") {
     assertSize(hex, { size: opts.size });
     return pad(hex, { size: opts.size });
   }
   return hex;
 }
-function bytesToHex(value, opts = {}) {
+function bytesToHex(value2, opts = {}) {
   let string = "";
-  for (let i = 0; i < value.length; i++) {
-    string += hexes[value[i]];
+  for (let i = 0; i < value2.length; i++) {
+    string += hexes[value2[i]];
   }
   const hex = `0x${string}`;
   if (typeof opts.size === "number") {
@@ -1383,7 +1383,7 @@ function bytesToHex(value, opts = {}) {
 }
 function numberToHex(value_, opts = {}) {
   const { signed: signed2, size: size2 } = opts;
-  const value = BigInt(value_);
+  const value2 = BigInt(value_);
   let maxValue;
   if (size2) {
     if (signed2)
@@ -1394,7 +1394,7 @@ function numberToHex(value_, opts = {}) {
     maxValue = BigInt(Number.MAX_SAFE_INTEGER);
   }
   const minValue = typeof maxValue === "bigint" && signed2 ? -maxValue - 1n : 0;
-  if (maxValue && value > maxValue || value < minValue) {
+  if (maxValue && value2 > maxValue || value2 < minValue) {
     const suffix = typeof value_ === "bigint" ? "n" : "";
     throw new IntegerOutOfRangeError({
       max: maxValue ? `${maxValue}${suffix}` : void 0,
@@ -1404,14 +1404,14 @@ function numberToHex(value_, opts = {}) {
       value: `${value_}${suffix}`
     });
   }
-  const hex = `0x${(signed2 && value < 0 ? (1n << BigInt(size2 * 8)) + BigInt(value) : value).toString(16)}`;
+  const hex = `0x${(signed2 && value2 < 0 ? (1n << BigInt(size2 * 8)) + BigInt(value2) : value2).toString(16)}`;
   if (size2)
     return pad(hex, { size: size2 });
   return hex;
 }
 function stringToHex(value_, opts = {}) {
-  const value = encoder.encode(value_);
-  return bytesToHex(value, opts);
+  const value2 = encoder.encode(value_);
+  return bytesToHex(value2, opts);
 }
 var hexes, encoder;
 var init_toHex = __esm({
@@ -1426,18 +1426,18 @@ var init_toHex = __esm({
 });
 
 // node_modules/viem/_esm/utils/encoding/toBytes.js
-function toBytes(value, opts = {}) {
-  if (typeof value === "number" || typeof value === "bigint")
-    return numberToBytes(value, opts);
-  if (typeof value === "boolean")
-    return boolToBytes(value, opts);
-  if (isHex(value))
-    return hexToBytes(value, opts);
-  return stringToBytes(value, opts);
+function toBytes(value2, opts = {}) {
+  if (typeof value2 === "number" || typeof value2 === "bigint")
+    return numberToBytes(value2, opts);
+  if (typeof value2 === "boolean")
+    return boolToBytes(value2, opts);
+  if (isHex(value2))
+    return hexToBytes(value2, opts);
+  return stringToBytes(value2, opts);
 }
-function boolToBytes(value, opts = {}) {
+function boolToBytes(value2, opts = {}) {
   const bytes = new Uint8Array(1);
-  bytes[0] = Number(value);
+  bytes[0] = Number(value2);
   if (typeof opts.size === "number") {
     assertSize(bytes, { size: opts.size });
     return pad(bytes, { size: opts.size });
@@ -1474,12 +1474,12 @@ function hexToBytes(hex_, opts = {}) {
   }
   return bytes;
 }
-function numberToBytes(value, opts) {
-  const hex = numberToHex(value, opts);
+function numberToBytes(value2, opts) {
+  const hex = numberToHex(value2, opts);
   return hexToBytes(hex);
 }
-function stringToBytes(value, opts = {}) {
-  const bytes = encoder2.encode(value);
+function stringToBytes(value2, opts = {}) {
+  const bytes = encoder2.encode(value2);
   if (typeof opts.size === "number") {
     assertSize(bytes, { size: opts.size });
     return pad(bytes, { dir: "right", size: opts.size });
@@ -1800,9 +1800,9 @@ var init_sha3 = __esm({
 });
 
 // node_modules/viem/_esm/utils/hash/keccak256.js
-function keccak2562(value, to_) {
+function keccak2562(value2, to_) {
   const to = to_ || "hex";
-  const bytes = keccak_256(isHex(value, { strict: false }) ? toBytes(value) : value);
+  const bytes = keccak_256(isHex(value2, { strict: false }) ? toBytes(value2) : value2);
   if (to === "bytes")
     return bytes;
   return toHex2(bytes);
@@ -1827,7 +1827,7 @@ var init_hashSignature = __esm({
     "use strict";
     init_toBytes();
     init_keccak256();
-    hash = (value) => keccak2562(toBytes(value));
+    hash = (value2) => keccak2562(toBytes(value2));
   }
 });
 
@@ -1958,17 +1958,17 @@ var init_lru = __esm({
         this.maxSize = size2;
       }
       get(key) {
-        const value = super.get(key);
+        const value2 = super.get(key);
         if (super.has(key)) {
           super.delete(key);
-          super.set(key, value);
+          super.set(key, value2);
         }
-        return value;
+        return value2;
       }
-      set(key, value) {
+      set(key, value2) {
         if (super.has(key))
           super.delete(key);
-        super.set(key, value);
+        super.set(key, value2);
         if (this.maxSize && this.size > this.maxSize) {
           const firstKey = super.keys().next().value;
           if (firstKey !== void 0)
@@ -2068,45 +2068,45 @@ var init_concat = __esm({
 });
 
 // node_modules/viem/_esm/utils/data/slice.js
-function slice(value, start, end, { strict } = {}) {
-  if (isHex(value, { strict: false }))
-    return sliceHex(value, start, end, {
+function slice(value2, start, end, { strict } = {}) {
+  if (isHex(value2, { strict: false }))
+    return sliceHex(value2, start, end, {
       strict
     });
-  return sliceBytes(value, start, end, {
+  return sliceBytes(value2, start, end, {
     strict
   });
 }
-function assertStartOffset(value, start) {
-  if (typeof start === "number" && start > 0 && start > size(value) - 1)
+function assertStartOffset(value2, start) {
+  if (typeof start === "number" && start > 0 && start > size(value2) - 1)
     throw new SliceOffsetOutOfBoundsError({
       offset: start,
       position: "start",
-      size: size(value)
+      size: size(value2)
     });
 }
-function assertEndOffset(value, start, end) {
-  if (typeof start === "number" && typeof end === "number" && size(value) !== end - start) {
+function assertEndOffset(value2, start, end) {
+  if (typeof start === "number" && typeof end === "number" && size(value2) !== end - start) {
     throw new SliceOffsetOutOfBoundsError({
       offset: end,
       position: "end",
-      size: size(value)
+      size: size(value2)
     });
   }
 }
 function sliceBytes(value_, start, end, { strict } = {}) {
   assertStartOffset(value_, start);
-  const value = value_.slice(start, end);
+  const value2 = value_.slice(start, end);
   if (strict)
-    assertEndOffset(value, start, end);
-  return value;
+    assertEndOffset(value2, start, end);
+  return value2;
 }
 function sliceHex(value_, start, end, { strict } = {}) {
   assertStartOffset(value_, start);
-  const value = `0x${value_.replace("0x", "").slice((start ?? 0) * 2, (end ?? value_.length) * 2)}`;
+  const value2 = `0x${value_.replace("0x", "").slice((start ?? 0) * 2, (end ?? value_.length) * 2)}`;
   if (strict)
-    assertEndOffset(value, start, end);
-  return value;
+    assertEndOffset(value2, start, end);
+  return value2;
 }
 var init_slice = __esm({
   "node_modules/viem/_esm/utils/data/slice.js"() {
@@ -2146,36 +2146,36 @@ function prepareParams({ params, values }) {
   }
   return preparedParams;
 }
-function prepareParam({ param, value }) {
+function prepareParam({ param, value: value2 }) {
   const arrayComponents = getArrayComponents(param.type);
   if (arrayComponents) {
     const [length, type] = arrayComponents;
-    return encodeArray(value, { length, param: { ...param, type } });
+    return encodeArray(value2, { length, param: { ...param, type } });
   }
   if (param.type === "tuple") {
-    return encodeTuple(value, {
+    return encodeTuple(value2, {
       param
     });
   }
   if (param.type === "address") {
-    return encodeAddress(value);
+    return encodeAddress(value2);
   }
   if (param.type === "bool") {
-    return encodeBool(value);
+    return encodeBool(value2);
   }
   if (param.type.startsWith("uint") || param.type.startsWith("int")) {
     const signed2 = param.type.startsWith("int");
     const [, , size2 = "256"] = integerRegex2.exec(param.type) ?? [];
-    return encodeNumber(value, {
+    return encodeNumber(value2, {
       signed: signed2,
       size: Number(size2)
     });
   }
   if (param.type.startsWith("bytes")) {
-    return encodeBytes(value, { param });
+    return encodeBytes(value2, { param });
   }
   if (param.type === "string") {
-    return encodeString(value);
+    return encodeString(value2);
   }
   throw new InvalidAbiEncodingTypeError(param.type, {
     docsPath: "/docs/contract/encodeAbiParameters"
@@ -2205,25 +2205,25 @@ function encodeParams(preparedParams) {
   }
   return concatHex([...staticParams, ...dynamicParams]);
 }
-function encodeAddress(value) {
-  if (!isAddress(value))
-    throw new InvalidAddressError({ address: value });
-  return { dynamic: false, encoded: padHex(value.toLowerCase()) };
+function encodeAddress(value2) {
+  if (!isAddress(value2))
+    throw new InvalidAddressError({ address: value2 });
+  return { dynamic: false, encoded: padHex(value2.toLowerCase()) };
 }
-function encodeArray(value, { length, param }) {
+function encodeArray(value2, { length, param }) {
   const dynamic = length === null;
-  if (!Array.isArray(value))
-    throw new InvalidArrayError(value);
-  if (!dynamic && value.length !== length)
+  if (!Array.isArray(value2))
+    throw new InvalidArrayError(value2);
+  if (!dynamic && value2.length !== length)
     throw new AbiEncodingArrayLengthMismatchError({
       expectedLength: length,
-      givenLength: value.length,
+      givenLength: value2.length,
       type: `${param.type}[${length}]`
     });
-  let dynamicChild = value.length === 0 && isDynamicType(param);
+  let dynamicChild = value2.length === 0 && isDynamicType(param);
   const preparedParams = [];
-  for (let i = 0; i < value.length; i++) {
-    const preparedParam = prepareParam({ param, value: value[i] });
+  for (let i = 0; i < value2.length; i++) {
+    const preparedParam = prepareParam({ param, value: value2[i] });
     if (preparedParam.dynamic)
       dynamicChild = true;
     preparedParams.push(preparedParam);
@@ -2245,15 +2245,15 @@ function encodeArray(value, { length, param }) {
     encoded: concatHex(preparedParams.map(({ encoded }) => encoded))
   };
 }
-function encodeBytes(value, { param }) {
+function encodeBytes(value2, { param }) {
   const [, paramSize] = param.type.split("bytes");
-  const bytesSize = size(value);
+  const bytesSize = size(value2);
   if (!paramSize) {
-    let value_ = value;
+    let value_ = value2;
     if (bytesSize % 32 !== 0)
       value_ = padHex(value_, {
         dir: "right",
-        size: Math.ceil((value.length - 2) / 2 / 32) * 32
+        size: Math.ceil((value2.length - 2) / 2 / 32) * 32
       });
     return {
       dynamic: true,
@@ -2266,38 +2266,38 @@ function encodeBytes(value, { param }) {
   if (bytesSize !== Number.parseInt(paramSize, 10))
     throw new AbiEncodingBytesSizeMismatchError({
       expectedSize: Number.parseInt(paramSize, 10),
-      value
+      value: value2
     });
-  return { dynamic: false, encoded: padHex(value, { dir: "right" }) };
+  return { dynamic: false, encoded: padHex(value2, { dir: "right" }) };
 }
-function encodeBool(value) {
-  if (typeof value !== "boolean")
-    throw new BaseError2(`Invalid boolean value: "${value}" (type: ${typeof value}). Expected: \`true\` or \`false\`.`);
-  return { dynamic: false, encoded: padHex(boolToHex(value)) };
+function encodeBool(value2) {
+  if (typeof value2 !== "boolean")
+    throw new BaseError2(`Invalid boolean value: "${value2}" (type: ${typeof value2}). Expected: \`true\` or \`false\`.`);
+  return { dynamic: false, encoded: padHex(boolToHex(value2)) };
 }
-function encodeNumber(value, { signed: signed2, size: size2 = 256 }) {
+function encodeNumber(value2, { signed: signed2, size: size2 = 256 }) {
   if (typeof size2 === "number") {
     const max = 2n ** (BigInt(size2) - (signed2 ? 1n : 0n)) - 1n;
     const min = signed2 ? -max - 1n : 0n;
-    if (value > max || value < min)
+    if (value2 > max || value2 < min)
       throw new IntegerOutOfRangeError({
         max: max.toString(),
         min: min.toString(),
         signed: signed2,
         size: size2 / 8,
-        value: value.toString()
+        value: value2.toString()
       });
   }
   return {
     dynamic: false,
-    encoded: numberToHex(value, {
+    encoded: numberToHex(value2, {
       size: 32,
       signed: signed2
     })
   };
 }
-function encodeString(value) {
-  const hexValue = stringToHex(value);
+function encodeString(value2) {
+  const hexValue = stringToHex(value2);
   const partsLength = Math.ceil(size(hexValue) / 32);
   const parts = [];
   for (let i = 0; i < partsLength; i++) {
@@ -2313,15 +2313,15 @@ function encodeString(value) {
     ])
   };
 }
-function encodeTuple(value, { param }) {
+function encodeTuple(value2, { param }) {
   let dynamic = false;
   const preparedParams = [];
   for (let i = 0; i < param.components.length; i++) {
     const param_ = param.components[i];
-    const index = Array.isArray(value) ? i : param_.name;
+    const index = Array.isArray(value2) ? i : param_.name;
     const preparedParam = prepareParam({
       param: param_,
-      value: value[index]
+      value: value2[index]
     });
     preparedParams.push(preparedParam);
     if (preparedParam.dynamic)
@@ -2677,68 +2677,68 @@ var init_cursor2 = __esm({
         this.bytes.set(bytes, this.position);
         this.position += bytes.length;
       },
-      pushUint8(value) {
+      pushUint8(value2) {
         this.assertPosition(this.position);
-        this.bytes[this.position] = value;
+        this.bytes[this.position] = value2;
         this.position++;
       },
-      pushUint16(value) {
+      pushUint16(value2) {
         this.assertPosition(this.position + 1);
-        this.dataView.setUint16(this.position, value);
+        this.dataView.setUint16(this.position, value2);
         this.position += 2;
       },
-      pushUint24(value) {
+      pushUint24(value2) {
         this.assertPosition(this.position + 2);
-        this.dataView.setUint16(this.position, value >> 8);
-        this.dataView.setUint8(this.position + 2, value & ~4294967040);
+        this.dataView.setUint16(this.position, value2 >> 8);
+        this.dataView.setUint8(this.position + 2, value2 & ~4294967040);
         this.position += 3;
       },
-      pushUint32(value) {
+      pushUint32(value2) {
         this.assertPosition(this.position + 3);
-        this.dataView.setUint32(this.position, value);
+        this.dataView.setUint32(this.position, value2);
         this.position += 4;
       },
       readByte() {
         this.assertReadLimit();
         this._touch();
-        const value = this.inspectByte();
+        const value2 = this.inspectByte();
         this.position++;
-        return value;
+        return value2;
       },
       readBytes(length, size2) {
         this.assertReadLimit();
         this._touch();
-        const value = this.inspectBytes(length);
+        const value2 = this.inspectBytes(length);
         this.position += size2 ?? length;
-        return value;
+        return value2;
       },
       readUint8() {
         this.assertReadLimit();
         this._touch();
-        const value = this.inspectUint8();
+        const value2 = this.inspectUint8();
         this.position += 1;
-        return value;
+        return value2;
       },
       readUint16() {
         this.assertReadLimit();
         this._touch();
-        const value = this.inspectUint16();
+        const value2 = this.inspectUint16();
         this.position += 2;
-        return value;
+        return value2;
       },
       readUint24() {
         this.assertReadLimit();
         this._touch();
-        const value = this.inspectUint24();
+        const value2 = this.inspectUint24();
         this.position += 3;
-        return value;
+        return value2;
       },
       readUint32() {
         this.assertReadLimit();
         this._touch();
-        const value = this.inspectUint32();
+        const value2 = this.inspectUint32();
         this.position += 4;
-        return value;
+        return value2;
       },
       get remaining() {
         return this.bytes.length - this.position;
@@ -2851,8 +2851,8 @@ function decodeParameter(cursor, param, { staticPosition }) {
   });
 }
 function decodeAddress(cursor) {
-  const value = cursor.readBytes(32);
-  return [checksumAddress(bytesToHex(sliceBytes(value, -20))), 32];
+  const value2 = cursor.readBytes(32);
+  return [checksumAddress(bytesToHex(sliceBytes(value2, -20))), 32];
 }
 function decodeArray(cursor, param, { length, staticPosition }) {
   if (length === null) {
@@ -2863,50 +2863,50 @@ function decodeArray(cursor, param, { length, staticPosition }) {
     const length2 = bytesToNumber(cursor.readBytes(sizeOfLength));
     const dynamicChild = hasDynamicChild(param);
     let consumed2 = 0;
-    const value2 = [];
+    const value3 = [];
     for (let i = 0; i < length2; ++i) {
       cursor.setPosition(startOfData + (dynamicChild ? i * 32 : consumed2));
       const [data, consumed_] = decodeParameter(cursor, param, {
         staticPosition: startOfData
       });
       consumed2 += consumed_;
-      value2.push(data);
+      value3.push(data);
       if (consumed_ === 0) {
         cursor.assertReadLimit();
         cursor._touch();
       }
     }
     cursor.setPosition(staticPosition + 32);
-    return [value2, 32];
+    return [value3, 32];
   }
   if (hasDynamicChild(param)) {
     const offset = bytesToNumber(cursor.readBytes(sizeOfOffset));
     const start = staticPosition + offset;
-    const value2 = [];
+    const value3 = [];
     for (let i = 0; i < length; ++i) {
       cursor.setPosition(start + i * 32);
       const [data] = decodeParameter(cursor, param, {
         staticPosition: start
       });
-      value2.push(data);
+      value3.push(data);
     }
     cursor.setPosition(staticPosition + 32);
-    return [value2, 32];
+    return [value3, 32];
   }
   let consumed = 0;
-  const value = [];
+  const value2 = [];
   for (let i = 0; i < length; ++i) {
     const [data, consumed_] = decodeParameter(cursor, param, {
       staticPosition: staticPosition + consumed
     });
     consumed += consumed_;
-    value.push(data);
+    value2.push(data);
     if (consumed_ === 0) {
       cursor.assertReadLimit();
       cursor._touch();
     }
   }
-  return [value, consumed];
+  return [value2, consumed];
 }
 function decodeBool(cursor) {
   return [bytesToBool(cursor.readBytes(32), { size: 32 }), 32];
@@ -2925,21 +2925,21 @@ function decodeBytes(cursor, param, { staticPosition }) {
     cursor.setPosition(staticPosition + 32);
     return [bytesToHex(data), 32];
   }
-  const value = bytesToHex(cursor.readBytes(Number.parseInt(size2, 10), 32));
-  return [value, 32];
+  const value2 = bytesToHex(cursor.readBytes(Number.parseInt(size2, 10), 32));
+  return [value2, 32];
 }
 function decodeNumber(cursor, param) {
   const signed2 = param.type.startsWith("int");
   const size2 = Number.parseInt(param.type.split("int")[1] || "256", 10);
-  const value = cursor.readBytes(32);
+  const value2 = cursor.readBytes(32);
   return [
-    size2 > 48 ? bytesToBigInt(value, { signed: signed2 }) : bytesToNumber(value, { signed: signed2 }),
+    size2 > 48 ? bytesToBigInt(value2, { signed: signed2 }) : bytesToNumber(value2, { signed: signed2 }),
     32
   ];
 }
 function decodeTuple(cursor, param, { staticPosition }) {
   const hasUnnamedChild = param.components.length === 0 || param.components.some(({ name }) => !name);
-  const value = hasUnnamedChild ? [] : {};
+  const value2 = hasUnnamedChild ? [] : {};
   let consumed = 0;
   if (hasDynamicChild(param)) {
     const offset = bytesToNumber(cursor.readBytes(sizeOfOffset));
@@ -2951,20 +2951,20 @@ function decodeTuple(cursor, param, { staticPosition }) {
         staticPosition: start
       });
       consumed += consumed_;
-      value[hasUnnamedChild ? i : component?.name] = data;
+      value2[hasUnnamedChild ? i : component?.name] = data;
     }
     cursor.setPosition(staticPosition + 32);
-    return [value, 32];
+    return [value2, 32];
   }
   for (let i = 0; i < param.components.length; ++i) {
     const component = param.components[i];
     const [data, consumed_] = decodeParameter(cursor, component, {
       staticPosition
     });
-    value[hasUnnamedChild ? i : component?.name] = data;
+    value2[hasUnnamedChild ? i : component?.name] = data;
     consumed += consumed_;
   }
-  return [value, consumed];
+  return [value2, consumed];
 }
 function decodeString(cursor, { staticPosition }) {
   const offset = bytesToNumber(cursor.readBytes(32));
@@ -2976,9 +2976,9 @@ function decodeString(cursor, { staticPosition }) {
     return ["", 32];
   }
   const data = cursor.readBytes(length, 32);
-  const value = bytesToString(data);
+  const value2 = bytesToString(data);
   cursor.setPosition(staticPosition + 32);
-  return [value, 32];
+  return [value2, 32];
 }
 function hasDynamicChild(param) {
   const { type } = param;
@@ -3512,8 +3512,8 @@ var ROUNDS = 24;
 var MASK64 = (1n << 64n) - 1n;
 var PAD_FIRST = 1;
 var PAD_LAST = 128;
-function rotl(value, by) {
-  return (value << BigInt(by) | value >> BigInt(64 - by)) & MASK64;
+function rotl(value2, by) {
+  return (value2 << BigInt(by) | value2 >> BigInt(64 - by)) & MASK64;
 }
 function rhoPi() {
   const rho = new Array(LANES).fill(0);
@@ -3607,11 +3607,11 @@ function toHex(bytes) {
 // src/lib/address.ts
 var ADDRESS_HEX_CHARS = 40;
 var SHAPE = new RegExp(`^0x[0-9a-fA-F]{${ADDRESS_HEX_CHARS}}$`);
-function hasAddressShape(value) {
-  return SHAPE.test(value.trim());
+function hasAddressShape(value2) {
+  return SHAPE.test(value2.trim());
 }
-function toChecksumAddress(value) {
-  const trimmed = value.trim();
+function toChecksumAddress(value2) {
+  const trimmed = value2.trim();
   if (!hasAddressShape(trimmed)) {
     throw new Error(notAnAddress(trimmed));
   }
@@ -3629,11 +3629,11 @@ function toChecksumAddress(value) {
 function carriesChecksum(hex) {
   return hex !== hex.toLowerCase() && hex !== hex.toUpperCase();
 }
-function notAnAddress(value) {
-  return `That is not a 20-byte hex address: "${value}". Chain plus address identifies an account; a name or a ticker never does.`;
+function notAnAddress(value2) {
+  return `That is not a 20-byte hex address: "${value2}". Chain plus address identifies an account; a name or a ticker never does.`;
 }
-function checkAddress(value) {
-  const trimmed = value.trim();
+function checkAddress(value2) {
+  const trimmed = value2.trim();
   if (!hasAddressShape(trimmed)) {
     return { kind: "malformed", why: notAnAddress(trimmed) };
   }
@@ -3650,8 +3650,8 @@ function checkAddress(value) {
   }
   return { kind: "checksummed", address: lowercased };
 }
-function assertChecksummedAddress(value, label) {
-  const checked = checkAddress(value);
+function assertChecksummedAddress(value2, label) {
+  const checked = checkAddress(value2);
   switch (checked.kind) {
     case "malformed":
       throw new Error(`${label}: ${checked.why}`);
@@ -3956,17 +3956,17 @@ function readRpc(chain, method, body) {
   }
   return body.result;
 }
-function quantity(value, what) {
-  if (typeof value !== "string" || !/^0x[0-9a-fA-F]+$/.test(value)) {
-    throw new Error(`The Base RPC sent ${what} as ${JSON.stringify(value)}, which is not a hex number.`);
+function quantity(value2, what) {
+  if (typeof value2 !== "string" || !/^0x[0-9a-fA-F]+$/.test(value2)) {
+    throw new Error(`The Base RPC sent ${what} as ${JSON.stringify(value2)}, which is not a hex number.`);
   }
-  return BigInt(value);
+  return BigInt(value2);
 }
-function hexData(value, what) {
-  if (typeof value !== "string" || !/^0x[0-9a-fA-F]*$/.test(value)) {
+function hexData(value2, what) {
+  if (typeof value2 !== "string" || !/^0x[0-9a-fA-F]*$/.test(value2)) {
     throw new Error(`The Base RPC sent ${what} that is not hex data.`);
   }
-  return value;
+  return value2;
 }
 async function ethCall(to, data) {
   return hexData(await rpc("eth_call", [{ to, data }, "latest"]), "a call result");
@@ -4507,13 +4507,13 @@ function parseAmount(input, decimals) {
   const padded = fraction.padEnd(decimals, "0");
   return BigInt(`${whole || "0"}${padded}`);
 }
-function formatAmount(value, decimals) {
+function formatAmount(value2, decimals) {
   assertDecimals(decimals);
-  if (value < 0n) throw new Error("Amount cannot be negative.");
-  if (decimals === 0) return value.toString();
+  if (value2 < 0n) throw new Error("Amount cannot be negative.");
+  if (decimals === 0) return value2.toString();
   const unit = 10n ** BigInt(decimals);
-  const whole = value / unit;
-  const fraction = (value % unit).toString().padStart(decimals, "0").replace(/0+$/, "");
+  const whole = value2 / unit;
+  const fraction = (value2 % unit).toString().padStart(decimals, "0").replace(/0+$/, "");
   return fraction ? `${whole}.${fraction}` : whole.toString();
 }
 function assertDecimals(decimals) {
@@ -4526,13 +4526,21 @@ function assertDecimals(decimals) {
 function short(address) {
   return `${address.slice(0, 6)}\u2026${address.slice(-4)}`;
 }
-function usd(value) {
-  if (value > 0 && value < 0.01) return "<$0.01";
-  return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function tokenAmount(raw, decimals, digits = 4) {
+  const exact = formatAmount(raw, decimals);
+  const [whole = "0", frac = ""] = exact.split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const kept = frac.slice(0, digits).replace(/0+$/, "");
+  if (grouped === "0" && kept === "" && raw > 0n) return `<0.${"0".repeat(digits - 1)}1`;
+  return kept ? `${grouped}.${kept}` : grouped;
 }
-function price(value) {
-  if (value >= 1) return usd(value);
-  return `$${value.toLocaleString("en-US", { maximumSignificantDigits: 4 })}`;
+function usd(value2) {
+  if (value2 > 0 && value2 < 0.01) return "<$0.01";
+  return `$${value2.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+function price(value2) {
+  if (value2 >= 1) return usd(value2);
+  return `$${value2.toLocaleString("en-US", { maximumSignificantDigits: 4 })}`;
 }
 var SUBSCRIPT = "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089";
 var SUBSCRIPT_FROM = 4;
@@ -4685,8 +4693,8 @@ async function padsBetween(from, to) {
 }
 
 // src/skills/types.ts
-function row(label, value, extra = {}) {
-  return { label, value, ...extra };
+function row(label, value2, extra = {}) {
+  return { label, value: value2, ...extra };
 }
 
 // src/skills/radar.ts
@@ -4751,11 +4759,11 @@ var plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 var activity = (m) => m ? (m.buys24h ?? 0) + (m.sells24h ?? 0) : 0;
 function launchRow(s, pad3, latest) {
   const m = s.market;
-  const ago = Math.max(1, minutesBetween(s.launch.block, latest));
+  const ago2 = Math.max(1, minutesBetween(s.launch.block, latest));
   const tone = s.flags.some((f) => f.tone === "bad") ? "bad" : s.flags.length ? "warn" : "ok";
   const parts = [
     `score ${riskScore(s)}/100`,
-    `${ago} min ago`,
+    `${ago2} min ago`,
     m.liquidityUsd === null ? "liquidity not reported" : `liq ${usd(m.liquidityUsd)}`,
     `${plural(m.buys24h ?? 0, "buy", "buys")} / ${plural(m.sells24h ?? 0, "sell", "sells")}`,
     ...s.flags.map((f) => f.text)
@@ -4984,9 +4992,9 @@ async function factoryHook(factory) {
   const data = encodeFunctionData({ abi: LAUNCHPAD_V3_ABI, functionName: "hook" });
   return decodeFunctionResult({ abi: LAUNCHPAD_V3_ABI, functionName: "hook", data: await ethCall(factory, data) });
 }
-function uint128(value, what) {
-  if (value < 1n || value > MAX_UINT128) throw new Error(`${what} must be more than zero and fit in 128 bits; it was ${value}.`);
-  return value;
+function uint128(value2, what) {
+  if (value2 < 1n || value2 > MAX_UINT128) throw new Error(`${what} must be more than zero and fit in 128 bits; it was ${value2}.`);
+  return value2;
 }
 var QUOTER_ABI = parseAbi([
   "function quoteExactInputSingle(((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) poolKey, bool zeroForOne, uint128 exactAmount, bytes hookData) params) returns (uint256 amountOut, uint256 gasEstimate)"
@@ -5124,12 +5132,12 @@ async function relayQuote(sell, buy, amount) {
 }
 function parseSimulation(result) {
   return listOf(objAt({ r: listOf(result)[0] }, "r").calls).map((c) => {
-    const call = isObj(c) ? c : {};
-    const error = objAt(call, "error");
+    const call2 = isObj(c) ? c : {};
+    const error = objAt(call2, "error");
     return {
-      ok: call.status === "0x1",
+      ok: call2.status === "0x1",
       reason: strOf(error.message) ?? "reverted with no reason",
-      logs: listOf(call.logs).flatMap((l) => {
+      logs: listOf(call2.logs).flatMap((l) => {
         if (!isObj(l)) return [];
         const address = strOf(l.address);
         const data = strOf(l.data);
@@ -5408,20 +5416,20 @@ function launchpadRows(record, fee, referrer) {
     row("Its creator", short(record.creator), { href: explorer.address(record.creator) })
   ];
 }
-function poolValueRows(value) {
-  if (value === null) return [];
+function poolValueRows(value2) {
+  if (value2 === null) return [];
   const label = "Market cap (its own pool)";
-  if (value === void 0) return [row(label, "not checked \u2014 its pool could not be read", { tone: "warn" })];
-  const supply = `${quoteWords(value.supplyInQuote)} ${value.quoteSymbol} for the whole supply`;
-  if (value.quoteUsd === null) return [row(label, `${supply} \u2014 the ${value.quoteSymbol} price in USD could not be read`, { tone: "warn" })];
-  const cap = value.supplyInQuote * value.quoteUsd;
+  if (value2 === void 0) return [row(label, "not checked \u2014 its pool could not be read", { tone: "warn" })];
+  const supply = `${quoteWords(value2.supplyInQuote)} ${value2.quoteSymbol} for the whole supply`;
+  if (value2.quoteUsd === null) return [row(label, `${supply} \u2014 the ${value2.quoteSymbol} price in USD could not be read`, { tone: "warn" })];
+  const cap = value2.supplyInQuote * value2.quoteUsd;
   return [
     // a stock quote links to the stock; ETH has no token page to link
-    row(label, `\u2248 ${usd(cap)} \u2014 ${price(cap / Number(LAUNCHPAD_EXPECTS.supply / 10n ** 18n))} a token; ${supply} at ${price(value.quoteUsd)}`, value.quoteSymbol === "ETH" ? {} : { href: explorer.token(value.quote) })
+    row(label, `\u2248 ${usd(cap)} \u2014 ${price(cap / Number(LAUNCHPAD_EXPECTS.supply / 10n ** 18n))} a token; ${supply} at ${price(value2.quoteUsd)}`, value2.quoteSymbol === "ETH" ? {} : { href: explorer.token(value2.quote) })
   ];
 }
-function stockQuote(value) {
-  return value && value.quoteSymbol !== "ETH" ? value.quoteSymbol : null;
+function stockQuote(value2) {
+  return value2 && value2.quoteSymbol !== "ETH" ? value2.quoteSymbol : null;
 }
 function marketRows(pairs, now, stock = null) {
   if (pairs === null) return [row("Market", "not checked \u2014 DexScreener could not be read", { tone: "warn" })];
@@ -5461,7 +5469,7 @@ async function tokenVerdict(input, now) {
   const market = settled(markets(address));
   const launch = settled(launchOf(address));
   const pad3 = launch.then((l) => l ? null : settled(launchpadOf(address, Promise.resolve(null))));
-  const [info, security, pairs, holders, origin, trip, launchpad, value, other] = await Promise.all([
+  const [info, security, pairs, holders, origin, trip, launchpad, value2, other] = await Promise.all([
     settled(tokenInfo(address)).then(async (i) => i ?? await settled(chainToken(address))),
     settled(scan(address)),
     market,
@@ -5485,8 +5493,8 @@ async function tokenVerdict(input, now) {
     ...launchpad ? [LAUNCHPAD_CODE] : codeRows(security),
     ...holderRows(token, holders ?? null, pairs ?? null),
     ...originRows(origin, now, other?.kind === "proven" ? other : null),
-    ...poolValueRows(value),
-    ...marketRows(pairs ?? null, now, stockQuote(value))
+    ...poolValueRows(value2),
+    ...marketRows(pairs ?? null, now, stockQuote(value2))
   ];
   const red = body.filter((r) => r.tone === "bad").map((r) => r.label);
   return {
@@ -5830,12 +5838,12 @@ function decode_arithmetic(bytes) {
   let low = 0;
   let range = FULL;
   while (true) {
-    let value = Math.floor(((register - low + 1) * total - 1) / range);
+    let value2 = Math.floor(((register - low + 1) * total - 1) / range);
     let start = 0;
     let end = symbol_count;
     while (end - start > 1) {
       let mid = start + end >>> 1;
-      if (value < acc[mid]) {
+      if (value2 < acc[mid]) {
         end = mid;
       } else {
         start = mid;
@@ -7079,12 +7087,12 @@ async function prepareLaunch(args) {
     ] : []
   ];
   const launch = launchTx2(factory, meta, salt, pair, firstBuy, fee, referrer ?? void 0);
-  const pct4 = fee === void 0 ? "1%" : feePercent(fee);
+  const pct5 = fee === void 0 ? "1%" : feePercent(fee);
   const v3Rows = fee !== void 0 && check.opening ? [
-    row("Fee", `${pct4} of every trade, chosen for this coin (1% or 3%)`),
+    row("Fee", `${pct5} of every trade, chosen for this coin (1% or 3%)`),
     row(
       "Opening protection",
-      `for the first ${check.opening.window} s the fee falls from ${feePercent(check.opening.startFee)} to ${pct4} \u2014 a sniper pays most of it; the creator's own first buy inside the launch pays only ${pct4}`,
+      `for the first ${check.opening.window} s the fee falls from ${feePercent(check.opening.startFee)} to ${pct5} \u2014 a sniper pays most of it; the creator's own first buy inside the launch pays only ${pct5}`,
       { tone: "ok" }
     )
   ] : [];
@@ -7116,7 +7124,7 @@ async function prepareLaunch(args) {
     notes: [
       "Nothing was signed or sent. Send each step from the creator's own wallet, in order, waiting for each to confirm \u2014 and simulate it first (eth_call), as this app does before every transaction.",
       "The salt is random and binds the token's address to this creator: anyone else sending this calldata gets a different token, or none.",
-      referrer !== null && approved === true ? `Public: the token, the creator's address, its referrer and every trade are visible on Base. The creator earns 80% of the pool's ${pct4} fee, the referrer 5%, ${BRAND.name} the rest (~15%).` : `Public: the token, the creator's address and every trade are visible on Base. The creator earns 80% of the pool's ${pct4} fee; ${BRAND.name} 20%.`,
+      referrer !== null && approved === true ? `Public: the token, the creator's address, its referrer and every trade are visible on Base. The creator earns 80% of the pool's ${pct5} fee, the referrer 5%, ${BRAND.name} the rest (~15%).` : `Public: the token, the creator's address and every trade are visible on Base. The creator earns 80% of the pool's ${pct5} fee; ${BRAND.name} 20%.`,
       ...stock ? [`${pair.symbol} is a Coinbase stock token: Coinbase restricts who may hold it (eligible persons outside the U.S.).`] : []
     ],
     sources: [`Base (the launchpad${stock ? ", the pair's token" : ""} and the creator's balances, read directly)`],
@@ -7139,8 +7147,229 @@ var prepareLaunchSkill = {
   run: (args) => prepareLaunch(args)
 };
 
+// src/config/collateral.ts
+var AAVE_V4 = {
+  hub: "0xa4d5947Eb727A052bae69C593FfC84247EC9864E",
+  spoke: "0x17905Db0e4A3514467539956c084180616AE7B8D",
+  oracle: "0xaBaf048fD7675Ea34a84332371ffd5D55E322A47"
+};
+var AAVE_V4_APP = "https://app.aave.com";
+var SPOKE_ABI = parseAbi([
+  "function getReserveCount() view returns (uint256)",
+  "function getReserve(uint256 reserveId) view returns ((address underlying, address hub, uint16 assetId, uint8 decimals, uint24 collateralRisk, uint8 flags, uint32 dynamicConfigKey))",
+  "function getDynamicReserveConfig(uint256 reserveId, uint32 dynamicConfigKey) view returns ((uint16 collateralFactor, uint32 maxLiquidationBonus, uint16 liquidationFee))",
+  "function getUserAccountData(address user) view returns ((uint256 riskPremium, uint256 avgCollateralFactor, uint256 healthFactor, uint256 totalCollateralValue, uint256 totalDebtValueRay, uint256 activeCollateralCount, uint256 borrowCount))",
+  "function getUserPosition(uint256 reserveId, address user) view returns ((uint120 drawnShares, uint120 premiumShares, int200 premiumOffsetRay, uint120 suppliedShares, uint32 dynamicConfigKey))",
+  "function getUserSuppliedAssets(uint256 reserveId, address user) view returns (uint256)",
+  "function getUserTotalDebt(uint256 reserveId, address user) view returns (uint256)",
+  "function getUserReserveStatus(uint256 reserveId, address user) view returns (bool, bool)"
+]);
+var ORACLE_ABI = parseAbi([
+  "function getReservesPrices(uint256[] reserveIds) view returns (uint256[])",
+  "function getReserveSource(uint256 reserveId) view returns (address)"
+]);
+var FEED_ABI = parseAbi(["function latestRoundData() view returns (uint80, int256, uint256, uint256, uint80)", "function description() view returns (string)"]);
+var BPS = 10000n;
+var WAD = 10n ** 18n;
+var PRICE_DECIMALS = 8;
+
+// src/skills/collateral.ts
+var AGREE = 5e-3;
+var HF_BAD = 1.05;
+var HF_WARN = 1.25;
+var DIST_BAD = 0.1;
+var DIST_WARN = 0.25;
+var call = async (to, data, decode) => decode(await ethCall(to, data));
+async function snapshot(input) {
+  const target = await resolveTarget(input, "Wallet");
+  const user = target.address;
+  const spoke = AAVE_V4.spoke;
+  const read4 = (functionName, args) => call(spoke, encodeFunctionData({ abi: SPOKE_ABI, functionName, args }), (data) => decodeFunctionResult({ abi: SPOKE_ABI, functionName, data }));
+  const [account, count] = await Promise.all([read4("getUserAccountData", [user]), read4("getReserveCount", [])]);
+  const acct = account;
+  const ids = Array.from({ length: Number(count) }, (_, i) => BigInt(i));
+  const held = await Promise.all(
+    ids.map(async (id) => {
+      const [supplied, debt, status] = await Promise.all([read4("getUserSuppliedAssets", [id, user]), read4("getUserTotalDebt", [id, user]), read4("getUserReserveStatus", [id, user])]);
+      return { id, supplied, debt, collateral: status[0] };
+    })
+  );
+  const mine = held.filter((h) => h.supplied > 0n || h.debt > 0n);
+  const prices = mine.length === 0 ? [] : await call(
+    AAVE_V4.oracle,
+    encodeFunctionData({ abi: ORACLE_ABI, functionName: "getReservesPrices", args: [mine.map((h) => h.id)] }),
+    (data) => decodeFunctionResult({ abi: ORACLE_ABI, functionName: "getReservesPrices", data })
+  );
+  const positions = await Promise.all(
+    mine.map(async (h, i) => {
+      const reserve = await read4("getReserve", [h.id]);
+      const own = await read4("getUserPosition", [h.id, user]);
+      const config = await read4("getDynamicReserveConfig", [h.id, own.dynamicConfigKey]);
+      const [symbol, feed] = await Promise.all([chainToken(reserve.underlying).then((t) => t.symbol, () => short(reserve.underlying)), feedOf(h.id)]);
+      return {
+        reserve: Number(h.id),
+        token: reserve.underlying,
+        symbol,
+        decimals: reserve.decimals,
+        supplied: h.supplied,
+        debt: h.debt,
+        collateral: h.collateral,
+        price: prices[i],
+        factor: config.collateralFactor,
+        feed
+      };
+    })
+  );
+  const stocks = positions.filter((p) => p.collateral && p.supplied > 0n).map((p) => p.token);
+  const dex = stocks.length === 0 ? /* @__PURE__ */ new Map() : await marketsOf(stocks).then(
+    (all) => new Map(
+      stocks.flatMap((t) => {
+        const best = deepest(all.filter((m) => m.base?.toLowerCase() === t.toLowerCase() && m.priceUsd !== null));
+        return best ? [[t.toLowerCase(), best]] : [];
+      })
+    ),
+    () => null
+  );
+  const health = acct.borrowCount === 0n ? null : acct.healthFactor;
+  return { user: target.address, via: target.via, health, positions, dex };
+}
+async function feedOf(id) {
+  try {
+    const address = await call(
+      AAVE_V4.oracle,
+      encodeFunctionData({ abi: ORACLE_ABI, functionName: "getReserveSource", args: [id] }),
+      (data) => decodeFunctionResult({ abi: ORACLE_ABI, functionName: "getReserveSource", data })
+    );
+    const [name, round] = await Promise.all([
+      call(address, encodeFunctionData({ abi: FEED_ABI, functionName: "description" }), (data) => decodeFunctionResult({ abi: FEED_ABI, functionName: "description", data })).catch(() => null),
+      call(address, encodeFunctionData({ abi: FEED_ABI, functionName: "latestRoundData" }), (data) => decodeFunctionResult({ abi: FEED_ABI, functionName: "latestRoundData", data })).catch(() => null)
+    ]);
+    return { address, name, updatedAt: round === null ? null : Number(round[3]) };
+  } catch {
+    return null;
+  }
+}
+var units = (raw, decimals) => Number(raw) / 10 ** decimals;
+var priceUsd = (p) => units(p.price, PRICE_DECIMALS);
+var value = (p, raw) => units(raw, p.decimals) * priceUsd(p);
+function mathAt(positions, at = /* @__PURE__ */ new Map()) {
+  const px = (p) => at.get(p.token.toLowerCase()) ?? priceUsd(p);
+  const debtUsd = positions.reduce((s, p) => s + units(p.debt, p.decimals) * px(p), 0);
+  const weighted = positions.filter((p) => p.collateral).reduce((s, p) => s + units(p.supplied, p.decimals) * px(p) * (p.factor / Number(BPS)), 0);
+  return { debtUsd, weighted, health: debtUsd === 0 ? Infinity : weighted / debtUsd };
+}
+function liquidationPrice(positions, p) {
+  const m = mathAt(positions);
+  const mine = value(p, p.supplied) * (p.factor / Number(BPS));
+  const tokens = units(p.supplied, p.decimals) * (p.factor / Number(BPS));
+  if (m.debtUsd === 0 || tokens === 0) return null;
+  const at = (m.debtUsd - (m.weighted - mine)) / tokens;
+  return at > 0 ? at : 0;
+}
+function marketShut(ms) {
+  const d = new Date(ms);
+  const day = d.getUTCDay();
+  if (day === 0 || day === 6) return true;
+  const minutes = d.getUTCHours() * 60 + d.getUTCMinutes();
+  return minutes < 13 * 60 + 30 || minutes >= 20 * 60;
+}
+var pct4 = (x) => `${(x * 100).toFixed(1)}%`;
+var hf = (x) => x.toFixed(2);
+var hfTone = (x) => x < HF_BAD ? "bad" : x < HF_WARN ? "warn" : "ok";
+var distTone = (x) => x < DIST_BAD ? "bad" : x < DIST_WARN ? "warn" : "ok";
+function ago(seconds, now) {
+  const h = (now / 1e3 - seconds) / 3600;
+  return h < 1 ? `${Math.max(0, Math.round(h * 60))} min ago` : h < 48 ? `${Math.round(h)} h ago` : `${Math.round(h / 24)} days ago`;
+}
+function utc(seconds) {
+  return new Date(seconds * 1e3).toISOString().slice(0, 16).replace("T", " ") + " UTC";
+}
+function collateralRows(s, now) {
+  const rows = [];
+  const notes = [];
+  const stocks = s.positions.filter((p) => p.collateral && p.supplied > 0n);
+  const debts = s.positions.filter((p) => p.debt > 0n);
+  if (s.positions.length === 0) {
+    rows.push(row("Aave V4 \xB7 MAG7", "no stock supplied and nothing borrowed", { tone: "ok", href: AAVE_V4_APP }));
+    return { rows, notes };
+  }
+  const m = mathAt(s.positions);
+  const chain = s.health === null ? Infinity : Number(s.health) / Number(WAD);
+  const trusted = s.health === null || Math.abs(m.health - chain) / chain <= AGREE;
+  rows.push(row("Health factor", s.health === null ? "no debt \u2014 nothing can be liquidated" : `${hf(chain)} \u2014 liquidated below 1.00`, { tone: s.health === null ? "ok" : hfTone(chain) }));
+  for (const d of debts) rows.push(row(`Borrowed \xB7 ${d.symbol}`, `${tokenAmount(d.debt, d.decimals, 2)} ${d.symbol} (${usd(value(d, d.debt))})`, { href: explorer.token(d.token) }));
+  for (const p of s.positions.filter((x) => x.supplied > 0n)) {
+    const used = p.collateral ? `counts ${p.factor / 100}% as collateral` : "supplied, NOT used as collateral";
+    rows.push(row(`Supplied \xB7 ${p.symbol}`, `${tokenAmount(p.supplied, p.decimals, 2)} ${p.symbol} \xB7 ${usd(value(p, p.supplied))} at Aave's price \xB7 ${used}`, { href: explorer.token(p.token) }));
+  }
+  if (!trusted) {
+    rows.push(row("Liquidation prices", `not worked out \u2014 this build's health factor (${hf(m.health)}) does not match the spoke's (${hf(chain)}), so its inputs are not the spoke's`, { tone: "warn" }));
+    return { rows, notes };
+  }
+  const shut = marketShut(now);
+  for (const p of s.health !== null ? stocks : []) {
+    const liq = liquidationPrice(s.positions, p);
+    const px = priceUsd(p);
+    const dist = 1 - liq / px;
+    rows.push(row(`Liquidation \xB7 ${p.symbol}`, dist <= 0 ? `at or above Aave's ${usd(px)} \u2014 the position can be liquidated now` : `${usd(liq)} \u2014 ${pct4(dist)} below Aave's ${usd(px)} (other holdings unchanged)`, { tone: distTone(dist) }));
+    const feed = p.feed;
+    if (feed === null || feed.updatedAt === null) rows.push(row(`Price feed \xB7 ${p.symbol}`, "not checked \u2014 the feed behind Aave's price could not be read", { tone: "warn" }));
+    else {
+      const frozen = shut ? " \u2014 the US market is shut, so this price stays until it reopens" : "";
+      const text = `${feed.name ?? short(feed.address)}, last set ${utc(feed.updatedAt)} (${ago(feed.updatedAt, now)})${frozen}`;
+      rows.push(row(`Price feed \xB7 ${p.symbol}`, text, shut ? { tone: "warn", href: explorer.address(feed.address) } : { href: explorer.address(feed.address) }));
+    }
+  }
+  if (s.health !== null && stocks.length > 0) {
+    if (s.dex === null) rows.push(row("At Base DEX prices", "not checked \u2014 DexScreener could not be reached", { tone: "warn" }));
+    else {
+      const at = /* @__PURE__ */ new Map();
+      const parts = [];
+      for (const p of stocks) {
+        const d = s.dex.get(p.token.toLowerCase());
+        if (!d || d.priceUsd === null) {
+          parts.push(`${p.symbol} has no DEX price`);
+          continue;
+        }
+        at.set(p.token.toLowerCase(), d.priceUsd);
+        parts.push(`${p.symbol} ${usd(d.priceUsd)} (${d.priceUsd >= priceUsd(p) ? "+" : ""}${pct4(d.priceUsd / priceUsd(p) - 1)} vs Aave)`);
+      }
+      if (at.size === 0) rows.push(row("At Base DEX prices", `not checked \u2014 ${parts.join(", ")}`, { tone: "warn" }));
+      else {
+        const then = mathAt(s.positions, at).health;
+        const lead = shut ? "If the market reopened at Base's prices" : "At Base's DEX prices";
+        rows.push(row(lead, `health ${hf(then)} (now ${hf(chain)}) \u2014 ${parts.join(", ")}`, { tone: hfTone(then) }));
+      }
+    }
+  }
+  notes.push(
+    "Aave liquidates at its own oracle \u2014 Coinbase's price feed for each stock \u2014 not at a DEX price. The DEX line is a scenario: where the position would stand if the feed caught up to Base's market.",
+    "A liquidation price moves one stock at a time and holds the rest still; a borrow keeps growing with interest, so the distance shrinks slowly even when prices do not move."
+  );
+  if (shut) notes.push("While the US market is shut the feed does not move, but the tokens still trade on Base \u2014 that gap is the weekend risk. US holidays are not known to this build.");
+  return { rows, notes };
+}
+async function collateralReport(input, now) {
+  const s = await snapshot(input);
+  const { rows, notes } = collateralRows(s, now);
+  const who = s.via ?? short(s.user);
+  return {
+    title: `${who} \u2014 Collateral Watch`,
+    rows: [row("Wallet", s.via ? `${s.via} (${s.user})` : s.user, { href: explorer.address(s.user) }), ...rows, row("Morpho", "not checked \u2014 stock markets on Morpho are not read yet", { tone: "warn" })],
+    notes,
+    sources: ["Aave V4 on Base (the MAG7 spoke and its oracle)", "Coinbase price feeds (when each last set a price)", "DexScreener (Base DEX prices)"]
+  };
+}
+var collateralSkill = {
+  id: "collateral",
+  title: "Collateral Watch",
+  summary: "A wallet's stocks borrowed against on Aave V4: health, how far each can fall before liquidation, and the weekend gap between Aave's frozen price and Base's market.",
+  args: [{ name: "wallet", hint: "0x\u2026 or name.base.eth" }],
+  run: ([input = ""]) => collateralReport(input, Date.now())
+};
+
 // src/skills/index.ts
-var SKILLS = [verdictSkill, gateSkill, radarSkill, forensicsSkill, launcherSkill, sendCheckSkill, prepareLaunchSkill];
+var SKILLS = [verdictSkill, gateSkill, radarSkill, forensicsSkill, launcherSkill, sendCheckSkill, collateralSkill, prepareLaunchSkill];
 var MARK = { ok: "\u2713", warn: "!", bad: "\u2717" };
 function reportText(report) {
   const width = Math.min(34, Math.max(...report.rows.map((r) => r.label.length), 8) + 2);
