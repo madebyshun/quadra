@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { depthReport, depthSkill, LOUD, parseQuote, SIZES, TOKEN_PAIRS } from "@/skills/depth";
+import { depthReport, depthSkill, LOUD, parseQuote, SIZES, tokenFrom, TOKEN_PAIRS } from "@/skills/depth";
+import { forgetCatalog } from "@/adapters/http/markets";
+import { STOCKS_PATH } from "@/server/stocks";
+import { MARKETS_FX, NVDA_ON_BASE } from "./fixtures/markets";
 import { findSkill } from "@/skills/index";
 import NVDAC from "./fixtures/depth/nvdac.json";
 import PDDC from "./fixtures/depth/pddc.json";
@@ -15,7 +18,7 @@ useNet();
 
 type Fixture = { token: string; calls: Record<string, string>; gets: Record<string, unknown>; relay: { request: { originCurrency: string; amount: string }; status: number; body: unknown }[] };
 
-function chain(fx: Fixture, change: { relay?: (i: number, body: unknown) => Answer; get?: Answer } = {}) {
+function chain(fx: Fixture, change: { relay?: (i: number, body: unknown) => Answer; get?: Answer; stocks?: Answer } = {}) {
   let i = 0;
   return net({
     rpc: (method, params) => {
@@ -23,7 +26,7 @@ function chain(fx: Fixture, change: { relay?: (i: number, body: unknown) => Answ
       const { to, data } = params[0] as { to: string; data: string };
       return fx.calls[`${to.toLowerCase()} ${data}`];
     },
-    get: (url) => (change.get !== undefined && url.startsWith(TOKEN_PAIRS) ? change.get : fx.gets[url]),
+    get: (url) => (url === `${STOCKS_PATH}/base` ? (change.stocks ?? MARKETS_FX.coinbaseStocks) : change.get !== undefined && url.startsWith(TOKEN_PAIRS) ? change.get : fx.gets[url]),
     post: (url) => {
       if (!url.endsWith("/quote")) return undefined;
       const k = i++;
@@ -88,6 +91,8 @@ describe("Trade Depth", () => {
     const r = await depthReport(fx.token);
     expect(r.rows.find((x) => x.label === "Buy $100,000")).toMatchObject({ tone: "bad", value: "74.28% impact — too much for the pools; Relay will not route it" });
     expect(r.rows[0]).toMatchObject({ tone: "bad", value: "Thin — buy $100,000 moves the price more than 2%" });
+    chain(fx, { relay: (i, body) => (i === 2 || i === 5 ? json({ message: "Swap impact is too high: -74.28%" }, 400) : body) });
+    expect((await depthReport(fx.token)).rows[0]!.value).toBe("Thin — buy $100,000, sell $100,000 move the price more than 2%");
   });
 
   it("never says no size moves the price while a size went unquoted", async () => {
@@ -111,6 +116,23 @@ describe("Trade Depth", () => {
     const r = await depthReport(fx.token);
     expect(r.rows.find((x) => x.label === "Pool · equalizer vs USDC")).toEqual({ label: "Pool · equalizer vs USDC", value: "liquidity not reported" });
     expect(r.rows.filter((x) => x.label.startsWith("Pool ·"))).toHaveLength(1);
+  });
+
+  it("takes a Coinbase stock's ticker, looked up in Coinbase's own list, and shows the address it named", async () => {
+    forgetCatalog();
+    chain(fx);
+    expect(await tokenFrom("nvdac")).toEqual({ token: NVDA_ON_BASE, via: "NVDAc" });
+    expect(await tokenFrom(" NVDA ")).toEqual({ token: NVDA_ON_BASE, via: "NVDAc" });
+    const r = await depthReport("NVDAc");
+    expect(r.rows.find((x) => x.label === "Token")!.value).toBe(`NVIDIA Corporation (NVDAc) — from Coinbase's list: ${NVDA_ON_BASE}`);
+    await expect(tokenFrom("DOGE")).rejects.toThrow('Token: "DOGE" is not a Coinbase stock on Base. Paste the token\'s address instead — a ticker alone never identifies a token.');
+  });
+
+  it("says when Coinbase's list could not be read to look a ticker up", async () => {
+    forgetCatalog();
+    chain(fx, { stocks: DOWN });
+    await expect(tokenFrom("NVDA")).rejects.toThrow(/could not be read to look it up/);
+    forgetCatalog();
   });
 
   it("reads Relay's quote for its amount out, and refuses one without", () => {

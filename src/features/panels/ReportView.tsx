@@ -3,6 +3,7 @@ import type { Report } from "@/skills/types";
 import { useRunCommand } from "@/features/openWindow";
 import { say } from "@/lib/assistant";
 import { count } from "@/lib/achievements";
+import { depthCard, DepthShare } from "@/features/panels/DepthShare";
 import { VerdictShare, verdictCard } from "@/features/panels/VerdictShare";
 
 /**
@@ -84,10 +85,11 @@ export function ReportView({ report }: { report: Report }) {
 /** A finished Token Verdict can be posted as a picture; opened on demand, so the report stays first. */
 function Shareable({ report }: { report: Report }) {
   const card = verdictCard(report);
-  return card ? (
+  const depth = card ? null : depthCard(report);
+  return card || depth ? (
     <details className="report__share">
       <summary>Share as a picture</summary>
-      <VerdictShare c={card} />
+      {card ? <VerdictShare c={card} /> : <DepthShare c={depth!} />}
     </details>
   ) : null;
 }

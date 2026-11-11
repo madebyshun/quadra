@@ -1,4 +1,5 @@
 import { askQuote } from "@/adapters/http/quotes";
+import { baseStocks } from "@/adapters/http/markets";
 import { assertChecksummedAddress, toChecksumAddress } from "@/lib/address";
 import { BASE, USDC } from "@/config/chain";
 import { RELAY } from "@/config/routes";
@@ -95,15 +96,33 @@ const pct = (n: number | null) => (n === null ? "not given" : `${Math.abs(n).toF
 const DEX_NAMES: Readonly<Record<string, string>> = { aero: "Aerodrome Slipstream", aerodrome: "Aerodrome", uniswap: "Uniswap" };
 const venue = (m: Market) => `${DEX_NAMES[m.dex] ?? m.dex} vs ${m.quote}`;
 
+/**
+ * A token from what was typed: an address, or a COINBASE STOCK's ticker ("NVDA" or "NVDAc").
+ * Hard rule 2 still holds — a ticker never identifies a token by itself; here it is looked up in
+ * Coinbase's own list of its tokenized stocks on Base (the issuer's registry, `baseStocks`), and the
+ * address it names is shown in the report. Any other ticker is refused, by name.
+ */
+export async function tokenFrom(input: string): Promise<{ readonly token: string; readonly via: string | null }> {
+  const text = input.trim();
+  if (text.startsWith("0x") || text === "") return { token: toChecksumAddress(assertChecksummedAddress(text, "Token")), via: null };
+  const word = text.toUpperCase();
+  const stocks = await baseStocks().catch(() => {
+    throw new Error(`Token: "${text}" is not an address, and Coinbase's list of stocks on Base could not be read to look it up.`);
+  });
+  const hit = stocks.get(word) ?? stocks.get(word.replace(/C$/, "")) ?? null;
+  if (hit === null) throw new Error(`Token: "${text}" is not a Coinbase stock on Base. Paste the token's address instead — a ticker alone never identifies a token.`);
+  return { token: toChecksumAddress(hit.address), via: hit.symbol };
+}
+
 export async function depthReport(input: string): Promise<Report> {
-  const token = toChecksumAddress(assertChecksummedAddress(input.trim(), "Token"));
+  const { token, via } = await tokenFrom(input);
   const [info, pairs] = await Promise.all([chainToken(token), getJson("DexScreener", `${TOKEN_PAIRS}/${token}`).then(
       // only pools that price THIS token (a pool pricing another coin in it is that coin's market)
       (body) => parseMarkets(body).filter((m) => m.base?.toLowerCase() === token.toLowerCase()),
       () => null,
     )]);
   const best = pairs === null ? null : deepest(pairs.filter((m) => m.priceUsd !== null));
-  const rows: Row[] = [row("Token", `${info.name} (${info.symbol})`, { href: explorer.token(token) })];
+  const rows: Row[] = [row("Token", `${info.name} (${info.symbol}) — ${via ? `from Coinbase's list: ` : ""}${token}`, { href: explorer.token(token) })];
 
   // one at a time: Relay rate-limits a burst (MEASURED while building this)
   for (const size of SIZES) {
@@ -145,7 +164,7 @@ export async function depthReport(input: string): Promise<Report> {
       !quoted
         ? row("Depth", "not checked — no size could be quoted", { tone: "warn" })
         : worst.length > 0
-        ? row("Depth", `Thin — ${worst.map((r) => r.label.toLowerCase()).join(", ")} moves the price more than ${LOUD}%`, { tone: "bad" })
+        ? row("Depth", `Thin — ${worst.map((r) => r.label.toLowerCase()).join(", ")} ${worst.length === 1 ? "moves" : "move"} the price more than ${LOUD}%`, { tone: "bad" })
         : unquoted.length > 0
           ? row("Depth", `No quoted size moves the price more than ${LOUD}% — ${unquoted.map((r) => r.label.toLowerCase()).join(", ")} not quoted`, { tone: "warn" })
           : row("Depth", `No size here moves the price more than ${LOUD}%`, { tone: rows.some((r) => r.tone === "warn") ? "warn" : "ok" }),
@@ -153,6 +172,7 @@ export async function depthReport(input: string): Promise<Report> {
     ],
     notes: [
       "Quoted by Relay for an address nobody holds — the route a swap in this app would take at this moment, across Base's DEXes. Nothing was signed. A quote moves with every trade.",
+      "Relay may fill a size from a market maker rather than a pool (MEASURED: PDDc's $10k buy came from one, not from its $50k pool), so a size can be cheaper than the pools listed suggest — the quote is what the route pays now.",
       "Impact is how far the pools' prices move for that size; 'with fees' adds the pools' and the route's fees. Past 2% a market order is paying through the book — split it or use a limit.",
     ],
     sources: ["Relay (quotes)", "DexScreener (pools and the price a sell is sized from)", "Base (the token's name and decimals)"],
@@ -163,6 +183,6 @@ export const depthSkill: Skill = {
   id: "depth",
   title: "Trade Depth",
   summary: "What a $1k / $10k / $100k buy or sell of a token costs on Base — price impact per size, red past 2%, and the pools behind it.",
-  args: [{ name: "token", hint: "0x… (a stock such as NVDAc)" }],
+  args: [{ name: "token", hint: "0x… or a Coinbase stock: NVDA, TSLAc" }],
   run: ([input = ""]) => depthReport(input),
 };
