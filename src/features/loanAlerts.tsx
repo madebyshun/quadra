@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { say, type Tip } from "@/lib/assistant";
 import { DEFAULT_THRESHOLD, isWatched, loadLoanWatch, MAX_WATCHED, unwatchLoan, watchLoan, type Watched } from "@/lib/loanWatch";
-import { collateralReport } from "@/skills/collateral";
+import { collateralReport, STRESS } from "@/skills/collateral";
 import { short } from "@/skills/format";
 import type { Report } from "@/skills/types";
 import { collateralCard } from "@/features/panels/CollateralShare";
@@ -16,6 +16,7 @@ import { collateralCard } from "@/features/panels/CollateralShare";
 
 export const EVERY_MS = 10 * 60 * 1000;
 const WEEKEND = /at Base's \$[\d,.]+: health (\d+\.\d\d)/;
+const WORST = /worst weekend gap \([^)]*\): health (\d+\.\d\d)/;
 
 /** The tips a report earns for its watcher, or none. */
 export function tipsFor(report: Report, w: Watched): Tip[] {
@@ -30,6 +31,13 @@ export function tipsFor(report: Report, w: Watched): Tip[] {
         ? `${who}: ${near.symbol} on ${near.venue} can be liquidated now.`
         : `${who}: ${near.symbol} on ${near.venue} is ${near.distance}% from liquidation — you asked to hear under ${w.threshold}%.`;
     return [{ id: `loan:${w.wallet}:${near.venue}:${near.symbol}:${Math.floor(near.distance)}`, tone: "bad", text, action: open }];
+  }
+  // the worst weekend on record would liquidate: Aave's stress row, or a Morpho loan's "worst weekend gap (…): health H" below 1
+  const stressAave = report.rows.find((r) => r.label === STRESS && r.value.includes("would be liquidated"));
+  const stressMorpho = report.rows.find((r) => r.label.startsWith("Morpho · ") && Number(WORST.exec(r.value)?.[1] ?? 2) < 1);
+  if (stressAave || stressMorpho) {
+    const where = stressMorpho ? `${stressMorpho.label.slice("Morpho · ".length)} on Morpho` : "its Aave loan";
+    return [{ id: `loan-worst:${w.wallet}`, tone: "bad", text: `${who}: a repeat of the worst weekend gap on record would liquidate ${where}.`, action: open }];
   }
   // the weekend: Aave's scenario row, or a Morpho loan's "at Base's $X: health H" below 1
   const aave = report.rows.find((r) => r.label === "If the market reopened at Base's prices" && r.tone === "bad");

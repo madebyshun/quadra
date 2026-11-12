@@ -7352,6 +7352,37 @@ var MORPHO_ABI = parseAbi([
 ]);
 var MORPHO_ORACLE_ABI = parseAbi(["function price() view returns (uint256)"]);
 
+// src/skills/weekendGap.ts
+var SCORECARD = "https://blueagent.dev/api/x402/weekend-scorecard";
+var WEEKENDS = 52;
+var tickerOf = (symbol) => /^[A-Z]{1,6}c$/.test(symbol) ? symbol.slice(0, -1) : null;
+function worstGap(body, ticker) {
+  let worst = null;
+  let seen = 0;
+  for (const w of listOf(isObj(body) ? body.weekends : null).filter(isObj)) {
+    for (const r of listOf(w.rows).filter(isObj)) {
+      if (r.ticker !== ticker || typeof r.open_gap_pct !== "number" || !Number.isFinite(r.open_gap_pct)) continue;
+      seen += 1;
+      if (r.open_gap_pct < 0 && (worst === null || r.open_gap_pct < worst.pct)) worst = { pct: r.open_gap_pct, friday: strOf(w.friday) ?? "?", weekends: 0 };
+    }
+  }
+  return worst ? { ...worst, weekends: seen } : null;
+}
+async function scorecardFor(ticker) {
+  const res = typeof document === "undefined" ? await fetch(SCORECARD, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ticker, weekends: WEEKENDS }) }) : await fetch(`/api/weekend/scorecard?ticker=${ticker}&weekends=${WEEKENDS}`, { headers: { "x-quadra": "1" } });
+  if (!res.ok) throw new Error(`Blue Agent's weekend record for ${ticker} could not be read (${res.status}).`);
+  return res.json();
+}
+async function worstGaps(symbols) {
+  const out = /* @__PURE__ */ new Map();
+  for (const s of symbols) {
+    const t = tickerOf(s);
+    if (t === null || out.has(s)) continue;
+    out.set(s, await scorecardFor(t).then((b) => worstGap(b, t), () => null));
+  }
+  return out;
+}
+
 // src/skills/collateral.ts
 var AGREE = 5e-3;
 var HF_BAD = 1.05;
@@ -7446,7 +7477,10 @@ async function snapshot(input) {
     () => null
   );
   const health = acct.borrowCount === 0n ? null : acct.healthFactor;
-  return { user: target.address, via: target.via, health, positions, dex, morpho };
+  const borrows = health !== null || (morpho ?? []).some((p) => p.borrowed > 0n);
+  const symbols = [...positions.filter((p) => p.collateral && p.supplied > 0n).map((p) => p.symbol), ...(morpho ?? []).map((p) => p.symbol)];
+  const gaps = borrows ? await worstGaps(symbols) : /* @__PURE__ */ new Map();
+  return { user: target.address, via: target.via, health, positions, dex, morpho, gaps };
 }
 async function feedOf(id) {
   try {
@@ -7558,6 +7592,24 @@ function collateralRows(s, now) {
       }
     }
   }
+  if (s.health !== null && stocks.length > 0) {
+    const at = /* @__PURE__ */ new Map();
+    const parts = [];
+    for (const p of stocks) {
+      const g = s.gaps.get(p.symbol) ?? null;
+      if (g === null) {
+        parts.push(`${p.symbol} not checked`);
+        continue;
+      }
+      at.set(p.token.toLowerCase(), priceUsd(p) * (1 + g.pct / 100));
+      parts.push(`${p.symbol} ${g.pct.toFixed(2)}% (weekend of ${g.friday})`);
+    }
+    if (at.size === 0) rows.push(row(STRESS, "not checked \u2014 no weekend gap on record for these stocks", { tone: "warn" }));
+    else {
+      const then = mathAt(s.positions, at).health;
+      rows.push(row(STRESS, `health ${hf(then)} (now ${hf(chain)})${then < 1 ? " \u2014 would be liquidated" : ""} \u2014 ${parts.join(", ")}`, { tone: hfTone(then) }));
+    }
+  }
   notes.push(
     "Aave liquidates at its own oracle \u2014 Coinbase's price feed for each stock \u2014 not at a DEX price. The DEX line is a scenario: where the position would stand if the feed caught up to Base's market.",
     "A liquidation price moves one stock at a time and holds the rest still; a borrow keeps growing with interest, so the distance shrinks slowly even when prices do not move."
@@ -7565,6 +7617,7 @@ function collateralRows(s, now) {
   if (shut) notes.push("While the US market is shut the feed does not move, but the tokens still trade on Base \u2014 that gap is the weekend risk. US holidays are not known to this build.");
   return { rows, notes };
 }
+var STRESS = "At each stock's worst weekend gap";
 function morphoRows(s) {
   if (s.morpho === null) return [row("Morpho", "not checked \u2014 its stock markets could not be read just now", { tone: "warn" })];
   if (s.morpho.length === 0) return [row("Morpho", "no stock collateral and no debt in its stock markets", { tone: "ok" })];
@@ -7580,7 +7633,11 @@ function morphoRows(s) {
     const dex = s.dex?.get(p.token.toLowerCase())?.priceUsd ?? null;
     const atDex = dex === null ? "" : ` \xB7 at Base's ${usd(dex)}: health ${(tokens * dex * p.lltv / debt).toFixed(2)}`;
     const where = dist <= 0 ? "can be liquidated now" : `liquidated at ${usd(liq)}, ${pct4(dist)} below its oracle's ${usd(p.price)}`;
-    return row(label, `${held} backing ${tokenAmount(p.borrowed, USDC_DECIMALS, 2)} USDC \xB7 health ${health.toFixed(2)} \xB7 ${where}${atDex}`, { tone: dist <= 0 ? "bad" : hfTone(health) === "ok" ? distTone(dist) : hfTone(health) });
+    const g = s.gaps.get(p.symbol) ?? null;
+    const stressed = g === null ? null : tokens * p.price * (1 + g.pct / 100) * p.lltv / debt;
+    const atGap = g === null || stressed === null ? " \xB7 worst weekend gap: not checked" : ` \xB7 at its worst weekend gap (${g.pct.toFixed(2)}%, ${g.friday}): health ${stressed.toFixed(2)}`;
+    const tone = dist <= 0 ? "bad" : hfTone(health) === "ok" ? stressed !== null && stressed < 1 ? "warn" : distTone(dist) : hfTone(health);
+    return row(label, `${held} backing ${tokenAmount(p.borrowed, USDC_DECIMALS, 2)} USDC \xB7 health ${health.toFixed(2)} \xB7 ${where}${atDex}${atGap}`, { tone });
   });
 }
 async function collateralReport(input, now) {
@@ -7591,7 +7648,7 @@ async function collateralReport(input, now) {
     title: `${who} \u2014 Collateral Watch`,
     rows: [row("Wallet", s.via ? `${s.via} (${s.user})` : s.user, { href: explorer.address(s.user) }), ...rows, ...morphoRows(s)],
     notes: [...notes, `Morpho: the ${MORPHO_STOCK_MARKETS.length} stock markets holding $1k or more of collateral when this was built (${MORPHO_STOCK_MARKETS.map((m) => m.symbol).join(", ")} against USDC). Each is its own loan, liquidated on its own.`],
-    sources: ["Aave V4 on Base (the MAG7 spoke and its oracle)", "Morpho Blue on Base (positions, markets, their oracles)", "Coinbase price feeds (when each last set a price)", "DexScreener (Base DEX prices)"]
+    sources: ["Aave V4 on Base (the MAG7 spoke and its oracle)", "Morpho Blue on Base (positions, markets, their oracles)", "Coinbase price feeds (when each last set a price)", "DexScreener (Base DEX prices)", "Blue Agent (each stock's weekend gaps, graded since 2026-08-28)"]
   };
 }
 var collateralSkill = {
@@ -8024,17 +8081,24 @@ function weekendHandler(fetchImpl = fetch, now = Date.now) {
   return async (request) => {
     if (request.headers.get("x-quadra") !== "1") return problem5(403, "Requests to this server need the x-quadra: 1 header.");
     if (request.method !== "GET") return problem5(405, "The weekend record takes GET.");
-    const which = new URL(request.url).pathname.slice(WEEKEND_PATH.length + 1);
+    const at = new URL(request.url);
+    const which = at.pathname.slice(WEEKEND_PATH.length + 1);
     const url = UPSTREAM2[which];
     if (url === void 0 || !Object.hasOwn(UPSTREAM2, which)) return problem5(404, "Ask for /api/weekend/scorecard or /api/weekend/diary.");
-    const kept = cache.get(which);
+    const ticker = at.searchParams.get("ticker");
+    const weekends = at.searchParams.get("weekends");
+    if (ticker !== null && (which !== "scorecard" || !/^[A-Z]{1,6}$/.test(ticker))) return problem5(400, "ticker is 1\u20136 capital letters, on the scorecard only.");
+    if (weekends !== null && (which !== "scorecard" || !/^[1-9]\d{0,2}$/.test(weekends) || Number(weekends) > 104)) return problem5(400, "weekends is a whole number from 1 to 104, on the scorecard only.");
+    const body = JSON.stringify({ ...ticker ? { ticker } : {}, ...weekends ? { weekends: Number(weekends) } : {} });
+    const key = `${which} ${body}`;
+    const kept = cache.get(key);
     if (kept && now() - kept.at < FRESH_MS2) return ok(kept.body);
     try {
-      const res = await fetchImpl(url, { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: "{}", redirect: "manual" });
+      const res = await fetchImpl(url, { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body, redirect: "manual" });
       if (!res.ok) return problem5(502, `Blue Agent answered ${res.status}.`);
-      const body = JSON.stringify(await res.json());
-      cache.set(which, { at: now(), body });
-      return ok(body);
+      const answer2 = JSON.stringify(await res.json());
+      cache.set(key, { at: now(), body: answer2 });
+      return ok(answer2);
     } catch {
       return problem5(502, "Blue Agent could not be reached.");
     }

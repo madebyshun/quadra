@@ -17,6 +17,7 @@ import { Gel } from "@/ui/Gel";
 import { useWalletSession } from "@/ui/WalletProvider";
 import { TxStepList, useTxSteps, type Step } from "@/features/panels/TxSteps";
 import { transfersPaused } from "@/features/panels/TradePanel";
+import { BasketShare } from "@/features/panels/BasketShare";
 
 /**
  * Treasury Basket (2026-11-13): buy a basket of Coinbase stocks and verified crypto on Base with
@@ -390,6 +391,12 @@ export function BasketPanel() {
             {stop ?? `Buy the basket — ${formatAmount(total, USDC.decimals)} USDC`}
           </Gel>
           <TxStepList states={steps.states} label="Buying the basket" />
+          <BasketShare
+            c={{
+              lines: bought.map((p) => ({ symbol: p.leg.asset.symbol, weight: p.leg.weight, impact: impactOf(p.quote!) })),
+              total: formatAmount(total, USDC.decimals),
+            }}
+          />
         </>
       )}
     </div>

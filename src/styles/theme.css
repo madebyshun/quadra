@@ -3497,3 +3497,26 @@
 .basket__review tr.tone-bad th {
   color: #c62828;
 }
+
+/* "Paired with …" on a coin's page (2026-11-13): the quote's price, the coin in shares, the day split */
+.pair {
+  padding: 8px 10px;
+}
+.pair__title {
+  margin: 0 0 6px;
+  font-size: 12px;
+}
+.pair__facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 3px 10px;
+  margin: 0 0 6px;
+  font-size: 11px;
+}
+.pair__facts dt {
+  color: var(--xp-ink-dim);
+}
+.pair__facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

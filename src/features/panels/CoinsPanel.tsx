@@ -32,6 +32,7 @@ import { CoinRewards } from "@/features/panels/CoinRewards";
 import { VerdictBadge } from "@/features/panels/VerdictBadge";
 import { CoinShare } from "@/features/panels/CoinShare";
 import { TxStepList, useTxSteps } from "@/features/panels/TxSteps";
+import { PairExposure } from "@/features/panels/PairExposure";
 import { Disclosures, FeeLedger, CoinMoves, CreatorLaunches, NewLaunches, TokenChart, TokenInfo, TokenStats, TokenTabs, TokenWarning, useCoinFee, useCoinPage, useCoinReferrer } from "@/features/panels/TokenPage";
 import { feePercent } from "@/config/launchpad";
 import { tokenInfo } from "@/skills/blockscout";
@@ -343,6 +344,7 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
       <section className="coin__overview" aria-label="Coin overview">
         <TokenStats page={page} value={value} holders={holders} />
       </section>
+      <PairExposure page={page !== "reading" && !("problem" in page) ? page : null} value={value} now={now} />
       <CoinMoves token={token} />
       <FeeLedger page={page} fee={fee} referrer={referrer} />
 

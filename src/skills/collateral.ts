@@ -5,6 +5,7 @@ import { explorer, short, tokenAmount, usd } from "@/skills/format";
 import { ethCall } from "@/skills/http";
 import { resolveTarget } from "@/skills/target";
 import { chainToken } from "@/skills/chaintoken";
+import { worstGaps, type Gap } from "@/skills/weekendGap";
 import { row, type Report, type Row, type Skill, type Tone } from "@/skills/types";
 
 /**
@@ -62,6 +63,8 @@ export type Snapshot = {
   readonly dex: ReadonlyMap<string, Market> | null;
   /** positions in Morpho's stock markets (`MORPHO_STOCK_MARKETS`); `null` when Morpho could not be read */
   readonly morpho: readonly MorphoPosition[] | null;
+  /** each collateral stock's worst recorded weekend gap (Blue Agent), by symbol; a missing or `null` entry is "not checked" */
+  readonly gaps: ReadonlyMap<string, Gap | null>;
 };
 
 export type MorphoPosition = {
@@ -182,7 +185,11 @@ export async function snapshot(input: string): Promise<Snapshot> {
           () => null,
         );
   const health = acct.borrowCount === 0n ? null : acct.healthFactor;
-  return { user: target.address, via: target.via, health, positions, dex, morpho };
+  // the worst weekends on record, only for a wallet that borrows — nothing to stress otherwise
+  const borrows = health !== null || (morpho ?? []).some((p) => p.borrowed > 0n);
+  const symbols = [...positions.filter((p) => p.collateral && p.supplied > 0n).map((p) => p.symbol), ...(morpho ?? []).map((p) => p.symbol)];
+  const gaps = borrows ? await worstGaps(symbols) : new Map<string, Gap | null>();
+  return { user: target.address, via: target.via, health, positions, dex, morpho, gaps };
 }
 
 /** The feed behind a reserve's price, and when it last set one — `null` when it could not be read. */
@@ -320,6 +327,26 @@ export function collateralRows(s: Snapshot, now: number): { rows: Row[]; notes: 
     }
   }
 
+  // the stress: every stock at its worst recorded weekend gap (Blue Agent's grading), the oracle moving in one step
+  if (s.health !== null && stocks.length > 0) {
+    const at = new Map<string, number>();
+    const parts: string[] = [];
+    for (const p of stocks) {
+      const g = s.gaps.get(p.symbol) ?? null;
+      if (g === null) {
+        parts.push(`${p.symbol} not checked`);
+        continue;
+      }
+      at.set(p.token.toLowerCase(), priceUsd(p) * (1 + g.pct / 100));
+      parts.push(`${p.symbol} ${g.pct.toFixed(2)}% (weekend of ${g.friday})`);
+    }
+    if (at.size === 0) rows.push(row(STRESS, "not checked — no weekend gap on record for these stocks", { tone: "warn" }));
+    else {
+      const then = mathAt(s.positions, at).health;
+      rows.push(row(STRESS, `health ${hf(then)} (now ${hf(chain)})${then < 1 ? " — would be liquidated" : ""} — ${parts.join(", ")}`, { tone: hfTone(then) }));
+    }
+  }
+
   notes.push(
     "Aave liquidates at its own oracle — Coinbase's price feed for each stock — not at a DEX price. The DEX line is a scenario: where the position would stand if the feed caught up to Base's market.",
     "A liquidation price moves one stock at a time and holds the rest still; a borrow keeps growing with interest, so the distance shrinks slowly even when prices do not move.",
@@ -329,6 +356,9 @@ export function collateralRows(s: Snapshot, now: number): { rows: Row[]; notes: 
 }
 
 /** Each Morpho position: its own health and liquidation price, and the same at Base's DEX price. */
+/** The stress row's label — read by the alerts (features/loanAlerts.tsx). */
+export const STRESS = "At each stock's worst weekend gap";
+
 export function morphoRows(s: Snapshot): Row[] {
   if (s.morpho === null) return [row("Morpho", "not checked — its stock markets could not be read just now", { tone: "warn" })];
   if (s.morpho.length === 0) return [row("Morpho", "no stock collateral and no debt in its stock markets", { tone: "ok" })];
@@ -344,7 +374,11 @@ export function morphoRows(s: Snapshot): Row[] {
     const dex = s.dex?.get(p.token.toLowerCase())?.priceUsd ?? null;
     const atDex = dex === null ? "" : ` · at Base's ${usd(dex)}: health ${((tokens * dex * p.lltv) / debt).toFixed(2)}`;
     const where = dist <= 0 ? "can be liquidated now" : `liquidated at ${usd(liq)}, ${pct(dist)} below its oracle's ${usd(p.price)}`;
-    return row(label, `${held} backing ${tokenAmount(p.borrowed, USDC_DECIMALS, 2)} USDC · health ${health.toFixed(2)} · ${where}${atDex}`, { tone: dist <= 0 ? "bad" : hfTone(health) === "ok" ? distTone(dist) : hfTone(health) });
+    const g = s.gaps.get(p.symbol) ?? null;
+    const stressed = g === null ? null : (tokens * p.price * (1 + g.pct / 100) * p.lltv) / debt;
+    const atGap = g === null || stressed === null ? " · worst weekend gap: not checked" : ` · at its worst weekend gap (${g.pct.toFixed(2)}%, ${g.friday}): health ${stressed.toFixed(2)}`;
+    const tone: Tone = dist <= 0 ? "bad" : hfTone(health) === "ok" ? (stressed !== null && stressed < 1 ? "warn" : distTone(dist)) : hfTone(health);
+    return row(label, `${held} backing ${tokenAmount(p.borrowed, USDC_DECIMALS, 2)} USDC · health ${health.toFixed(2)} · ${where}${atDex}${atGap}`, { tone });
   });
 }
 
@@ -356,7 +390,7 @@ export async function collateralReport(input: string, now: number): Promise<Repo
     title: `${who} — Collateral Watch`,
     rows: [row("Wallet", s.via ? `${s.via} (${s.user})` : s.user, { href: explorer.address(s.user) }), ...rows, ...morphoRows(s)],
     notes: [...notes, `Morpho: the ${MORPHO_STOCK_MARKETS.length} stock markets holding $1k or more of collateral when this was built (${MORPHO_STOCK_MARKETS.map((m) => m.symbol).join(", ")} against USDC). Each is its own loan, liquidated on its own.`],
-    sources: ["Aave V4 on Base (the MAG7 spoke and its oracle)", "Morpho Blue on Base (positions, markets, their oracles)", "Coinbase price feeds (when each last set a price)", "DexScreener (Base DEX prices)"],
+    sources: ["Aave V4 on Base (the MAG7 spoke and its oracle)", "Morpho Blue on Base (positions, markets, their oracles)", "Coinbase price feeds (when each last set a price)", "DexScreener (Base DEX prices)", "Blue Agent (each stock's weekend gaps, graded since 2026-08-28)"],
   };
 }
 

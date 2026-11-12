@@ -6,6 +6,7 @@ import {
   collateralReport,
   collateralRows,
   collateralSkill,
+  STRESS,
   borrowAssets,
   morphoRows,
   liquidationPrice,
@@ -19,6 +20,10 @@ import { findSkill } from "@/skills/index";
 import TWO from "./fixtures/collateral/two-stocks.json";
 import EMPTY from "./fixtures/collateral/empty.json";
 import MORPHO_FX from "./fixtures/collateral/morpho.json";
+import SC_NVDA from "./fixtures/weekend/scorecard-NVDA.json";
+import SC_AAPL from "./fixtures/weekend/scorecard-AAPL.json";
+import SC_GOOGL from "./fixtures/weekend/scorecard-GOOGL.json";
+import SC_META from "./fixtures/weekend/scorecard-META.json";
 import { basenames, DOWN, net, RpcError, useNet, type Answer } from "./net";
 
 useNet();
@@ -44,8 +49,15 @@ function chain(fx: Fixture, change: { rpc?: (to: string, data: `0x${string}`) =>
       const real = fx.calls[`${to.toLowerCase()} ${data}`];
       return typeof real === "object" ? new RpcError(real.error) : real;
     },
-    get: (url) => change.get?.(url) ?? fx.gets[url],
+    get: (url) => change.get?.(url) ?? fx.gets[url] ?? scorecards(url),
   });
+}
+
+/** Blue Agent's weekend record per ticker, as it answered on 2026-11-13 (tests/fixtures/weekend). */
+const SCORECARDS: Record<string, unknown> = { NVDA: SC_NVDA, AAPL: SC_AAPL, GOOGL: SC_GOOGL, META: SC_META };
+function scorecards(url: string): Answer | undefined {
+  const t = /^\/api\/weekend\/scorecard\?ticker=([A-Z]+)&weekends=52$/.exec(url)?.[1];
+  return t ? SCORECARDS[t] : undefined;
 }
 
 // a Thursday 18:00 UTC (open) and a Sunday 22:00 UTC (shut)
@@ -180,13 +192,14 @@ const stock = (symbol: string, supplied: bigint, price: number, factor: number, 
   ...extra,
 });
 const usdcDebt = (amount: number): Position => ({ ...stock("usdc", 0n, 1, 0), symbol: "USDC", decimals: 6, debt: BigInt(amount * 1e6), collateral: false });
-const snap = (positions: Position[], health: number | null, dex: Snapshot["dex"] = new Map()): Snapshot => ({
+const snap = (positions: Position[], health: number | null, dex: Snapshot["dex"] = new Map(), gaps: Snapshot["gaps"] = new Map()): Snapshot => ({
   user: "0x0000000000000000000000000000000000000002",
   via: null,
   health: health === null ? null : BigInt(Math.round(health * 1e6)) * 10n ** 12n,
   positions,
   dex,
   morpho: [],
+  gaps,
 });
 
 describe("the arithmetic", () => {
@@ -236,11 +249,11 @@ describe("the arithmetic", () => {
     const b = stock("bbb", 100n * 10n ** 8n, 100, 7000);
     const market = (price: number | null) => ({ priceUsd: price }) as never;
     const none = collateralRows(snap([a, usdcDebt(7000)], 1, new Map([[b.token, market(null)]])), OPEN).rows;
-    expect(none.at(-1)).toMatchObject({ label: "At Base DEX prices", tone: "warn", value: "not checked — aaa has no DEX price" });
+    expect(none.find((r) => r.label === "At Base DEX prices")).toMatchObject({ label: "At Base DEX prices", tone: "warn", value: "not checked — aaa has no DEX price" });
     const some = collateralRows(snap([a, b, usdcDebt(7000)], 2, new Map([[a.token, market(110)]])), SUNDAY).rows;
-    expect(some.at(-1)).toMatchObject({ label: "If the market reopened at Base's prices", tone: "ok", value: "health 2.10 (now 2.00) — aaa $110.00 (+10.0% vs Aave), bbb has no DEX price" });
+    expect(some.find((r) => r.label === "If the market reopened at Base's prices")).toMatchObject({ label: "If the market reopened at Base's prices", tone: "ok", value: "health 2.10 (now 2.00) — aaa $110.00 (+10.0% vs Aave), bbb has no DEX price" });
     const down = collateralRows(snap([a, usdcDebt(7000)], 1, new Map([[a.token, market(95)]])), OPEN).rows;
-    expect(down.at(-1)!.value).toBe("health 0.95 (now 1.00) — aaa $95.00 (-5.0% vs Aave)");
+    expect(down.find((r) => r.label === "At Base's DEX prices")!.value).toBe("health 0.95 (now 1.00) — aaa $95.00 (-5.0% vs Aave)");
   });
 
   it("says a supplied stock that is not collateral, and words a feed set long ago or just now", () => {
@@ -263,7 +276,7 @@ describe("Morpho's stock markets", () => {
     expect(rows.map((x) => x.label)).toEqual(["Morpho · AAPLc", "Morpho · METAc", "Morpho · NVDAc"]);
     expect(rows[2]).toMatchObject({
       tone: "warn",
-      value: expect.stringMatching(/^109\.8\d NVDAc \(\$19,\d{3}\.\d\d\) backing 10,21\d\.\d\d USDC · health 1\.19 · liquidated at \$148\.\d\d, 15\.\d% below its oracle's \$176\.80 · at Base's \$176\.\d\d: health 1\.19$/),
+      value: expect.stringMatching(/^109\.8\d NVDAc \(\$19,\d{3}\.\d\d\) backing 10,21\d\.\d\d USDC · health 1\.19 · liquidated at \$148\.\d\d, 15\.\d% below its oracle's \$176\.80 · at Base's \$176\.\d\d: health 1\.19 · at its worst weekend gap \(-5\.13%, 2026-11-06\): health 1\.13$/),
     });
     expect(r.rows.find((x) => x.label === "Aave V4 · MAG7")!.value).toBe("no stock supplied and nothing borrowed");
     expect(r.sources).toContain("Morpho Blue on Base (positions, markets, their oracles)");
@@ -289,11 +302,38 @@ describe("Morpho's stock markets", () => {
   it("colours each loan by its health and distance, and says collateral with nothing borrowed", () => {
     const at = (p: ReturnType<typeof one>, dex: Snapshot["dex"] = null) => morphoRows({ ...snap([], null, dex), morpho: [p] });
     expect(at(one(0))[0]).toEqual({ label: "Morpho · AAA", value: "10 AAA ($1,000.00), nothing borrowed", tone: "ok" });
-    expect(at(one(300))[0]).toMatchObject({ tone: "ok", value: expect.stringMatching(/health 2\.08 · liquidated at \$48\.00, 52\.0% below its oracle's \$100\.00$/) });
+    expect(at(one(300))[0]).toMatchObject({ tone: "ok", value: expect.stringMatching(/health 2\.08 · liquidated at \$48\.00, 52\.0% below its oracle's \$100\.00 · worst weekend gap: not checked$/) });
     expect(at(one(550))[0]!.tone).toBe("warn");
     expect(at(one(620))[0]!.tone).toBe("bad");
-    expect(at(one(700))[0]).toMatchObject({ tone: "bad", value: expect.stringMatching(/· can be liquidated now$/) });
+    expect(at(one(700))[0]).toMatchObject({ tone: "bad", value: expect.stringMatching(/· can be liquidated now · worst weekend gap: not checked$/) });
     const dex = new Map([[base.token, { priceUsd: 90 } as never]]);
-    expect(at(one(300), dex)[0]!.value).toMatch(/· at Base's \$90\.00: health 1\.88$/);
+    expect(at(one(300), dex)[0]!.value).toMatch(/· at Base's \$90\.00: health 1\.88 · worst weekend gap: not checked$/);
+  });
+});
+
+describe("the worst weekend on record", () => {
+  const a = stock("aaa", 100n * 10n ** 8n, 100, 7000);
+  const b = stock("bbb", 100n * 10n ** 8n, 100, 7000);
+  const gap = (pct: number) => ({ pct, friday: "2026-11-06", weekends: 11 });
+
+  it("applies each stock's worst downward gap at once, and says which it could not check", () => {
+    const rows = collateralRows(snap([a, b, usdcDebt(10000)], 1.4, null, new Map([["aaa", gap(-10)]])), OPEN).rows;
+    expect(rows.find((r) => r.label === STRESS)).toEqual({ label: STRESS, tone: "ok", value: "health 1.33 (now 1.40) — aaa -10.00% (weekend of 2026-11-06), bbb not checked" });
+  });
+
+  it("is red, and says so, when the worst weekend would liquidate", () => {
+    const rows = collateralRows(snap([a, usdcDebt(6600)], 7000 / 6600, null, new Map([["aaa", gap(-9.15)]])), OPEN).rows;
+    expect(rows.find((r) => r.label === STRESS)).toMatchObject({ tone: "bad", value: expect.stringMatching(/^health 0\.96 \(now 1\.06\) — would be liquidated — aaa -9\.15%/) });
+  });
+
+  it("is not checked with no record at all — never 'no gap'", () => {
+    const rows = collateralRows(snap([a, usdcDebt(5000)], 1.4), OPEN).rows;
+    expect(rows.find((r) => r.label === STRESS)).toEqual({ label: STRESS, tone: "warn", value: "not checked — no weekend gap on record for these stocks" });
+  });
+
+  it("stresses each Morpho loan too, amber when its worst weekend would liquidate it", () => {
+    const loan = { market: "0x01" as const, token: "0x00000000000000000000000000000000000000aa", symbol: "AAA", decimals: 8, price: 100, lltv: 0.625, collateral: 10n * 10n ** 8n, borrowed: 450n * 10n ** 6n };
+    const rows = morphoRows({ ...snap([], null, null, new Map([["AAA", gap(-30)]])), morpho: [loan] });
+    expect(rows[0]).toMatchObject({ tone: "warn", value: expect.stringMatching(/ · at its worst weekend gap \(-30\.00%, 2026-11-06\): health 0\.97$/) });
   });
 });

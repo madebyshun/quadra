@@ -84,6 +84,12 @@ describe("what Q says", () => {
     const m = report(morpho("AAPLc", `${far} · at Base's $250.00: health 0.99`));
     expect(tipsFor(m, w)[0]!.text).toBe("0x3998…E891: at Base's weekend price, AAPLc on Morpho would already be below a health of 1 when the market reopens.");
     expect(tipsFor(report(morpho("AAPLc", `${far} · at Base's $360.00: health 1.42`)), w)).toEqual([]);
+    // the worst weekend on record would liquidate: Aave's stress row, or a Morpho loan's
+    const stressed = report(morpho("AAPLc", far), row("At each stock's worst weekend gap", "health 0.96 (now 1.06) — would be liquidated — AAPLc -9.15% (weekend of 2026-09-18)", { tone: "bad" }));
+    expect(tipsFor(stressed, w)[0]).toMatchObject({ id: `loan-worst:${W}`, text: "0x3998…E891: a repeat of the worst weekend gap on record would liquidate its Aave loan." });
+    expect(tipsFor(report(morpho("AAPLc", `${far} · at its worst weekend gap (-30.00%, 2026-11-06): health 0.97`)), w)[0]!.text).toBe(
+      "0x3998…E891: a repeat of the worst weekend gap on record would liquidate AAPLc on Morpho.",
+    );
     // nothing borrowed: nothing to say
     expect(tipsFor(report(morpho("AAPLc", "1 AAPLc ($354.60), nothing borrowed", "ok")), w)).toEqual([]);
   });
@@ -101,7 +107,7 @@ describe("checking the chain", () => {
         const real = fx.calls[`${to.toLowerCase()} ${data}`];
         return typeof real === "object" ? new RpcError(real.error) : real;
       },
-      get: (url) => fx.gets[url],
+      get: (url) => fx.gets[url] ?? (url.startsWith("/api/weekend/scorecard?ticker=") ? { weekends: [] } : undefined),
     });
   }
 
