@@ -5,6 +5,7 @@ import { portraitOf, PIXELS } from "@/lib/cardArt";
 import { cardWords, compact, ships, type CardWords } from "@/lib/cardWords";
 import { dataUrl, lookupWords, parseHandle, pictureData, xProfile, type XUser } from "@/skills/xprofile";
 import { useInbox } from "@/features/openWindow";
+import { DotsPattern, HalftoneSky } from "@/features/panels/cardKit";
 import "./BaseCard.css";
 
 /**
@@ -139,8 +140,6 @@ const INK = "#000";
 const UI = "Verdana, Tahoma, 'Segoe UI', sans-serif";
 const MONO = "'Courier New', Courier, monospace";
 const FRAME_FACE = "#dddddd";
-const DESK_A = "#6b74c9";
-const DESK_B = "#8f97e0";
 
 /** The picture frame: picture at 130,180, 400×400. */
 const PX = 130;
@@ -318,18 +317,11 @@ export function CardSvg({ user, words, picture }: { user: XUser; words: CardWord
         <clipPath id="card-photo">
           <rect x={PX} y={PY} width={PS} height={PS} />
         </clipPath>
-        <pattern id="card-desk" width="8" height="8" patternUnits="userSpaceOnUse">
-          <rect width="8" height="8" fill={DESK_A} />
-          <rect width="4" height="4" fill={DESK_B} />
-          <rect x="4" y="4" width="4" height="4" fill={DESK_B} />
-        </pattern>
-        <pattern id="card-dots" width="12" height="12" patternUnits="userSpaceOnUse">
-          <rect width="12" height="12" fill="#fff" />
-          <rect width="3" height="3" fill="#cfd6ff" />
-        </pattern>
+        <DotsPattern />
       </defs>
 
-      <rect width={CARD_W} height={CARD_H} fill="url(#card-desk)" />
+      {/* 2026-11-12: the share cards' sky — halftone clouds (panels/cardKit.tsx) */}
+      <HalftoneSky w={CARD_W} h={CARD_H} />
 
       {/* the menu bar across the top, the chain's label on its right */}
       <g shapeRendering="crispEdges">
@@ -351,7 +343,8 @@ export function CardSvg({ user, words, picture }: { user: XUser; words: CardWord
       {/* the window: a hard one-bit shadow, the frame, the striped title bar */}
       <g shapeRendering="crispEdges">
         <rect x="70" y="92" width="1470" height="770" fill={INK} />
-        <rect x="60" y="82" width="1470" height="770" fill="url(#card-dots)" stroke={INK} strokeWidth="4" />
+        <rect x="60" y="82" width="1470" height="770" fill="#fff" stroke={INK} strokeWidth="4" />
+        <rect x="62" y="84" width="1466" height="766" fill="url(#kit-dots)" />
       </g>
       <TitleBar x={62} y={84} w={1466} title={`${caption} — Base Card`} />
 

@@ -210,7 +210,7 @@ export async function ethReceived(receipt: Receipt, account: string, options: Wa
 export const BALANCE_TRIES = 5;
 
 export type WaitOptions = {
-  /** ms between polls — Base makes a block every two seconds */
+  /** ms between polls — Base makes five blocks a second (skills/blocktime.ts); a receipt is asked for every 2 s */
   readonly every?: number;
   /** ms before giving up and reporting "still pending" */
   readonly within?: number;

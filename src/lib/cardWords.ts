@@ -88,7 +88,7 @@ export const FAMILIES: readonly Family[] = [
     id: "base",
     re: /(\bbase\b|\bonchain\b|on-chain|\bweb3\b|\bcrypto\b|\bethereum\b|\beth\b|\.base\.eth|\bl2\b)/i,
     titles: ["BASED CITIZEN", "ONCHAIN RESIDENT", "BLOCK ENJOYER"],
-    riffs: [(q) => `“${q}” — two-second blocks, zero regrets.`, (q) => `“${q}.” Lives on Base, one block at a time.`],
+    riffs: [(q) => `“${q}” — five blocks a second, zero regrets.`, (q) => `“${q}.” Lives on Base, one block at a time.`],
   },
   {
     id: "gaming",
@@ -157,7 +157,7 @@ export const TIER_QUOTES: readonly Pick<(f: WordFacts, now: Date) => string>[] =
 
 export const PLAIN_QUOTES: readonly ((f: WordFacts) => string)[] = [
   (f) => `@${f.handle} lets the work do the talking. The bio is on a coffee break.`,
-  () => "Reads the chain before signing. Two seconds a block, zero regrets.",
+  () => "Reads the chain before signing. Five blocks a second, zero regrets.",
   () => "Lives on Base, one block at a time.",
   () => "Mysterious bio, excellent card.",
 ];

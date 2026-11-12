@@ -4,6 +4,7 @@ import { useRunCommand } from "@/features/openWindow";
 import { say } from "@/lib/assistant";
 import { count } from "@/lib/achievements";
 import { depthCard, DepthShare } from "@/features/panels/DepthShare";
+import { collateralCard, CollateralShare } from "@/features/panels/CollateralShare";
 import { VerdictShare, verdictCard } from "@/features/panels/VerdictShare";
 
 /**
@@ -86,10 +87,11 @@ export function ReportView({ report }: { report: Report }) {
 function Shareable({ report }: { report: Report }) {
   const card = verdictCard(report);
   const depth = card ? null : depthCard(report);
-  return card || depth ? (
+  const loans = card || depth ? null : collateralCard(report);
+  return card || depth || loans ? (
     <details className="report__share">
       <summary>Share as a picture</summary>
-      {card ? <VerdictShare c={card} /> : <DepthShare c={depth!} />}
+      {card ? <VerdictShare c={card} /> : depth ? <DepthShare c={depth} /> : <CollateralShare c={loans!} />}
     </details>
   ) : null;
 }
