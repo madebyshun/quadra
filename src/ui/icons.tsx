@@ -234,6 +234,22 @@ const GLYPHS: Record<IconId, JSX.Element> = {
       </g>
     </>
   ),
+  basket: (
+    <>
+      {/* a basket: a woven body under a handle, three coins peeking out */}
+      <g {...BODY} fill="#ffcc33">
+        <circle cx="8.5" cy="9.5" r="2.6" />
+        <circle cx="12" cy="8.2" r="2.6" />
+        <circle cx="15.5" cy="9.5" r="2.6" />
+      </g>
+      <g {...BODY} fill="#c98a4a">
+        <path d="M3.5 11h17l-2 8.5H5.5Z" />
+      </g>
+      <g {...LINE} strokeWidth={1.1}>
+        <path d="M7.5 11v8.5M12 11v8.5M16.5 11v8.5M4.4 15h15.2" />
+      </g>
+    </>
+  ),
   weekend: (
     <>
       {/* a calendar page with a line that keeps moving past the weekend */}

@@ -3948,8 +3948,8 @@ function hookAddressProblem(raw) {
 }
 function readHookAddress(raw) {
   const address2 = raw.trim();
-  const problem8 = hookAddressProblem(address2);
-  if (problem8 !== null) throw new Error(problem8);
+  const problem9 = hookAddressProblem(address2);
+  if (problem9 !== null) throw new Error(problem9);
   const bits = BigInt(address2) & (1n << BigInt(ALL_HOOK_BITS)) - 1n;
   const permissions = HOOK_PERMISSIONS.map((p) => ({
     ...p,
@@ -7178,12 +7178,12 @@ async function pairOf(factory, asked) {
     const t = await chainToken(address2);
     return { address: address2, symbol: t.symbol, name: t.name, decimals: t.decimals, startTick: q.startTick };
   }
-  const { pairs, problem: problem8 } = await launchPairs(factory);
+  const { pairs, problem: problem9 } = await launchPairs(factory);
   const found = pairs.find((p) => p.symbol.toLowerCase() === text.toLowerCase());
   if (found) return found;
   const offered = pairs.map((p) => p.symbol).join(", ");
   throw new Error(
-    problem8 ? `The list of stocks could not be read (${problem8}) \u2014 give the stock token's address instead of "${text}".` : `The launchpad does not pair with "${text}". It pairs with: ${offered}.`
+    problem9 ? `The list of stocks could not be read (${problem9}) \u2014 give the stock token's address instead of "${text}".` : `The launchpad does not pair with "${text}". It pairs with: ${offered}.`
   );
 }
 function feeOf(text, version3) {
@@ -8042,6 +8042,21 @@ function weekendHandler(fetchImpl = fetch, now = Date.now) {
 }
 var ok = (body) => new Response(body, { status: 200, headers: { "content-type": "application/json", "cache-control": "max-age=300" } });
 
+// src/server/region.ts
+var CODE = /^[A-Z]{2}$/;
+function problem6(status, detail) {
+  return new Response(JSON.stringify({ status, detail, origin: "quadra-server" }), { status, headers: { "content-type": "application/problem+json" } });
+}
+function regionHandler() {
+  return async (request) => {
+    if (request.headers.get("x-quadra") !== "1") return problem6(403, "Requests to this server need the x-quadra: 1 header.");
+    if (request.method !== "GET") return problem6(405, "The region takes GET.");
+    const said = (request.headers.get("x-vercel-ip-country") ?? "").toUpperCase();
+    const country = CODE.test(said) ? said : null;
+    return new Response(JSON.stringify({ country }), { status: 200, headers: { "content-type": "application/json", "cache-control": "private, no-store" } });
+  };
+}
+
 // src/server/indexerPath.ts
 var INDEXER_PATH = "/api/launchpad";
 
@@ -8377,7 +8392,7 @@ async function syncOnce(state, rpc2, head, maxChunks = MAX_CHUNKS) {
 }
 var FRESH_MS3 = 15e3;
 var CATCH_UP_MS = 1500;
-function problem6(status, detail) {
+function problem7(status, detail) {
   return new Response(JSON.stringify({ status, detail, origin: "quadra-server" }), {
     status,
     headers: { "content-type": "application/problem+json" }
@@ -8435,19 +8450,19 @@ function indexerHandler(deps = {}) {
   };
   return async (request) => {
     const path = new URL(request.url).pathname.slice(INDEXER_PATH.length);
-    if (request.headers.get("x-quadra") !== "1") return problem6(403, "Requests to this server need the x-quadra: 1 header.");
-    if (path !== "/coins" && path !== "/creators" && path !== "/coin") return problem6(404, `${path} is not a route of the launchpad index.`);
-    if (request.method !== "GET") return problem6(405, `${path} takes GET.`);
+    if (request.headers.get("x-quadra") !== "1") return problem7(403, "Requests to this server need the x-quadra: 1 header.");
+    if (path !== "/coins" && path !== "/creators" && path !== "/coin") return problem7(404, `${path} is not a route of the launchpad index.`);
+    if (request.method !== "GET") return problem7(405, `${path} takes GET.`);
     if (last === null || now() - last.at >= FRESH_MS3) await sync();
     const { head, error } = last;
     if (state.syncedTo < FIRST_BLOCK) {
-      return problem6(502, `The launchpad index has read nothing from Base yet: ${error ?? "the chain is still being read"}`);
+      return problem7(502, `The launchpad index has read nothing from Base yet: ${error ?? "the chain is still being read"}`);
     }
     if (path === "/coin") {
       const token = new URL(request.url).searchParams.get("token") ?? "";
-      if (!/^0x[0-9a-fA-F]{40}$/.test(token)) return problem6(400, "/coin takes ?token=0x\u2026 \u2014 a 20-byte address.");
+      if (!/^0x[0-9a-fA-F]{40}$/.test(token)) return problem7(400, "/coin takes ?token=0x\u2026 \u2014 a 20-byte address.");
       const detail = coinDetail(state, token, Math.floor(now() / 1e3));
-      if (detail === null) return problem6(404, `${token} is not a coin of this launchpad, or the index has not reached its launch yet.`);
+      if (detail === null) return problem7(404, `${token} is not a coin of this launchpad, or the index has not reached its launch yet.`);
       return new Response(JSON.stringify({ ...detail, syncedTo: state.syncedTo, head, behind: head === null ? null : Math.max(0, head - state.syncedTo), error }), {
         status: 200,
         headers: { "content-type": "application/json", "cache-control": "public, max-age=10, s-maxage=15, stale-while-revalidate=60" }
@@ -8478,7 +8493,7 @@ function asSent(request) {
   for (const k of routed) url.searchParams.delete(k);
   return new Request(url, request);
 }
-function problem7(status, detail) {
+function problem8(status, detail) {
   return new Response(JSON.stringify({ status, detail, origin: "quadra-server" }), { status, headers: { "content-type": "application/problem+json" } });
 }
 function routes(env, fetchImpl = fetch, blob2 = null, indexer = {}) {
@@ -8486,22 +8501,24 @@ function routes(env, fetchImpl = fetch, blob2 = null, indexer = {}) {
   const token = env.BLOB_READ_WRITE_TOKEN ?? null;
   const connected = token !== null || Boolean(env.BLOB_STORE_ID);
   const chain = indexerRpc(env);
-  const launchpad = connected && blob2 ? indexerHandler({ ...chain ? { rpc: chain } : {}, ...indexer, store: blobStore(blob2, token, env.BLOB_ACCESS === "public" ? "public" : "private") }) : async () => problem7(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID).");
+  const launchpad = connected && blob2 ? indexerHandler({ ...chain ? { rpc: chain } : {}, ...indexer, store: blobStore(blob2, token, env.BLOB_ACCESS === "public" ? "public" : "private") }) : async () => problem8(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID).");
   const stocks = stocksHandler(fetchImpl);
   const charts = chartsHandler(fetchImpl);
   const logo = logoHandler(fetchImpl);
   const weekend = weekendHandler(fetchImpl);
+  const region = regionHandler();
   const skills = apiHandler({ facilitator: creds ? cdpFacilitator(creds, fetchImpl) : null });
   return {
     stocks: (request) => stocks(asSent(request)),
     charts: (request) => charts(asSent(request)),
     logo: (request) => logo(asSent(request)),
     weekend: (request) => weekend(asSent(request)),
+    region: (request) => region(request),
     skills: (request) => skills(asSent(request)),
     launchpad: (request) => launchpad(asSent(request)),
     /** Vercel Cron's daily call: the index stepped forward with nobody asking. Vercel sends `CRON_SECRET` as a bearer. */
     cron: async (request) => {
-      if (env.CRON_SECRET && request.headers.get("authorization") !== `Bearer ${env.CRON_SECRET}`) return problem7(401, "Only Vercel Cron may run the index step.");
+      if (env.CRON_SECRET && request.headers.get("authorization") !== `Bearer ${env.CRON_SECRET}`) return problem8(401, "Only Vercel Cron may run the index step.");
       return launchpad(new Request(new URL(`${INDEXER_PATH}/creators`, request.url), { headers: { "x-quadra": "1" } }));
     }
   };

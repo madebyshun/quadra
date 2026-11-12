@@ -49,7 +49,7 @@ describe("the desktop", () => {
     await user.dblClick(within(screen.getByRole("list", { name: "My Computer" })).getByRole("button", { name: "Money" }));
     const folder = screen.getByRole("list", { name: "Money" });
     const win = windowFrame("Money");
-    expect(within(win).getByRole("status")).toHaveTextContent("3 objects");
+    expect(within(win).getByRole("status")).toHaveTextContent("4 objects");
     const send = within(folder).getByRole("button", { name: "Send" });
     await user.click(send);
     expect(send).toHaveAttribute("aria-pressed", "true");

@@ -280,6 +280,25 @@ describe("TradePanel: buying and selling", () => {
     expect(open).toHaveBeenCalledWith("research", { "run-research": `depth ${NVDA_ON_BASE}` });
   });
 
+  it("offers a U.S. visitor no stock: the quote button names why, and crypto still trades", async () => {
+    world({ get: (url) => (url === "/api/region" ? { country: "US" } : undefined) });
+    wallet();
+    mount();
+    await settle();
+    await pick("Stocks", "NVDA");
+    await settle();
+    expect(screen.getByRole("button", { name: "Not offered in your region" })).toBeDisabled();
+    expect(screen.getByText(/not offered where you are \(the U\.S\. and its territories\)/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Sell NVDA" }));
+    await settle();
+    expect(screen.getByRole("button", { name: "Not offered in your region" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("tab", { name: "Crypto" }));
+    await settle();
+    await pick("Crypto", "cbBTC");
+    await settle();
+    expect(screen.queryByRole("button", { name: "Not offered in your region" })).toBeNull();
+  });
+
   it("says a multiplier that is not one in shares, and a missing NAV as such", async () => {
     world();
     mount();

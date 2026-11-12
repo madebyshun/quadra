@@ -25,6 +25,7 @@ export const FUNCTIONS = [
   { file: "api/charts/[...path].js", route: "charts", methods: ["GET"] },
   { file: "api/logo/[...path].js", route: "logo", methods: ["GET"] },
   { file: "api/weekend/[...path].js", route: "weekend", methods: ["GET"] },
+  { file: "api/region.js", route: "region", methods: ["GET"] },
   // the list at /api/skills, and each skill at /api/skills/<id>: a catch-all needs a segment
   { file: "api/skills.js", route: "skills", methods: ["GET", "OPTIONS"] },
   { file: "api/skills/[...path].js", route: "skills", methods: ["GET", "OPTIONS"] },

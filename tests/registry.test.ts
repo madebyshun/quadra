@@ -53,6 +53,7 @@ const SHIPPED_IDS = [
   "card",
   // a directory of projects on Base, 2026-10-22
   "explore",
+  "basket",
   "weekend",
   "x402",
   "mcp",
@@ -197,7 +198,7 @@ describe("the desktop's folders (2026-10-21)", () => {
   });
 
   it("lists a folder's switched-on programs only, and Coming Soon while it holds something", () => {
-    expect(folderItems("folder-money").map((e) => e.id)).toEqual(["send", "swap", "trade"]);
+    expect(folderItems("folder-money").map((e) => e.id)).toEqual(["send", "swap", "trade", "basket"]);
     expect(folderItems("computer").map((e) => e.id)).toEqual([
       "folder-research",
       "folder-money",

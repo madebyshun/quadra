@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useLoanAlerts } from "@/features/loanAlerts";
 import { Routes, Route, useSearchParams } from "react-router-dom";
 import { OpenWindowProvider } from "@/features/openWindow";
 import { Desktop } from "@/features/Desktop";
@@ -254,6 +255,7 @@ function Home() {
       {/* Q no longer greets on its own (2026-10-29, the owner: "extremely simple"): it speaks only when
           something real happens — a red verdict, fees waiting, a Rugsweeper win */}
       {intro ? <Intro onDone={endIntro} /> : <Assistant greet={false} />}
+      <LoanAlerts />
       {!intro && welcome && <Welcome onClose={closeWelcome} />}
       {!intro && <Screensaver />}
       </OpenWindowProvider>
@@ -285,4 +287,10 @@ export function App() {
       </WalletProvider>
     </AdaptersProvider>
   );
+}
+
+/** Liquidation alerts for the wallets this browser watches (features/loanAlerts.tsx) — renders nothing. */
+function LoanAlerts() {
+  useLoanAlerts();
+  return null;
 }

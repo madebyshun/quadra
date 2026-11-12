@@ -206,6 +206,11 @@ describe("the strings a rename must NOT touch stay literal", () => {
       what: "the localStorage key the Markets watchlist is kept under",
     },
     {
+      file: "src/lib/loanWatch.ts",
+      literal: '"quadra.loanwatch.v1"',
+      what: "the localStorage key the wallets watched for liquidation alerts are kept under",
+    },
+    {
       file: "src/lib/welcome.ts",
       literal: '"quadra.welcome.v1"',
       what: "the localStorage key the Welcome screen's \"show next time\" is kept under",

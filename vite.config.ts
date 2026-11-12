@@ -7,6 +7,7 @@ import { stocksHandler, STOCKS_PATH } from "./src/server/stocks";
 import { chartsHandler, CHARTS_PATH } from "./src/server/charts";
 import { logoHandler, LOGO_PATH } from "./src/server/logo";
 import { weekendHandler, WEEKEND_PATH } from "./src/server/weekend";
+import { regionHandler, REGION_PATH } from "./src/server/region";
 import { cdpFacilitator, type CdpCredentials } from "./src/server/cdp";
 import { API_PATH } from "./src/server/apiPath";
 import type { apiHandler } from "./src/server/api";
@@ -55,6 +56,8 @@ function devRoutes(): Plugin {
       server.middlewares.use(LOGO_PATH, asMiddleware(LOGO_PATH, logoHandler()));
       /** Blue Agent's weekend record, which sends no CORS header — `src/server/weekend.ts`. */
       server.middlewares.use(WEEKEND_PATH, asMiddleware(WEEKEND_PATH, weekendHandler()));
+      /** The visitor's country — Vercel's header; none on the dev server — `src/server/region.ts`. */
+      server.middlewares.use(REGION_PATH, asMiddleware(REGION_PATH, regionHandler()));
     },
   };
 }

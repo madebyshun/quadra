@@ -3461,3 +3461,39 @@
 .flow__eth path:first-child { fill: #8c8c8c; }
 .report__share { margin-top: 8px; }
 .report__share > summary { cursor: pointer; font-weight: 600; }
+
+/* Treasury Basket (2026-11-13): one compact row per asset — symbol, weight, %, its weight now, remove */
+.basket__legs {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.basket__legs li.group__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px auto minmax(0, auto) auto;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.basket__legs .field {
+  width: 100%;
+  min-width: 0;
+}
+.basket__review {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.basket__review th,
+.basket__review td {
+  text-align: left;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--xp-border-mid);
+  vertical-align: top;
+}
+.basket__review tr.tone-bad td,
+.basket__review tr.tone-bad th {
+  color: #c62828;
+}

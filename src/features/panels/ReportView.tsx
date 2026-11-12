@@ -5,6 +5,7 @@ import { say } from "@/lib/assistant";
 import { count } from "@/lib/achievements";
 import { depthCard, DepthShare } from "@/features/panels/DepthShare";
 import { collateralCard, CollateralShare } from "@/features/panels/CollateralShare";
+import { LoanWatch } from "@/features/loanAlerts";
 import { VerdictShare, verdictCard } from "@/features/panels/VerdictShare";
 
 /**
@@ -79,6 +80,7 @@ export function ReportView({ report }: { report: Report }) {
       ) : null}
       {refused ? <p className="tx__warn">{refused}</p> : null}
       <Shareable report={report} />
+      {report.title.endsWith("— Collateral Watch") && collateralCard(report) ? <LoanWatch wallet={collateralCard(report)!.wallet} /> : null}
     </section>
   );
 }

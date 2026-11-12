@@ -192,6 +192,8 @@ export const FLAGS = {
   card: true,
   /** Blue Agent's weekend scorecard and diary, shown and credited (2026-11-12) — reads blueagent.dev through /api/weekend */
   weekend: true,
+  /** Treasury Basket — a basket of stocks and crypto bought into the user's own wallet (2026-11-13) */
+  basket: true,
   /**
    * Robinhood Chain (4663), HIDDEN on the owner's call of 2026-10-02: "build on Base first, Robinhood
    * Chain after". Off hides every surface that needs it — the Bridge window and the Robinhood Chain

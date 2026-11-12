@@ -27,6 +27,7 @@ export type FeatureId =
   | "card"
   | "explore"
   | "weekend"
+  | "basket"
   | "x402"
   | "mcp"
   | "inference"
@@ -211,6 +212,7 @@ export const FEATURES: readonly Feature[] = [
   },
   // a directory of projects on Base, from base.org's own list (2026-10-22) — no flag: it reads nothing live
   { id: "explore", title: "Explore Base", blurb: "projects on Base, folder by folder", window: "Explore Base" },
+  { id: "basket", title: "Treasury Basket", blurb: "a basket of stocks, held in your wallet", window: "Treasury Basket", flag: "basket" },
   { id: "weekend", title: "Weekend", blurb: "does Base's weekend price call Monday?", window: "Weekend — by Blue Agent", flag: "weekend" },
   {
     id: "x402",
@@ -357,7 +359,7 @@ export function comingSoon(): readonly Feature[] {
 export const FOLDERS: Readonly<Record<FolderId, readonly WindowId[]>> = {
   computer: ["folder-research", "folder-money", "folder-launchpad", "folder-games", "terminal", "taskmgr", "control", "readme", "soon"],
   "folder-research": ["research", "weekend", "markets", "profile", "explore"],
-  "folder-money": ["send", "swap", "trade", "bridge"],
+  "folder-money": ["send", "swap", "trade", "basket", "bridge"],
   "folder-launchpad": ["leaderboard", "card"],
   "folder-games": ["rugsweeper", "achievements"],
   "folder-agents": ["mcp", "x402", "api", "docs", "verify"],

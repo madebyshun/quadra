@@ -34,6 +34,7 @@ import { useWalletSession } from "@/ui/WalletProvider";
 import { ReportView } from "@/features/panels/ReportView";
 import { TxStepList, useTxSteps, type Step } from "@/features/panels/TxSteps";
 import { useOpenWindow } from "@/features/openWindow";
+import { RESTRICTED_TEXT, useStocksClosed } from "@/lib/region";
 
 /**
  * Launch a coin on this app's own launchpad on Base (`contracts/src/LaunchFactory.sol`), paired with
@@ -208,7 +209,9 @@ export function BaseLaunch() {
   const factoryAt = "address" in pinned ? pinned.address : null;
   const version: Version | null = "version" in pinned ? pinned.version : null;
   const account = ready?.account ?? null;
-  const pair = pairs.pairs.find((p) => p.address === pairAt) ?? ETH_PAIR_FALLBACK;
+  // a U.S. visitor is offered ETH only (lib/region.ts) — a stock picked before the country was read falls back to ETH
+  const closed = useStocksClosed();
+  const pair = (closed ? undefined : pairs.pairs.find((p) => p.address === pairAt)) ?? ETH_PAIR_FALLBACK;
   const buy = readFirstBuy(firstBuy, pair.decimals);
   const anyFactory = factories().length > 0;
 
@@ -353,7 +356,7 @@ export function BaseLaunch() {
     </label>
   );
 
-  const stocks = pairs.pairs.filter((p) => p.address !== ETH_QUOTE);
+  const stocks = closed ? [] : pairs.pairs.filter((p) => p.address !== ETH_QUOTE);
 
   return (
     <div className="stack">
@@ -434,7 +437,9 @@ export function BaseLaunch() {
             <span className="unit">a trade</span>
           </div>
         ) : null}
-        {pairs.problem ? (
+        {closed ? (
+          <p className="crt__amber">{RESTRICTED_TEXT} ETH pairs work as usual.</p>
+        ) : pairs.problem ? (
           <p className="dim">Stock pairs are not listed right now: {pairs.problem}</p>
         ) : pairs.pairs.length > 0 && stocks.length === 0 ? (
           <p className="dim">No stock is enabled on the launchpad yet — its quote admin turns each one on (setQuote). ETH works now.</p>

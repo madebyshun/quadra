@@ -28,6 +28,7 @@ import { LeaderboardPanel } from "@/features/panels/LeaderboardPanel";
 import { CardPanel } from "@/features/panels/BaseCard";
 import { radarSkill } from "@/skills/radar";
 import { WeekendPanel } from "@/features/panels/WeekendPanel";
+import { BasketPanel } from "@/features/panels/BasketPanel";
 import { collateralSkill } from "@/skills/collateral";
 import { depthSkill } from "@/skills/depth";
 import { verdictSkill } from "@/skills/verdict";
@@ -106,6 +107,7 @@ const BUILT: Partial<Record<Feature["id"], () => ReactNode>> = {
   card: () => <CardPanel />,
   explore: () => <ExplorePanel />,
   weekend: () => <WeekendPanel />,
+  basket: () => <BasketPanel />,
   profile: () => <ProfilePanel />,
   inference: () => <InferencePanel />,
   x402: () => <X402Panel />,

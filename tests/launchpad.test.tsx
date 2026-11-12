@@ -355,6 +355,8 @@ describe("the window", () => {
       slot0?: `0x${string}`;
       /** DexScreener: down unless a test gives it an answer */
       dex?: Answer;
+      /** the visitor's country (lib/region.ts) — unread unless given */
+      country?: string;
     } = {},
   ) {
     const calls = ethCalls({
@@ -366,7 +368,9 @@ describe("the window", () => {
     });
     return net({
       get: (u) =>
-        u === `${STOCKS_PATH}/base`
+        u === "/api/region" && w.country
+          ? { country: w.country }
+          : u === `${STOCKS_PATH}/base`
           ? (w.stocks ?? MARKETS_FX.coinbaseStocks)
           : u.startsWith(`${BLOCKSCOUT}/addresses/${FACTORY}/logs`)
             ? (w.mine ?? myLogs())
@@ -725,6 +729,16 @@ describe("the window", () => {
     expect(BigInt(sent[1]!.value ?? "0x0")).toBe(0n);
     expect(decodeFunctionData({ abi: LAUNCHPAD_ABI, data: sent[1]!.data as `0x${string}` }).args.slice(4)).toEqual([AAPL, 5n * 10n ** 7n]);
     pinned.factory = null;
+  });
+
+  it("offers a U.S. visitor ETH alone, and says why", async () => {
+    pinned.factory = FACTORY;
+    wallet(ME);
+    chain({ country: "US" });
+    mount();
+    await act(async () => {});
+    await screen.findByText(/not offered where you are/);
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["ETH"]);
   });
 
   it("launches against a stock with no first buy in one signature, nothing to approve", async () => {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isStock, RESTRICTED_TEXT, useStockAddresses, useStocksClosed } from "@/lib/region";
 import { quoteSwap, isRelayNoRoute, type SwapQuote } from "@/adapters/http/relay";
 import { launchOf } from "@/skills/launchpad";
 import { BASE } from "@/config/chain";
@@ -118,8 +119,13 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
     steps.reset();
   };
 
+  const closed = useStocksClosed();
+  const stocks = useStockAddresses(closed);
+  const touchesStock = closed && [sellChoice === "other" ? sellAddress : "", buyChoice === "other" ? buyAddress : ""].some((a) => a !== "" && isStock(a, stocks));
   const ready = wallet?.kind === "ready" ? wallet : null;
-  const blocker = !ready
+  const blocker = touchesStock
+    ? "Not offered in your region"
+    : !ready
     ? "Connect a wallet first"
     : sellChoice === "other" && sellAddress.trim() === ""
       ? "Enter the address of the token you pay"
@@ -248,6 +254,7 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
         </label>
       </fieldset>
 
+      {touchesStock ? <p className="crt__amber">{RESTRICTED_TEXT}</p> : null}
       {review === null ? (
         <Gel className="mf__cta" onClick={() => void onReview()} disabled={blocker !== null || reading}>
           {reading ? "Quoting…" : (blocker ?? "Get a quote")}

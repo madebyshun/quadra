@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
+import { forgetRegion } from "@/lib/region";
 
 /**
  * No test reaches the network.
@@ -32,6 +33,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   cleanup();
+  // the visitor's country is read once per page (lib/region.ts) — once per test here
+  forgetRegion();
   // a server-side test runs under `@vitest-environment node`, which has no localStorage
   if (typeof localStorage !== "undefined") localStorage.clear();
 });
