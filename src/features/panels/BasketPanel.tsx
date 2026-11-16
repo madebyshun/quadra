@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { baseStocks, spots, type BaseStock } from "@/adapters/http/markets";
 import { quoteSwap, type SwapQuote } from "@/adapters/http/relay";
 import { BASE, USDC } from "@/config/chain";
@@ -11,6 +11,7 @@ import { approveData, balanceOf, type Asset } from "@/lib/erc20";
 import { messageOf } from "@/lib/errors";
 import { RESTRICTED_TEXT, useStocksClosed } from "@/lib/region";
 import { tokenReceived, type TxRequest } from "@/lib/transact";
+import { QUOTE_ACCOUNT } from "@/skills/depth";
 import { tokenAmount, usd } from "@/skills/format";
 import { Crt } from "@/ui/Crt";
 import { Gel } from "@/ui/Gel";
@@ -18,6 +19,9 @@ import { useWalletSession } from "@/ui/WalletProvider";
 import { TxStepList, useTxSteps, type Step } from "@/features/panels/TxSteps";
 import { transfersPaused } from "@/features/panels/TradePanel";
 import { useBasketBatch } from "@/features/panels/useBasketBatch";
+import { BasketRecipes } from "@/features/panels/BasketRecipes";
+import { parseRecipe, recipeLink } from "@/lib/basketRecipes";
+import { measureStrength, type Strength } from "@/lib/basketStrength";
 import { BasketShare } from "@/features/panels/BasketShare";
 
 /**
@@ -89,10 +93,16 @@ export function BasketPanel() {
   const closed = useStocksClosed();
   const [list, setList] = useState<ReturnType<typeof catalog> | { readonly problem: string } | null>(null);
   const [rows, setRows] = useState<readonly Row[]>(PRESETS[0]!.picks.map(([s, w]) => ({ symbol: s, weight: String(w) })));
+  const [name, setName] = useState("My basket");
+  const [strength, setStrength] = useState<Strength | null>(null);
+  const [strengthProgress, setStrengthProgress] = useState<string | null>(null);
+  const [strengthAt, setStrengthAt] = useState<number | null>(null);
+  const [heldRefresh, setHeldRefresh] = useState(0);
+  const [heldProblem, setHeldProblem] = useState(false);
   const [amount, setAmount] = useState("");
   const [top, setTop] = useState(false);
   const [held, setHeld] = useState<readonly bigint[] | null>(null);
-  const [review, setReview] = useState<{ readonly priced: readonly Priced[]; readonly balance: bigint } | null>(null);
+  const [review, setReview] = useState<{ readonly priced: readonly Priced[]; readonly balance: bigint; readonly at: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   /** what each buyable leg delivered — `null` for one not bought yet, or whose receipt could not be read */
@@ -101,8 +111,10 @@ export function BasketPanel() {
   const [bought, setBought] = useState(0);
   const steps = useTxSteps();
   const ready = wallet?.kind === "ready" ? wallet : null;
+  const activeAccount = useRef(ready?.account);
+  activeAccount.current = ready?.account;
   const batch = useBasketBatch(ready?.account ?? null, signingProvider);
-  const purchaseLocked = busy || steps.running || batch.working || batch.pending !== null;
+  const purchaseLocked = strengthProgress !== null || busy || steps.running || batch.working || batch.pending !== null;
 
   useEffect(() => {
     setReview(null);
@@ -139,6 +151,8 @@ export function BasketPanel() {
 
   const edit = () => {
     setReview(null);
+    setStrength(null);
+    setStrengthAt(null);
     setError(null);
     setGot(null);
     setBought(0);
@@ -150,23 +164,26 @@ export function BasketPanel() {
   const key = resolved.legs.map((l) => l.asset.address).join();
   useEffect(() => {
     setHeld(null);
+    setHeldProblem(false);
     if (!ready || resolved.legs.length === 0) return;
     let live = true;
     const legs = resolved.legs;
     Promise.all([Promise.all(legs.map((l) => balanceOf(asAsset(l.asset), ready.account))), spots("base", legs.map((l) => l.asset.address))]).then(
       ([balances, prices]) => {
+        const unknown = legs.some((l, i) => balances[i]! > 0n && prices.get(l.asset.address.toLowerCase())?.price == null);
+        if (unknown) { if (live) setHeldProblem(true); return; }
         const value = legs.map((l, i) => {
           const p = prices.get(l.asset.address.toLowerCase())?.price ?? null;
           return p === null ? 0n : BigInt(Math.floor((Number(balances[i]!) / 10 ** l.asset.decimals) * p * 1e6));
         });
         if (live) setHeld(value);
       },
-      () => undefined,
+      () => { if (live) setHeldProblem(true); },
     );
     return () => {
       live = false;
     };
-  }, [key, ready]);
+  }, [key, ready, bought, batch.complete, heldRefresh]);
 
   const amounts = (total: bigint): bigint[] => {
     const w = resolved.legs.map((l) => l.weight);
@@ -184,7 +201,7 @@ export function BasketPanel() {
       const balance = await balanceOf(USDC_ASSET, ready!.account);
       const parts = amounts(total);
       const priced = await priceAll(resolved.legs.map((leg, i) => ({ leg, amount: parts[i]!, quote: null, problem: "not quoted yet" })));
-      setReview({ priced, balance });
+      setReview({ priced, balance, at: Date.now() });
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -220,7 +237,7 @@ export function BasketPanel() {
   const onRetry = async () => {
     setBusy(true);
     const priced = await priceAll(review!.priced);
-    setReview({ ...review!, priced });
+    setReview({ ...review!, priced, at: Date.now() });
     setBusy(false);
   };
 
@@ -252,6 +269,8 @@ export function BasketPanel() {
       ];
     });
     const done = await steps.run(signingProvider(), account, plan);
+    if (activeAccount.current !== account) return;
+    setReview({ ...r, at: Date.now(), priced: r.priced.map((p) => ({ ...p, quote: fresh.get(legs.indexOf(p)) ?? p.quote })) });
     if (done !== null) {
       // `done` holds the receipts of the legs attempted, in order; each pair is approve then buy, and
       // every one of those buys confirmed — so every one of them is measured, never `null`
@@ -293,7 +312,7 @@ export function BasketPanel() {
     // Conservative preparation budget, not a claim about Relay's quote expiry. The wallet
     // simulates the final atomic execution too; on-chain slippage/deadline checks still apply.
     if (Date.now() - started > 30_000) throw new Error("Refreshing the basket took too long. Nothing was sent — try again for fresh quotes.");
-    setReview({ ...review!, priced: review!.priced.map((p) => priced.find((fresh) => fresh.leg === p.leg) ?? p) });
+    setReview({ ...review!, at: Date.now(), priced: review!.priced.map((p) => priced.find((fresh) => fresh.leg === p.leg) ?? p) });
     return calls;
   });
 
@@ -314,6 +333,19 @@ export function BasketPanel() {
   const now = held ? weightsNow(held) : null;
   const buyable = priced.filter((p) => p.quote !== null);
 
+  const recipe = parseRecipe({ name, picks: rows.map((r) => [r.symbol.trim(), Number(r.weight)]) });
+  const checkStrength = async () => {
+    setStrength(null);
+    let asked = 0;
+    const result = await measureStrength(resolved.legs, async (leg, amount) => {
+      if (asked++ > 0) await sleep(PACE.gapMs);
+      return quoteLeg(ready?.account ?? QUOTE_ACCOUNT, leg.asset, amount);
+    }, (total, symbol) => setStrengthProgress(`Checking ${usd(total)} · ${symbol}…`));
+    setStrength(result);
+    setStrengthAt(Date.now());
+    setStrengthProgress(null);
+  };
+
   return (
     <div className="stack">
       <p className="panel__lede">
@@ -324,6 +356,7 @@ export function BasketPanel() {
 
       <fieldset className="group" disabled={purchaseLocked}>
         <legend>Basket</legend>
+        <BasketRecipes rows={rows} name={name} setName={setName} disabled={purchaseLocked} onLoad={(r) => { edit(); setName(r.name); setRows(r.picks.map(([symbol, weight]) => ({ symbol, weight: String(weight) }))); setAmount(""); setTop(false); }} />
         <div className="group__row group__row--actions" role="group" aria-label="Ready-made baskets">
           {PRESETS.map((p) => (
             <button
@@ -332,6 +365,7 @@ export function BasketPanel() {
               className="chip"
               onClick={() => {
                 edit();
+                setName(p.name);
                 setRows(p.picks.map(([s, w]) => ({ symbol: s, weight: String(w) })));
               }}
             >
@@ -389,6 +423,26 @@ export function BasketPanel() {
           Add an asset
         </button>
       </fieldset>
+
+      {ready && resolved.problem === null ? <section className="group" aria-label="Your basket holdings">
+        <h3>Your basket</h3>
+        <Gel quiet disabled={purchaseLocked} onClick={() => setHeldRefresh((n) => n + 1)}>Refresh holdings</Gel>
+        {held === null ? <p className="dim">{heldProblem ? "Holdings value unavailable — a balance or market price could not be read. Top-up is unavailable." : "Reading balances and market prices…"}</p> : <>
+          <table className="basket__review" aria-label="Basket target and current holdings"><thead><tr><th>Asset</th><th>Target</th><th>Now</th><th>Value</th></tr></thead><tbody>{resolved.legs.map((l, i) => <tr key={l.asset.address}><th scope="row">{l.asset.symbol}</th><td>{l.weight}%</td><td>{now![i]}%</td><td>{usd(Number(held[i]!) / 1e6)}</td></tr>)}</tbody></table>
+          <p className="dim">Total {usd(Number(held.reduce((sum, v) => sum + v, 0n)) / 1e6)} · wallet holdings at current DEX prices, not a separately managed account.</p>
+        </>}
+      </section> : null}
+      <section className="group" aria-label="Basket Strength">
+        <h3>Strength</h3>
+        <p className="dim">Test a buy of $100, $1K, $10K and $100K at your target weights. Each leg must have at most 2% quoted impact. Nothing is signed.</p>
+        <Gel quiet disabled={purchaseLocked || resolved.problem !== null} onClick={() => void checkStrength()}>Measure basket Strength</Gel>
+        {strengthProgress ? <p role="status">{strengthProgress}</p> : null}
+        {strength ? <div className="dim">
+          <p>{strength.passed > 0 ? `Measured buy depth ≥ ${usd(strength.passed)}` : "No tested size passed"}{strength.limiting && !strength.problem ? ` · ${strength.limiting} exceeded 2% at a ${usd(strength.tested)} basket buy.` : ""}</p>
+          {strength.problem ? <p>{strength.limiting} at {usd(strength.tested)}: not measured — {strength.problem}.</p> : null}
+          <p>Sampled quotes, not an exact maximum or a guarantee of execution. {new Date(strengthAt!).toLocaleTimeString()} · Relay.</p>
+        </div> : null}
+      </section>
 
       <label className="group__row">
         <span>Put in</span>
@@ -448,7 +502,7 @@ export function BasketPanel() {
                         ? p.problem
                         : p.quote
                           ? `≈ ${tokenAmount(p.quote.out, p.leg.asset.decimals, 4)} ${p.leg.asset.symbol} · ${impact === null ? "impact not given" : `${impact.toFixed(2)}% impact`}`
-                          : "nothing to add — already at its weight"}
+                          : "nothing to add in this allocation"}
                     </td>
                     {got && p.quote ? <td>{got[buyable.indexOf(p)] === null ? "not measured" : arrived(got[buyable.indexOf(p)]!, p.leg.asset)}</td> : null}
                   </tr>
@@ -485,8 +539,13 @@ export function BasketPanel() {
           <TxStepList states={steps.states} label="Buying the basket" />
           <BasketShare
             c={{
-              lines: buyable.map((p) => ({ symbol: p.leg.asset.symbol, weight: p.leg.weight, impact: impactOf(p.quote!) })),
+              lines: priced.map((p) => ({ symbol: p.leg.asset.symbol, weight: p.leg.weight, impact: p.quote ? impactOf(p.quote) : null, skipped: p.amount === 0n })),
               total: formatAmount(total, USDC.decimals),
+              name,
+              link: recipe ? recipeLink(recipe) : undefined,
+              state: batch.complete || (buyable.length > 0 && bought === buyable.length) ? "bought" : bought > 0 ? "partial" : "quoted",
+              topUp: top,
+              at: review.at,
             }}
           />
         </>

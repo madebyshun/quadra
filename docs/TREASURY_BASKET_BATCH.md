@@ -62,3 +62,32 @@ cover a $0.50 basket in sequential and atomic modes, exact fractional approvals,
 and a $0.50 top-up. A fresh live Base atomic simulation also passed for $0.15 NVDAc
 + $0.15 AAPLc + $0.20 WETH, each delivering at least its quoted minimum. No real
 transaction was submitted.
+
+
+## Basket management and share cards (2026-11-16)
+
+Saved recipes keep only a name and target weights in this browser (up to 20).
+Compact share links and QR codes reconstruct the target basket without copying
+wallet addresses, balances, funding amounts or permission to trade. Shared data is
+validated and asset symbols are resolved against the app's verified catalog again.
+Opening a link does not connect a wallet, quote, sign, or purchase automatically.
+
+The holdings view shows Target / Now / Value at DEX prices and can be refreshed.
+A missing price for a nonzero balance makes valuation and top-up unavailable;
+it is not silently valued at zero. Holdings are read again after purchases.
+
+Strength samples full-basket buys at $100 / $1,000 / $10,000 / $100,000 using
+exact target weights and paced Relay quotes. It reports a measured lower bound,
+not an exact maximum or a TVL-derived estimate. Missing or refused quotes remain
+unknown unless Relay explicitly reports excessive impact. Measurement is public,
+read-only and requires no wallet connection. A live 60/40 NVDAc/AAPLc probe at
+2026-11-16 15:11 UTC+7 passed all four sizes (eight real quotes). Nothing was sent.
+
+Cards include all target assets, including zero-allocation top-up legs. They show
+quoted, purchased or partially purchased status, label the weights as targets,
+and remove the old claim that every leg was signed separately. Up to ten assets
+fit without dropping a constituent. The four-asset top-up and ten-asset layouts
+were rendered to PNG and inspected; local browser checks verified saving and
+reopening a shared recipe. Unit/integration tests cover storage and malformed
+links, quote failures, unavailable holdings prices, top-up cards, all purchase
+states and account changes during a pending transaction.

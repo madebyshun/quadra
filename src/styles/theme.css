@@ -3523,3 +3523,7 @@
 
 /* Only the preferred basket action sticks; two sticky buttons overlap the review text. */
 .basket__sequential { width: 100%; min-height: 30px; }
+
+.basket__recipes { margin-bottom: 12px; }
+.basket__saved { list-style: none; padding: 0; margin: 0; }
+.basket__review th, .basket__review td { font-variant-numeric: tabular-nums; }

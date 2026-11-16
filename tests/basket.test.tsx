@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { erc20Abi } from "viem";
 import { BASE, USDC } from "@/config/chain";
@@ -26,6 +26,7 @@ import { contractAt, json, net, simulated, useNet } from "./net";
 useNet();
 afterEach(() => forgetCatalog());
 beforeEach(() => {
+  window.history.replaceState(null, "", "/");
   PACE.gapMs = 0;
   PACE.retryMs = [0, 0];
 });
@@ -57,6 +58,7 @@ function wallet() {
 function quoteFor(body: Json): Json {
   const q = copy(ROUTES_FX.relayUsdcNvda) as { steps: { id: string; items: { data: Json }[] }[]; details: { currencyIn: Json; currencyOut: { currency: Json } } };
   const amount = String(body.amount);
+  for (const step of q.steps) for (const item of step.items) item.data.from = body.user;
   q.details.currencyIn.amount = amount;
   q.details.currencyOut.currency.address = String(body.destinationCurrency).toLowerCase();
   const approve = q.steps.find((s) => s.id === "approve")!.items[0]!.data;
@@ -75,7 +77,7 @@ function delivered(token: string, amount: bigint): unknown {
   return r;
 }
 
-type World = { readonly relay?: (body: Json, i: number) => Response; readonly usdc?: bigint; readonly held?: bigint; readonly receipt?: (i: number) => unknown; readonly stocks?: unknown; readonly region?: string; readonly batchSim?: (params: readonly unknown[]) => unknown };
+type World = { readonly relay?: (body: Json, i: number) => Response; readonly usdc?: bigint; readonly held?: bigint; readonly receipt?: (i: number) => unknown; readonly stocks?: unknown; readonly region?: string; readonly batchSim?: (params: readonly unknown[]) => unknown; readonly noPrices?: boolean; readonly spotsError?: boolean };
 
 function world(w: World = {}) {
   const asked: Json[] = [];
@@ -94,7 +96,7 @@ function world(w: World = {}) {
     get: (url) => {
       if (url === "/api/region") return { country: w.region ?? null };
       if (url === `${STOCKS_PATH}/base`) return w.stocks ?? MARKETS_FX.coinbaseStocks;
-      if (url.startsWith("https://api.dexscreener.com/tokens/v1/base/")) return MARKETS_FX.dexBase;
+      if (url.startsWith("https://api.dexscreener.com/tokens/v1/base/")) return w.spotsError ? json({}, 502) : w.noPrices ? [] : MARKETS_FX.dexBase;
       return undefined;
     },
     rpc: (m, p) => {
@@ -287,8 +289,8 @@ describe("the Treasury Basket window", () => {
     expect(String(sent[0]!.to).toLowerCase()).toBe(USDC.address.toLowerCase());
     expect(String(sent[0]!.data).endsWith((6_000_000n).toString(16).padStart(64, "0"))).toBe(true);
     expect(String(sent[2]!.data).endsWith((4_000_000n).toString(16).padStart(64, "0"))).toBe(true);
-    expect(screen.getByRole("table")).toHaveTextContent("arrived: 0.3 NVDAc");
-    expect(screen.getByRole("table")).toHaveTextContent("arrived: 0 AAPLc");
+    expect(screen.getByRole("table", { name: "The basket, quoted" })).toHaveTextContent("arrived: 0.3 NVDAc");
+    expect(screen.getByRole("table", { name: "The basket, quoted" })).toHaveTextContent("arrived: 0 AAPLc");
   });
 
   it("quotes and buys a basket below 1 USDC with exact fractional approvals", async () => {
@@ -343,7 +345,7 @@ describe("the Treasury Basket window", () => {
     await userEvent.click(cta());
     await settle();
     expect(cta()).toHaveTextContent("A leg cannot be bought — see it above");
-    expect(screen.getByRole("table")).toHaveTextContent("Relay: No routes found.");
+    expect(screen.getByRole("table", { name: "The basket, quoted" })).toHaveTextContent("Relay: No routes found.");
     busy = false;
     await userEvent.click(screen.getByRole("button", { name: "Quote the failed ones again" }));
     await settle();
@@ -355,7 +357,7 @@ describe("the Treasury Basket window", () => {
     await userEvent.type(screen.getByLabelText("USDC to put in"), "0");
     await userEvent.click(cta());
     await settle();
-    expect(screen.getByRole("table")).toHaveTextContent("moves its market 3.10% — too thin for this size");
+    expect(screen.getByRole("table", { name: "The basket, quoted" })).toHaveTextContent("moves its market 3.10% — too thin for this size");
   });
 
   it("says when the wallet has too little USDC, an impact Relay did not give, and a typo in the amount", async () => {
@@ -372,7 +374,7 @@ describe("the Treasury Basket window", () => {
     await userEvent.type(screen.getByLabelText("USDC to put in"), "10");
     await userEvent.click(cta());
     await settle();
-    expect(screen.getByRole("table")).toHaveTextContent("impact not given");
+    expect(screen.getByRole("table", { name: "The basket, quoted" })).toHaveTextContent("impact not given");
     expect(cta()).toHaveTextContent("Not enough USDC");
   });
 
@@ -453,7 +455,7 @@ describe("the Treasury Basket window", () => {
     await userEvent.click(screen.getByRole("button", { name: "Buy the basket — 5 USDC" }));
     await settle();
     expect(screen.getByText(/User rejected the request/)).toBeInTheDocument();
-    expect(screen.getByRole("table")).not.toHaveTextContent("arrived");
+    expect(screen.getByRole("table", { name: "The basket, quoted" })).not.toHaveTextContent("arrived");
   });
 
   it("shows each asset's weight now, and tops up toward the weights when asked", async () => {
@@ -473,7 +475,7 @@ describe("the Treasury Basket window", () => {
     await settle();
     // NVDA is already far over its half, so the whole 0.5 USDC goes to AAPL
     expect(asked.map((a) => [String(a.destinationCurrency).toLowerCase(), a.amount])).toEqual([[AAPL_ON_BASE.toLowerCase(), "500000"]]);
-    expect(screen.getByRole("table")).toHaveTextContent("nothing to add — already at its weight");
+    expect(screen.getByRole("table", { name: "The basket, quoted" })).toHaveTextContent("nothing to add in this allocation");
   });
 });
 
@@ -538,7 +540,7 @@ describe("Treasury Basket atomic purchase", () => {
     await userEvent.click(batchBuy());
     await settle();
     expect((wallet.sent[0]!.calls as unknown[])).toHaveLength(2);
-    expect(screen.getByRole("table")).toHaveTextContent("already at its weight");
+    expect(screen.getByRole("table", { name: "The basket, quoted" })).toHaveTextContent("nothing to add in this allocation");
   });
 
   it("shows capability discovery while the wallet is still answering", async () => {
@@ -567,7 +569,7 @@ describe("Treasury Basket atomic purchase", () => {
     expect(calls).toHaveLength(4);
     expect(calls[0]!.data).toBe(approveData(RELAY.approvalProxy, 6_000_000n));
     expect(calls[2]!.data).toBe(approveData(RELAY.approvalProxy, 4_000_000n));
-    expect(screen.getByRole("table")).toHaveTextContent("arrived: 0.3 NVDAc");
+    expect(screen.getByRole("table", { name: "The basket, quoted" })).toHaveTextContent("arrived: 0.3 NVDAc");
     expect(batchBuy()).toBeDisabled();
     expect(cta()).toBeDisabled();
     await userEvent.type(screen.getByLabelText("USDC to put in"), "0");
@@ -592,7 +594,7 @@ describe("Treasury Basket atomic purchase", () => {
     await userEvent.click(screen.getByRole("button", { name: "Check basket status" }));
     await settle();
     expect(wallet.sent).toHaveLength(1);
-    expect(screen.getByRole("table")).toHaveTextContent("arrived: 0.3 NVDAc");
+    expect(screen.getByRole("table", { name: "The basket, quoted" })).toHaveTextContent("arrived: 0.3 NVDAc");
     expect(batchBuy()).toBeDisabled();
   });
 
@@ -649,12 +651,101 @@ describe("Treasury Basket atomic purchase", () => {
   it("refuses preparation that took too long", async () => {
     const wallet = batchWallet();
     let clock = 1000;
-    vi.spyOn(Date, "now").mockImplementation(() => clock);
+    const clockSpy = vi.spyOn(Date, "now").mockImplementation(() => clock);
     world({ relay: (body) => { clock += 31_000; return json(quoteFor(body)); } });
     await reviewBatch();
     await userEvent.click(batchBuy());
     await settle();
     expect(screen.getByRole("status")).toHaveTextContent("took too long");
     expect(wallet.sent).toHaveLength(0);
+    clockSpy.mockRestore();
   });
+  it("measures Strength from weighted quotes without requesting a signature", async () => {
+    const sent = wallet();
+    const asked = world();
+    mount(); await settle();
+    await basket([["NVDA", "60"], ["AAPL", "40"]]);
+    await userEvent.click(screen.getByRole("button", { name: "Measure basket Strength" }));
+    await settle();
+    const strength = screen.getByRole("region", { name: "Basket Strength" });
+    await waitFor(() => expect(strength).toHaveTextContent("Measured buy depth ≥ $100,000.00"));
+    expect(asked).toHaveLength(8);
+    expect(sent).toHaveLength(0);
+    expect(asked[0]!.amount).toBe("60000000");
+    await userEvent.click(screen.getByRole("button", { name: "Refresh holdings" }));
+    await settle();
+    expect(screen.getByRole("table", { name: "Basket target and current holdings" })).toHaveTextContent("NVDAc60%");
+  });
+
+  it("names the limiting Strength leg, keeps missing data unknown and reports holdings failures", async () => {
+    wallet();
+    world({ held: 100n, noPrices: true, relay: (body) => json({ ...quoteFor(body), details: { ...(quoteFor(body).details as Json), totalImpact: { percent: "-3" } } }) });
+    mount(); await settle();
+    await basket([["NVDA", "100"]]);
+    await settle();
+    expect(screen.getByRole("region", { name: "Your basket holdings" })).toHaveTextContent("Holdings value unavailable");
+    await userEvent.click(screen.getByRole("button", { name: "Measure basket Strength" })); await settle();
+    expect(screen.getByRole("region", { name: "Basket Strength" })).toHaveTextContent("No tested size passed · NVDAc exceeded 2%");
+    world({ spotsError: true, relay: () => json({ message: "No routes found" }, 400) });
+    await userEvent.click(screen.getByRole("button", { name: "Refresh holdings" })); await settle();
+    await userEvent.click(screen.getByRole("button", { name: "Measure basket Strength" })); await settle();
+    expect(screen.getByRole("region", { name: "Basket Strength" })).toHaveTextContent("not measured — Relay: No routes found");
+  });
+
+  it("loads a shared target without copying an amount or signing and keeps the full top-up card", async () => {
+    const sent = wallet(); world({ held: 10n ** 8n });
+    const recipe = { name: "My AI", picks: [["NVDA", 60], ["AAPL", 40]] };
+    window.history.replaceState(null, "", `/?do=basket&basket=${encodeURIComponent(JSON.stringify(recipe))}`);
+    mount(); await settle();
+    expect(screen.getByLabelText("Basket name")).toHaveValue("My AI");
+    expect(screen.getByLabelText("Asset 1")).toHaveValue("NVDA");
+    expect(screen.getByLabelText("USDC to put in")).toHaveValue("");
+    expect(sent).toHaveLength(0);
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.type(screen.getByLabelText("USDC to put in"), "0.5");
+    await userEvent.click(cta()); await settle();
+    const card = screen.getByRole("img", { name: "Treasury Basket card" });
+    expect(card).toHaveTextContent("2 assets, 1 basket");
+    expect(card).toHaveTextContent("NVDAc60%not bought this time");
+    expect(card).toHaveTextContent("AAPLc40%");
+    await userEvent.clear(screen.getByLabelText("Basket name"));
+    expect(screen.getByRole("link", { name: "Post on X" }).getAttribute("href")).not.toContain("basket%3D");
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("does not restore a previous wallet's review when its transaction finishes after switching accounts", async () => {
+    let account = USER;
+    let notify: () => void = () => {};
+    let approve!: (hash: string) => void;
+    vi.stubGlobal("ethereum", {
+      on: (event: string, callback: () => void) => { if (event === "accountsChanged") notify = callback; },
+      removeListener: () => {},
+      request: async ({ method }: Eip1193Request) => {
+        if (method === "eth_accounts") return [account];
+        if (method === "eth_chainId") return BASE.idHex;
+        if (method === "eth_sendTransaction") return new Promise<string>((resolve) => { approve = resolve; });
+        throw Error("unsupported");
+      },
+    });
+    world(); await reviewBatch("0.5");
+    await userEvent.click(cta());
+    await waitFor(() => expect(approve).toBeDefined());
+    await act(async () => { account = `0x${"12".repeat(20)}`; notify(); });
+    await settle();
+    await act(async () => { approve(HASH); });
+    await settle();
+    expect(screen.queryByRole("table", { name: "The basket, quoted" })).not.toBeInTheDocument();
+    expect(cta()).toHaveTextContent("Quote the basket");
+  });
+
+  it("lets a visitor measure Strength without connecting or signing a wallet", async () => {
+    const asked = world();
+    mount(); await settle();
+    await basket([["NVDA", "100"]]);
+    await userEvent.click(screen.getByRole("button", { name: "Measure basket Strength" }));
+    await waitFor(() => expect(screen.getByRole("region", { name: "Basket Strength" })).toHaveTextContent("Measured buy depth ≥"));
+    expect(asked).toHaveLength(4);
+    expect(asked[0]!.user).toBe("0x000000000000000000000000000000000000dEaD");
+  });
+
 });
