@@ -6,7 +6,7 @@ import { BASE, USDC } from "@/config/chain";
 import { RELAY } from "@/config/routes";
 import { forgetCatalog, parseBaseStocks } from "@/adapters/http/markets";
 import { approveData } from "@/lib/erc20";
-import { basketProblem, dustProblem, MAX_LEGS, PRESETS, split, topUp, weightsNow, type Leg } from "@/lib/basket";
+import { basketProblem, MAX_LEGS, PRESETS, split, topUp, weightsNow, type Leg } from "@/lib/basket";
 import { TRANSFER_TOPIC } from "@/lib/transact";
 import { STOCKS_PATH } from "@/server/stocks";
 import { BasketPanel, catalog, PACE, quoteLeg } from "@/features/panels/BasketPanel";
@@ -155,18 +155,10 @@ describe("a basket's arithmetic", () => {
     expect(basketProblem(legs(60, 40))).toBeNull();
   });
 
-  it("names a leg too small to swap — one in its own words, several together, and none when all are big enough", () => {
-    const a = { symbol: "A0", address: `0x${String(0).padStart(40, "0")}`, decimals: 8, kind: "stock" as const };
-    const b = { symbol: "A1", address: `0x${String(1).padStart(40, "0")}`, decimals: 8, kind: "stock" as const };
-    const two = [
-      { asset: a, weight: 50 },
-      { asset: b, weight: 50 },
-    ];
-    expect(dustProblem([500_000n, 500_000n], two)).toBe("A0, A1 would each be under 1 USDC — put in more, or give those assets more weight.");
-    expect(dustProblem([500_000n, 20_000_000n], two)).toBe("A0 would be under 1 USDC — put in more, or give that asset more weight.");
-    expect(dustProblem([1_000_000n, 20_000_000n], two)).toBeNull();
-    // a leg the top-up left at zero is already at its weight, not dust
-    expect(dustProblem([0n, 20_000_000n], two)).toBeNull();
+  it("preserves USDC precision for small test baskets without imposing a dollar floor", () => {
+    expect(split(500_000n, [50, 50])).toEqual([250_000n, 250_000n]);
+    expect(split(10_001n, [50, 50])).toEqual([5_001n, 5_000n]);
+    expect(split(1n, [50, 50])).toEqual([1n, 0n]);
   });
 
   it("splits exactly what was typed — floored, the remainder to the largest leg", () => {
@@ -299,22 +291,35 @@ describe("the Treasury Basket window", () => {
     expect(screen.getByRole("table")).toHaveTextContent("arrived: 0 AAPLc");
   });
 
-  it("refuses a leg too small to swap before quoting, and says which assets", async () => {
+  it("quotes and buys a basket below 1 USDC with exact fractional approvals", async () => {
+    const sent = wallet();
+    const asked = world();
+    mount();
+    await settle();
+    await basket([["NVDA", "50"], ["AAPL", "50"]]);
+    await userEvent.type(screen.getByLabelText("USDC to put in"), "0.5");
+    await userEvent.click(cta());
+    await settle();
+    expect(asked.map((q) => q.amount)).toEqual(["250000", "250000"]);
+    expect(cta()).toHaveTextContent("Buy the basket — 0.5 USDC");
+    await userEvent.click(cta());
+    await settle();
+    expect(sent).toHaveLength(4);
+    expect(sent[0]!.data).toBe(approveData(RELAY.approvalProxy, 250_000n));
+    expect(sent[2]!.data).toBe(approveData(RELAY.approvalProxy, 250_000n));
+  });
+
+  it("refuses zero USDC before requesting quotes", async () => {
     wallet();
     const asked = world();
     mount();
     await settle();
-    await basket([
-      ["NVDA", "50"],
-      ["AAPL", "50"],
-    ]);
-    // $1 over two legs is 50 cents each — under MIN_LEG, a size not worth a signature and its gas
-    await userEvent.type(screen.getByLabelText("USDC to put in"), "1");
+    await basket([["NVDA", "100"]]);
+    await userEvent.type(screen.getByLabelText("USDC to put in"), "0");
     await userEvent.click(cta());
     await settle();
-    expect(screen.getByLabelText("Basket")).toHaveTextContent("NVDAc, AAPLc would each be under 1 USDC — put in more, or give those assets more weight.");
+    expect(screen.getByText("Enter an amount above 0 USDC.")).toBeInTheDocument();
     expect(asked).toHaveLength(0);
-    expect(cta()).toHaveTextContent("Quote the basket");
   });
 
   it("stops at a leg that is too thin or could not be quoted, and quotes only the failed ones again", async () => {
@@ -463,11 +468,11 @@ describe("the Treasury Basket window", () => {
     await settle();
     expect(screen.getAllByText(/^now \d+(\.\d)?%$/)).toHaveLength(2);
     await userEvent.click(screen.getByRole("checkbox"));
-    await userEvent.type(screen.getByLabelText("USDC to put in"), "10");
+    await userEvent.type(screen.getByLabelText("USDC to put in"), "0.5");
     await userEvent.click(cta());
     await settle();
-    // NVDA is already far over its half, so the whole 10 USDC goes to AAPL
-    expect(asked.map((a) => [String(a.destinationCurrency).toLowerCase(), a.amount])).toEqual([[AAPL_ON_BASE.toLowerCase(), "10000000"]]);
+    // NVDA is already far over its half, so the whole 0.5 USDC goes to AAPL
+    expect(asked.map((a) => [String(a.destinationCurrency).toLowerCase(), a.amount])).toEqual([[AAPL_ON_BASE.toLowerCase(), "500000"]]);
     expect(screen.getByRole("table")).toHaveTextContent("nothing to add — already at its weight");
   });
 });
@@ -495,17 +500,30 @@ function batchWallet(status = "supported") {
   return { sent, outcome: (value: typeof outcome) => { outcome = value; }, reject: () => { reject = true; } };
 }
 
-async function reviewBatch() {
+async function reviewBatch(amount = "10") {
   mount();
   await settle();
   await basket([["NVDA", "60"], ["AAPL", "40"]]);
-  await userEvent.type(screen.getByLabelText("USDC to put in"), "10");
+  await userEvent.type(screen.getByLabelText("USDC to put in"), amount);
   await userEvent.click(cta());
   await settle();
 }
 const batchBuy = () => screen.getByRole("button", { name: "Buy basket · 1 confirmation" });
 
 describe("Treasury Basket atomic purchase", () => {
+  it("buys below 1 USDC with one batch request and exact per-leg approvals", async () => {
+    const wallet = batchWallet();
+    const asked = world();
+    await reviewBatch("0.5");
+    await userEvent.click(batchBuy());
+    await settle();
+    expect(asked.map((q) => q.amount)).toEqual(["300000", "200000", "300000", "200000"]);
+    expect(wallet.sent).toHaveLength(1);
+    const calls = wallet.sent[0]!.calls as Json[];
+    expect(calls[0]!.data).toBe(approveData(RELAY.approvalProxy, 300_000n));
+    expect(calls[2]!.data).toBe(approveData(RELAY.approvalProxy, 200_000n));
+  });
+
   it("batches only the underweight top-up asset and preserves the zero leg in review", async () => {
     const wallet = batchWallet();
     world({ held: 10n ** 8n });

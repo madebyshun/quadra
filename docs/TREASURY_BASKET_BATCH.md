@@ -52,3 +52,13 @@ for an on-chain revert. Wallet upgrades may require an initial extra confirmatio
 
 This verifies Relay call composability with an atomic executor. It does not claim a
 real user wallet signed a batch; the final confirmation UI depends on that wallet.
+
+## Small test purchases (2026-11-16)
+
+Removed the app-imposed $1 minimum per asset. Any positive total representable in
+USDC's six decimals can request quotes; Relay's actual route/amount refusals remain
+visible per leg. Zero-USDC purchases are refused before quoting. Regression tests
+cover a $0.50 basket in sequential and atomic modes, exact fractional approvals,
+and a $0.50 top-up. A fresh live Base atomic simulation also passed for $0.15 NVDAc
++ $0.15 AAPLc + $0.20 WETH, each delivering at least its quoted minimum. No real
+transaction was submitted.

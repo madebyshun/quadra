@@ -6,7 +6,7 @@ import { TRADE_CRYPTO } from "@/config/markets";
 import { RELAY_PAIRS } from "@/config/routes";
 import { sameAddress } from "@/lib/address";
 import { formatAmount, parseAmount } from "@/lib/amount";
-import { basketProblem, dustProblem, PRESETS, split, topUp, weightsNow, type BasketAsset, type Leg } from "@/lib/basket";
+import { basketProblem, PRESETS, split, topUp, weightsNow, type BasketAsset, type Leg } from "@/lib/basket";
 import { approveData, balanceOf, type Asset } from "@/lib/erc20";
 import { messageOf } from "@/lib/errors";
 import { RESTRICTED_TEXT, useStocksClosed } from "@/lib/region";
@@ -180,14 +180,9 @@ export function BasketPanel() {
     setError(null);
     try {
       const total = parseAmount(amount, USDC.decimals);
+      if (total === 0n) throw new Error("Enter an amount above 0 USDC.");
       const balance = await balanceOf(USDC_ASSET, ready!.account);
       const parts = amounts(total);
-      // a leg too small to swap is refused BEFORE a quote is asked for and before anything is signed
-      const dust = dustProblem(parts, resolved.legs);
-      if (dust !== null) {
-        setError(dust);
-        return;
-      }
       const priced = await priceAll(resolved.legs.map((leg, i) => ({ leg, amount: parts[i]!, quote: null, problem: "not quoted yet" })));
       setReview({ priced, balance });
     } catch (e) {
