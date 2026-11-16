@@ -9,9 +9,10 @@ import { messageOf } from "@/lib/errors";
 import { launchOf } from "@/skills/launchpad";
 import { explorer, short, tokenAmount } from "@/skills/format";
 import { Flywheel } from "./Flywheel";
+import "./About.css";
 
 /**
- * The plain page (2026-11-04, after c-na.dev): one scroll that says what this app is in ten seconds —
+ * The marketing page: one scroll that says what this app is in ten seconds —
  * for a visitor who arrives from a link and does not want a desktop first, and for whatever reads pages
  * without running them. The desktop stays the product; this page points at it.
  *
@@ -76,25 +77,85 @@ export function About() {
         <Link to="/" className="about__brand">
           {BRAND.name}
         </Link>
-        <Link to="/" className="gel">
-          Open the computer
-        </Link>
+        <nav aria-label="About navigation">
+          <a href="#tools">The tools</a>
+          <Link to="/docs">Docs</Link>
+          <Link to="/" className="about__button about__button--small">Open the computer <span aria-hidden="true">↗</span></Link>
+        </nav>
       </header>
 
       <section className="about__hero">
-        <h1>{BRAND.name}</h1>
-        <p className="about__lede">An on-chain supercomputer for {BASE.name}. Check a token before you buy it, launch a coin, trade it — every step signed in your own wallet.</p>
-        <div className="about__row">
-          <Link to="/" className="gel">
-            Open the computer
-          </Link>
-          <Link to="/?do=coins" className="gel gel--quiet">
-            Browse coins
-          </Link>
+        <img className="about__sky" src="/brand/computer-sky.webp" srcSet="/brand/computer-sky-480.webp 480w, /brand/computer-sky-960.webp 960w, /brand/computer-sky.webp 1536w" sizes="100vw" width="1536" height="1024" fetchPriority="high" alt="A cream-colored personal computer floating above the ocean under a blue sky" />
+        <div className="about__hero-inner">
+          <p className="about__eyebrow">A personal computer. An open world.</p>
+          <h1>{BRAND.name}</h1>
+          <h2>Your own<br />on-chain<br /><em>supercomputer.</em></h2>
+          <p className="about__lede">Research a token. Build a basket. Launch something new. Your corner of {BASE.name}, signed in your own wallet.</p>
+          <div className="about__row">
+            <Link to="/" className="about__button">Open the computer <span aria-hidden="true">↗</span></Link>
+            <a href="#tools" className="about__text-link">Take a look around <span aria-hidden="true">↓</span></a>
+          </div>
+          <p className="about__hero-note">Built on {BASE.name} · Your wallet holds the keys</p>
         </div>
       </section>
 
-      <section className="about__section" aria-label="Live">
+      <section className="about__tools" id="tools" aria-labelledby="about-tools-title">
+        <div className="about__section-head">
+          <p className="about__eyebrow">Good tools. Open windows.</p>
+          <h2 id="about-tools-title">A little curiosity.<br /><em>A lot you can do.</em></h2>
+          <p>Start with a question, a basket, or an idea. Connect your wallet when you are ready to act.</p>
+        </div>
+        <div className="about__doors">
+          <article className="about__tool">
+            <div className="about__window" aria-hidden="true">
+              <div className="about__window-bar"><span>Token Verdict</span></div>
+              <div className="about__check-art">
+                <span className="about__art-label">BEFORE YOU BUY</span>
+                <strong>Look a<br />little closer.</strong>
+                <span>Simulation · Code · Holders</span>
+              </div>
+            </div>
+            <h3>Check before you act.</h3>
+            <p>Simulate a buy and a sell, inspect the code, and read the holders and launcher. See what was checked and what could not be read.</p>
+            <Link to="/?do=safety" className="about__tool-link">Check a token <span aria-hidden="true">↗</span></Link>
+          </article>
+          <article className="about__tool">
+            <div className="about__window" aria-hidden="true">
+              <div className="about__window-bar"><span>Treasury Basket</span></div>
+              <div className="about__basket-art">
+                <span className="about__art-label">YOUR MIX. YOUR WALLET.</span>
+                <strong>A basket,<br /><em>held by you.</em></strong>
+                <div className="about__basket-bars"><i /><i /><i /><i /></div>
+                <span>Stocks + crypto on {BASE.name}</span>
+              </div>
+            </div>
+            <h3>Make your own mix.</h3>
+            <p>Choose assets and target weights, review a fresh quote, then buy a Treasury Basket. You hold the individual assets in your wallet.</p>
+            <Link to="/?do=basket" className="about__tool-link">Build a basket <span aria-hidden="true">↗</span></Link>
+          </article>
+          <article className="about__tool">
+            <div className="about__window" aria-hidden="true">
+              <div className="about__window-bar"><span>Launch</span></div>
+              <div className="about__launch-art">
+                <span className="about__art-label">AN IDEA, MEET A MARKET.</span>
+                <strong>Something<br /><em>starts here.</em></strong>
+                <span className="about__pair">Your coin <b>↔</b> ETH / Stock</span>
+              </div>
+            </div>
+            <h3>Give an idea a market.</h3>
+            <p>Launch a fixed-supply coin paired with ETH or a supported tokenized stock. Its supply starts in a Uniswap v4 pool with permanently locked liquidity.</p>
+            <Link to="/?do=launch" className="about__tool-link">Launch a coin <span aria-hidden="true">↗</span></Link>
+          </article>
+        </div>
+        <div className="about__more">
+          <span>Already have something in mind?</span>
+          <Link to="/?do=coins">Browse coins <span aria-hidden="true">↗</span></Link>
+          <Link to="/?do=trade">Trade on {BASE.name} <span aria-hidden="true">↗</span></Link>
+        </div>
+      </section>
+
+      <section className="about__section about__live" aria-label="Live">
+        <p className="about__eyebrow">From the chain, when you arrive</p>
         <h2>Live on {BASE.name}</h2>
         <div className="about__figures">
           <Figure label="coins launched here" value={shown(stats, (s) => s.coins.toLocaleString("en-US"))} />
@@ -106,24 +167,7 @@ export function About() {
       </section>
 
       <section className="about__section">
-        <h2>Three things it does</h2>
-        <div className="about__doors">
-          <div>
-            <h3>Check</h3>
-            <p>Paste any token. A buy and a sell are simulated on {BASE.name} right now, then its code, holders and launcher are read — one answer: high risk, caution, or no red flags.</p>
-          </div>
-          <div>
-            <h3>Launch</h3>
-            <p>A coin with a fixed supply and no admin, its whole supply in a Uniswap v4 pool nobody can pull, paired with ETH or a tokenized stock. 80% of every trade's fee is the launcher's.</p>
-          </div>
-          <div>
-            <h3>Trade</h3>
-            <p>Buy or sell a coin on its own pool, with ETH or its pair. Every transaction is simulated and shown to you before your wallet signs it.</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="about__section">
+        <p className="about__eyebrow">Follow the flow</p>
         <h2>Every coin launched here feeds {BRAND.ticker}</h2>
         <Flywheel />
         <p className="about__note">
@@ -148,6 +192,7 @@ export function About() {
       </section>
 
       <section className="about__section">
+        <p className="about__eyebrow">Another way in</p>
         <h2>For agents</h2>
         <p>
           Every check is also a tool an AI agent can call — over MCP, or paid per call in USDC over x402. See the <Link to="/docs">Docs</Link> and the <Link to="/api">API</Link>.
@@ -155,12 +200,12 @@ export function About() {
       </section>
 
       <footer className="about__foot">
-        <Link to="/" className="gel">
-          Open the computer
-        </Link>
-        <span>
-          {BRAND.name} · {BRAND.x} · built on {BASE.name}
-        </span>
+        <div className="about__foot-inner">
+          <p className="about__eyebrow">The desktop is yours.</p>
+          <h2>Make yourself<br /><em>at home.</em></h2>
+          <Link to="/" className="about__button">Open the computer <span aria-hidden="true">↗</span></Link>
+          <div className="about__colophon"><span>{BRAND.name} · {BRAND.x} · built on {BASE.name}</span><Link to="/docs">Read the docs ↗</Link></div>
+        </div>
       </footer>
     </div>
   );

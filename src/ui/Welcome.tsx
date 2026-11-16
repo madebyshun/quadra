@@ -60,6 +60,10 @@ export function Welcome({ onClose }: { onClose: () => void }) {
           </h2>
         </div>
         <div className="win__body welcome__body">
+          <div className="welcome__sky" aria-hidden="true">
+            <img src="/brand/computer-sky-480.webp" width="480" height="320" alt="" />
+            <span>A personal computer.<br /><em>An open world.</em></span>
+          </div>
           <h1 id="welcome-title" className="welcome__head">
             Welcome to <b>{BRAND.name}</b>
           </h1>

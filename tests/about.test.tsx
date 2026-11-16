@@ -33,6 +33,9 @@ describe("the About page", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(BRAND.name);
     expect(screen.getAllByRole("link", { name: "Open the computer" })[0]).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Browse coins" })).toHaveAttribute("href", "/?do=coins");
+    expect(screen.getByRole("link", { name: "Check a token" })).toHaveAttribute("href", "/?do=safety");
+    expect(screen.getByRole("link", { name: "Build a basket" })).toHaveAttribute("href", "/?do=basket");
+    expect(screen.getByRole("link", { name: "Launch a coin" })).toHaveAttribute("href", "/?do=launch");
     expect(screen.getByRole("heading", { name: "What it never does" })).toBeInTheDocument();
     expect(figure("coins launched here")).toBe("…");
     await settle();

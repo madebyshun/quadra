@@ -14,6 +14,8 @@ separate repo and must stay that way.
 
 These came from ShunTr directly. They are not preferences.
 
+- **Language (owner, 2026-11-16): reports, explanations and direct communication for the owner are in Vietnamese. All product-facing content, UI, marketing copy, image text, code and code comments are entirely in English. Preserve product names, code identifiers, contract addresses and source links.**
+
 - **Separate repo. Never build it inside `blue-agent`.** The two live side by side at
   `~/projects/quadra` and `~/projects/blue-agent`. Do not edit anything in `blue-agent` on
   Quadra's behalf — not its config, not its `.claude/launch.json`, nothing. If a tool needs
