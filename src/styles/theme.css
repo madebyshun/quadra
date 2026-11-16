@@ -3520,3 +3520,6 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+/* Only the preferred basket action sticks; two sticky buttons overlap the review text. */
+.basket__sequential { width: 100%; min-height: 30px; }

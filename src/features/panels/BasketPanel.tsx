@@ -6,7 +6,7 @@ import { TRADE_CRYPTO } from "@/config/markets";
 import { RELAY_PAIRS } from "@/config/routes";
 import { sameAddress } from "@/lib/address";
 import { formatAmount, parseAmount } from "@/lib/amount";
-import { basketProblem, PRESETS, split, topUp, weightsNow, type BasketAsset, type Leg } from "@/lib/basket";
+import { basketProblem, dustProblem, PRESETS, split, topUp, weightsNow, type BasketAsset, type Leg } from "@/lib/basket";
 import { approveData, balanceOf, type Asset } from "@/lib/erc20";
 import { messageOf } from "@/lib/errors";
 import { RESTRICTED_TEXT, useStocksClosed } from "@/lib/region";
@@ -17,6 +17,7 @@ import { Gel } from "@/ui/Gel";
 import { useWalletSession } from "@/ui/WalletProvider";
 import { TxStepList, useTxSteps, type Step } from "@/features/panels/TxSteps";
 import { transfersPaused } from "@/features/panels/TradePanel";
+import { useBasketBatch } from "@/features/panels/useBasketBatch";
 import { BasketShare } from "@/features/panels/BasketShare";
 
 /**
@@ -94,9 +95,21 @@ export function BasketPanel() {
   const [review, setReview] = useState<{ readonly priced: readonly Priced[]; readonly balance: bigint } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [got, setGot] = useState<readonly bigint[] | null>(null);
+  /** what each buyable leg delivered — `null` for one not bought yet, or whose receipt could not be read */
+  const [got, setGot] = useState<readonly (bigint | null)[] | null>(null);
+  /** how many legs at the FRONT of the plan have confirmed — a failed leg is retried from here */
+  const [bought, setBought] = useState(0);
   const steps = useTxSteps();
   const ready = wallet?.kind === "ready" ? wallet : null;
+  const batch = useBasketBatch(ready?.account ?? null, signingProvider);
+  const purchaseLocked = busy || steps.running || batch.working || batch.pending !== null;
+
+  useEffect(() => {
+    setReview(null);
+    setBought(0);
+    setGot(null);
+    steps.reset();
+  }, [ready?.account]);
 
   useEffect(() => {
     let live = true;
@@ -128,6 +141,8 @@ export function BasketPanel() {
     setReview(null);
     setError(null);
     setGot(null);
+    setBought(0);
+    batch.reset();
     steps.reset();
   };
 
@@ -167,12 +182,19 @@ export function BasketPanel() {
       const total = parseAmount(amount, USDC.decimals);
       const balance = await balanceOf(USDC_ASSET, ready!.account);
       const parts = amounts(total);
+      // a leg too small to swap is refused BEFORE a quote is asked for and before anything is signed
+      const dust = dustProblem(parts, resolved.legs);
+      if (dust !== null) {
+        setError(dust);
+        return;
+      }
       const priced = await priceAll(resolved.legs.map((leg, i) => ({ leg, amount: parts[i]!, quote: null, problem: "not quoted yet" })));
       setReview({ priced, balance });
     } catch (e) {
       setError(messageOf(e));
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   };
 
   /** Quote every leg that has none yet, one at a time and spaced — the legs already quoted are kept. */
@@ -208,47 +230,104 @@ export function BasketPanel() {
   };
 
   /** Each leg is approve + buy, both built from ONE fresh quote taken when that leg's turn comes. */
-  const onBuy = async () => {
+  const onBuy = async (from = 0) => {
     const r = review!;
     const account = ready!.account;
     const legs = r.priced.filter((p) => p.quote !== null);
     const fresh = new Map<number, SwapQuote>();
-    const plan: Step[] = legs.flatMap((p, i): Step[] => [
-      {
-        label: `Approve exactly ${formatAmount(p.amount, USDC.decimals)} USDC for ${p.leg.asset.symbol}`,
-        build: async (): Promise<TxRequest> => {
-          const q = await quoteLeg(account, p.leg.asset, p.amount);
-          fresh.set(i, q);
-          const approve = q.steps.find((s) => s.label.startsWith("Approve"));
-          if (approve) return approve.tx;
-          // Relay saw an allowance already in place; set it to exactly this leg anyway, for the proxy this quote uses
-          const swap = q.steps[q.steps.length - 1]!;
-          const pair = RELAY_PAIRS.find((x) => sameAddress(x.approvalProxy, swap.tx.to))!;
-          return { to: USDC.address, data: approveData(pair.approvalProxy, p.amount) };
+    const plan: Step[] = legs.slice(from).flatMap((p, k): Step[] => {
+      const i = from + k;
+      return [
+        {
+          label: `Approve exactly ${formatAmount(p.amount, USDC.decimals)} USDC for ${p.leg.asset.symbol}`,
+          build: async (): Promise<TxRequest> => {
+            const q = await quoteLeg(account, p.leg.asset, p.amount);
+            const impact = impactOf(q);
+            if (impact !== null && impact > LOUD) throw new Error(`${p.leg.asset.symbol} now moves its market ${impact.toFixed(2)}% — review the basket again.`);
+            fresh.set(i, q);
+            const approve = q.steps.find((s) => s.label.startsWith("Approve"));
+            if (approve) return approve.tx;
+            // Relay saw an allowance already in place; set it to exactly this leg anyway, for the proxy this quote uses
+            const swap = q.steps[q.steps.length - 1]!;
+            const pair = RELAY_PAIRS.find((x) => sameAddress(x.approvalProxy, swap.tx.to))!;
+            return { to: USDC.address, data: approveData(pair.approvalProxy, p.amount) };
+          },
         },
-      },
-      { label: `Buy ${p.leg.asset.symbol}`, build: () => fresh.get(i)!.steps.at(-1)!.tx },
-    ]);
+        { label: `Buy ${p.leg.asset.symbol}`, build: () => fresh.get(i)!.steps.at(-1)!.tx },
+      ];
+    });
     const done = await steps.run(signingProvider(), account, plan);
-    if (done === null) return;
-    setGot(legs.map((p, i) => tokenReceived(done[i * 2 + 1]!, p.leg.asset.address, account)));
+    if (done !== null) {
+      // `done` holds the receipts of the legs attempted, in order; each pair is approve then buy, and
+      // every one of those buys confirmed — so every one of them is measured, never `null`
+      const measured = [...(got ?? buyable.map(() => null as bigint | null))];
+      legs.slice(from).forEach((p, k) => {
+        measured[buyable.indexOf(p)] = tokenReceived(done[k * 2 + 1]!, p.leg.asset.address, account);
+      });
+      setGot(measured);
+      setBought(buyable.length);
+      return;
+    }
+    // a leg failed or the wallet refused (MEASURED 2026-11-15: a buy reverted while its approval
+    // confirmed, and before this the whole button was dead afterwards): the legs before it DID
+    // confirm, so the next attempt must start there rather than at the top
+    const confirmed = steps.confirmed();
+    if (confirmed > 0) setBought(from + Math.floor(confirmed / 2));
   };
+
+  const onBatchBuy = () => batch.buy(async () => {
+    const priced: Priced[] = [];
+    const calls: TxRequest[] = [];
+    const started = Date.now();
+    for (const p of buyable.slice(bought)) {
+      if (calls.length > 0) await sleep(PACE.gapMs);
+      const q = await quoteLeg(ready!.account, p.leg.asset, p.amount);
+      const impact = impactOf(q);
+      if (impact !== null && impact > LOUD) throw new Error(`${p.leg.asset.symbol} now moves its market ${impact.toFixed(2)}% — review the basket again.`);
+      // A fresh exact approval for EVERY leg, even if Relay saw an old allowance. Interleaving
+      // approve/buy avoids overwriting an earlier leg's allowance when a proxy is shared.
+      if (q.steps.filter((step) => !step.label.startsWith("Approve")).length !== 1) throw new Error("A basket leg needs one same-chain swap. Nothing was sent.");
+      for (const step of q.steps) {
+        if (!step.label.startsWith("Approve")) {
+          const pair = RELAY_PAIRS.find((x) => sameAddress(x.approvalProxy, step.tx.to))!;
+          calls.push({ to: USDC.address, data: approveData(pair.approvalProxy, p.amount) }, step.tx);
+        }
+      }
+      priced.push({ ...p, quote: q });
+    }
+    // Conservative preparation budget, not a claim about Relay's quote expiry. The wallet
+    // simulates the final atomic execution too; on-chain slippage/deadline checks still apply.
+    if (Date.now() - started > 30_000) throw new Error("Refreshing the basket took too long. Nothing was sent — try again for fresh quotes.");
+    setReview({ ...review!, priced: review!.priced.map((p) => priced.find((fresh) => fresh.leg === p.leg) ?? p) });
+    return calls;
+  });
+
+  useEffect(() => {
+    if (batch.receipts === null || review === null) return;
+    const receipts = batch.receipts;
+    const measured = [...(got ?? buyable.map(() => null as bigint | null))];
+    buyable.slice(bought).forEach((p, i) => {
+      measured[bought + i] = receipts.reduce((sum, r) => sum + tokenReceived(r, p.leg.asset.address, ready!.account), 0n);
+    });
+    setGot(measured);
+    setBought(buyable.length);
+  }, [batch.receipts]);
 
   const priced = review?.priced ?? [];
   const total = priced.reduce((s, p) => s + p.amount, 0n);
   const stop = review === null ? null : priced.find((p) => p.problem !== null) ? "A leg cannot be bought — see it above" : review.balance < total ? "Not enough USDC" : null;
   const now = held ? weightsNow(held) : null;
-  const bought = priced.filter((p) => p.quote !== null);
+  const buyable = priced.filter((p) => p.quote !== null);
 
   return (
     <div className="stack">
       <p className="panel__lede">
         Buy a basket of stocks and crypto on {BASE.name} with USDC. Every asset lands in your own wallet — no index token, no manager, no basket fee. Each one is
-        quoted, checked and signed on its own.
+        quoted and checked. Compatible wallets can confirm the whole basket at once.
       </p>
       {closed ? <p className="crt__amber">{RESTRICTED_TEXT} A basket of crypto only still works.</p> : null}
 
-      <fieldset className="group">
+      <fieldset className="group" disabled={purchaseLocked}>
         <legend>Basket</legend>
         <div className="group__row group__row--actions" role="group" aria-label="Ready-made baskets">
           {PRESETS.map((p) => (
@@ -321,6 +400,7 @@ export function BasketPanel() {
         <input
           className="field"
           aria-label="USDC to put in"
+          disabled={purchaseLocked}
           inputMode="decimal"
           placeholder="0.00"
           value={amount}
@@ -335,6 +415,7 @@ export function BasketPanel() {
         <label className="group__row">
           <input
             type="checkbox"
+            disabled={purchaseLocked}
             checked={top}
             onChange={(e) => {
               edit();
@@ -351,8 +432,10 @@ export function BasketPanel() {
         </Crt>
       ) : null}
 
+      {batch.message ? <p role="status" className="tx__warn">{batch.message}</p> : null}
+      {batch.pending ? <div className="stack"><p className="dim">Batch ID: <code style={{ overflowWrap: "anywhere" }}>{batch.pending.id}</code>. Check the wallet for account {batch.pending.account}.</p><Gel quiet disabled={batch.working} onClick={() => void batch.refresh()}>Check basket status</Gel></div> : null}
       {review === null ? (
-        <Gel className="mf__cta" onClick={() => void onReview()} disabled={blocker !== null || busy}>
+        <Gel className="mf__cta" onClick={() => void onReview()} disabled={blocker !== null || purchaseLocked}>
           {busy ? "Quoting each asset…" : (blocker ?? "Quote the basket")}
         </Gel>
       ) : (
@@ -372,28 +455,42 @@ export function BasketPanel() {
                           ? `≈ ${tokenAmount(p.quote.out, p.leg.asset.decimals, 4)} ${p.leg.asset.symbol} · ${impact === null ? "impact not given" : `${impact.toFixed(2)}% impact`}`
                           : "nothing to add — already at its weight"}
                     </td>
-                    {got && p.quote ? <td>{arrived(got[bought.indexOf(p)]!, p.leg.asset)}</td> : null}
+                    {got && p.quote ? <td>{got[buyable.indexOf(p)] === null ? "not measured" : arrived(got[buyable.indexOf(p)]!, p.leg.asset)}</td> : null}
                   </tr>
                 );
               })}
             </tbody>
           </table>
+          {batch.capability === "supported" || batch.capability === "ready" ? (
+            <>
+              <p className="dim">One basket confirmation. All purchases succeed together or revert together; gas may still be charged.{batch.capability === "ready" ? " Your wallet may first ask you to enable batching." : ""}</p>
+              <Gel className="mf__cta" disabled={stop !== null || purchaseLocked || batch.complete || steps.states.some((s) => s.status === "slow") || bought >= buyable.length} onClick={() => void onBatchBuy()}>
+                {batch.working ? "Preparing basket…" : "Buy basket · 1 confirmation"}
+              </Gel>
+            </>
+          ) : <p className="dim">{batch.capability === "checking" ? "Checking whether your wallet can confirm the basket at once…" : "This wallet does not report atomic batching on Base. Buy step by step, or connect a compatible wallet."}</p>}
           <p className="dim">
-            {priced.filter((p) => p.quote).length * 2} signatures: for each asset, an approval of exactly its USDC, then the buy — each re-quoted the moment it is
+            Step by step: {priced.filter((p) => p.quote).length * 2} signatures: for each asset, an approval of exactly its USDC, then the buy — each re-quoted the moment it is
             signed, checked against Relay&apos;s verified contracts and simulated first. Your USDC: {formatAmount(review.balance, USDC.decimals)}.
           </p>
           {priced.some((p) => p.quote === null && p.problem !== null) ? (
-            <Gel quiet onClick={() => void onRetry()} disabled={busy || steps.running}>
+            <Gel quiet onClick={() => void onRetry()} disabled={purchaseLocked}>
               {busy ? "Quoting…" : "Quote the failed ones again"}
             </Gel>
           ) : null}
-          <Gel className="mf__cta" onClick={() => void onBuy()} disabled={stop !== null || steps.running || steps.states.length > 0}>
-            {stop ?? `Buy the basket — ${formatAmount(total, USDC.decimals)} USDC`}
+          <Gel quiet className="basket__sequential" onClick={() => void onBuy(bought)} disabled={stop !== null || purchaseLocked || batch.complete || steps.states.some((s) => s.status === "slow") || bought >= buyable.length}>
+            {stop ?? (bought > 0 ? `Buy the rest — ${formatAmount(buyable.slice(bought).reduce((s, p) => s + p.amount, 0n), USDC.decimals)} USDC` : `Buy the basket — ${formatAmount(total, USDC.decimals)} USDC`)}
           </Gel>
+          {bought > 0 && bought < buyable.length && !steps.running ? (
+            <p className="tx__warn">
+              {bought} of {buyable.length} bought. A leg can fail on chain after the ones before it confirmed — the button above starts at the next one, and
+              nothing already bought is charged again.
+            </p>
+          ) : null}
           <TxStepList states={steps.states} label="Buying the basket" />
           <BasketShare
             c={{
-              lines: bought.map((p) => ({ symbol: p.leg.asset.symbol, weight: p.leg.weight, impact: impactOf(p.quote!) })),
+              lines: buyable.map((p) => ({ symbol: p.leg.asset.symbol, weight: p.leg.weight, impact: impactOf(p.quote!) })),
               total: formatAmount(total, USDC.decimals),
             }}
           />

@@ -6,7 +6,7 @@ import { BASE, USDC } from "@/config/chain";
 import { RELAY } from "@/config/routes";
 import { forgetCatalog, parseBaseStocks } from "@/adapters/http/markets";
 import { approveData } from "@/lib/erc20";
-import { basketProblem, MAX_LEGS, PRESETS, split, topUp, weightsNow, type Leg } from "@/lib/basket";
+import { basketProblem, dustProblem, MAX_LEGS, PRESETS, split, topUp, weightsNow, type Leg } from "@/lib/basket";
 import { TRANSFER_TOPIC } from "@/lib/transact";
 import { STOCKS_PATH } from "@/server/stocks";
 import { BasketPanel, catalog, PACE, quoteLeg } from "@/features/panels/BasketPanel";
@@ -75,7 +75,7 @@ function delivered(token: string, amount: bigint): unknown {
   return r;
 }
 
-type World = { readonly relay?: (body: Json, i: number) => Response; readonly usdc?: bigint; readonly held?: bigint; readonly receipt?: (i: number) => unknown; readonly stocks?: unknown; readonly region?: string };
+type World = { readonly relay?: (body: Json, i: number) => Response; readonly usdc?: bigint; readonly held?: bigint; readonly receipt?: (i: number) => unknown; readonly stocks?: unknown; readonly region?: string; readonly batchSim?: (params: readonly unknown[]) => unknown };
 
 function world(w: World = {}) {
   const asked: Json[] = [];
@@ -98,6 +98,7 @@ function world(w: World = {}) {
       return undefined;
     },
     rpc: (m, p) => {
+      if (m === "eth_simulateV1") return w.batchSim ? w.batchSim(p) : [{ calls: ((p[0] as { blockStateCalls: { calls: unknown[] }[] }).blockStateCalls[0]!.calls).map(() => ({ status: "0x1" })) }];
       const sim = simulated()(m, p);
       if (sim !== undefined) return sim;
       if (m === "eth_getTransactionReceipt") return w.receipt?.(receipts++) ?? { status: "0x1", blockNumber: "0x2a", logs: [] };
@@ -138,7 +139,7 @@ async function basket(rows: readonly (readonly [string, string])[]) {
   }
 }
 
-const cta = () => screen.getByRole("button", { name: /Quote the basket|Quoting|Connect|Enter how much|Buy the basket|Not enough|cannot be bought|weights add|Add at least|is not a|Reading|transfers are paused|not offered|could not be read/ });
+const cta = () => screen.getByRole("button", { name: /Quote the basket|Quoting|Connect|Enter how much|Buy the (basket|rest)|Not enough|cannot be bought|weights add|Add at least|is not a|Reading|transfers are paused|not offered|could not be read/ });
 
 describe("a basket's arithmetic", () => {
   const asset = (n: number) => ({ symbol: `A${n}`, address: `0x${String(n).padStart(40, "0")}`, decimals: 8, kind: "stock" as const });
@@ -152,6 +153,20 @@ describe("a basket's arithmetic", () => {
     expect(basketProblem([...legs(50), { asset: asset(0), weight: 50 }])).toBe("A0 is in the basket twice.");
     expect(basketProblem(legs(60, 30))).toBe("The weights add up to 90%, not 100%.");
     expect(basketProblem(legs(60, 40))).toBeNull();
+  });
+
+  it("names a leg too small to swap — one in its own words, several together, and none when all are big enough", () => {
+    const a = { symbol: "A0", address: `0x${String(0).padStart(40, "0")}`, decimals: 8, kind: "stock" as const };
+    const b = { symbol: "A1", address: `0x${String(1).padStart(40, "0")}`, decimals: 8, kind: "stock" as const };
+    const two = [
+      { asset: a, weight: 50 },
+      { asset: b, weight: 50 },
+    ];
+    expect(dustProblem([500_000n, 500_000n], two)).toBe("A0, A1 would each be under 1 USDC — put in more, or give those assets more weight.");
+    expect(dustProblem([500_000n, 20_000_000n], two)).toBe("A0 would be under 1 USDC — put in more, or give that asset more weight.");
+    expect(dustProblem([1_000_000n, 20_000_000n], two)).toBeNull();
+    // a leg the top-up left at zero is already at its weight, not dust
+    expect(dustProblem([0n, 20_000_000n], two)).toBeNull();
   });
 
   it("splits exactly what was typed — floored, the remainder to the largest leg", () => {
@@ -284,6 +299,24 @@ describe("the Treasury Basket window", () => {
     expect(screen.getByRole("table")).toHaveTextContent("arrived: 0 AAPLc");
   });
 
+  it("refuses a leg too small to swap before quoting, and says which assets", async () => {
+    wallet();
+    const asked = world();
+    mount();
+    await settle();
+    await basket([
+      ["NVDA", "50"],
+      ["AAPL", "50"],
+    ]);
+    // $1 over two legs is 50 cents each — under MIN_LEG, a size not worth a signature and its gas
+    await userEvent.type(screen.getByLabelText("USDC to put in"), "1");
+    await userEvent.click(cta());
+    await settle();
+    expect(screen.getByLabelText("Basket")).toHaveTextContent("NVDAc, AAPLc would each be under 1 USDC — put in more, or give those assets more weight.");
+    expect(asked).toHaveLength(0);
+    expect(cta()).toHaveTextContent("Quote the basket");
+  });
+
   it("stops at a leg that is too thin or could not be quoted, and quotes only the failed ones again", async () => {
     wallet();
     let busy = true;
@@ -359,6 +392,43 @@ describe("the Treasury Basket window", () => {
     expect(sent[0]!.data).toBe(approveData(RELAY.approvalProxy, 5_000_000n));
   });
 
+  it("resumes at the leg that failed, rather than charging the confirmed legs again", async () => {
+    const sent = wallet();
+    // MEASURED 2026-11-15: a first leg's approval confirmed and its buy reverted on chain
+    world({
+      receipt: (i) => (i === 1 ? { status: "0x0", blockNumber: "0x2a", logs: [] } : undefined),
+    });
+    mount();
+    await settle();
+    await basket([
+      ["NVDA", "50"],
+      ["AAPL", "50"],
+    ]);
+    await userEvent.type(screen.getByLabelText("USDC to put in"), "10");
+    await userEvent.click(cta());
+    await settle();
+    await userEvent.click(screen.getByRole("button", { name: "Buy the basket — 10 USDC" }));
+    await settle();
+    expect(sent).toHaveLength(2);
+    // the failed leg is leg 0, so nothing confirmed: the whole basket is still offered
+    expect(cta()).toHaveTextContent("Buy the basket — 10 USDC");
+
+    // now the first leg succeeds and the second reverts: a retry must start at the second
+    const asked2 = world({ receipt: (i) => (i === 3 ? { status: "0x0", blockNumber: "0x2b", logs: [] } : undefined) });
+    await userEvent.click(cta());
+    await settle();
+    expect(sent).toHaveLength(6);
+    expect(cta()).toHaveTextContent("Buy the rest — 5 USDC");
+    expect(screen.getByText(/1 of 2 bought/)).toBeInTheDocument();
+    const before = asked2.length;
+    await userEvent.click(cta());
+    await settle();
+    // only the remaining leg was quoted and signed: one approval and one buy
+    expect(asked2.length - before).toBe(1);
+    expect(sent).toHaveLength(8);
+    expect(String(asked2.at(-1)!.destinationCurrency).toLowerCase()).toBe(AAPL_ON_BASE.toLowerCase());
+  });
+
   it("stops when the wallet refuses, and buys nothing past it", async () => {
     const provider: Eip1193Provider = {
       request(args: Eip1193Request) {
@@ -399,5 +469,174 @@ describe("the Treasury Basket window", () => {
     // NVDA is already far over its half, so the whole 10 USDC goes to AAPL
     expect(asked.map((a) => [String(a.destinationCurrency).toLowerCase(), a.amount])).toEqual([[AAPL_ON_BASE.toLowerCase(), "10000000"]]);
     expect(screen.getByRole("table")).toHaveTextContent("nothing to add — already at its weight");
+  });
+});
+
+
+function batchWallet(status = "supported") {
+  let id = "";
+  let outcome: "pending" | "confirmed" | "failed" = "confirmed";
+  let reject = false;
+  const sent: Json[] = [];
+  vi.stubGlobal("ethereum", { request: async ({ method, params }: Eip1193Request) => {
+    if (method === "eth_accounts") return [USER];
+    if (method === "eth_chainId") return BASE.idHex;
+    if (method === "wallet_getCapabilities") return { [BASE.idHex]: { atomic: { status } } };
+    if (method === "wallet_sendCalls") {
+      if (reject) throw { code: 4001 };
+      const request = params![0] as Json;
+      id = String(request.id);
+      sent.push(request);
+      return { id };
+    }
+    if (method === "wallet_getCallsStatus") return { id, chainId: BASE.idHex, status: outcome === "pending" ? 100 : outcome === "failed" ? 500 : 200, atomic: true, receipts: [delivered(NVDA_ON_BASE, 30_000_000n)] };
+    throw Error(`Unexpected wallet method ${method}`);
+  } });
+  return { sent, outcome: (value: typeof outcome) => { outcome = value; }, reject: () => { reject = true; } };
+}
+
+async function reviewBatch() {
+  mount();
+  await settle();
+  await basket([["NVDA", "60"], ["AAPL", "40"]]);
+  await userEvent.type(screen.getByLabelText("USDC to put in"), "10");
+  await userEvent.click(cta());
+  await settle();
+}
+const batchBuy = () => screen.getByRole("button", { name: "Buy basket · 1 confirmation" });
+
+describe("Treasury Basket atomic purchase", () => {
+  it("batches only the underweight top-up asset and preserves the zero leg in review", async () => {
+    const wallet = batchWallet();
+    world({ held: 10n ** 8n });
+    mount();
+    await settle();
+    await basket([["NVDA", "50"], ["AAPL", "50"]]);
+    await settle();
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.type(screen.getByLabelText("USDC to put in"), "10");
+    await userEvent.click(cta());
+    await settle();
+    await userEvent.click(batchBuy());
+    await settle();
+    expect((wallet.sent[0]!.calls as unknown[])).toHaveLength(2);
+    expect(screen.getByRole("table")).toHaveTextContent("already at its weight");
+  });
+
+  it("shows capability discovery while the wallet is still answering", async () => {
+    const sent = wallet();
+    const original = (globalThis as unknown as { ethereum: Eip1193Provider }).ethereum;
+    let resolve!: (value: unknown) => void;
+    vi.stubGlobal("ethereum", { request: (args: Eip1193Request) => args.method === "wallet_getCapabilities" ? new Promise((r) => { resolve = r; }) : original.request(args) });
+    world();
+    await reviewBatch();
+    expect(screen.getByText(/Checking whether your wallet/)).toBeInTheDocument();
+    await act(async () => { resolve({}); });
+    expect(screen.getByText(/does not report atomic batching/)).toBeInTheDocument();
+    expect(sent).toHaveLength(0);
+  });
+
+  it("submits fresh interleaved approvals and swaps once, then measures delivered assets from the batch receipt", async () => {
+    const wallet = batchWallet();
+    const asked = world();
+    await reviewBatch();
+    await userEvent.click(batchBuy());
+    await settle();
+    expect(asked).toHaveLength(4);
+    expect(wallet.sent).toHaveLength(1);
+    expect(wallet.sent[0]!.atomicRequired).toBe(true);
+    const calls = wallet.sent[0]!.calls as Json[];
+    expect(calls).toHaveLength(4);
+    expect(calls[0]!.data).toBe(approveData(RELAY.approvalProxy, 6_000_000n));
+    expect(calls[2]!.data).toBe(approveData(RELAY.approvalProxy, 4_000_000n));
+    expect(screen.getByRole("table")).toHaveTextContent("arrived: 0.3 NVDAc");
+    expect(batchBuy()).toBeDisabled();
+    expect(cta()).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("USDC to put in"), "0");
+    expect(cta()).toHaveTextContent("Quote the basket");
+  });
+
+  it("keeps pending work locked, checks it without signing again and measures the eventual result", async () => {
+    const wallet = batchWallet("ready");
+    wallet.outcome("pending");
+    world();
+    await reviewBatch();
+    expect(screen.getByText(/may first ask you to enable batching/)).toBeInTheDocument();
+    await userEvent.click(batchBuy());
+    await settle();
+    expect(screen.getByLabelText("USDC to put in")).toBeDisabled();
+    expect(batchBuy()).toBeDisabled();
+    expect(cta()).toBeDisabled();
+    expect(screen.getByText(/Batch ID:/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Check basket status" }));
+    await settle();
+    wallet.outcome("confirmed");
+    await userEvent.click(screen.getByRole("button", { name: "Check basket status" }));
+    await settle();
+    expect(wallet.sent).toHaveLength(1);
+    expect(screen.getByRole("table")).toHaveTextContent("arrived: 0.3 NVDAc");
+    expect(batchBuy()).toBeDisabled();
+  });
+
+  it("does not fall back after rejection or a reverted batch, allowing a deliberate retry", async () => {
+    const wallet = batchWallet();
+    world();
+    await reviewBatch();
+    wallet.outcome("failed");
+    await userEvent.click(batchBuy());
+    await settle();
+    expect(screen.getByRole("status")).toHaveTextContent("batch failed");
+    expect(batchBuy()).toBeEnabled();
+    wallet.reject();
+    await userEvent.click(batchBuy());
+    await settle();
+    expect(screen.getByRole("status")).toHaveTextContent("You rejected");
+    expect(wallet.sent).toHaveLength(1);
+  });
+
+  it("stops before signing if the refreshed impact is too high", async () => {
+    const wallet = batchWallet();
+    world({ relay: (body, i) => json(i >= 2 ? { ...quoteFor(body), details: { ...(quoteFor(body).details as Json), totalImpact: { percent: "-3.1" } } } : quoteFor(body)) });
+    await reviewBatch();
+    await userEvent.click(batchBuy());
+    await settle();
+    expect(screen.getByRole("status")).toHaveTextContent("now moves its market 3.10%");
+    expect(wallet.sent).toHaveLength(0);
+  });
+
+  it("also rechecks impact in step-by-step mode", async () => {
+    const sent = wallet();
+    world({ relay: (body, i) => json(i >= 2 ? { ...quoteFor(body), details: { ...(quoteFor(body).details as Json), totalImpact: { percent: "-3.1" } } } : quoteFor(body)) });
+    await reviewBatch();
+    await userEvent.click(cta());
+    await settle();
+    expect(screen.getByText(/now moves its market 3.10%/)).toBeInTheDocument();
+    expect(sent).toHaveLength(0);
+  });
+
+  it("refuses a multi-swap leg instead of spending its amount twice", async () => {
+    const wallet = batchWallet();
+    world({ relay: (body, i) => {
+      const q = quoteFor(body) as { steps: { id: string }[] };
+      if (i >= 2) q.steps.push(q.steps.find((s) => s.id === "swap")!);
+      return json(q);
+    } });
+    await reviewBatch();
+    await userEvent.click(batchBuy());
+    await settle();
+    expect(screen.getByRole("status")).toHaveTextContent("one same-chain swap");
+    expect(wallet.sent).toHaveLength(0);
+  });
+
+  it("refuses preparation that took too long", async () => {
+    const wallet = batchWallet();
+    let clock = 1000;
+    vi.spyOn(Date, "now").mockImplementation(() => clock);
+    world({ relay: (body) => { clock += 31_000; return json(quoteFor(body)); } });
+    await reviewBatch();
+    await userEvent.click(batchBuy());
+    await settle();
+    expect(screen.getByRole("status")).toHaveTextContent("took too long");
+    expect(wallet.sent).toHaveLength(0);
   });
 });

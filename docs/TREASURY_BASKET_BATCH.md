@@ -1,0 +1,54 @@
+# Treasury Basket: one wallet confirmation
+
+Implemented 2026-11-16. Treasury Basket discovers atomic batching on Base using
+[EIP-5792 v2](https://eips.ethereum.org/EIPS/eip-5792). `supported` enables the batch
+button; `ready` enables it with an account-upgrade notice. Unknown, absent or refused
+capabilities leave the existing sequential option available. WalletConnect's installed
+provider already advertises the EIP-5792 methods as optional methods.
+
+Each purchase refreshes every nonzero remaining leg, spaces/retries Relay quotes using
+the existing pace, enforces the 2% impact limit again and keeps an exact USDC approval
+immediately before each swap. This also handles allowances shared between legs. A leg
+must contain exactly one checked same-chain swap. Zero top-up legs are skipped.
+Preparation exceeding 30 seconds is refused; this is a conservative local budget,
+not a promise about upstream quote lifetime. Relay's on-chain slippage/deadline checks
+and the wallet's execution simulation still apply while the user reviews the request.
+
+The full ordered sequence is preflighted with `eth_simulateV1`, from the connected
+account against its actual balances. No fake balance or code is used in the app.
+A refused or incomplete simulation stops the batch. The account/network is rechecked
+before `wallet_sendCalls`, which specifies `atomicRequired: true` and a unique ID.
+
+The app saves the batch ID to local storage before asking the wallet. Pending or
+uncertain submissions lock further purchases and editing; the user checks status
+without signing again, including after reopening the window or reloading. There is
+no automatic fallback or resubmission. Explicit user rejection and definite complete
+failure unlock retry; success requires matching Base/batch IDs, `atomic: true` and
+successful receipts. Received tokens are summed from the batch's Transfer logs.
+Storage recovery is scoped to this browser, origin and account. Gas may be charged
+for an on-chain revert. Wallet upgrades may require an initial extra confirmation.
+
+## Verification
+
+- Unit/integration tests cover discovery, account/network changes, preflight refusal,
+  exact interleaved approvals, fresh-quote impact, preparation timeout, rejection,
+  confirmed/reverted/pending/uncertain batches, receipt measurement, storage failure,
+  concurrent clicks and recovery after reopening.
+- Chrome localhost smoke with a deterministic EIP-1193 test wallet: two-asset basket,
+  one `wallet_sendCalls`, four calls, `atomicRequired: true`, inputs/buy buttons locked
+  while pending, reload restored the ID, status confirmed without a second submission,
+  no browser page errors. Screenshots inspected at desktop and mobile widths.
+- Live Base simulation at 2026-11-16 14:08:55 (UTC+7), using fresh checked
+  [Relay quotes](https://docs.relay.link/references/api/get-quote): $5 USDC per asset,
+  NVDAc + AAPLc + WETH. A simulation-only executor runtime was overridden onto a funded
+  public address and invoked once, executing all six calls atomically. No deployment,
+  transaction submission, signature or real balance change occurred. Results:
+
+| Asset | Quoted base units | Minimum | Simulated received |
+| --- | ---: | ---: | ---: |
+| NVDAc (8 decimals) | 3092197 | 3061275 | 3091817 |
+| AAPLc (8 decimals) | 1397975 | 1383995 | 1397940 |
+| WETH (18 decimals) | 2751057991484004 | 2723547411569163 | 2751012084604324 |
+
+This verifies Relay call composability with an atomic executor. It does not claim a
+real user wallet signed a batch; the final confirmation UI depends on that wallet.

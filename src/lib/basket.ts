@@ -58,6 +58,25 @@ export const MAX_LEGS = 10;
 /** The smallest leg worth a swap, in USDC base units ($1). */
 export const MIN_LEG = 1_000_000n;
 
+/**
+ * The legs the split made too small to swap, in words, or `null`. A leg of a few cents is not a
+ * bargain: it costs as much gas as it buys, and it is the size at which a routed swap has the least
+ * room to be filled at all. MEASURED 2026-11-15 on a 7-asset basket: its legs were ~$0.17 each, one
+ * approval confirmed and the buy behind it reverted on chain. That revert was NOT reproduced — a
+ * replay of the same transaction, at the parent and at its own block, succeeded, with the balance
+ * and allowance both sufficient and the gas limit only two thirds used, so the on-chain cause is
+ * still unknown. This floor is a guard against a size that is not worth signing, not a fix for a
+ * proven cause. A leg the top-up left at zero is not dust — it is already at its weight, and
+ * `priceAll` says so.
+ */
+export function dustProblem(amounts: readonly bigint[], legs: readonly Leg[]): string | null {
+  const dust = legs.filter((_, i) => amounts[i]! > 0n && amounts[i]! < MIN_LEG);
+  if (dust.length === 0) return null;
+  const [one, ...rest] = dust;
+  if (rest.length === 0) return `${one!.asset.symbol} would be under ${Number(MIN_LEG) / 1e6} USDC — put in more, or give that asset more weight.`;
+  return `${dust.map((l) => l.asset.symbol).join(", ")} would each be under ${Number(MIN_LEG) / 1e6} USDC — put in more, or give those assets more weight.`;
+}
+
 /** What is wrong with a basket, in words, or `null` when it can be bought. */
 export function basketProblem(legs: readonly Leg[]): string | null {
   if (legs.length === 0) return "Add at least one asset.";

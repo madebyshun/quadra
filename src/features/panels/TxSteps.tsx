@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { BASE } from "@/config/chain";
 import { messageOf } from "@/lib/errors";
 import { sendTransaction, waitForReceipt, type Receipt, type TxRequest, type WaitOptions } from "@/lib/transact";
@@ -35,12 +35,19 @@ export type TxSteps = {
   readonly running: boolean;
   /** Runs the steps in order. Resolves with every receipt when all confirmed, else `null`. */
   run(provider: Eip1193Provider, from: string, steps: readonly Step[]): Promise<Receipt[] | null>;
+  /**
+   * How many steps of the LAST `run` confirmed, read synchronously after it resolves — the `states`
+   * array is React state and may still be the previous render when a caller looks at it.
+   */
+  confirmed(): number;
   reset(): void;
 };
 
 export function useTxSteps(wait: WaitOptions = {}): TxSteps {
   const [states, setStates] = useState<readonly StepState[]>([]);
   const [running, setRunning] = useState(false);
+  /** kept in a ref as well as in `states`: a caller reading it right after `run` resolves sees the truth */
+  const lastConfirmed = useRef(0);
 
   const run = useCallback(
     async (provider: Eip1193Provider, from: string, steps: readonly Step[]) => {
@@ -51,6 +58,7 @@ export function useTxSteps(wait: WaitOptions = {}): TxSteps {
         setStates([...now]);
       };
       setStates([...now]);
+      lastConfirmed.current = 0;
       const receipts: Receipt[] = [];
       try {
         for (const [i, step] of steps.entries()) {
@@ -71,6 +79,7 @@ export function useTxSteps(wait: WaitOptions = {}): TxSteps {
           show(i, { label: step.label, status: receipt.status === "success" ? "confirmed" : "reverted", hash, block: receipt.block });
           if (receipt.status !== "success") return null;
           receipts.push(receipt);
+          lastConfirmed.current = receipts.length;
         }
         return receipts;
       } finally {
@@ -80,8 +89,11 @@ export function useTxSteps(wait: WaitOptions = {}): TxSteps {
     [wait],
   );
 
-  const reset = useCallback(() => setStates([]), []);
-  return { states, running, run, reset };
+  const reset = useCallback(() => {
+    lastConfirmed.current = 0;
+    setStates([]);
+  }, []);
+  return { states, running, run, reset, confirmed: () => lastConfirmed.current };
 }
 
 function line(s: StepState) {
