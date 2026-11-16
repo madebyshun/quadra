@@ -76,15 +76,17 @@ describe("the About page", () => {
 });
 
 describe("the fee flow", () => {
-  it("draws every flow as an arrow with a dot on it, and names the furnace's split", async () => {
-    const { FLOWS } = await import("@/pages/Flywheel");
+  it("keeps the launch split, token furnace and planned connection distinct", async () => {
     const a = renderAt("/about");
     await settle();
-    const svg = document.querySelector("svg.flow__svg")!;
-    expect(svg).toHaveAttribute("aria-labelledby", "flow-title flow-desc");
-    for (const f of FLOWS) expect(svg.querySelector(`#flow-${f.id}`)).not.toBeNull();
-    expect(svg.querySelectorAll(".flow__dot")).toHaveLength(FLOWS.length * 3);
-    expect(svg).toHaveTextContent("50% burnt");
+    const map = screen.getByRole("figure", { name: "Where every fee goes" });
+    expect(map).toHaveTextContent("20% without a referrer.");
+    expect(map).toHaveTextContent("15% with one.");
+    expect(map).toHaveTextContent("Approved referrers only");
+    expect(map).toHaveTextContent("Not connected");
+    expect(map).toHaveTextContent("Planned");
+    expect(map).toHaveTextContent("50%");
+    expect(map).toHaveTextContent("Contracts not audited");
     a.unmount();
   });
 });
