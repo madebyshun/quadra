@@ -30,7 +30,7 @@ describe("the desktop", () => {
     }
   });
 
-  it("puts the four doors, Agents and My Computer on the desktop, and the Trash in its corner", () => {
+  it("puts the four doors, Agents and My Computer on the desktop, and the Trash in its corner", async () => {
     renderAt("/");
     const cards = within(screen.getByLabelText("What you can do")).getAllByRole("button");
     expect(cards.map((c) => c.querySelector(".icon__title")!.textContent)).toEqual(desktopItems().map((e) => e.title));
@@ -39,6 +39,10 @@ describe("the desktop", () => {
     expect(screen.queryByRole("button", { name: /^Bridge/ })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Read about it")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Trash" })).toHaveClass("desk-trash");
+    await userEvent.click(screen.getByRole("button", { name: "treasury basket" }));
+    expect(screen.getByRole("heading", { name: "Treasury Basket" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "terminal" }));
+    expect(screen.getByRole("heading", { name: "Terminal" })).toBeInTheDocument();
   });
 
   it("opens a folder as an Explorer window: one click selects, a double click or Enter opens", async () => {

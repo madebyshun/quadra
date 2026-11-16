@@ -36,7 +36,7 @@ export function Desktop({ onOpen, onHome }: DesktopProps) {
         <div className="workspace__bar"><span className="workspace__box" aria-hidden="true" /><span>{BRAND.slug} / applications</span><span>base</span></div>
         <div className="workspace__intro"><span>your everyday tools</span><span>open a window to begin</span></div>
         <IconMenu onOpen={onOpen} />
-        <div className="workspace__pinned"><span>pinned /</span><Link to="/?do=basket">treasury basket</Link><Link to="/?do=terminal">terminal</Link></div>
+        <div className="workspace__pinned"><span>pinned /</span><button type="button" onClick={() => onOpen("basket")}>treasury basket</button><button type="button" onClick={() => onOpen("terminal")}>terminal</button></div>
         <footer className="workspace__foot"><span>research / trade / create</span><span>your wallet signs</span></footer>
       </section>
       <nav className="home__links" aria-label="Product information"><Link to="/about">read me / about</Link><Link to="/docs">documentation</Link><Link to="/api">api</Link></nav>
