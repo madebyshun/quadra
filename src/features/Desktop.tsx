@@ -2,6 +2,7 @@ import { BRAND } from "@/brand";
 import type { WindowId } from "@/features/registry";
 import { IconMenu } from "@/features/IconMenu";
 import { Icon } from "@/ui/icons";
+import { Link } from "react-router-dom";
 
 export type DesktopProps = {
   /** a feature icon was clicked: open (or re-focus) its window */
@@ -14,8 +15,10 @@ export function Desktop({ onOpen, onHome }: DesktopProps) {
   return (
     <div className="home stack">
       <header className="home__head">
+        <p className="home__path">desktop / base</p>
         <h1 className="home__brand">
           <button type="button" className="home__brand-link" onClick={onHome} aria-label={`${BRAND.name} — home`}>
+            <img src="/brand/icon.svg" width="64" height="64" alt="" />
             {BRAND.name}
           </button>
         </h1>
@@ -26,10 +29,17 @@ export function Desktop({ onOpen, onHome }: DesktopProps) {
           still made where they can be acted on (the Docs window for the pool and
           the token, the MCP window for the key).
         */}
-        <p className="home__tagline">{BRAND.tagline}</p>
+        <p className="home__tagline">{BRAND.desktopLine}</p>
       </header>
 
-      <IconMenu onOpen={onOpen} />
+      <section className="workspace" aria-label="Desktop workspace">
+        <div className="workspace__bar"><span className="workspace__box" aria-hidden="true" /><span>{BRAND.slug} / applications</span><span>base</span></div>
+        <div className="workspace__intro"><span>your everyday tools</span><span>open a window to begin</span></div>
+        <IconMenu onOpen={onOpen} />
+        <div className="workspace__pinned"><span>pinned /</span><Link to="/?do=basket">treasury basket</Link><Link to="/?do=terminal">terminal</Link></div>
+        <footer className="workspace__foot"><span>research / trade / create</span><span>your wallet signs</span></footer>
+      </section>
+      <nav className="home__links" aria-label="Product information"><Link to="/about">read me / about</Link><Link to="/docs">documentation</Link><Link to="/api">api</Link></nav>
       {/* the Markets gadget left the desktop on 2026-10-29 (one door per job: Coins shows the coins);
           it lives on in the Markets window, in My Computer > Research */}
       {/* the Trash keeps its own corner, the way it always has */}

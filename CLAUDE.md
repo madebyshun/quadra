@@ -16,6 +16,10 @@ These came from ShunTr directly. They are not preferences.
 
 - **Language (owner, 2026-11-16): reports, explanations and direct communication for the owner are in Vietnamese. All product-facing content, UI, marketing copy, image text, code and code comments are entirely in English. Preserve product names, code identifiers, contract addresses and source links.**
 
+- **Brand voice (owner, 2026-11-16): outward-facing copy and tweets use lowercase English, short lines and plain ASCII punctuation. Use `/` for folder-like headings and `-` for concise entries. Anchor the voice in Macintosh Quadra, Finder, folders, files and windows. No emoji, decorative Unicode, arrows, smart quotes, hype or invented terminal commands. Folder paths are editorial labels, not claims about executable commands. Preserve case-sensitive addresses and identifiers exactly. Financial instructions must remain explicit.**
+
+- **App design (2026-11-17): `src/styles/workspace.css` supplies the current desktop and shared chrome over the Platinum base. Cobalt, warm paper, lowercase chrome, an applications workspace and the sky wallpaper replace the sparse icon column. `public/brand/icon.svg` is the canonical computer/q mark; `logo.svg`, `logo-on-blue.svg`, `wordmark.svg` and `icon-512.png` are its exports. Keep financial values and case-sensitive identifiers out of lowercase text transforms.**
+
 - **Separate repo. Never build it inside `blue-agent`.** The two live side by side at
   `~/projects/quadra` and `~/projects/blue-agent`. Do not edit anything in `blue-agent` on
   Quadra's behalf — not its config, not its `.claude/launch.json`, nothing. If a tool needs

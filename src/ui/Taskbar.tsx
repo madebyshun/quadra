@@ -39,15 +39,7 @@ const BAR_FOLDERS: readonly FolderId[] = DESKTOP.filter(isFolder);
 /** The app's own mark — this app's pixel machine, never anybody's logo. */
 export function BrandMark() {
   return (
-    <svg viewBox="0 0 16 16" width="16" height="16" shapeRendering="crispEdges" aria-hidden="true">
-      <rect x="2" y="1" width="12" height="12" fill="#000" />
-      <rect x="3" y="2" width="10" height="8" fill="#0052ff" />
-      <rect x="6" y="4" width="4" height="4" fill="#fff" />
-      <rect x="7" y="5" width="2" height="2" fill="#0052ff" />
-      <rect x="9" y="7" width="2" height="2" fill="#fff" />
-      <rect x="3" y="11" width="10" height="1" fill="#d7d1c0" />
-      <rect x="4" y="13" width="8" height="2" fill="#000" />
-    </svg>
+    <img src="/brand/icon.svg" width="20" height="20" alt="" aria-hidden="true" />
   );
 }
 

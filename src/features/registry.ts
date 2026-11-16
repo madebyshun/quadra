@@ -157,7 +157,7 @@ export const FEATURES: readonly Feature[] = [
   {
     id: "launch",
     title: "Launch",
-    blurb: "a coin on Base, nothing to rug",
+    blurb: "a coin on base, paired with eth or a stock",
     window: "Launch",
     flag: "launch",
   },

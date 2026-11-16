@@ -3387,6 +3387,7 @@ import { get, put } from "@vercel/blob";
 // src/brand.ts
 var BRAND = {
   name: "Quadra",
+  desktopLine: "a personal computer for base. open a window. make it yours.",
   /** lowercase, url + package safe */
   slug: "quadra",
   ticker: "$QUADRA",

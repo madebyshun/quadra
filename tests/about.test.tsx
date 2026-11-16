@@ -71,7 +71,7 @@ describe("the About page", () => {
     localStorage.removeItem(WELCOME_KEY);
     renderAt("/");
     await settle();
-    expect(screen.getByRole("link", { name: `What is ${BRAND.name}? ›` })).toHaveAttribute("href", "/about");
+    expect(screen.getByRole("link", { name: `What is ${BRAND.name}? /` })).toHaveAttribute("href", "/about");
   });
 });
 

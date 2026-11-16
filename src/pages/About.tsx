@@ -75,6 +75,7 @@ export function About() {
     <div className="about">
       <header className="about__bar">
         <Link to="/" className="about__brand">
+          <img src="/brand/icon.svg" width="30" height="30" alt="" />
           {BRAND.name}
         </Link>
         <nav aria-label="About navigation">

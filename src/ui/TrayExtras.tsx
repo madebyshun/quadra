@@ -58,7 +58,7 @@ export function SoundToggle() {
         if (!on) play("ok");
       }}
     >
-      {on ? "🔊" : "🔈"}
+      <span aria-hidden="true">{on ? "snd/on" : "snd/off"}</span>
     </button>
   );
 }

@@ -3384,6 +3384,7 @@ var init_abis = __esm({
 // src/brand.ts
 var BRAND = {
   name: "Quadra",
+  desktopLine: "a personal computer for base. open a window. make it yours.",
   /** lowercase, url + package safe */
   slug: "quadra",
   ticker: "$QUADRA",

@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
 import "./styles/reset.css";
 import "./styles/theme.css";
+import "./styles/workspace.css";
 
 const host = document.getElementById("root");
 if (!host) throw new Error("#root is missing from index.html");

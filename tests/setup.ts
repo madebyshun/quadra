@@ -23,6 +23,7 @@ beforeEach(() => {
 });
 
 beforeEach(() => {
+  vi.stubGlobal("scrollTo", vi.fn());
   vi.stubGlobal("fetch", () => {
     throw new Error(
       "This test called fetch without stubbing it. Stub globalThis.fetch with the response you mean to test.",

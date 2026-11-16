@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useLoanAlerts } from "@/features/loanAlerts";
-import { Routes, Route, useSearchParams } from "react-router-dom";
+import { Routes, Route, useSearchParams, useLocation } from "react-router-dom";
 import { OpenWindowProvider } from "@/features/openWindow";
 import { Desktop } from "@/features/Desktop";
 import { FeaturePanel } from "@/features/FeaturePanel";
@@ -207,6 +207,7 @@ function Home() {
       setParams(new URLSearchParams(), { replace: true });
     }
     setWelcome(true);
+    window.scrollTo(0, 0);
   }, [state.windows, params, setParams]);
   const openMarkets = useCallback(() => dispatch(openAction("markets")), []);
 
@@ -264,6 +265,10 @@ function Home() {
 }
 
 export function App() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   // the Control Panel's wallpaper, applied to the whole page the moment it is picked
   const paper = useSetting(wallpaper);
   return (

@@ -69,7 +69,7 @@ export function Welcome({ onClose }: { onClose: () => void }) {
           </h1>
           {/* short, in the era's voice (2026-11-04, after c-na.dev's "The desk is ready.") */}
           <p className="welcome__lede">
-            Check a token. Launch a coin. Trade it. Your wallet signs; nothing else can. <a href="/about">What is {BRAND.name}? ›</a>
+            Check a token. Launch a coin. Trade it. Your wallet signs; nothing else can. <a href="/about">What is {BRAND.name}? /</a>
           </p>
           <form className="welcome__check" onSubmit={check} aria-label="Check a token">
             <label className="field-label" htmlFor="welcome-token">
@@ -79,7 +79,7 @@ export function Welcome({ onClose }: { onClose: () => void }) {
               <input
                 id="welcome-token"
                 className="field mono"
-                placeholder="Paste a token address, 0x…"
+                placeholder="paste a token address, 0x..."
                 autoComplete="off"
                 spellCheck={false}
                 value={token}

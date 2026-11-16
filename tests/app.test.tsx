@@ -24,7 +24,7 @@ describe("the desktop", () => {
     // scoped to the header: "switched on" also appears in the off feature's blurb
     const head = screen.getByRole("heading", { level: 1 }).closest("header")!;
     expect(head.querySelectorAll(".chip")).toHaveLength(0);
-    expect(head).toHaveTextContent(BRAND.tagline);
+    expect(head).toHaveTextContent(BRAND.desktopLine);
     for (const claim of [/switched on/, /holds no key/, /not deployed yet/]) {
       expect(head.textContent).not.toMatch(claim);
     }

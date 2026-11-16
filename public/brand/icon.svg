@@ -1,9 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">
-  <rect x="2" y="1" width="12" height="12" fill="#000"/>
-  <rect x="3" y="2" width="10" height="8" fill="#0052ff"/>
-  <rect x="6" y="4" width="4" height="4" fill="#fff"/>
-  <rect x="7" y="5" width="2" height="2" fill="#0052ff"/>
-  <rect x="9" y="7" width="2" height="2" fill="#fff"/>
-  <rect x="3" y="11" width="10" height="1" fill="#d7d1c0"/>
-  <rect x="4" y="13" width="8" height="2" fill="#000"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>quadra</title>
+  <path fill="#2422cf" d="M4 4h46v46H4zM12 50h30v7H12zM7 57h40v4H7zM53 4h7v46h-7z"/>
+  <path fill="#f4f0e6" d="M10 10h34v29H10z"/>
+  <path fill="#2422cf" fill-rule="evenodd" d="M17 15h19v18H17zm5 5v8h9v-8z"/>
+  <path fill="#2422cf" d="m29 27 12 10-4 4-12-10z"/>
+  <path fill="#f4f0e6" d="M10 43h17v2H10zM55 10h3v2h-3zM55 16h3v2h-3zM55 22h3v2h-3z"/>
 </svg>

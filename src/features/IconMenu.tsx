@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { Icon } from "@/ui/icons";
 import { desktopItems, type WindowId } from "@/features/registry";
 
 export type IconMenuProps = {
@@ -23,7 +22,7 @@ export function IconMenu({ onOpen }: IconMenuProps) {
           const body = (
             <>
               <span className="icon__glyph">
-                <Icon id={e.id} />
+                <img src={`/brand/tools/${e.id}.svg`} width="36" height="36" alt="" />
               </span>
               <span className="icon__title">{e.title}</span>
               <span className="icon__blurb">{e.blurb}</span>
