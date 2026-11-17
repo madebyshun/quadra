@@ -115,11 +115,14 @@ function Home() {
   const [intro, setIntro] = useState(() =>
     shouldPlayIntro({ search: params.toString(), matchMedia: window.matchMedia?.bind(window), webgl: () => hasWebGL(document) }),
   );
-  const endIntro = useCallback(() => setIntro(false), []);
   // decided once too: the Welcome screen follows the intro (or a bare load), never a `?do=` link
   const [welcomeAtStart] = useState(() => showWelcome(params.toString()));
   const [welcome, setWelcome] = useState(welcomeAtStart);
   const closeWelcome = useCallback(() => setWelcome(false), []);
+  const endIntro = useCallback(() => {
+    setWelcome(false);
+    setIntro(false);
+  }, []);
 
   /** Reads `?do=` exactly once, on mount — after that, the URL follows the topmost window, not the other way round. */
   useEffect(() => {
@@ -255,7 +258,7 @@ function Home() {
       />
       {/* Q no longer greets on its own (2026-10-29, the owner: "extremely simple"): it speaks only when
           something real happens — a red verdict, fees waiting, a Rugsweeper win */}
-      {intro ? <Intro onDone={endIntro} /> : <Assistant greet={false} />}
+      {intro ? <Intro onDone={endIntro} explore={params.get("intro") === "explore"} /> : <Assistant greet={false} />}
       <LoanAlerts />
       {!intro && welcome && <Welcome onClose={closeWelcome} />}
       {!intro && <Screensaver />}

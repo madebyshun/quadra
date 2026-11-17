@@ -67,11 +67,12 @@ function chain(block: unknown = RX.blockNumber) {
 /** The tube's element, as the component handed it to the scene — the boot screen renders into it. */
 let tube: HTMLElement = document.createElement("div");
 
-async function mount(start: (...a: Parameters<typeof import("@/intro/start").startScene>) => Promise<IntroScene>) {
+async function mount(start: (...a: Parameters<typeof import("@/intro/start").startScene>) => Promise<IntroScene>, explore = false) {
   const onDone = vi.fn();
   const view = render(
     <Intro
       onDone={onDone}
+      explore={explore}
       start={(host, el, size, onStep) => {
         tube = el;
         return start(host, el, size, onStep);
@@ -93,15 +94,28 @@ describe("the boot screen", () => {
   it("shows the icon, then the welcome box, then the desktop the page is about to be", () => {
     const at = (phase: Parameters<typeof BootScreen>[0]["phase"]) => render(<BootScreen phase={phase} block={{ kind: "reading" }} />).container;
     expect(at("icon").querySelector(".boot__icon")).not.toBeNull();
-    expect(at("welcome").textContent).toContain("Welcome to Quadra");
+    expect(at("welcome").textContent).toContain("welcome to quadra");
     expect(at("welcome").textContent).not.toContain("Click the screen");
-    expect(at("ready").textContent).toContain("Click the screen to begin ▸");
+    expect(at("ready").textContent).toContain("open desktop /");
     for (const p of ["zoom", "fade", "done"] as const) expect(at(p).querySelector(".boot__desk")).not.toBeNull();
     expect(at("dark").textContent).toBe("");
   });
 });
 
 describe("the intro", () => {
+  it("keeps explore mode on the ready screen until the visitor enters", async () => {
+    chain();
+    const { scene } = fakeScene("screen");
+    const { view, onDone } = await mount(async () => scene, true);
+    await step(TOTAL_MS + 1000);
+    expect(view.container.querySelector(".intro")).toHaveClass("intro--ready");
+    expect(onDone).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "open desktop" }));
+    await step(TOTAL_MS + 1010);
+    expect(view.container.querySelector(".intro")).toHaveClass("intro--zoom");
+    await step(TOTAL_MS * 2 + 2000);
+    expect(onDone).toHaveBeenCalledOnce();
+  });
   it("plays every phase on its clock, draws each frame, and ends by handing over", async () => {
     chain();
     const { scene, drawn } = fakeScene();

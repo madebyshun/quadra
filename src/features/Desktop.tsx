@@ -39,7 +39,7 @@ export function Desktop({ onOpen, onHome }: DesktopProps) {
         <div className="workspace__pinned"><span>pinned /</span><button type="button" onClick={() => onOpen("basket")}>treasury basket</button><button type="button" onClick={() => onOpen("terminal")}>terminal</button></div>
         <footer className="workspace__foot"><span>research / trade / create</span><span>your wallet signs</span></footer>
       </section>
-      <nav className="home__links" aria-label="Product information"><Link to="/about">read me / about</Link><Link to="/docs">documentation</Link><Link to="/api">api</Link></nav>
+      <nav className="home__links" aria-label="Product information"><a href="/?intro=explore">explore / desk</a><Link to="/about">read me / about</Link><Link to="/docs">documentation</Link><Link to="/api">api</Link></nav>
       {/* the Markets gadget left the desktop on 2026-10-29 (one door per job: Coins shows the coins);
           it lives on in the Markets window, in My Computer > Research */}
       {/* the Trash keeps its own corner, the way it always has */}

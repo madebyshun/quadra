@@ -27,7 +27,7 @@ export type GL = {
 export const SCREEN_PX = { width: 640, height: 480 } as const;
 export const FOV = 30;
 /** The room's darkness — the same colour as the overlay's CSS background at its edges. */
-export const ROOM = "#0b0d13";
+export const ROOM = "#c8c6be";
 
 export type Pointer = { x: number; y: number };
 
@@ -62,7 +62,7 @@ const DARK_MS = PHASES.find((p) => p.id === "dark")!.ms;
 export function createScene(o: SceneOptions): IntroScene {
   const scene = new Scene();
   scene.environment = o.environment;
-  scene.environmentIntensity = 0.35;
+  scene.environmentIntensity = 0.6;
   // the desk runs off into the dark of the room instead of ending at a horizon line
   const fog = new Fog(ROOM, 16, 34);
   scene.fog = fog;
@@ -72,20 +72,23 @@ export function createScene(o: SceneOptions): IntroScene {
   const things = buildRoom();
   scene.add(things.group);
 
-  const hemi = new HemisphereLight("#cdd8ff", "#2a2420", 0.55);
+  const hemi = new HemisphereLight("#e1edff", "#79684e", 0.9);
   const key = new DirectionalLight("#fff1dc", 2.4);
   key.position.set(-5, 9, 7);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
+  key.shadow.bias = -0.00015;
+  key.shadow.normalBias = 0.025;
+  key.shadow.radius = 3;
   Object.assign(key.shadow.camera, { left: -7, right: 7, top: 7, bottom: -7 });
-  const rim = new DirectionalLight("#6f8cff", 1.2);
+  const rim = new DirectionalLight("#a8d4ff", 1.2);
   rim.position.set(6, 5, -6);
   // the tube's own light on the keyboard and the desk, once it is on
   const glow = new PointLight("#cfd8e6", 0, 9, 2);
   glow.position.set(machine.screen.center.x, machine.screen.center.y, machine.screen.center.z + 1.4);
   scene.add(hemi, key, rim, glow);
   const room = [
-    [hemi, 0.55],
+    [hemi, 0.9],
     [key, 2.4],
     [rim, 1.2],
   ] as const;

@@ -1,8 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>quadra</title>
-  <path fill="#2422cf" d="M4 4h46v46H4zM12 50h30v7H12zM7 57h40v4H7zM53 4h7v46h-7z"/>
-  <path fill="#f4f0e6" d="M10 10h34v29H10z"/>
-  <path fill="#2422cf" fill-rule="evenodd" d="M17 15h19v18H17zm5 5v8h9v-8z"/>
-  <path fill="#2422cf" d="m29 27 12 10-4 4-12-10z"/>
-  <path fill="#f4f0e6" d="M10 43h17v2H10zM55 10h3v2h-3zM55 16h3v2h-3zM55 22h3v2h-3z"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><title>quadra</title><path d="M44 44H16V16H44V44L55 55" fill="none" stroke="#2422cf" stroke-width="8" stroke-linejoin="round"/></svg>

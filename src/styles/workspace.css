@@ -130,3 +130,23 @@
 .taskbar__wallet { white-space: nowrap; font-size: 11px; }
 .tray__sound { font: 10px var(--font-mono); padding: 3px 5px; white-space: nowrap; }
 @media(max-width:380px) { .tray__clock { display: none; } }
+/* Daylight boot: the same cobalt and paper palette continues through the CRT. */
+.intro { background: radial-gradient(ellipse at 35% 35%, #e2e4dc, #c8c6be 70%, #afbfc9); }
+.intro__hint { color: #343b43; font: 11px var(--font-mono); text-transform: lowercase; padding: 0 80px; }
+.intro__skip { color: #252a31; background: #f4f0e6; border: 1px solid #686961; border-radius: 0; text-transform: lowercase; }
+.intro__loading { color: #252a31; }
+.intro__step { text-transform: lowercase; }
+.boot--icon, .boot--welcome, .boot--ready { background: #244f86; }
+.boot__dialog { width: 470px; padding: 28px 30px; background: #f4f0e6; border: 1px solid #222; box-shadow: 4px 4px 0 #1118; font-family: var(--font-ui); }
+.boot__welcome { font: bold 36px Georgia,serif; letter-spacing: -.03em; }
+.boot__line { font-size: 15px; margin: 10px 0 22px; }
+.boot__bar { height: 8px; border-color: #7d776d; }
+.boot__bar span { background: #2422cf; }
+.boot__go { font: 13px var(--font-mono); color: #2422cf; }
+.boot__tube::after { opacity: .35; }
+.boot__desk { background-image: linear-gradient(100deg,#183f74e8,#19417a4d),url('/brand/computer-sky.webp'); background-size: cover; background-position: center; }
+.boot__desk span { text-transform: lowercase; font-family: Georgia,serif; text-shadow: none; }
+.intro__enter { position: absolute; bottom: 48px; left: 50%; transform: translateX(-50%); padding: 10px 20px; background: #2422cf; color: #f4f0e6; border: 1px solid #2422cf; box-shadow: 2px 2px 0 #272627; font: 12px var(--font-mono); cursor: pointer; }
+.intro__enter:focus-visible { outline: 2px solid #2422cf; outline-offset: 5px; }
+html:has(.intro), body:has(.intro) { overflow: hidden; }
+.intro__hint { bottom: 94px; white-space: normal; padding: 0 24px; }

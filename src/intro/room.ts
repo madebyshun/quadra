@@ -36,6 +36,23 @@ export function buildRoom(): Room {
     return mesh;
   };
 
+  // Daylight studio: a warm wall, a blue window and a cobalt work mat anchor the scene.
+  const wall = paint("#ded5c1", 0.95);
+  const framePaint = paint("#f4f0e6", 0.8);
+  add(keep(new BoxGeometry(30, 14, 0.15)), wall, 0, 5, -5.8);
+  add(keep(new BoxGeometry(4.6, 4.1, 0.12)), framePaint, -6, 4, -5.65);
+  add(keep(new BoxGeometry(4.25, 3.75, 0.05)), paint("#8ebdda", 0.8), -6, 4, -5.55);
+  add(keep(new BoxGeometry(0.1, 3.8, 0.12)), framePaint, -6, 4, -5.48);
+  add(keep(new BoxGeometry(4.25, 0.1, 0.12)), framePaint, -6, 4, -5.48);
+  add(keep(new BoxGeometry(5, 0.12, 0.65)), framePaint, -6, 1.95, -5.3);
+  const mat = paint("#264a7a", 0.95);
+  add(keep(new BoxGeometry(8.3, 0.012, 4.6)), mat, 0, 0.007, 2.9);
+  const grid = paint("#8294aa", 0.95);
+  const gridX = keep(new BoxGeometry(8.1, 0.003, 0.009));
+  const gridZ = keep(new BoxGeometry(0.009, 0.003, 4.4));
+  for (let i = 0; i < 10; i++) add(gridX, grid, 0, 0.016, 0.75 + i * 0.47);
+  for (let i = 0; i < 18; i++) add(gridZ, grid, -4 + i * 0.47, 0.016, 2.9);
+
   // floppy disks, three high, left of the keyboard — each with its metal shutter and label
   const disk = keep(new BoxGeometry(0.9, 0.032, 0.94));
   const shutter = keep(new BoxGeometry(0.42, 0.036, 0.3));
@@ -83,7 +100,7 @@ export function buildRoom(): Room {
     return p;
   };
   // low enough on the wall to sit inside the opening shot (MEASURED: at y 4.3 the frames were cut off)
-  const q = poster(-3.4, 3.3, 0.02, "#e9e4d6");
+  const q = poster(-2.7, 4.2, 0.02, "#e9e4d6");
   const lit = paint(BASE_BLUE, 0.6);
   POSTER_Q.forEach((row, r) =>
     [...row].forEach((c, col) => {

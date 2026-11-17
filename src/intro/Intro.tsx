@@ -35,15 +35,7 @@ type Phase = PhaseId | "done" | "loading";
 /** This app's own boot icon: a small monitor in Base blue with the app's initial. */
 function BootIcon() {
   return (
-    <svg className="boot__icon" viewBox="0 0 16 16" width="64" height="64" shapeRendering="crispEdges" aria-hidden="true">
-      <rect x="2" y="1" width="12" height="12" fill="#000" />
-      <rect x="3" y="2" width="10" height="8" fill="#0052ff" />
-      <rect x="6" y="4" width="4" height="4" fill="#fff" />
-      <rect x="7" y="5" width="2" height="2" fill="#0052ff" />
-      <rect x="9" y="7" width="2" height="2" fill="#fff" />
-      <rect x="3" y="11" width="10" height="1" fill="#d7d1c0" />
-      <rect x="4" y="13" width="8" height="2" fill="#000" />
-    </svg>
+    <img className="boot__icon" src="/brand/icon.svg" width="64" height="64" alt="" aria-hidden="true" />
   );
 }
 
@@ -53,13 +45,13 @@ export function BootScreen({ phase, block }: { phase: Phase; block: BlockLine })
       {phase === "icon" && <BootIcon />}
       {(phase === "welcome" || phase === "ready") && (
         <div className="boot__dialog">
-          <p className="boot__welcome">Welcome to {BRAND.name}</p>
-          <p className="boot__line">An on-chain supercomputer for Base</p>
+          <p className="boot__welcome">welcome to {BRAND.slug}</p>
+          <p className="boot__line">a personal computer for base</p>
           <div className="boot__bar">
             <span />
           </div>
           <p className="boot__block">{blockText(block)}</p>
-          {phase === "ready" && <p className="boot__go">Click the screen to begin ▸</p>}
+          {phase === "ready" && <p className="boot__go">open desktop /</p>}
         </div>
       )}
       {(phase === "zoom" || phase === "fade" || phase === "done") && (
@@ -73,8 +65,8 @@ export function BootScreen({ phase, block }: { phase: Phase; block: BlockLine })
 
 /** The line under the machine: what the visitor can do right now, or nothing. */
 export function hintFor(phase: Phase): string | null {
-  if (phase === "dark" || phase === "idle") return "Drag to look around · scroll to lean in · click the Macintosh to switch it on";
-  if (phase === "ready") return "Click the screen to go in";
+  if (phase === "dark" || phase === "idle") return "drag to explore / scroll to zoom / click to start";
+  if (phase === "ready") return "click the screen / open desktop";
   return null;
 }
 
@@ -93,6 +85,7 @@ export const CLICK_PX = 6;
 
 export type IntroProps = {
   onDone(): void;
+  explore?: boolean;
   /** where three.js and the scene come from — a test hands in its own */
   start?: typeof startScene;
   /** milliseconds, monotonic */
@@ -103,7 +96,7 @@ const FADE_AT = startOf("fade");
 /** One function for the life of the module: a new one per render would restart the scene on every phase. */
 const now = () => performance.now();
 
-export function Intro({ onDone, start = startScene, clock = now }: IntroProps) {
+export function Intro({ onDone, explore = false, start = startScene, clock = now }: IntroProps) {
   const stage = useRef<HTMLDivElement>(null);
   const [screenEl] = useState(() => {
     const el = document.createElement("div");
@@ -124,6 +117,7 @@ export function Intro({ onDone, start = startScene, clock = now }: IntroProps) {
   const sceneRef = useRef<IntroScene | null>(null);
   const [hover, setHover] = useState(false);
   const [loaded, setLoaded] = useState(0);
+  const exploreDone = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -165,7 +159,8 @@ export function Intro({ onDone, start = startScene, clock = now }: IntroProps) {
             t0 = clock() - jump.current;
             jump.current = null;
           }
-          const ms = clock() - t0;
+          const elapsed = clock() - t0;
+          const ms = explore && !exploreDone.current ? Math.min(elapsed, startOf("zoom") - 1) : elapsed;
           at.current = ms;
           const { id } = phaseAt(ms);
           if (id !== last) {
@@ -192,15 +187,17 @@ export function Intro({ onDone, start = startScene, clock = now }: IntroProps) {
       sceneRef.current = null;
       scene?.dispose();
     };
-  }, [start, clock, screenEl]);
+  }, [start, clock, screenEl, explore]);
 
   const skip = useCallback(() => {
+    exploreDone.current = true;
     if (phaseNow.current === "loading") return finish.current();
     if (phaseNow.current !== "fade" && phaseNow.current !== "done") jump.current = FADE_AT;
   }, []);
 
   /** Switch the machine on, or go in: the visitor's one action, wherever the intro is waiting. */
   const advance = useCallback(() => {
+    if (phaseNow.current === "ready") exploreDone.current = true;
     const to = advanceFrom(at.current);
     if (to !== null) jump.current = to;
   }, []);
@@ -268,6 +265,7 @@ export function Intro({ onDone, start = startScene, clock = now }: IntroProps) {
         </div>
       )}
       {hintFor(phase) ? <p className="intro__hint">{hintFor(phase)}</p> : null}
+      {phase === "ready" && <button type="button" className="intro__enter" onClick={advance}>open desktop</button>}
       <button
         type="button"
         className="intro__skip"

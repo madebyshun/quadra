@@ -111,7 +111,7 @@ export function buildMachine(): Machine {
   const dark = paint(plastic(SLOT, 0.5));
 
   // the desk
-  const desk = add(keep(new PlaneGeometry(60, 60)), paint(new MeshStandardMaterial({ color: "#16171c", roughness: 0.9 })), 0, 0, 0, false);
+  const desk = add(keep(new PlaneGeometry(60, 60)), paint(new MeshStandardMaterial({ color: "#86674c", roughness: 0.85 })), 0, 0, 0, false);
   desk.rotation.x = -Math.PI / 2;
 
   // the case: low and wide, a floppy slot on the right, the power light on the left
@@ -120,6 +120,8 @@ export function buildMachine(): Machine {
   add(keep(new RoundedBoxGeometry(1.15, 0.24, 0.04, 2, 0.02)), trim, 1.05, 0.46, 1.9);
   add(keep(new BoxGeometry(0.9, 0.05, 0.03)), dark, 1.05, 0.46, 1.915);
   add(keep(new BoxGeometry(0.5, 0.11, 0.02)), trim, -1.2, 0.46, 1.905);
+  const vent = keep(new BoxGeometry(0.025, 0.19, 0.012));
+  for (let i = 0; i < 19; i++) add(vent, dark, -1.5 + i * 0.065, 0.45, 1.91, false);
 
   const ledGeometry = keep(new CylinderGeometry(0.035, 0.035, 0.03, 12));
   const ledCase = add(ledGeometry, paint(new MeshStandardMaterial({ color: LED_OFF, emissive: LED_ON, emissiveIntensity: 0 })), -1.65, 0.46, 1.905, false);
@@ -142,6 +144,8 @@ export function buildMachine(): Machine {
 
   // the monitor's chin: a vent line and its own power light
   add(keep(new BoxGeometry(1.2, 0.02, 0.02)), trim, -0.6, 1.18, 0.905);
+  const chinVent = keep(new BoxGeometry(0.018, 0.12, 0.015));
+  for (let i = 0; i < 22; i++) add(chinVent, dark, -1.45 + i * 0.055, 1.16, 0.91, false);
   const ledMonitor = add(ledGeometry, paint(new MeshStandardMaterial({ color: LED_OFF, emissive: LED_ON, emissiveIntensity: 0 })), 1.45, 1.18, 0.905, false);
   ledMonitor.rotation.x = Math.PI / 2;
 
@@ -163,6 +167,7 @@ export function buildMachine(): Machine {
 
   // the mouse, to the right
   add(keep(new RoundedBoxGeometry(0.55, 0.2, 0.9, 3, 0.09)), body, 3.15, 0.1, 3.5);
+  add(keep(new BoxGeometry(0.46, 0.012, 0.016)), trim, 3.15, 0.2, 3.38, false);
 
   const leds = [ledCase, ledMonitor];
   return {
