@@ -38,8 +38,8 @@ export function DocsBody() {
             wallet is asked — where it goes, how much it can take — and signed there.
           </li>
           <li>
-            Pay any x402 endpoint from your own wallet, with every 402 checked before anything signs
-            and spending limits you set.
+            The x402 window lists this app&apos;s paid API. Payment availability is read from this server;
+            external x402 payment flows are disabled in this build.
           </li>
           <li>Every skill as a tool your own AI agent can call, from a server that holds no key.</li>
         </ul>
@@ -48,7 +48,7 @@ export function DocsBody() {
       <fieldset className="group">
         <legend>Not yet</legend>
         <ul className="notes" aria-label="Not yet">
-          <li>The app itself is not deployed: it runs on a developer&apos;s machine while each feature is tested.</li>
+          <li>Availability depends on this server and its upstream data sources. A failed read is not a successful check.</li>
           <li>The launchpad contract has not been audited. It holds the liquidity of every coin launched through it, forever.</li>
         </ul>
       </fieldset>

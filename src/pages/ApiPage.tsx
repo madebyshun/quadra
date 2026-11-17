@@ -129,8 +129,8 @@ export function ApiBody() {
       <fieldset className="group">
         <legend>What this app reads</legend>
         <p className="panel__lede">
-          Besides its own tools, the x402 window lists tools from {BLUEAGENT.name}&apos;s directory, read live every time, and pays
-          any other x402 URL. Who each origin may be paid to is pinned in this build, and a payee that does not match is refused.
+          The x402 window lists this app&apos;s own tools. External x402 payments and the {BLUEAGENT.name} catalog are disabled
+          in this build. The upstream catalog below is a reference, not an enabled payment flow.
         </p>
         <Crt label="Upstream catalog">{`curl ${BLUEAGENT.catalog}`}</Crt>
       </fieldset>

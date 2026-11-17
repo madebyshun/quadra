@@ -1,3 +1,4 @@
+import { journalWallet, settlePendingStep } from "@/lib/basketJournal";
 import { useCallback, useRef, useState } from "react";
 import { BASE } from "@/config/chain";
 import { messageOf } from "@/lib/errors";
@@ -43,7 +44,7 @@ export type TxSteps = {
   reset(): void;
 };
 
-export function useTxSteps(wait: WaitOptions = {}): TxSteps {
+export function useTxSteps(wait: WaitOptions = {}, durable = false): TxSteps {
   const [states, setStates] = useState<readonly StepState[]>([]);
   const [running, setRunning] = useState(false);
   /** kept in a ref as well as in `states`: a caller reading it right after `run` resolves sees the truth */
@@ -65,7 +66,7 @@ export function useTxSteps(wait: WaitOptions = {}): TxSteps {
           show(i, { label: step.label, status: "wallet" });
           let hash: string;
           try {
-            hash = await sendTransaction(provider, from, await step.build());
+            hash = await sendTransaction(durable ? journalWallet(provider, from, step.label) : provider, from, await step.build());
           } catch (err) {
             show(i, { label: step.label, status: "failed", why: messageOf(err) });
             return null;
@@ -76,6 +77,7 @@ export function useTxSteps(wait: WaitOptions = {}): TxSteps {
             show(i, { label: step.label, status: "slow", hash });
             return null;
           }
+          if (durable) settlePendingStep(from, hash);
           show(i, { label: step.label, status: receipt.status === "success" ? "confirmed" : "reverted", hash, block: receipt.block });
           if (receipt.status !== "success") return null;
           receipts.push(receipt);
@@ -86,7 +88,7 @@ export function useTxSteps(wait: WaitOptions = {}): TxSteps {
         setRunning(false);
       }
     },
-    [wait],
+    [wait, durable],
   );
 
   const reset = useCallback(() => {

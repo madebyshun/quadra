@@ -1,0 +1,60 @@
+{
+ "tokens": [
+  {
+   "contract_address": "0xb200000000000000000000000D3176ee4af1102d",
+   "symbol": "RKTc",
+   "name": "Rocket Companies, Inc.",
+   "decimals": 8,
+   "icon_url": "https://metadata.coinbase.com/equity_icons/4dde0edccaaf5a6e62a814beeef58402cc8a1aba58ca6aab50f65b2ae28d1127.png",
+   "isin": "US77311W1018",
+   "multiplier": 1,
+   "description": "About Rocket Companies, Inc. (Coinbase Tokenized Stock) (RKTc)\n\nRocket Companies\u2026",
+   "adgm_isin": "AE000A4AXJY9"
+  },
+  {
+   "contract_address": "0xb2000000000000000000001e800a7f5189430cD0",
+   "symbol": "TSLAc",
+   "name": "Tesla Inc.",
+   "decimals": 8,
+   "icon_url": "https://metadata.coinbase.com/equity_icons/a3b67028295d0e9fa3182c867b8a9afed5ebcbd8c012de3a46e160ae5e490980.png",
+   "total_supply": 6513.76335297,
+   "isin": "US88160R1014",
+   "multiplier": 1,
+   "nav_price": 386.32,
+   "nav_price_updated_at": "2026-11-11T11:45:03Z",
+   "description": "About Tesla Inc. (Coinbase Tokenized Stock) (TSLAc)\n\nTesla Inc. (Coinbase Tokeni\u2026",
+   "first_mint_date": "2026-09-03T18:16:27Z",
+   "adgm_isin": "AE000A4AWG09"
+  },
+  {
+   "contract_address": "0xb2000000000000000000002D0BA3164cc74f58B7",
+   "symbol": "GOOGLc",
+   "name": "Alphabet Inc.",
+   "decimals": 8,
+   "icon_url": "https://metadata.coinbase.com/equity_icons/0e80e31df40f7c42b49a3c7f6d23c6351625d73f235aeb69006ddee9221702b0.png",
+   "total_supply": 35707.28109821,
+   "isin": "US02079K3059",
+   "multiplier": 1.0003771186767842,
+   "nav_price": 290.91161521,
+   "nav_price_updated_at": "2026-11-11T03:12:22Z",
+   "description": "About Alphabet Inc. (Coinbase Tokenized Stock) (GOOGLc)\n\nAlphabet Inc. (Coinbase\u2026",
+   "first_mint_date": "2026-08-12T12:55:49Z",
+   "adgm_isin": "AE000A4AV8D4"
+  },
+  {
+   "contract_address": "0xb20000000000000000000078ee7ce2fE4908108C",
+   "symbol": "NVDAc",
+   "name": "NVIDIA Corporation",
+   "decimals": 8,
+   "icon_url": "https://metadata.coinbase.com/equity_icons/1fee9b7a44e800d438dd9d96c3283e05784c925c2c871a48ff735950740b551a.png",
+   "total_supply": 41796.74341603,
+   "isin": "US67066G1040",
+   "multiplier": 1.0005379395763694,
+   "nav_price": 174.84800709,
+   "nav_price_updated_at": "2026-11-11T13:06:06Z",
+   "description": "About NVIDIA Corporation (Coinbase Tokenized Stock) (NVDAc)\n\nNVIDIA Corporation \u2026",
+   "first_mint_date": "2026-08-12T12:40:59Z",
+   "adgm_isin": "AE000A4AV8A0"
+  }
+ ]
+}

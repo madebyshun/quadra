@@ -162,7 +162,7 @@ describe("the Coins window", () => {
     const list = await screen.findByLabelText("Coins", { selector: "ul" });
     await waitFor(() => expect(list).toHaveTextContent("test (test)"));
     // MEASURED: ≈ 4.974 ETH for the supply × the captured WETH price, $2,670.91
-    expect(list).toHaveTextContent(/vs ETH.*market cap ≈ \$13,28\d\.\d\d · not traded yet · .* · by 0xD5C1…3FAB/);
+    expect(list).toHaveTextContent(/vs ETH.*market cap ≈ \$13,28\d\.\d\d · market data unavailable · .* · by 0xD5C1…3FAB/);
     const stats = screen.getByLabelText("Launchpad numbers");
     expect(within(stats).getByText("Coins launched").nextSibling).toHaveTextContent("1");
     expect(within(stats).getByText("Volume 24h").nextSibling).toHaveTextContent("—");
@@ -195,15 +195,15 @@ describe("the Coins window", () => {
     await screen.findByLabelText("Coins", { selector: "ul" });
     expect(screen.queryByRole("button", { name: "Launch a token" })).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("option", { name: "ETH" })).toBeInTheDocument());
-    await userEvent.click(screen.getByRole("button", { name: "Stocks" }));
+    await userEvent.click(screen.getByRole("button", { name: "stock-paired" }));
     expect(screen.getByText("No coin matches — try All.")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Crypto" }));
+    await userEvent.click(screen.getByRole("button", { name: "eth-paired" }));
     await userEvent.selectOptions(screen.getByLabelText("Paired with"), "ETH");
     expect(screen.getByLabelText("Coins", { selector: "ul" })).toHaveTextContent("test (test)");
     await userEvent.selectOptions(screen.getByLabelText("Paired with"), "");
-    for (const label of ["⚡ Vol 24h", "🌱 New", "💧 Liquidity", "Mcap", "Gainers", "🔥 Trending"]) {
-      await userEvent.click(screen.getByRole("button", { name: label }));
-      expect(screen.getByRole("button", { name: label })).toHaveAttribute("aria-pressed", "true");
+    for (const value of ["volume", "new", "liquidity", "marketCap", "gainers", "trending"]) {
+      await userEvent.selectOptions(screen.getByLabelText("Sort coins"), value);
+      expect(screen.getByLabelText("Sort coins")).toHaveValue(value);
     }
     await userEvent.click(screen.getByRole("button", { name: "All" }));
     expect(screen.getByLabelText("Coins", { selector: "ul" })).toBeInTheDocument();
@@ -235,7 +235,7 @@ describe("the Coins window", () => {
     mount();
     const again = await screen.findByLabelText("Coins", { selector: "ul" });
     await waitFor(() => expect(again).toHaveTextContent(/market cap ≈ \$[\d,.]+ · \d+ min ago|market cap ≈ \$[\d,.]+ · \d+ (h|days) ago/));
-    expect(again).not.toHaveTextContent("not traded yet");
+    expect(again).not.toHaveTextContent("market data unavailable");
   });
 
   it("says when there are none, when the index ran out of pages, and when it could not be read", async () => {

@@ -59,8 +59,7 @@ const EXPLAIN: Partial<Record<Feature["id"], string>> = {
   bridge: "Move ETH or USDC from Base to Robinhood Chain, to your own address, signed in your wallet.",
   launch:
     "Put a coin out on Base, paired with ETH or a stock: a fixed supply nobody can mint, liquidity nobody can pull, and 80% of every trade's fee to you.",
-  coins:
-    "Every coin launched here, with its numbers. Open one for its page: its value, who launched it, the fees waiting, a buy or sell, and a full verdict.",
+
   profile:
     "Your wallet as you would want to read it — or anybody's: what it holds, the coins it launched here and the fees waiting, and what moved through it, with fake look-alike tokens called out.",
   taskmgr: "This computer's CPU is Base. Watch it work: every block, how full it is, what gas costs, and which launchpads are busiest right now.",

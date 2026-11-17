@@ -74,10 +74,12 @@ export function routes(env: Env, fetchImpl: typeof fetch = fetch, blob: BlobCall
   // a connected store arrives as a read-write token, or as a store id the SDK reaches with Vercel's OIDC token
   const connected = token !== null || Boolean(env.BLOB_STORE_ID);
   const chain = indexerRpc(env);
-  const launchpad =
-    connected && blob
-      ? indexerHandler({ ...(chain ? { rpc: chain } : {}), ...indexer, store: blobStore(blob, token, env.BLOB_ACCESS === "public" ? "public" : "private") })
-      : async () => problem(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID).");
+  const makeIndex = (readOnly: boolean) => connected && blob
+    ? indexerHandler({ ...(chain ? { rpc: chain } : {}), ...indexer, readOnly, store: blobStore(blob, token, env.BLOB_ACCESS === "public" ? "public" : "private") })
+    : async () => problem(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID).");
+  // Keep request-driven catch-up until a frequent production worker is configured.
+  const launchpad = makeIndex(false);
+  const syncIndex = makeIndex(false);
   const stocks = stocksHandler(fetchImpl);
   const charts = chartsHandler(fetchImpl);
   const logo = logoHandler(fetchImpl);
@@ -95,7 +97,7 @@ export function routes(env: Env, fetchImpl: typeof fetch = fetch, blob: BlobCall
     /** Vercel Cron's daily call: the index stepped forward with nobody asking. Vercel sends `CRON_SECRET` as a bearer. */
     cron: async (request: Request): Promise<Response> => {
       if (env.CRON_SECRET && request.headers.get("authorization") !== `Bearer ${env.CRON_SECRET}`) return problem(401, "Only Vercel Cron may run the index step.");
-      return launchpad(new Request(new URL(`${INDEXER_PATH}/creators`, request.url), { headers: { "x-quadra": "1" } }));
+      return syncIndex(new Request(new URL(`${INDEXER_PATH}/creators`, request.url), { headers: { "x-quadra": "1" } }));
     },
   };
 }

@@ -1,3 +1,4 @@
+import { IndexNotice } from "@/ui/IndexNotice";
 import { useEffect, useState } from "react";
 import { BRAND } from "@/brand";
 import { CONTRACTS, UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
@@ -357,6 +358,7 @@ function Trades({ page, now, quoteUsd }: { page: IndexedCoinPage; now: number; q
   const rows = page.trades.filter((t) => only === "all" || t.side === only);
   return (
     <div className="stack">
+      <IndexNotice behind={page.behind} error={null} />
       <div className="row" role="group" aria-label="Trades shown">
         {(["all", "buy", "sell"] as const).map((o) => (
           <button key={o} type="button" className="chip chip--mode" aria-pressed={only === o} onClick={() => setOnly(o)}>

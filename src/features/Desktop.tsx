@@ -9,9 +9,11 @@ export type DesktopProps = {
   onOpen: (id: WindowId) => void;
   /** the name was clicked: back to the front page, as the menu bar's Home does */
   onHome: () => void;
+  /** Desktop objects step aside while intro or Welcome owns the screen. */
+  obscured: boolean;
 };
 
-export function Desktop({ onOpen, onHome }: DesktopProps) {
+export function Desktop({ onOpen, onHome, obscured }: DesktopProps) {
   return (
     <div className="home stack">
       <header className="home__head">
@@ -32,14 +34,19 @@ export function Desktop({ onOpen, onHome }: DesktopProps) {
         <p className="home__tagline">{BRAND.desktopLine}</p>
       </header>
 
-      <section className="workspace" aria-label="Desktop workspace">
-        <div className="workspace__bar"><span className="workspace__box" aria-hidden="true" /><span>{BRAND.slug} / applications</span><span>base</span></div>
-        <div className="workspace__intro"><span>your everyday tools</span><span>open a window to begin</span></div>
+      <section className="workspace" aria-label="Desktop workspace" hidden={obscured}>
         <IconMenu onOpen={onOpen} />
-        <div className="workspace__pinned"><span>pinned /</span><button type="button" onClick={() => onOpen("basket")}>treasury basket</button><button type="button" onClick={() => onOpen("terminal")}>terminal</button></div>
-        <footer className="workspace__foot"><span>research / trade / create</span><span>your wallet signs</span></footer>
+        <div className="workspace__pinned" aria-label="Pinned tools">
+          <button type="button" className="icon" onClick={() => onOpen("basket")}><span className="icon__glyph"><Icon id="basket" /></span><span className="icon__title">treasury basket</span></button>
+          <button type="button" className="icon" onClick={() => onOpen("terminal")}><span className="icon__glyph"><Icon id="terminal" /></span><span className="icon__title">terminal</span></button>
+        </div>
       </section>
-      <nav className="home__links" aria-label="Product information"><a href="/?intro=explore">explore / desk</a><Link to="/about">read me / about</Link><Link to="/docs">documentation</Link><Link to="/api">api</Link></nav>
+      <nav className="home__links" aria-label="Product information" hidden={obscured}>
+        <a className="icon" href="/?intro=explore"><span className="icon__glyph"><Icon id="computer" /></span><span className="icon__title">explore / desk</span></a>
+        <button type="button" className="icon" onClick={() => onOpen("readme")}><span className="icon__glyph"><Icon id="docs" /></span><span className="icon__title">read me / about</span></button>
+        <Link className="icon" to="/docs"><span className="icon__glyph"><Icon id="folder-research" /></span><span className="icon__title">documentation</span></Link>
+        <Link className="icon" to="/api"><span className="icon__glyph"><Icon id="api" /></span><span className="icon__title">api</span></Link>
+      </nav>
       {/* the Markets gadget left the desktop on 2026-10-29 (one door per job: Coins shows the coins);
           it lives on in the Markets window, in My Computer > Research */}
       {/* the Trash keeps its own corner, the way it always has */}

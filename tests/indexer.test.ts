@@ -723,7 +723,7 @@ describe("the index kept between function runs (T3, 2026-11-04)", () => {
   it("keeps the index in a Blob at one path, private by default, read past the CDN's cache", async () => {
     const calls: unknown[][] = [];
     const blob = {
-      get: async (...a: unknown[]) => (calls.push(["get", ...a]), { stream: new Response("saved").body }),
+      get: async (...a: unknown[]) => (calls.push(["get", ...a]), { stream: new Response("saved").body, blob: { etag: "v1" } }),
       put: async (...a: unknown[]) => void calls.push(["put", ...a]),
     };
     const store = blobStore(blob, "tok");
@@ -731,11 +731,44 @@ describe("the index kept between function runs (T3, 2026-11-04)", () => {
     await store.save("next");
     expect(calls).toEqual([
       ["get", STATE_PATH, { access: "private", useCache: false, token: "tok" }],
-      ["put", STATE_PATH, "next", { access: "private", allowOverwrite: true, addRandomSuffix: false, contentType: "application/json", token: "tok" }],
+      ["put", STATE_PATH, "next", { access: "private", allowOverwrite: true, ifMatch: "v1", addRandomSuffix: false, contentType: "application/json", token: "tok" }],
     ]);
     const none = blobStore({ get: async () => null, put: async () => undefined }, "tok", "public");
     expect(await none.load()).toBeNull();
     expect(await blobStore({ get: async () => ({ stream: null }), put: async () => undefined }, "tok").load()).toBeNull();
+  });
+
+  it("conditionally creates snapshots and refuses an unversioned overwrite", async () => {
+    const put = vi.fn(async () => undefined);
+    const a = blobStore({ get: async () => null, put }, null);
+    await expect(a.save("early")).rejects.toThrow("versioned");
+    await a.load(); await a.save("first");
+    expect(put).toHaveBeenCalledWith(STATE_PATH, "first", expect.objectContaining({ allowOverwrite: false }));
+    await expect(a.save("again")).rejects.toThrow("versioned");
+    const b = blobStore({ get: async () => ({ stream: new Response("old").body }), put }, null);
+    await b.load(); await expect(b.save("unsafe")).rejects.toThrow("versioned");
+  });
+
+  it("serves a persisted snapshot without log scans and fails explicitly when storage or the head cannot be checked", async () => {
+    const node = fakeNode({ fail: (m) => m === "eth_getBlockByNumber" ? atHead(52_071_446) : undefined });
+    const { store } = memory(encodeState({ ...emptyState(), syncedTo: FIRST_BLOCK }));
+    const reader = indexerHandler({ store, rpc: node.rpc, readOnly: true });
+    const result = await reader(get("/coins"));
+    expect(result.status).toBe(200); expect((await result.json()).behind).toBe(52_071_446 - FIRST_BLOCK);
+    expect(node.calls.map(c=>c.method)).not.toContain("eth_getLogs");
+    expect((await indexerHandler({ store: memory().store, readOnly: true })(get("/coins"))).status).toBe(503);
+    expect((await indexerHandler({ store, rpc: async()=>{throw new Error("node down");}, readOnly: true })(get("/coins"))).status).toBe(503);
+  });
+
+  it("adopts a concurrent worker's newer checkpoint after publishing and tolerates an absent reread", async () => {
+    for (const reread of [null, encodeState({ ...emptyState(), syncedTo: 52_071_446 })]) {
+      let reads = 0;
+      const store: Store = { load: async () => reads++ === 0 ? encodeState({ ...emptyState(), syncedTo: FIRST_BLOCK }) : reread, save: async () => {} };
+      const node = fakeNode({ fail: m => m === "eth_getBlockByNumber" ? atHead(52_071_446) : undefined });
+      const state = emptyState();
+      await indexerHandler({ store, state, rpc: node.rpc, maxChunks: 1, budgetMs: -1 })(get("/coins"));
+      expect(state.syncedTo).toBe(reread === null ? FIRST_BLOCK + CHUNK : 52_071_446);
+    }
   });
 
   it("steps forward for up to its budget, then saves; the next run starts where the last saved", async () => {
@@ -771,8 +804,7 @@ describe("the index kept between function runs (T3, 2026-11-04)", () => {
     expect(quiet.box.saves).toBe(0);
     const broken: Store = { load: async () => Promise.reject(new Error("blob down")), save: async () => Promise.reject(new Error("blob full")) };
     const res = (await (await indexerHandler({ rpc: node.rpc, now: () => t, state: { ...emptyState(), syncedTo: 52_066_246 }, store: broken, maxChunks: 100 })(get("/coins"))).json()) as Snapshot;
-    expect(res.behind).toBe(0);
-    expect(res.error).toBe("the index could not be saved: blob full");
+    expect(res).toMatchObject({ status: 502, detail: expect.stringContaining("the index could not be saved: blob full") });
     // an OLDER stored index never replaces a newer one in memory
     const older = memory(encodeState({ ...emptyState(), syncedTo: 52_066_246 }));
     const state = { ...emptyState(), syncedTo: 52_071_446 };
@@ -807,6 +839,6 @@ describe("the index kept between function runs (T3, 2026-11-04)", () => {
     });
     const broken: Store = { load: async () => null, save: async () => Promise.reject(new Error("blob full")) };
     const snap = (await (await indexerHandler({ rpc: node.rpc, state: { ...emptyState(), syncedTo: 52_066_246 }, store: broken, maxChunks: 100 })(get("/coins"))).json()) as Snapshot;
-    expect(snap.error).toMatch(/node refused/);
+    expect(snap).toMatchObject({ status: 502, detail: expect.stringContaining("node refused") });
   });
 });

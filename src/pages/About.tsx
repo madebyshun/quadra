@@ -1,3 +1,4 @@
+import { IndexNotice } from "@/ui/IndexNotice";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { BRAND } from "@/brand";
@@ -158,6 +159,7 @@ export function About() {
       <section className="about__section about__live" aria-label="Live">
         <p className="about__eyebrow">From the chain, when you arrive</p>
         <h2>Live on {BASE.name}</h2>
+        {index !== "reading" && !("problem" in index) ? <IndexNotice behind={index.behind} error={index.error} /> : null}
         <div className="about__figures">
           <Figure label="coins launched here" value={shown(stats, (s) => s.coins.toLocaleString("en-US"))} />
           <Figure label="launchers" value={shown(stats, (s) => s.creators.toLocaleString("en-US"))} />

@@ -585,6 +585,8 @@ export type IndexerDeps = {
    */
   readonly store?: Store;
   readonly budgetMs?: number;
+  /** Serve persisted snapshots without doing historical RPC work in a user request. */
+  readonly readOnly?: boolean;
 };
 
 /** How long one stored step may spend reading the chain before it answers. */
@@ -630,19 +632,27 @@ export function indexerHandler(deps: IndexerDeps = {}) {
       return;
     }
     const started = now();
-    const before = state.syncedTo;
-    let result = await syncOnce(state, rpc, head, maxChunks);
-    while (store && result.error === null && state.syncedTo < head.number && now() - started < budgetMs) result = await syncOnce(state, rpc, head, maxChunks);
-    last = { at: now(), head: head.number, error: result.error };
-    if (store) {
-      if (state.syncedTo > before) {
+    do {
+      const before = state.syncedTo;
+      const previous = encodeState(state);
+      const result = await syncOnce(state, rpc, head, maxChunks);
+      last = { at: now(), head: head.number, error: result.error };
+      if (store && state.syncedTo > before) {
         try {
+          // Publish each bounded batch before spending more of the invocation budget.
           await store.save(encodeState(state));
+          const saved = decodeState(await store.load());
+          if (saved && saved.syncedTo > state.syncedTo) adopt(state, saved);
         } catch (e) {
+          adopt(state, decodeState(previous)!);
           last = { ...last, error: last.error ?? `the index could not be saved: ${messageOf(e)}` };
+          return;
         }
       }
-    } else if (result.error === null && state.syncedTo < head.number) later(() => void sync(), CATCH_UP_MS);
+      if (result.error !== null || state.syncedTo >= head.number) return;
+      if (!store) { later(() => void sync(), CATCH_UP_MS); return; }
+    } while (now() - started < budgetMs);
+
   };
   const sync = (): Promise<void> => {
     inFlight ??= step().finally(() => (inFlight = null));
@@ -654,7 +664,17 @@ export function indexerHandler(deps: IndexerDeps = {}) {
     if (request.headers.get("x-quadra") !== "1") return problem(403, "Requests to this server need the x-quadra: 1 header.");
     if (path !== "/coins" && path !== "/creators" && path !== "/coin") return problem(404, `${path} is not a route of the launchpad index.`);
     if (request.method !== "GET") return problem(405, `${path} takes GET.`);
-    if (last === null || now() - last.at >= FRESH_MS) await sync();
+    if (deps.readOnly) {
+      try {
+        const saved = decodeState(await store!.load());
+        if (saved === null) return problem(503, "The index snapshot is unavailable. The sync worker must publish one first.");
+        adopt(state, saved);
+        const head = await readHead(rpc);
+        last = { at: now(), head: head.number, error: null };
+      } catch (e) {
+        return problem(503, `The index snapshot could not be verified: ${messageOf(e)}`);
+      }
+    } else if (last === null || now() - last.at >= FRESH_MS) await sync();
     const { head, error } = last!;
     if (state.syncedTo < FIRST_BLOCK) {
       return problem(502, `The launchpad index has read nothing from Base yet: ${error ?? "the chain is still being read"}`);

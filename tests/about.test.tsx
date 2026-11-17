@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { screen, within } from "@testing-library/react";
 import { BRAND } from "@/brand";
 import { renderAt, settle } from "./helpers";
 import { WELCOME_KEY } from "@/lib/welcome";
@@ -71,7 +72,7 @@ describe("the About page", () => {
     localStorage.removeItem(WELCOME_KEY);
     renderAt("/");
     await settle();
-    expect(screen.getByRole("link", { name: `What is ${BRAND.name}? /` })).toHaveAttribute("href", "/about");
+    expect(screen.getByRole("button", { name: "what is quadra /" })).toBeInTheDocument();
   });
 });
 
@@ -88,5 +89,46 @@ describe("the fee flow", () => {
     expect(map).toHaveTextContent("50%");
     expect(map).toHaveTextContent("Contracts not audited");
     a.unmount();
+  });
+});
+
+
+describe("in-app read me", () => {
+  it("opens read me as a desktop document", async () => {
+    renderAt("/?do=readme");
+    await settle();
+    expect(screen.getByRole("heading", { name: "your desktop for coins and stocks on base." })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "About navigation" })).toBeNull();
+    expect(screen.getByRole("link", { name: "quadra / product tour - opens a new tab" })).toHaveAttribute("target", "_blank");
+  });
+
+  it("keeps an unfinished basket when read me opens and closes", async () => {
+    renderAt("/?do=basket");
+    await settle();
+    const asset = screen.getByLabelText("Asset 1");
+    await userEvent.clear(asset);
+    await userEvent.type(asset, "NVDA");
+    await userEvent.click(screen.getByRole("button", { name: "read me / about" }));
+    await userEvent.click(within(screen.getByLabelText("Read Me", { selector: "section" })).getByRole("button", { name: "Close" }));
+    expect(screen.getByLabelText("Asset 1")).toHaveValue("NVDA");
+  });
+
+  it("opens each getting-started action inside the desktop", async () => {
+    renderAt("/?do=readme");
+    await settle();
+    for (const title of ["explore coins", "build a basket", "launch a coin", "your wallet"]) {
+      await userEvent.click(screen.getByRole("button", { name: "open " + title }));
+      await userEvent.click(screen.getByRole("button", { name: "read me / about" }));
+    }
+    expect(screen.getByRole("heading", { name: "your desktop for coins and stocks on base." })).toBeInTheDocument();
+  });
+
+  it("opens help from welcome without navigating to marketing", async () => {
+    localStorage.removeItem(WELCOME_KEY);
+    renderAt("/");
+    await settle();
+    await userEvent.click(screen.getByRole("button", { name: "what is quadra /" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("heading", { name: "your desktop for coins and stocks on base." })).toBeInTheDocument();
   });
 });

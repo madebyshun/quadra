@@ -1,13 +1,9 @@
-import { Link } from "react-router-dom";
+import { Icon } from "@/ui/icons";
 import { desktopItems, type WindowId } from "@/features/registry";
 
 export type IconMenuProps = {
-  /**
-   * Present only on the desktop: an icon opens a window in place. Absent on the
-   * standalone pages (`/docs`, `/api`, `/verify`), where an icon is a plain link
-   * — there is no window manager to open one into.
-   */
-  onOpen?: (id: WindowId) => void;
+  /** Open or refocus a desktop tool. */
+  onOpen: (id: WindowId) => void;
 };
 
 /**
@@ -22,7 +18,7 @@ export function IconMenu({ onOpen }: IconMenuProps) {
           const body = (
             <>
               <span className="icon__glyph">
-                <img src={`/brand/tools/${e.id}.svg`} width="36" height="36" alt="" />
+                <Icon id={e.id} />
               </span>
               <span className="icon__title">{e.title}</span>
               <span className="icon__blurb">{e.blurb}</span>
@@ -30,15 +26,9 @@ export function IconMenu({ onOpen }: IconMenuProps) {
           );
           return (
             <li key={e.id}>
-              {onOpen ? (
-                <button type="button" onClick={() => onOpen(e.id)} className="icon">
-                  {body}
-                </button>
-              ) : (
-                <Link to={`/?do=${e.id}`} className="icon">
-                  {body}
-                </Link>
-              )}
+              <button type="button" onClick={() => onOpen(e.id)} className="icon">
+                {body}
+              </button>
             </li>
           );
         })}

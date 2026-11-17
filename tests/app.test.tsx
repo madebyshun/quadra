@@ -6,6 +6,11 @@ import { BRAND } from "@/brand";
 import { visibleFeatures, FEATURES, desktopItems, comingSoon, folderItems, FOLDER_IDS, entryOf } from "@/features/registry";
 import { radarSkill } from "@/skills/radar";
 
+async function openFromMenu(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: BRAND.name }));
+  await user.click(within(screen.getByRole("menu", { name: `${BRAND.name} menu` })).getByRole("menuitem", { name }));
+}
+
 describe("the desktop", () => {
   it("leads with the product name", () => {
     renderAt("/");
@@ -41,6 +46,9 @@ describe("the desktop", () => {
     expect(screen.getByRole("button", { name: "Trash" })).toHaveClass("desk-trash");
     await userEvent.click(screen.getByRole("button", { name: "treasury basket" }));
     expect(screen.getByRole("heading", { name: "Treasury Basket" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Desktop workspace")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.getByLabelText("Desktop workspace")).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: "terminal" }));
     expect(screen.getByRole("heading", { name: "Terminal" })).toBeInTheDocument();
   });
@@ -173,7 +181,7 @@ describe("the desktop", () => {
     const user = userEvent.setup();
     renderAt("/?do=send");
     await settle();
-    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Agents/ }));
+    await openFromMenu(user, "Agents");
     await user.dblClick(within(screen.getByRole("list", { name: "Agents" })).getByRole("button", { name: "Verify" }));
     await settle();
     const titles = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
@@ -263,7 +271,7 @@ describe("multiple windows", () => {
     const user = userEvent.setup();
     renderAt("/?do=send");
     await settle();
-    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Coins/ }));
+    await openFromMenu(user, "Coins");
     expect(windowFrame("Send")).toBeInTheDocument();
     expect(windowFrame("Coins")).toBeInTheDocument();
   });
@@ -272,7 +280,7 @@ describe("multiple windows", () => {
     const user = userEvent.setup();
     renderAt("/?do=send");
     await settle();
-    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Coins/ }));
+    await openFromMenu(user, "Coins");
     await user.click(within(windowFrame("Send")).getByRole("button", { name: "Close" }));
     expect(screen.queryByLabelText("Send", { selector: "section" })).not.toBeInTheDocument();
     expect(windowFrame("Coins")).toBeInTheDocument();
@@ -282,7 +290,7 @@ describe("multiple windows", () => {
     const user = userEvent.setup();
     renderAt("/?do=send");
     await settle();
-    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Coins/ }));
+    await openFromMenu(user, "Coins");
     await user.click(windowFrame("Send"));
     await user.click(within(screen.getByLabelText("Menu bar")).getByRole("button", { name: "Windows" }));
     const send = within(screen.getByRole("menu", { name: "Windows menu" })).getByRole("menuitemcheckbox", { name: "Send" });
@@ -515,6 +523,14 @@ describe("routing", () => {
     }
   });
 
+  it("uses the desktop on standalone documents and opens its tools", async () => {
+    const user = userEvent.setup();
+    renderAt("/docs");
+    expect(screen.getByLabelText("Desktop workspace")).toBeVisible();
+    await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^My Computer/ }));
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("My Computer");
+  });
+
   it("closes a standalone page back to the desktop from its close light", async () => {
     const user = userEvent.setup();
     renderAt("/docs");
@@ -618,7 +634,7 @@ describe("what the Docs window admits", () => {
     expect(works).toHaveTextContent(/Send ETH or any token.*launch a coin on this app's own launchpad/);
     // Robinhood Chain is hidden (2026-10-02): the Docs do not offer a bridge to it
     expect(works).not.toHaveTextContent(/Robinhood/);
-    expect(notYet).toHaveTextContent(/The app itself is not deployed/);
+    expect(notYet).toHaveTextContent(/A failed read is not a successful check/);
     expect(notYet).toHaveTextContent(/launchpad contract has not been audited/);
     /*
       The privacy model was dropped on 2026-09-30. A leftover sentence promising it would

@@ -34,6 +34,17 @@ describe("the server route", () => {
     expect(upstream).toHaveBeenCalledTimes(2);
   });
 
+  it("reads the free Base-only stock snapshot, coalescing its cache for thirty seconds", async () => {
+    const upstream = vi.fn(async () => json({ rows: [], chain_filter: "base" }));
+    let at = 0;
+    const handle = weekendHandler(upstream as unknown as typeof fetch, () => at);
+    expect((await handle(ask("live"))).status).toBe(200);
+    expect(upstream).toHaveBeenCalledWith(UPSTREAM.live, expect.objectContaining({ body: JSON.stringify({ chain: "base" }) }));
+    await handle(ask("live")); expect(upstream).toHaveBeenCalledTimes(1);
+    at = 30000; await handle(ask("live")); expect(upstream).toHaveBeenCalledTimes(2);
+    expect((await handle(ask("live?ticker=AAPL"))).status).toBe(400);
+  });
+
   it("refuses a request without its header, a POST, and anything but the two records", async () => {
     const handle = weekendHandler(vi.fn() as unknown as typeof fetch);
     expect((await handle(ask("scorecard", {}))).status).toBe(403);

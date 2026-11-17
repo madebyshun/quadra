@@ -71,11 +71,11 @@ export type Store = {
 
 /** The two Blob calls the store makes — the SDK's `get` and `put`, passed in so a test can stand in. */
 export type BlobCalls = {
-  readonly get: (path: string, options: { access: "public" | "private"; useCache: false; token?: string }) => Promise<{ stream: ReadableStream | null } | null>;
+  readonly get: (path: string, options: { access: "public" | "private"; useCache: false; token?: string }) => Promise<{ stream: ReadableStream | null; blob?: { etag: string } } | null>;
   readonly put: (
     path: string,
     body: string,
-    options: { access: "public" | "private"; allowOverwrite: true; addRandomSuffix: false; contentType: string; token?: string },
+    options: { access: "public" | "private"; allowOverwrite: boolean; ifMatch?: string; addRandomSuffix: false; contentType: string; token?: string },
   ) => Promise<unknown>;
 };
 
@@ -87,13 +87,18 @@ export function blobStore(calls: BlobCalls, token: string | null, access: "publi
   // no token: the SDK authenticates itself — Vercel's OIDC token with BLOB_STORE_ID, how a store connected
   // to a project may arrive (MEASURED 2026-11-04: a connected store and no BLOB_READ_WRITE_TOKEN yet)
   const auth = token === null ? {} : { token };
+  let expected: string | null | undefined;
   return {
     load: async () => {
       const found = await calls.get(STATE_PATH, { access, useCache: false, ...auth });
+      expected = found === null ? null : found.blob?.etag;
       return found?.stream ? await new Response(found.stream).text() : null;
     },
     save: async (text) => {
-      await calls.put(STATE_PATH, text, { access, allowOverwrite: true, addRandomSuffix: false, contentType: "application/json", ...auth });
+      if (expected === undefined) throw new Error("The index needs a versioned storage read before saving. Nothing was overwritten.");
+      await calls.put(STATE_PATH, text, { access, allowOverwrite: expected !== null, ...(expected === null ? {} : { ifMatch: expected }), addRandomSuffix: false, contentType: "application/json", ...auth });
+      // The next save must read its own new version first.
+      expected = undefined;
     },
   };
 }

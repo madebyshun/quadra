@@ -74,6 +74,7 @@ export function net(routes: Routes): Call[] {
       calls.push({ url, rpc: null });
       answer = routes.get?.(url);
       // the visitor's country (lib/region.ts): unread unless a test says otherwise — never a block by default
+      if (answer === undefined && url === "/api/weekend/live") answer = new Response(JSON.stringify({ detail: "stock data unavailable in this fixture" }), { status: 503 });
       if (answer === undefined && url === "/api/region") answer = { country: null };
       if (answer === undefined) unrouted.push(`GET ${url}`);
       else if (answer !== DOWN && !(answer instanceof Response)) answer = json(answer);

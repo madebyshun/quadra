@@ -1,0 +1,60 @@
+[
+ {
+  "chainId": "base",
+  "dexId": "uniswap",
+  "url": "https://dexscreener.com/base/0x342af3dc58e331704cd79b187098e43cc7bf76b7938e3bf63aa1b2f3b2d9e965",
+  "pairAddress": "0x342af3dc58e331704cd79b187098e43cc7bf76b7938e3bf63aa1b2f3b2d9e965",
+  "labels": [
+   "v4"
+  ],
+  "baseToken": {
+   "address": "0xb2000000000000000000001e800a7f5189430cD0",
+   "name": "Tesla Inc.",
+   "symbol": "TSLAc"
+  },
+  "quoteToken": {
+   "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+   "name": "USD Coin",
+   "symbol": "USDC"
+  },
+  "priceNative": "386.3764",
+  "priceUsd": "386.37",
+  "txns": {
+   "m5": {
+    "buys": 0,
+    "sells": 0
+   },
+   "h1": {
+    "buys": 0,
+    "sells": 6
+   },
+   "h6": {
+    "buys": 13,
+    "sells": 32
+   },
+   "h24": {
+    "buys": 119,
+    "sells": 83
+   }
+  },
+  "volume": {
+   "h24": 8976.4,
+   "h6": 1904.69,
+   "h1": 290.63,
+   "m5": 0
+  },
+  "priceChange": {
+   "h1": -0.28,
+   "h6": 0.2,
+   "h24": 3.53
+  },
+  "liquidity": {
+   "usd": 33412.64,
+   "base": 58.01634,
+   "quote": 10996
+  },
+  "fdv": 2516765,
+  "marketCap": 2516765,
+  "pairCreatedAt": 1793593731000
+ }
+]

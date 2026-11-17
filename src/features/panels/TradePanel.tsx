@@ -1,3 +1,4 @@
+import { StockHealth } from "@/features/panels/StockHealth";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { baseStocks, spots, type BaseStock, type Spot } from "@/adapters/http/markets";
 import { BASE, USDC, WETH } from "@/config/chain";
@@ -224,6 +225,7 @@ export function TradePanel() {
               </button>
             ) : null}
           </div>
+          {selected.stock ? <StockHealth key={selected.stock.address} stock={selected.stock} /> : null}
           {transfersPaused(selected.stock) ? (
             <Crt label="Trading paused">
               <span className="crt__amber">

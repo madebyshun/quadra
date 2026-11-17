@@ -85,7 +85,7 @@ describe("the indexer's own RPC", () => {
     vi.stubGlobal("fetch", async (url: string) => (asked.push(url), new Response("down", { status: 503 })));
     try {
       const r = routes({ BLOB_STORE_ID: "s", BASE_RPC_URL: "https://base.example/key" }, fetch, blob);
-      expect((await r.launchpad(new Request("https://x/api/launchpad/coins", { headers: { "x-quadra": "1" } }))).status).toBe(502);
+      expect((await r.cron(new Request("https://x/api/cron/index"))).status).toBe(502);
       expect(asked[0]).toBe("https://base.example/key");
     } finally {
       vi.unstubAllGlobals();

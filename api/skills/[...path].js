@@ -8070,6 +8070,7 @@ function logoHandler(fetchImpl = fetch) {
 // src/server/weekend.ts
 var WEEKEND_PATH = "/api/weekend";
 var UPSTREAM2 = {
+  live: "https://blueagent.dev/api/x402/hood-live",
   scorecard: "https://blueagent.dev/api/x402/weekend-scorecard",
   diary: "https://blueagent.dev/api/x402/weekend-diary"
 };
@@ -8090,10 +8091,10 @@ function weekendHandler(fetchImpl = fetch, now = Date.now) {
     const weekends = at.searchParams.get("weekends");
     if (ticker !== null && (which !== "scorecard" || !/^[A-Z]{1,6}$/.test(ticker))) return problem5(400, "ticker is 1\u20136 capital letters, on the scorecard only.");
     if (weekends !== null && (which !== "scorecard" || !/^[1-9]\d{0,2}$/.test(weekends) || Number(weekends) > 104)) return problem5(400, "weekends is a whole number from 1 to 104, on the scorecard only.");
-    const body = JSON.stringify({ ...ticker ? { ticker } : {}, ...weekends ? { weekends: Number(weekends) } : {} });
+    const body = JSON.stringify({ ...which === "live" ? { chain: "base" } : {}, ...ticker ? { ticker } : {}, ...weekends ? { weekends: Number(weekends) } : {} });
     const key = `${which} ${body}`;
     const kept = cache.get(key);
-    if (kept && now() - kept.at < FRESH_MS2) return ok(kept.body);
+    if (kept && now() - kept.at < (which === "live" ? 3e4 : FRESH_MS2)) return ok(kept.body);
     try {
       const res = await fetchImpl(url, { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body, redirect: "manual" });
       if (!res.ok) return problem5(502, `Blue Agent answered ${res.status}.`);
@@ -8163,13 +8164,17 @@ function decodeState(text) {
 }
 function blobStore(calls, token, access = "private") {
   const auth = token === null ? {} : { token };
+  let expected;
   return {
     load: async () => {
       const found = await calls.get(STATE_PATH, { access, useCache: false, ...auth });
+      expected = found === null ? null : found.blob?.etag;
       return found?.stream ? await new Response(found.stream).text() : null;
     },
     save: async (text) => {
-      await calls.put(STATE_PATH, text, { access, allowOverwrite: true, addRandomSuffix: false, contentType: "application/json", ...auth });
+      if (expected === void 0) throw new Error("The index needs a versioned storage read before saving. Nothing was overwritten.");
+      await calls.put(STATE_PATH, text, { access, allowOverwrite: expected !== null, ...expected === null ? {} : { ifMatch: expected }, addRandomSuffix: false, contentType: "application/json", ...auth });
+      expected = void 0;
     }
   };
 }
@@ -8495,19 +8500,28 @@ function indexerHandler(deps = {}) {
       return;
     }
     const started = now();
-    const before = state.syncedTo;
-    let result = await syncOnce(state, rpc2, head, maxChunks);
-    while (store && result.error === null && state.syncedTo < head.number && now() - started < budgetMs) result = await syncOnce(state, rpc2, head, maxChunks);
-    last = { at: now(), head: head.number, error: result.error };
-    if (store) {
-      if (state.syncedTo > before) {
+    do {
+      const before = state.syncedTo;
+      const previous = encodeState(state);
+      const result = await syncOnce(state, rpc2, head, maxChunks);
+      last = { at: now(), head: head.number, error: result.error };
+      if (store && state.syncedTo > before) {
         try {
           await store.save(encodeState(state));
+          const saved = decodeState(await store.load());
+          if (saved && saved.syncedTo > state.syncedTo) adopt(state, saved);
         } catch (e) {
+          adopt(state, decodeState(previous));
           last = { ...last, error: last.error ?? `the index could not be saved: ${messageOf(e)}` };
+          return;
         }
       }
-    } else if (result.error === null && state.syncedTo < head.number) later(() => void sync(), CATCH_UP_MS);
+      if (result.error !== null || state.syncedTo >= head.number) return;
+      if (!store) {
+        later(() => void sync(), CATCH_UP_MS);
+        return;
+      }
+    } while (now() - started < budgetMs);
   };
   const sync = () => {
     inFlight ??= step().finally(() => inFlight = null);
@@ -8518,7 +8532,17 @@ function indexerHandler(deps = {}) {
     if (request.headers.get("x-quadra") !== "1") return problem7(403, "Requests to this server need the x-quadra: 1 header.");
     if (path !== "/coins" && path !== "/creators" && path !== "/coin") return problem7(404, `${path} is not a route of the launchpad index.`);
     if (request.method !== "GET") return problem7(405, `${path} takes GET.`);
-    if (last === null || now() - last.at >= FRESH_MS3) await sync();
+    if (deps.readOnly) {
+      try {
+        const saved = decodeState(await store.load());
+        if (saved === null) return problem7(503, "The index snapshot is unavailable. The sync worker must publish one first.");
+        adopt(state, saved);
+        const head2 = await readHead(rpc2);
+        last = { at: now(), head: head2.number, error: null };
+      } catch (e) {
+        return problem7(503, `The index snapshot could not be verified: ${messageOf(e)}`);
+      }
+    } else if (last === null || now() - last.at >= FRESH_MS3) await sync();
     const { head, error } = last;
     if (state.syncedTo < FIRST_BLOCK) {
       return problem7(502, `The launchpad index has read nothing from Base yet: ${error ?? "the chain is still being read"}`);
@@ -8566,7 +8590,9 @@ function routes(env, fetchImpl = fetch, blob2 = null, indexer = {}) {
   const token = env.BLOB_READ_WRITE_TOKEN ?? null;
   const connected = token !== null || Boolean(env.BLOB_STORE_ID);
   const chain = indexerRpc(env);
-  const launchpad = connected && blob2 ? indexerHandler({ ...chain ? { rpc: chain } : {}, ...indexer, store: blobStore(blob2, token, env.BLOB_ACCESS === "public" ? "public" : "private") }) : async () => problem8(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID).");
+  const makeIndex = (readOnly) => connected && blob2 ? indexerHandler({ ...chain ? { rpc: chain } : {}, ...indexer, readOnly, store: blobStore(blob2, token, env.BLOB_ACCESS === "public" ? "public" : "private") }) : async () => problem8(503, "The launchpad index needs a Vercel Blob store connected to this project (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID).");
+  const launchpad = makeIndex(false);
+  const syncIndex = makeIndex(false);
   const stocks = stocksHandler(fetchImpl);
   const charts = chartsHandler(fetchImpl);
   const logo = logoHandler(fetchImpl);
@@ -8584,7 +8610,7 @@ function routes(env, fetchImpl = fetch, blob2 = null, indexer = {}) {
     /** Vercel Cron's daily call: the index stepped forward with nobody asking. Vercel sends `CRON_SECRET` as a bearer. */
     cron: async (request) => {
       if (env.CRON_SECRET && request.headers.get("authorization") !== `Bearer ${env.CRON_SECRET}`) return problem8(401, "Only Vercel Cron may run the index step.");
-      return launchpad(new Request(new URL(`${INDEXER_PATH}/creators`, request.url), { headers: { "x-quadra": "1" } }));
+      return syncIndex(new Request(new URL(`${INDEXER_PATH}/creators`, request.url), { headers: { "x-quadra": "1" } }));
     }
   };
 }

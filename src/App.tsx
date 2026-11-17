@@ -75,7 +75,7 @@ const TALL_PANELS: ReadonlySet<WindowId> = new Set<WindowId>([
  * the Base card measured 452px wide at the default width, the card itself a thumbnail). Still never
  * wider than the viewport allows.
  */
-export const WIDE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["card", "coins"]);
+export const WIDE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["card", "coins", "readme"]);
 export const WIDE_WIDTH = 760;
 
 function openAction(id: WindowId): { type: "open"; id: WindowId; origin: Origin; height: number } {
@@ -217,7 +217,7 @@ function Home() {
   return (
     <MarketsProvider onOpen={openMarkets}>
       <OpenWindowProvider open={openWith}>
-      <Desktop onOpen={openFeature} onHome={goHome} />
+      <Desktop onOpen={openFeature} onHome={goHome} obscured={welcome || intro} />
       {/* `w.id: WindowId` is exactly the key space the two resolvers were built from — every open window resolves to one or the other. */}
       {state.windows.map((w) => {
         const doc = resolveDoc(w.id);

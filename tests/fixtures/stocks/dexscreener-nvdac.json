@@ -1,0 +1,73 @@
+[
+ {
+  "chainId": "base",
+  "dexId": "aero",
+  "url": "https://dexscreener.com/base/0xf668e21993f0acd7ab00bb1cfbaed0df28a3c8ec",
+  "pairAddress": "0xF668e21993f0ACd7ab00BB1cFbAeD0df28A3C8EC",
+  "baseToken": {
+   "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+   "name": "NVIDIA Corporation",
+   "symbol": "NVDAc"
+  },
+  "quoteToken": {
+   "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+   "name": "USD Coin",
+   "symbol": "USDC"
+  },
+  "priceNative": "175.5770",
+  "priceUsd": "175.57",
+  "txns": {
+   "m5": {
+    "buys": 22,
+    "sells": 0
+   },
+   "h1": {
+    "buys": 310,
+    "sells": 230
+   },
+   "h6": {
+    "buys": 1717,
+    "sells": 1490
+   },
+   "h24": {
+    "buys": 5626,
+    "sells": 5126
+   }
+  },
+  "volume": {
+   "h24": 9880486.32,
+   "h6": 2823391.05,
+   "h1": 389926.51,
+   "m5": 8708.87
+  },
+  "priceChange": {
+   "m5": 0.05,
+   "h1": 0.17,
+   "h6": 1.92,
+   "h24": -1.02
+  },
+  "liquidity": {
+   "usd": 1466550.43,
+   "base": 4367.9803,
+   "quote": 699633
+  },
+  "fdv": 7338531,
+  "marketCap": 7338531,
+  "info": {
+   "imageUrl": "https://cdn.dexscreener.com/cms/images/E1EjcAwgcyu0qKSZ?width=800&height=800&quality=95&format=auto",
+   "openGraph": "https://cdn.dexscreener.com/token-images/og/base/0xb20000000000000000000078ee7ce2fe4908108c?timestamp=1794403200000",
+   "websites": [
+    {
+     "url": "https://www.coinbase.com/tokenize",
+     "label": "Website"
+    }
+   ],
+   "socials": [
+    {
+     "url": "https://x.com/coinbase",
+     "type": "twitter"
+    }
+   ]
+  }
+ }
+]

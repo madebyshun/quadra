@@ -16,6 +16,7 @@
 
 export const WEEKEND_PATH = "/api/weekend";
 export const UPSTREAM: Readonly<Record<string, string>> = {
+  live: "https://blueagent.dev/api/x402/hood-live",
   scorecard: "https://blueagent.dev/api/x402/weekend-scorecard",
   diary: "https://blueagent.dev/api/x402/weekend-diary",
 };
@@ -38,10 +39,10 @@ export function weekendHandler(fetchImpl: typeof fetch = fetch, now: () => numbe
     const weekends = at.searchParams.get("weekends");
     if (ticker !== null && (which !== "scorecard" || !/^[A-Z]{1,6}$/.test(ticker))) return problem(400, "ticker is 1–6 capital letters, on the scorecard only.");
     if (weekends !== null && (which !== "scorecard" || !/^[1-9]\d{0,2}$/.test(weekends) || Number(weekends) > 104)) return problem(400, "weekends is a whole number from 1 to 104, on the scorecard only.");
-    const body = JSON.stringify({ ...(ticker ? { ticker } : {}), ...(weekends ? { weekends: Number(weekends) } : {}) });
+    const body = JSON.stringify({ ...(which === "live" ? { chain: "base" } : {}), ...(ticker ? { ticker } : {}), ...(weekends ? { weekends: Number(weekends) } : {}) });
     const key = `${which} ${body}`;
     const kept = cache.get(key);
-    if (kept && now() - kept.at < FRESH_MS) return ok(kept.body);
+    if (kept && now() - kept.at < (which === "live" ? 30_000 : FRESH_MS)) return ok(kept.body);
     try {
       const res = await fetchImpl(url, { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body, redirect: "manual" });
       // Blue Agent answers an unreadable record with a 503 — said as such, never as an empty record

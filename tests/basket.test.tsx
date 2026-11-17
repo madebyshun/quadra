@@ -221,6 +221,8 @@ describe("the Treasury Basket window", () => {
     // the 2026-09-30 capture of Coinbase's list has no Amazon yet — said by name, never guessed
     expect(cta()).toHaveTextContent("AMZN is not a Coinbase stock or a listed token on Base.");
     await userEvent.click(screen.getByRole("button", { name: "AI compute" }));
+    expect(screen.getByLabelText("Asset 1")).toHaveValue("AAPL");
+    await userEvent.click(screen.getByRole("button", { name: "use this allocation" }));
     expect(screen.getByLabelText("Asset 1")).toHaveValue("NVDA");
     await basket([["NVDA", "100"]]);
     expect(cta()).toHaveTextContent("Connect a wallet first");
@@ -748,4 +750,21 @@ describe("Treasury Basket atomic purchase", () => {
     expect(asked[0]!.user).toBe("0x000000000000000000000000000000000000dEaD");
   });
 
+});
+
+
+it("restores sequential basket recovery for known, unknown and unreadable pending work", async () => {
+  for (const hash of [HASH, null, "corrupt"] as const) {
+    wallet(); world();
+    localStorage.setItem(`quadra.basket.sequence.v1:${USER.toLowerCase()}`, hash === "corrupt" ? "invalid" : JSON.stringify({ account: USER.toLowerCase(), label: "Buy NVDAc", hash }));
+    const view = mount(); await settle();
+    const recovery = screen.getByRole("region", { name: "Basket recovery" });
+    expect(recovery).toBeVisible();
+    if (hash !== "corrupt") {
+      await userEvent.click(within(recovery).getByRole("button", { name: "Check previous transaction" }));
+      await settle();
+      expect(screen.getByRole("region", { name: "Basket recovery" })).toHaveTextContent(hash === null ? "unresolved" : "confirmed");
+    }
+    view.unmount(); localStorage.removeItem(`quadra.basket.sequence.v1:${USER.toLowerCase()}`);
+  }
 });

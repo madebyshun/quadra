@@ -2,7 +2,7 @@ import { useCallback, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Window } from "@/ui/Window";
 import { Taskbar } from "@/ui/Taskbar";
-import { IconMenu } from "@/features/IconMenu";
+import { Desktop } from "@/features/Desktop";
 import { centeredOrigin, clampWindowSize, pageHeight, windowWidth } from "@/lib/windowManager";
 
 type Layout = { x: number; y: number; width: number; height: number; minimized: boolean };
@@ -10,21 +10,11 @@ type Layout = { x: number; y: number; width: number; height: number; minimized: 
 function initialLayout(): Layout {
   const height = pageHeight(window.innerHeight);
   const origin = centeredOrigin(window.innerWidth, window.innerHeight, height);
-  return { x: origin.x, y: origin.y, width: windowWidth(window.innerWidth), height, minimized: false };
+  const width = Math.min(960, Math.max(windowWidth(window.innerWidth), window.innerWidth - 640));
+  return { x: Math.max(8, (window.innerWidth - width) / 2), y: origin.y, width, height, minimized: false };
 }
 
-/**
- * Shared shell for the standalone pages: the same left-hand icon menu the
- * desktop shows, plus one window and a way back. Feature icons here are plain
- * links to `/?do=<id>` — `IconMenu` renders them that way whenever it gets no
- * `onOpen`, because there is no window manager on this page to open one into.
- *
- * The window itself now carries a real `layout` — draggable by its title bar,
- * resizable from its corner grip, minimises to the taskbar — the same as any
- * window on the multi-window desktop. There is only ever one window here, so
- * there is no z-order to track and no `FeatureId` to key it by; a plain
- * `useState` stands in for the reducer `windowManager.ts` uses for many.
- */
+/** Standalone documents share the full desktop and keep a draggable, resizable document window. */
 export function Page({ title, children }: { title: string; children: ReactNode }) {
   const navigate = useNavigate();
   const home = () => navigate("/");
@@ -35,7 +25,7 @@ export function Page({ title, children }: { title: string; children: ReactNode }
   return (
     <>
       <div className="page">
-        <IconMenu />
+        <Desktop onOpen={(id) => navigate(`/?do=${id}`)} onHome={home} obscured={false} />
         <div className="shell">
           <Window
             title={title}
