@@ -4,7 +4,7 @@
  * link pasted on X, Telegram or Discord shows that page's card. Assets and /api are not touched.
  * Any failure serves the page unchanged — a share card is never worth a broken page.
  */
-import { injectMeta, metaFor } from "./src/server/og";
+import { injectMeta, metaFor } from "../src/server/og";
 
 export const config = { matcher: ["/((?!api/|og/|brand/|assets/|.*\\..*).*)"] };
 
