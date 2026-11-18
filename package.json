@@ -19,7 +19,8 @@
     "contracts:test": "cd contracts && base-forge test",
     "contracts:cov": "vite-node scripts/check-contract-coverage.ts",
     "gate:contracts": "npm run contracts:build && npm run contracts:test && npm run contracts:cov",
-    "build:api": "node scripts/build-api.mjs"
+    "build:api": "node scripts/build-api.mjs",
+    "build:og": "vite-node scripts/build-og.tsx"
   },
   "dependencies": {
     "@coinbase/wallet-sdk": "^4.4.0",
