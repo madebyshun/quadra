@@ -27,7 +27,7 @@ export const OG_PAGES: readonly OgPage[] = [
     path: "quadra / desktop",
     title: "quadra",
     description: "an on-chain computer for base. check any token before you buy, then trade, swap or launch from your own wallet.",
-    lines: ["a personal computer for base", "discover coins. build a basket. launch your own.", "review each action. sign in your wallet."],
+    lines: ["check any token before you buy", "build a basket. launch a coin.", "review it. sign in your wallet."],
   },
   {
     id: "about",

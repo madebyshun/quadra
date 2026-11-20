@@ -10,6 +10,7 @@ import { messageOf } from "@/lib/errors";
 import { launchOf } from "@/skills/launchpad";
 import { explorer, short, tokenAmount } from "@/skills/format";
 import { Flywheel } from "./Flywheel";
+import aboutSky from "@/assets/quadra-banner.jpg";
 import "./About.css";
 
 /**
@@ -75,26 +76,26 @@ export function About() {
   return (
     <div className="about">
       <header className="about__bar">
-        <Link to="/" className="about__brand">
+        <Link to="/" state={{ fromPage: true }} className="about__brand">
           <img src="/brand/icon.svg" width="30" height="30" alt="" />
           {BRAND.name}
         </Link>
         <nav aria-label="About navigation">
           <a href="#tools">The tools</a>
           <Link to="/docs">Docs</Link>
-          <Link to="/" className="about__button about__button--small">Open the computer <span aria-hidden="true">↗</span></Link>
+          <Link to="/" state={{ fromPage: true }} className="about__button about__button--small">Open the computer <span aria-hidden="true">↗</span></Link>
         </nav>
       </header>
 
       <section className="about__hero">
-        <img className="about__sky" src="/brand/computer-sky.webp" srcSet="/brand/computer-sky-480.webp 480w, /brand/computer-sky-960.webp 960w, /brand/computer-sky.webp 1536w" sizes="100vw" width="1536" height="1024" fetchPriority="high" alt="A cream-colored personal computer floating above the ocean under a blue sky" />
+        <img className="about__sky" src={aboutSky} width="1376" height="768" fetchPriority="high" alt="Sunlit wildflower hills, a lone green tree, and summer cumulus clouds under a clear blue sky" />
         <div className="about__hero-inner">
           <p className="about__eyebrow">A personal computer. An open world.</p>
           <h1>{BRAND.name}</h1>
           <h2>Your own<br />on-chain<br /><em>supercomputer.</em></h2>
           <p className="about__lede">Research a token. Build a basket. Launch something new. Your corner of {BASE.name}, signed in your own wallet.</p>
           <div className="about__row">
-            <Link to="/" className="about__button">Open the computer <span aria-hidden="true">↗</span></Link>
+            <Link to="/" state={{ fromPage: true }} className="about__button">Open the computer <span aria-hidden="true">↗</span></Link>
             <a href="#tools" className="about__text-link">Take a look around <span aria-hidden="true">↓</span></a>
           </div>
           <p className="about__hero-note">Built on {BASE.name} · Your wallet holds the keys</p>
@@ -206,7 +207,7 @@ export function About() {
         <div className="about__foot-inner">
           <p className="about__eyebrow">The desktop is yours.</p>
           <h2>Make yourself<br /><em>at home.</em></h2>
-          <Link to="/" className="about__button">Open the computer <span aria-hidden="true">↗</span></Link>
+          <Link to="/" state={{ fromPage: true }} className="about__button">Open the computer <span aria-hidden="true">↗</span></Link>
           <div className="about__colophon"><span>{BRAND.name} · {BRAND.x} · built on {BASE.name}</span><Link to="/docs">Read the docs ↗</Link></div>
         </div>
       </footer>

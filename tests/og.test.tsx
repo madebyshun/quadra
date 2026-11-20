@@ -4,7 +4,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { injectMeta, metaFor, OG_PAGES } from "@/server/og";
-import { OgCard } from "@/features/og/OgCard";
+import { OgCard, PHOTO, splitAt } from "@/features/og/OgCard";
 import middleware, { config } from "../scripts/og-middleware-draft";
 
 /**
@@ -71,6 +71,19 @@ describe("the tags written into index.html", () => {
 });
 
 describe("the card", () => {
+  it("is a magazine page around one photo: the masthead, the path, the page's line and its entries", () => {
+    render(<OgCard page={OG_PAGES.find((p) => p.id === "home")!} />);
+    const svg = screen.getByRole("img", { name: "share card: quadra / desktop" });
+    expect(svg.querySelector("image")).toHaveAttribute("href", PHOTO);
+    // the desktop's line is too wide for the column, so it breaks in two
+    expect([...svg.querySelectorAll("text")].map((t) => t.textContent)).toEqual(expect.arrayContaining(["your own on-chain", "computer.", "look first. sign when ready."]));
+  });
+
+  it("breaks a headline at the space nearest its middle, and leaves one with no space whole", () => {
+    expect(splitAt("your own on-chain computer.")).toEqual(["your own on-chain", "computer."]);
+    expect(splitAt("supercalifragilistic")).toEqual(["supercalifragilistic", ""]);
+  });
+
   it("draws the page's path, its name big, and its three entries", () => {
     const page = OG_PAGES.find((p) => p.id === "launch")!;
     render(<OgCard page={page} />);

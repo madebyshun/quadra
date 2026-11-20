@@ -644,3 +644,56 @@ describe("what the Docs window admits", () => {
     expect(win.textContent).not.toMatch(/private|shielded|unlinkab|anonym/i);
   });
 });
+
+describe("the photo intro on a bare load", () => {
+  function motion() {
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} }));
+  }
+
+  it("plays where motion is welcome, and opens the window chosen on the tube", async () => {
+    motion();
+    vi.useFakeTimers({ toFake: ["setTimeout", "requestAnimationFrame", "cancelAnimationFrame"] });
+    try {
+      renderAt("/");
+      expect(screen.getByRole("dialog", { name: "quadra is starting" })).toBeInTheDocument();
+      // the menu waits; Esc skips it from any phase
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(screen.queryByRole("dialog", { name: "quadra is starting" })).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("hands off to the Welcome dialog once the loading bar finishes", async () => {
+    motion();
+    localStorage.removeItem("quadra.welcome.v1");
+    vi.useFakeTimers({ toFake: ["setTimeout", "requestAnimationFrame", "cancelAnimationFrame", "performance"] });
+    try {
+      renderAt("/");
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3600);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(screen.queryByRole("dialog", { name: "quadra is starting" })).toBeNull();
+      expect(screen.getByRole("dialog", { name: /Welcome to/i })).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not replay the intro when closing /docs back to the desktop", async () => {
+    motion();
+    const user = userEvent.setup();
+    renderAt("/docs");
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog", { name: "quadra is starting" })).toBeNull();
+    expect(screen.getByLabelText("What you can do")).toBeInTheDocument();
+  });
+});

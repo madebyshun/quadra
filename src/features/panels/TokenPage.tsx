@@ -369,39 +369,41 @@ function Trades({ page, now, quoteUsd }: { page: IndexedCoinPage; now: number; q
       {rows.length === 0 ? (
         <p className="dim">{page.trades.length === 0 ? "No trades yet — the first buy sets the price moving." : "None of these."}</p>
       ) : (
-        <table className="token__trades">
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Type</th>
-              <th>{sym}</th>
-              <th>{qs}</th>
-              <th>Fee</th>
-              <th>USD</th>
-              <th>Wallet</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((t: IndexedTrade, i) => (
-              // a buy and a sell of the same size in one transaction are two rows: the index keeps them apart
-              <tr key={`${t.tx}:${t.side}:${i}`}>
-                <td>
-                  <a href={explorer.tx(t.tx)} target="_blank" rel="noreferrer">
-                    {ago(t.at, now)}
-                  </a>
-                </td>
-                <td className={t.side === "buy" ? "tone-ok" : "tone-bad"}>{t.side === "buy" ? "Buy" : "Sell"}</td>
-                <td className="mono">{compact(t.tokens)}</td>
-                <td className="mono">{compact(t.quote)}</td>
-                <td className="mono">
-                  {compact(t.fee, 3)} {t.feeIn === "quote" ? qs : sym}
-                </td>
-                <td className="mono">{quoteUsd === null ? "—" : usd(t.quote * quoteUsd)}</td>
-                <td className="mono">{t.trader ? short(t.trader) : "—"}</td>
+        <div className="token__trades-wrap">
+          <table className="token__trades">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Type</th>
+                <th>{sym}</th>
+                <th>{qs}</th>
+                <th>Fee</th>
+                <th>USD</th>
+                <th>Wallet</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((t: IndexedTrade, i) => (
+                // a buy and a sell of the same size in one transaction are two rows: the index keeps them apart
+                <tr key={`${t.tx}:${t.side}:${i}`}>
+                  <td>
+                    <a href={explorer.tx(t.tx)} target="_blank" rel="noreferrer">
+                      {ago(t.at, now)}
+                    </a>
+                  </td>
+                  <td className={t.side === "buy" ? "tone-ok" : "tone-bad"}>{t.side === "buy" ? "Buy" : "Sell"}</td>
+                  <td className="mono">{compact(t.tokens)}</td>
+                  <td className="mono">{compact(t.quote)}</td>
+                  <td className="mono">
+                    {compact(t.fee, 3)} {t.feeIn === "quote" ? qs : sym}
+                  </td>
+                  <td className="mono">{quoteUsd === null ? "—" : usd(t.quote * quoteUsd)}</td>
+                  <td className="mono">{t.trader ? short(t.trader) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

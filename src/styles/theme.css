@@ -3368,6 +3368,15 @@
   gap: 6px;
   margin: 0;
 }
+@media (max-width: 520px) {
+  .basket__legs li.group__row {
+    grid-template-columns: minmax(0, 1fr) 56px auto auto;
+  }
+  .basket__legs li.group__row .dim {
+    grid-column: 1 / -1;
+    font-size: 10.5px;
+  }
+}
 .basket__legs .field {
   width: 100%;
   min-width: 0;
@@ -3418,3 +3427,118 @@
 .basket__recipes { margin-bottom: 12px; }
 .basket__saved { list-style: none; padding: 0; margin: 0; }
 .basket__review th, .basket__review td { font-variant-numeric: tabular-nums; }
+
+/* Coins discover: scannable rows on desktop, clean wrapping on mobile */
+.coins__row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.coins__pair {
+  margin-left: auto;
+}
+@media (min-width: 680px) {
+  .coins__item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    align-items: center;
+    gap: 8px 14px;
+    padding: 8px 10px;
+  }
+  .coins__item .coins__row-head {
+    padding: 0;
+  }
+  .coins__item .coins__meta {
+    padding: 0;
+    margin: 0;
+    text-align: right;
+  }
+}
+
+/* Coin detail: 2-column layout on wide windows, Trade-first on mobile */
+.coin__layout {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+}
+@media (min-width: 680px) {
+  .coin__layout {
+    grid-template-columns: minmax(0, 1fr) 310px;
+  }
+  .coin__main {
+    order: 1;
+    min-width: 0;
+  }
+  .coin__side {
+    order: 2;
+    min-width: 0;
+  }
+}
+.token__trades-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Launch: step bar + 2-column form and live draft preview */
+.launch__steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.launch__step {
+  padding: 4px 8px;
+  border: 1px solid var(--xp-border-mid);
+  background: var(--xp-face-lit);
+  font-size: 11px;
+  color: var(--xp-ink-dim);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.launch__step--active {
+  border-color: var(--pt-select);
+  background: var(--pt-select-soft);
+  color: var(--pt-accent);
+  font-weight: 700;
+}
+.launch__step--done {
+  border-color: var(--ok);
+  color: var(--ok);
+  font-weight: 600;
+}
+.launch__layout {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+}
+@media (min-width: 680px) {
+  .launch__layout {
+    grid-template-columns: minmax(0, 1fr) 230px;
+  }
+}
+.launch__form {
+  min-width: 0;
+}
+.launch__preview {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: var(--xp-sunken);
+}
+.launch__preview-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.launch__done {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: var(--xp-sunken);
+}

@@ -323,71 +323,74 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
       </p>
       <ContractAddress address={token} />
 
-      <fieldset className="group">
-        <legend>Trade {symbol}</legend>
-        <div className="group__row group__row--actions" role="group" aria-label="Side">
-          {(["buy", "sell"] as const).map((s) => (
-            <button key={s} type="button" className="chip chip--mode" aria-pressed={side === s} onClick={() => setSide(s)}>
-              {s === "buy" ? `Buy ${symbol}` : `Sell ${symbol}`}
-            </button>
-          ))}
+      <div className="coin__layout">
+        <div className="coin__side stack">
+          <fieldset className="group">
+            <legend>Trade {symbol}</legend>
+            <div className="group__row group__row--actions" role="group" aria-label="Side">
+              {(["buy", "sell"] as const).map((s) => (
+                <button key={s} type="button" className="chip chip--mode" aria-pressed={side === s} onClick={() => setSide(s)}>
+                  {s === "buy" ? `Buy ${symbol}` : `Sell ${symbol}`}
+                </button>
+              ))}
+            </div>
+            {/* ONE route (2026-10-29, the owner: "no overlapping features"): the coin's own pool. Relay does not
+                route a v3 hook pool at all (MEASURED: "no routes found" on the first referred launch), and this
+                pool is the one place a coin launched here is sure to trade. Swap and Trade keep Relay for the rest. */}
+            <PoolTrade key={`${token}:${side}`} token={token} symbol={symbol} side={side} />
+          </fieldset>
+
+          {ready && ready.account.toLowerCase() === record.creatorRecipient.toLowerCase() ? (
+            <fieldset className="group">
+              <legend>Your fees</legend>
+              <Gel className="gel--quiet" onClick={() => void onCollect()} disabled={collecting.running || nothingWaiting}>
+                {nothingWaiting ? "No fees waiting" : "Collect"}
+              </Gel>
+              <p className="dim">80% to you, 20% to this app — the launchpad&apos;s split, in both currencies of the pool.</p>
+              <TxStepList states={collecting.states} label="Collect progress" />
+            </fieldset>
+          ) : null}
+
+          <CoinRewards token={token} symbol={symbol} record={record} />
+          {facts && value ? (
+            <CoinShare c={{ token, name: facts.name, symbol: facts.symbol, pair: value.quoteSymbol, cap: valueText(value).replace(/^market cap ≈ /, "") }} />
+          ) : null}
+
+          <fieldset className="group">
+            <legend>Token Verdict</legend>
+            {verdict === null ? (
+              <Gel className="gel--quiet" onClick={onVerdict}>
+                Run a full verdict on {symbol}
+              </Gel>
+            ) : verdict === "running" ? (
+              <p className="dim">Simulating a buy and a sell, reading the holders and the launcher…</p>
+            ) : "problem" in verdict ? (
+              <p className="tx__warn">The verdict could not run: {verdict.problem}</p>
+            ) : (
+              <ReportView report={verdict} />
+            )}
+          </fieldset>
         </div>
-        {/* ONE route (2026-10-29, the owner: "no overlapping features"): the coin's own pool. Relay does not
-            route a v3 hook pool at all (MEASURED: "no routes found" on the first referred launch), and this
-            pool is the one place a coin launched here is sure to trade. Swap and Trade keep Relay for the rest. */}
-        <PoolTrade key={`${token}:${side}`} token={token} symbol={symbol} side={side} />
-      </fieldset>
-      {/* below the trade: the page's call to action stays above the fold (MEASURED 2026-10-29: with
-          market activity above it the trade's button sat 30px below a 659px-wide window's fold, and
-          with the number cards above it 59px below a phone's) — the head line already says the cap */}
-      <section className="coin__overview" aria-label="Coin overview">
-        <TokenStats page={page} value={value} holders={holders} />
-      </section>
-      <PairExposure page={page !== "reading" && !("problem" in page) ? page : null} value={value} now={now} />
-      <CoinMoves token={token} />
-      <FeeLedger page={page} fee={fee} referrer={referrer} />
 
-      <TokenChart page={page} />
-      <TokenInfo page={page} creator={record.creator} launchedAt={launchedAt} quoteUsd={value?.quoteUsd ?? null} fee={fee} referrer={referrer} />
-      <TokenTabs token={token} page={page} now={now} quoteUsd={value?.quoteUsd ?? null} />
-      <CreatorLaunches creator={record.creator} current={token} />
-      <Disclosures factory={record.factory} fee={fee} referrer={referrer} />
+        <div className="coin__main stack">
+          <section className="coin__overview" aria-label="Coin overview">
+            <TokenStats page={page} value={value} holders={holders} />
+          </section>
+          <TokenChart page={page} />
+          <TokenTabs token={token} page={page} now={now} quoteUsd={value?.quoteUsd ?? null} />
+          <PairExposure page={page !== "reading" && !("problem" in page) ? page : null} value={value} now={now} />
+          <CoinMoves token={token} />
+          <FeeLedger page={page} fee={fee} referrer={referrer} />
+          <TokenInfo page={page} creator={record.creator} launchedAt={launchedAt} quoteUsd={value?.quoteUsd ?? null} fee={fee} referrer={referrer} />
+          <CreatorLaunches creator={record.creator} current={token} />
+          <Disclosures factory={record.factory} fee={fee} referrer={referrer} />
 
-      <details className="trade__more">
-        <summary>Everything about {symbol}, with sources</summary>
-        <ReportView report={coinReport(token, facts, record, value, fees, listed)} />
-      </details>
-
-      {ready && ready.account.toLowerCase() === record.creatorRecipient.toLowerCase() ? (
-        <fieldset className="group">
-          <legend>Your fees</legend>
-          <Gel className="gel--quiet" onClick={() => void onCollect()} disabled={collecting.running || nothingWaiting}>
-            {nothingWaiting ? "No fees waiting" : "Collect"}
-          </Gel>
-          <p className="dim">80% to you, 20% to this app — the launchpad&apos;s split, in both currencies of the pool.</p>
-          <TxStepList states={collecting.states} label="Collect progress" />
-        </fieldset>
-      ) : null}
-
-      <CoinRewards token={token} symbol={symbol} record={record} />
-      {facts && value ? (
-        <CoinShare c={{ token, name: facts.name, symbol: facts.symbol, pair: value.quoteSymbol, cap: valueText(value).replace(/^market cap ≈ /, "") }} />
-      ) : null}
-
-      <fieldset className="group">
-        <legend>Token Verdict</legend>
-        {verdict === null ? (
-          <Gel className="gel--quiet" onClick={onVerdict}>
-            Run a full verdict on {symbol}
-          </Gel>
-        ) : verdict === "running" ? (
-          <p className="dim">Simulating a buy and a sell, reading the holders and the launcher…</p>
-        ) : "problem" in verdict ? (
-          <p className="tx__warn">The verdict could not run: {verdict.problem}</p>
-        ) : (
-          <ReportView report={verdict} />
-        )}
-      </fieldset>
+          <details className="trade__more">
+            <summary>Everything about {symbol}, with sources</summary>
+            <ReportView report={coinReport(token, facts, record, value, fees, listed)} />
+          </details>
+        </div>
+      </div>
     </div>
   );
 }
@@ -400,11 +403,22 @@ export function CoinsPanel() {
   const kind = raw ? checkAddress(raw).kind : "malformed";
   const linked = raw && kind !== "malformed" && kind !== "mismatch" ? toChecksumAddress(raw) : null;
   const [list, setList] = useState<{ readonly coins: readonly Listed[]; readonly total: number; readonly complete: boolean } | "reading" | { readonly problem: string }>("reading");
-  const [tab, setTab] = useState<Tab>("all");
-  const [asset, setAsset] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<Sort>("trending");
+  const tabParam = params.get("tab");
+  const tab: Tab = tabParam === "crypto" || tabParam === "stocks" ? tabParam : "all";
+  const asset = params.get("pair") || null;
+  const query = params.get("q") ?? "";
+  const sortParam = params.get("sort");
+  const sort: Sort = SORTS.some((s) => s.id === sortParam) ? (sortParam as Sort) : "trending";
   const [now] = useState(() => Date.now());
+
+  const setFilter = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams(params);
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === null || v === "") next.delete(k);
+      else next.set(k, v);
+    }
+    setParams(next, { replace: true });
+  };
 
   // read once, when the window opens; a state set after it closed is dropped by React, so no guard is kept
   useEffect(() => {
@@ -469,15 +483,15 @@ export function CoinsPanel() {
       <div className="coins__filters">
         <label className="coins__search-label">
           <span>Find a coin</span>
-          <input className="field coins__search" type="search" aria-label="Search coins" placeholder="Name, ticker, or contract address" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input className="field coins__search" type="search" aria-label="Search coins" placeholder="Name, ticker, or contract address" value={query} onChange={(e) => setFilter({ q: e.target.value || null })} />
         </label>
         <div className="group__row group__row--actions" role="group" aria-label="Coins shown">
           {(["all", "crypto", "stocks"] as const).map((t) => (
-            <button key={t} type="button" className="chip chip--mode" aria-pressed={tab === t} onClick={() => (setTab(t), setAsset(null))}>
+            <button key={t} type="button" className="chip chip--mode" aria-pressed={tab === t} onClick={() => setFilter({ tab: t === "all" ? null : t, pair: null })}>
               {t === "all" ? "All" : t === "crypto" ? "eth-paired" : "stock-paired"}
             </button>
           ))}
-          <select className="field coins__asset" aria-label="Paired with" value={asset ?? ""} onChange={(e) => setAsset(e.target.value || null)}>
+          <select className="field coins__asset" aria-label="Paired with" value={asset ?? ""} onChange={(e) => setFilter({ pair: e.target.value || null })}>
             <option value="">All assets</option>
             {(ready ? assetsOf(filterCoins(ready.coins, tab, null)) : []).map((a) => (
               <option key={a} value={a}>{a}</option>
@@ -485,7 +499,7 @@ export function CoinsPanel() {
           </select>
         </div>
       </div>
-      <label className="coins__sort">sort by <select className="field" aria-label="Sort coins" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>{SORTS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+      <label className="coins__sort">sort by <select className="field" aria-label="Sort coins" value={sort} onChange={(e) => setFilter({ sort: e.target.value === "trending" ? null : e.target.value })}>{SORTS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
 
       {list === "reading" ? (
         <p className="dim">Reading the launchpad&apos;s launches…</p>
@@ -498,16 +512,16 @@ export function CoinsPanel() {
       ) : (
         <ul className="notes coins__results" aria-label="Coins">
           {shown.map((c) => (
-            <li key={`${c.token}:${c.tx}`}>
-              <span className="notes__row">
+            <li key={`${c.token}:${c.tx}`} className="coins__item">
+              <span className="notes__row coins__row-head">
                 <button type="button" className="chip" aria-label={`Open ${c.token}`} onClick={() => open(c.token)}>
                   {c.facts ? `${c.facts.name} (${c.facts.symbol})` : short(c.token)}
                 </button>
                 <CopyCa address={c.token} />
                 <VerdictBadge token={c.token} />
-                <span className="notes__id">{c.value === undefined ? "…" : c.value === null ? "pair not read" : `vs ${c.value.quoteSymbol}`}</span>
+                <span className="notes__id coins__pair">{c.value === undefined ? "…" : c.value === null ? "pair not read" : `vs ${c.value.quoteSymbol}`}</span>
               </span>
-              <span className="notes__why">
+              <span className="notes__why coins__meta">
                 {c.value === undefined ? "reading…" : valueText(c.value)}
                 {listFee(c)}
                 {" · "}

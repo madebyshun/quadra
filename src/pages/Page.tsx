@@ -17,7 +17,7 @@ function initialLayout(): Layout {
 /** Standalone documents share the full desktop and keep a draggable, resizable document window. */
 export function Page({ title, children }: { title: string; children: ReactNode }) {
   const navigate = useNavigate();
-  const home = () => navigate("/");
+  const home = () => navigate("/", { state: { fromPage: true } });
   const [layout, setLayout] = useState<Layout>(initialLayout);
 
   const toggleMinimized = useCallback(() => setLayout((l) => ({ ...l, minimized: !l.minimized })), []);
@@ -46,7 +46,7 @@ export function Page({ title, children }: { title: string; children: ReactNode }
             <div className="stack">{children}</div>
           </Window>
           <p className="shell__hint">
-            <Link to="/">Back to the desktop</Link>
+            <Link to="/" state={{ fromPage: true }}>Back to the desktop</Link>
           </p>
         </div>
       </div>

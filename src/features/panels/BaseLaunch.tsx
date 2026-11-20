@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   checkFactory,
   collectTx,
+  ECOSYSTEM_QUOTES,
   launchedIn,
   launchFactory,
   launchPairs,
@@ -20,6 +21,7 @@ import {
   type Version,
 } from "@/adapters/http/launchpad";
 import { BASE } from "@/config/chain";
+import { TRADE_CRYPTO } from "@/config/markets";
 import { feePercent, LAUNCHPAD_DECIMALS, LAUNCHPAD_EXPECTS } from "@/config/launchpad";
 import { assertChecksummedAddress, toChecksumAddress } from "@/lib/address";
 import { formatAmount, parseAmount } from "@/lib/amount";
@@ -356,7 +358,14 @@ export function BaseLaunch() {
     </label>
   );
 
-  const stocks = closed ? [] : pairs.pairs.filter((p) => p.address !== ETH_QUOTE);
+  const ecosystemAddresses = new Set<string>(ECOSYSTEM_QUOTES.map((c) => c.address.toLowerCase()));
+  const cryptoAddresses = new Set<string>(TRADE_CRYPTO.map((c) => c.address.toLowerCase()));
+  const ecosystems = pairs.pairs.filter((p) => ecosystemAddresses.has(p.address.toLowerCase()));
+  const cryptos = pairs.pairs.filter((p) => p.address !== ETH_QUOTE && cryptoAddresses.has(p.address.toLowerCase()));
+  const stocks = closed ? [] : pairs.pairs.filter((p) => p.address !== ETH_QUOTE && !ecosystemAddresses.has(p.address.toLowerCase()) && !cryptoAddresses.has(p.address.toLowerCase()));
+  const hasIdentity = meta.name.trim().length > 0 && meta.symbol.trim().length > 0 && metadataProblem(meta) === null;
+  const hasPair = !("problem" in buy);
+  const currentStep = review !== null ? 4 : !hasIdentity ? 1 : !hasPair ? 2 : 3;
 
   return (
     <div className="stack">
@@ -366,104 +375,163 @@ export function BaseLaunch() {
         </Crt>
       ) : null}
 
-      <fieldset className="group">
-        <legend>Your coin</legend>
-        {field("Name", "name", `e.g. ${hint.name}`)}
-        {field("Symbol", "symbol", `e.g. ${hint.symbol}`)}
-        <label className="group__row">
-          <span>Description</span>
-          <textarea className="field" aria-label="Description" rows={2} value={meta.description} onChange={(e) => set("description")(e.target.value)} />
-        </label>
-        {field("Image", "image", "https://… link to the picture (optional)")}
-        {field("Website", "website", "https://… (optional)")}
-        <label className="group__row">
-          <span>Paired with</span>
-          <select
-            className="field"
-            aria-label="Paired with"
-            value={pair.address}
-            onChange={(e) => {
-              setPairAt(e.target.value);
-              setFirstBuy("");
-              changed();
-            }}
-          >
-            <option value={ETH_QUOTE}>ETH</option>
-            {stocks.length > 0 ? (
-              <optgroup label="Coinbase stocks on Base">
-                {stocks.map((p) => (
-                  <option key={p.address} value={p.address}>
-                    {p.symbol} — {p.name}
-                  </option>
-                ))}
-              </optgroup>
-            ) : null}
-          </select>
-        </label>
-        <label className="group__row">
-          <span>First buy</span>
-          <input
-            className="field field--short"
-            aria-label="First buy"
-            inputMode="decimal"
-            placeholder={pair.address === ETH_QUOTE ? "0.1 (optional)" : "1 (optional)"}
-            value={firstBuy}
-            onChange={(e) => {
-              setFirstBuy(e.target.value);
-              changed();
-            }}
-          />
-          <span className="unit">{pair.symbol}</span>
-        </label>
-        {version === 3 ? (
-          <div className="group__row" role="group" aria-label="Fee">
-            <span>Fee</span>
-            <span className="row">
-              {LAUNCH_FEES.map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  className="chip chip--mode"
-                  aria-pressed={fee === f}
-                  onClick={() => {
-                    setFee(f);
-                    changed();
-                  }}
-                >
-                  {feePercent(f)}
-                </button>
-              ))}
-            </span>
-            <span className="unit">a trade</span>
-          </div>
-        ) : null}
-        {closed ? (
-          <p className="crt__amber">{RESTRICTED_TEXT} ETH pairs work as usual.</p>
-        ) : pairs.problem ? (
-          <p className="dim">Stock pairs are not listed right now: {pairs.problem}</p>
-        ) : pairs.pairs.length > 0 && stocks.length === 0 ? (
-          <p className="dim">No stock is enabled on the launchpad yet — its quote admin turns each one on (setQuote). ETH works now.</p>
-        ) : null}
-        <p className="dim">
-          {SUPPLY_WORDS} tokens, all of it in a Uniswap v4 pool against {pair.symbol} that nobody can pull. You earn 80% of the {version === 3 ? feePercent(fee) : "1%"} fee
-          on every trade. The first buy happens in the launch itself, before any bot can see the pool.
-          {version === 3 ? " In the first seconds the fee starts far higher, so a sniper pays most of it." : null}
-          {pair.address === ETH_QUOTE ? null : ` ${STOCK_PAIR_PRICE_NOTE}`}
-        </p>
-      </fieldset>
+      <ol className="launch__steps" aria-label="Launch steps">
+        <li className={currentStep === 1 ? "launch__step launch__step--active" : hasIdentity ? "launch__step launch__step--done" : "launch__step"}>
+          <span>1. identity</span>
+        </li>
+        <li className={currentStep === 2 ? "launch__step launch__step--active" : hasPair && hasIdentity ? "launch__step launch__step--done" : "launch__step"}>
+          <span>2. pair</span>
+        </li>
+        <li className={currentStep === 3 ? "launch__step launch__step--active" : review !== null ? "launch__step launch__step--done" : "launch__step"}>
+          <span>3. options</span>
+        </li>
+        <li className={currentStep === 4 ? "launch__step launch__step--active" : "launch__step"}>
+          <span>4. review</span>
+        </li>
+      </ol>
 
-      {review === null ? (
-        <Gel className="mf__cta" onClick={() => void onReview()} disabled={blocker !== null || busy}>
-          {busy ? "Checking the launchpad…" : (blocker ?? "Review launch")}
-        </Gel>
-      ) : (
-        <>
-          <ReportView report={reviewReport(meta, review, ready!.account)} />
-          <Gel className="mf__cta" onClick={() => void onLaunch()} disabled={steps.running || steps.states.length > 0}>
-            {steps.states.length > 0 ? "Launched — edit a field to start another" : "Launch in wallet"}
-          </Gel>
-        </>
-      )}
+      <div className="launch__layout">
+        <div className="stack launch__form">
+          <fieldset className="group">
+            <legend>Your coin</legend>
+            {field("Name", "name", `e.g. ${hint.name}`)}
+            {field("Symbol", "symbol", `e.g. ${hint.symbol}`)}
+            <label className="group__row">
+              <span>Description</span>
+              <textarea className="field" aria-label="Description" rows={2} value={meta.description} onChange={(e) => set("description")(e.target.value)} />
+            </label>
+            {field("Image", "image", "https://… link to the picture (optional)")}
+            {field("Website", "website", "https://… (optional)")}
+            <label className="group__row">
+              <span>Paired with</span>
+              <select
+                className="field"
+                aria-label="Paired with"
+                value={pair.address}
+                onChange={(e) => {
+                  setPairAt(e.target.value);
+                  setFirstBuy("");
+                  changed();
+                }}
+              >
+                <optgroup label="Base crypto">
+                  <option value={ETH_QUOTE}>ETH</option>
+                  {cryptos.map((p) => (
+                    <option key={p.address} value={p.address}>
+                      {p.symbol} — {p.name}
+                    </option>
+                  ))}
+                </optgroup>
+                {ecosystems.length > 0 ? (
+                  <optgroup label="Ecosystem (Quadra)">
+                    {ecosystems.map((p) => (
+                      <option key={p.address} value={p.address}>
+                        {p.symbol} — {p.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
+                {stocks.length > 0 ? (
+                  <optgroup label="Coinbase stocks on Base">
+                    {stocks.map((p) => (
+                      <option key={p.address} value={p.address}>
+                        {p.symbol} — {p.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
+              </select>
+            </label>
+            <label className="group__row">
+              <span>First buy</span>
+              <input
+                className="field field--short"
+                aria-label="First buy"
+                inputMode="decimal"
+                placeholder={pair.address === ETH_QUOTE ? "0.1 (optional)" : "1 (optional)"}
+                value={firstBuy}
+                onChange={(e) => {
+                  setFirstBuy(e.target.value);
+                  changed();
+                }}
+              />
+              <span className="unit">{pair.symbol}</span>
+            </label>
+            {version === 3 ? (
+              <div className="group__row" role="group" aria-label="Fee">
+                <span>Fee</span>
+                <span className="row">
+                  {LAUNCH_FEES.map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      className="chip chip--mode"
+                      aria-pressed={fee === f}
+                      onClick={() => {
+                        setFee(f);
+                        changed();
+                      }}
+                    >
+                      {feePercent(f)}
+                    </button>
+                  ))}
+                </span>
+                <span className="unit">a trade</span>
+              </div>
+            ) : null}
+            {closed ? (
+              <p className="crt__amber">{RESTRICTED_TEXT} ETH pairs work as usual.</p>
+            ) : pairs.problem ? (
+              <p className="dim">Stock pairs are not listed right now: {pairs.problem}</p>
+            ) : pairs.pairs.length > 0 && stocks.length === 0 ? (
+              <p className="dim">No stock is enabled on the launchpad yet — its quote admin turns each one on (setQuote). ETH works now.</p>
+            ) : null}
+            {cryptos.length === 0 && ecosystems.length === 0 ? (
+              <p className="dim">Base crypto &amp; ecosystem pairs (USDC, cbBTC, AERO, QUADRA) and more stocks appear here once enabled on the factory via setQuote.</p>
+            ) : null}
+            <p className="dim">
+              {SUPPLY_WORDS} tokens, all of it in a Uniswap v4 pool against {pair.symbol} that nobody can pull. You earn 80% of the {version === 3 ? feePercent(fee) : "1%"} fee
+              on every trade. The first buy happens in the launch itself, before any bot can see the pool.
+              {version === 3 ? " In the first seconds the fee starts far higher, so a sniper pays most of it." : null}
+              {pair.address === ETH_QUOTE ? null : ` ${STOCK_PAIR_PRICE_NOTE}`}
+            </p>
+          </fieldset>
+
+          {review === null ? (
+            <Gel className="mf__cta" onClick={() => void onReview()} disabled={blocker !== null || busy}>
+              {busy ? "Checking the launchpad…" : (blocker ?? "Review launch")}
+            </Gel>
+          ) : (
+            <>
+              <ReportView report={reviewReport(meta, review, ready!.account)} />
+              <Gel className="mf__cta" onClick={() => void onLaunch()} disabled={steps.running || steps.states.length > 0}>
+                {steps.states.length > 0 ? "Launched — edit a field to start another" : "Launch in wallet"}
+              </Gel>
+            </>
+          )}
+        </div>
+
+        <aside className="group launch__preview" aria-label="Draft preview">
+          <div className="launch__preview-head">
+            <span className="badge badge--ok">draft</span>
+            <strong>{meta.name.trim() || hint.name}</strong>
+            <span className="mono dim">{meta.symbol.trim() || hint.symbol}</span>
+          </div>
+          {meta.description.trim() ? <p className="dim">{meta.description.trim()}</p> : <p className="dim">No description yet.</p>}
+          <dl className="pair__facts">
+            <dt>Pair</dt>
+            <dd>{pair.symbol}</dd>
+            <dt>Supply</dt>
+            <dd>{SUPPLY_WORDS}</dd>
+            <dt>Fee</dt>
+            <dd>{version === 3 ? `${feePercent(fee)} (80% to you)` : "1% (80% to you)"}</dd>
+            <dt>First buy</dt>
+            <dd>{firstBuy.trim() ? `${firstBuy.trim()} ${pair.symbol}` : "none"}</dd>
+            <dt>Liquidity</dt>
+            <dd>Locked forever</dd>
+          </dl>
+        </aside>
+      </div>
 
       {error ? (
         <Crt label="Launch error">
@@ -474,27 +542,27 @@ export function BaseLaunch() {
       {done === null ? null : done === "unread" ? (
         <p className="tx__warn">The launch confirmed, but its Launched event could not be read from the receipt — look the transaction up on the explorer.</p>
       ) : (
-        <p className="tx__ok">
-          Live:{" "}
-          <a href={explorer.token(done.launched.token)} target="_blank" rel="noreferrer">
-            {done.launched.token}
-          </a>
-          {done.launched.devBuyIn > 0n
-            ? ` — your first buy: ${tokenAmount(done.launched.devBuyTokens, LAUNCHPAD_DECIMALS, 2)} for ${tokenAmount(done.launched.devBuyIn, done.pair.decimals, 8)} ${done.pair.symbol}`
-            : ""}
-          {" · "}
-          <a href={`https://dexscreener.com/base/${done.launched.token}`} target="_blank" rel="noreferrer">
-            chart
-          </a>
-          {openWindow ? (
-            <>
-              {" · "}
-              <button type="button" className="chip" onClick={() => openWindow("coins", { t: done.launched.token })}>
+        <div className="group launch__done">
+          <p className="tx__ok">
+            Live:{" "}
+            <a href={explorer.token(done.launched.token)} target="_blank" rel="noreferrer">
+              {done.launched.token}
+            </a>
+            {done.launched.devBuyIn > 0n
+              ? ` — your first buy: ${tokenAmount(done.launched.devBuyTokens, LAUNCHPAD_DECIMALS, 2)} for ${tokenAmount(done.launched.devBuyIn, done.pair.decimals, 8)} ${done.pair.symbol}`
+              : ""}
+          </p>
+          <div className="row">
+            {openWindow ? (
+              <Gel onClick={() => openWindow("coins", { t: done.launched.token })}>
                 its page here
-              </button>
-            </>
-          ) : null}
-        </p>
+              </Gel>
+            ) : null}
+            <a className="chip" href={`https://dexscreener.com/base/${done.launched.token}`} target="_blank" rel="noreferrer">
+              chart
+            </a>
+          </div>
+        </div>
       )}
 
       {anyFactory ? (

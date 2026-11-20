@@ -16,14 +16,15 @@ import { NotFound } from "@/pages/NotFound";
 import { AdaptersProvider } from "@/adapters/AdaptersProvider";
 import { WalletProvider } from "@/ui/WalletProvider";
 import { MarketsProvider } from "@/features/markets/MarketsProvider";
-import { Intro } from "@/intro/Intro";
+import { PhotoIntro } from "@/intro/PhotoIntro";
 import { Assistant } from "@/ui/Assistant";
 import { Screensaver } from "@/ui/Screensaver";
 import { Welcome } from "@/ui/Welcome";
 import { showWelcome } from "@/lib/welcome";
 import { wallpaper } from "@/lib/settings";
+import blissWallpaper from "@/assets/quadra-wallpaper.jpg";
 import { useSetting } from "@/ui/useSettings";
-import { hasWebGL, shouldPlayIntro } from "@/intro/timeline";
+import { shouldPlayIntro } from "@/intro/photo";
 import {
   DEFAULT_HEIGHT,
   EMPTY_STATE,
@@ -66,6 +67,7 @@ const TALL_PANELS: ReadonlySet<WindowId> = new Set<WindowId>([
   "swap",
   "bridge",
   "launch",
+  "basket",
   "control",
   "readme",
 ]);
@@ -75,7 +77,7 @@ const TALL_PANELS: ReadonlySet<WindowId> = new Set<WindowId>([
  * the Base card measured 452px wide at the default width, the card itself a thumbnail). Still never
  * wider than the viewport allows.
  */
-export const WIDE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["card", "coins", "readme"]);
+export const WIDE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["card", "coins", "launch", "readme"]);
 export const WIDE_WIDTH = 760;
 
 function openAction(id: WindowId): { type: "open"; id: WindowId; origin: Origin; height: number } {
@@ -107,22 +109,32 @@ function openAction(id: WindowId): { type: "open"; id: WindowId; origin: Origin;
  * `TASKS.md`): the alternative, a comma-separated `?do=`, makes every drag and
  * every focus change a history write.
  */
-function Home() {
+function Home({ introPlayed, onIntroDone }: { introPlayed: boolean; onIntroDone: () => void }) {
   const [params, setParams] = useSearchParams();
+  const location = useLocation();
+  const fromPage = Boolean((location.state as { fromPage?: boolean } | null)?.fromPage);
+  const forceIntro = params.get("intro") === "explore";
   const [state, dispatch] = useReducer(reduceWindows, EMPTY_STATE);
   const openedFromUrl = useRef(false);
-  // decided once, on the first render: a `?do=` link, less motion or no GPU go straight to the desktop
+  // decided once, on the first render: never replay intro when returning from /docs, /api, /verify, or /about
   const [intro, setIntro] = useState(() =>
-    shouldPlayIntro({ search: params.toString(), matchMedia: window.matchMedia?.bind(window), webgl: () => hasWebGL(document) }),
+    forceIntro
+      ? shouldPlayIntro({ search: params.toString(), matchMedia: window.matchMedia?.bind(window) })
+      : !introPlayed && !fromPage && shouldPlayIntro({ search: params.toString(), matchMedia: window.matchMedia?.bind(window) }),
   );
-  // decided once too: the Welcome screen follows the intro (or a bare load), never a `?do=` link
-  const [welcomeAtStart] = useState(() => showWelcome(params.toString()));
+  // decided once too: the Welcome screen follows the intro (or a bare load), never a `?do=` link or closing a page tab
+  const [welcomeAtStart] = useState(() => !fromPage && showWelcome(params.toString()));
   const [welcome, setWelcome] = useState(welcomeAtStart);
   const closeWelcome = useCallback(() => setWelcome(false), []);
-  const endIntro = useCallback(() => {
-    setWelcome(false);
+  const endIntro = useCallback((open: string | null = null) => {
+    onIntroDone();
     setIntro(false);
-  }, []);
+    // only bypass Welcome when a specific window is opened from the intro
+    if (open !== null) {
+      setWelcome(false);
+      dispatch(openAction(open as WindowId));
+    }
+  }, [onIntroDone]);
 
   /** Reads `?do=` exactly once, on mount — after that, the URL follows the topmost window, not the other way round. */
   useEffect(() => {
@@ -258,7 +270,7 @@ function Home() {
       />
       {/* Q no longer greets on its own (2026-10-29, the owner: "extremely simple"): it speaks only when
           something real happens — a red verdict, fees waiting, a Rugsweeper win */}
-      {intro ? <Intro onDone={endIntro} explore={params.get("intro") === "explore"} /> : <Assistant greet={false} />}
+      {intro ? <PhotoIntro onDone={endIntro} /> : <Assistant greet={false} />}
       <LoanAlerts />
       {!intro && welcome && <Welcome onClose={closeWelcome} />}
       {!intro && <Screensaver />}
@@ -269,6 +281,8 @@ function Home() {
 
 export function App() {
   const { pathname } = useLocation();
+  const [introPlayed, setIntroPlayed] = useState(false);
+  const markIntroPlayed = useCallback(() => setIntroPlayed(true), []);
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
@@ -282,9 +296,12 @@ export function App() {
         either shows in both. See `ui/WalletProvider.tsx`.
       */}
       <WalletProvider>
-        <div className={`desktop wallpaper--${paper}`}>
+        <div
+          className={`desktop wallpaper--${paper}`}
+          style={paper === "bliss" ? { backgroundImage: `url(${blissWallpaper})` } : undefined}
+        >
           <Routes>
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<Home introPlayed={introPlayed} onIntroDone={markIntroPlayed} />} />
             <Route path="/about" element={<About />} />
             <Route path="/docs" element={<Docs />} />
             <Route path="/api" element={<ApiPage />} />

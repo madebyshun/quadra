@@ -1,0 +1,295 @@
+/* The intro (src/intro/PhotoIntro.tsx): the Quadra workstation on a sunlit green hill under blue sky. */
+.pintro {
+  --ink: #141414;
+  --paper: #f4f0e6;
+  --cobalt: #2422cf;
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 10000 !important;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 46vw 16vh at 18% 22%, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0) 70%),
+    radial-gradient(ellipse 38vw 14vh at 80% 18%, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0) 72%),
+    radial-gradient(ellipse 30vw 12vh at 52% 28%, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0) 75%),
+    linear-gradient(180deg, #2770d8 0%, #5da3eb 42%, #a8d7f7 66%, #4e921c 66.2%, #2c5b0d 100%);
+  font-family: "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+.pintro__hill {
+  position: absolute;
+  left: -12vw;
+  right: -12vw;
+  top: 61%;
+  bottom: -10vh;
+  border-radius: 50% 50% 0 0 / 18% 18% 0 0;
+  background:
+    radial-gradient(ellipse at 50% 10%, rgba(168, 224, 68, 0.38) 0%, transparent 55%),
+    linear-gradient(180deg, #62aa26 0%, #438116 38%, #29570c 100%);
+  box-shadow: inset 0 6px 24px rgba(255, 255, 255, 0.22);
+  pointer-events: none;
+}
+
+.pintro__stage {
+  position: absolute;
+  height: min(88vh, 94vw * 0.9);
+  aspect-ratio: 1000 / 900;
+  left: 50%;
+  top: 52%;
+  transform: translate(-50%, -50%) scale(1);
+  transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1), filter 0.7s ease;
+}
+
+.pintro__machine,
+.pintro__photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pintro--photo .pintro__stage {
+  height: auto;
+  width: max(100vw, 177.78vh);
+  aspect-ratio: 16 / 9;
+  top: 50%;
+}
+
+/* Cinematic dolly-in out of soft focus */
+.pintro--haze .pintro__stage {
+  transform: translate(-50%, -50%) scale(0.88);
+  filter: blur(8px) saturate(0.75) brightness(1.08);
+}
+
+/* Power LED lights up as soon as the machine powers on */
+.pintro--power .pintro__led,
+.pintro--icon .pintro__led,
+.pintro--welcome .pintro__led,
+.pintro--menu .pintro__led,
+.pintro--zoom .pintro__led {
+  fill: #44f272;
+  filter: drop-shadow(0 0 6px #44f272);
+}
+
+.pintro__screen {
+  position: absolute;
+  container-type: size;
+  border-radius: 5% / 6%;
+  overflow: hidden;
+  background: #091124;
+  box-shadow: inset 0 0 6cqw #000b;
+}
+
+.pintro--photo .pintro__screen {
+  border-radius: 2.5% / 3%;
+}
+
+/* Power on: bright CRT horizontal sweep */
+.pintro--power .pintro__screen::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  background: #fff;
+  box-shadow: 0 0 14px 5px #fff;
+  animation: pintro-on 0.3s ease-out forwards;
+}
+
+@keyframes pintro-on {
+  from { transform: scaleX(0.05); opacity: 1; }
+  to { transform: scaleX(1) scaleY(60); opacity: 0.2; }
+}
+
+.pintro--icon .pintro__screen,
+.pintro--welcome .pintro__screen,
+.pintro--menu .pintro__screen,
+.pintro--zoom .pintro__screen {
+  background: var(--paper);
+}
+
+/* Scanlines, tube vignette, and gentle glass reflection */
+.pintro__screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(125deg, rgba(255, 255, 255, 0.1) 0%, transparent 32%),
+    repeating-linear-gradient(to bottom, #0000 0 2px, #0000000f 2px 3px),
+    radial-gradient(ellipse at center, #0000 58%, #0000002e 100%);
+  animation: pintro-flicker 3s steps(30) infinite;
+}
+
+@keyframes pintro-flicker {
+  50% { opacity: 0.88; }
+}
+
+.pintro__icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16cqw;
+  height: 16cqw;
+  transform: translate(-50%, -50%);
+  animation: pintro-pop 0.4s ease-out;
+}
+
+@keyframes pintro-pop {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+}
+
+.pintro__dialog {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 5cqh 6cqw;
+  border: 2px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.pintro__welcome {
+  margin: 0 0 1.5cqh;
+  font: 700 6.2cqw/1.1 Georgia, "Times New Roman", serif;
+  color: var(--cobalt);
+}
+
+.pintro__line {
+  margin: 0 0 4cqh;
+  font-size: 3.6cqw;
+}
+
+.pintro__bar {
+  height: 4.5cqh;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+}
+
+.pintro__bar span {
+  display: block;
+  height: 100%;
+  background: var(--cobalt);
+}
+
+.pintro__block {
+  margin: 2.5cqh 0 0;
+  font-size: 3cqw;
+  color: #555;
+}
+
+.pintro__foot {
+  position: absolute;
+  left: 9cqw;
+  bottom: 4.5cqh;
+  margin: 0;
+  font-size: 3cqw;
+  color: #555;
+}
+
+.pintro__menu {
+  height: 100%;
+  padding: 6.5cqh 9cqw;
+  box-sizing: border-box;
+  color: var(--ink);
+  animation: pintro-in 0.35s ease-out;
+}
+
+@keyframes pintro-in {
+  from { opacity: 0; transform: translateY(3cqh); }
+}
+
+.pintro__title {
+  margin: 0 0 3cqh;
+  font: 700 9cqw/1 Georgia, "Times New Roman", serif;
+  color: var(--cobalt);
+  letter-spacing: -0.03em;
+}
+
+.pintro__menu ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pintro__menu li button,
+.pintro__desk {
+  display: flex;
+  gap: 3cqw;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 0.7cqh 2cqw;
+  font-family: inherit;
+  font-size: 4.5cqw;
+  line-height: 1.35;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pintro__n {
+  flex: none;
+  width: 7cqw;
+  text-align: right;
+  color: #6b6b6b;
+}
+
+.pintro__menu li button.is-at {
+  background: var(--cobalt);
+  color: var(--paper);
+}
+
+.pintro__menu li button.is-at .pintro__n {
+  color: var(--paper);
+}
+
+.pintro__desk {
+  margin-top: 2cqh;
+  font-size: 3.7cqw;
+  color: var(--cobalt);
+}
+
+.pintro__skip {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font: 500 13px/1 "JetBrains Mono", Menlo, monospace;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+/* Choosing: zoom straight into the CRT glass */
+.pintro--zoom .pintro__stage {
+  transform: translate(-50%, -50%) scale(4.6);
+  transition: transform 0.65s cubic-bezier(0.6, 0, 0.8, 0.4);
+}
+
+.pintro--zoom {
+  animation: pintro-out 0.65s ease-in forwards;
+}
+
+@keyframes pintro-out {
+  70% { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Portrait / mobile: keep the CRT glass large and readable while preserving the hill & sky */
+@media (max-aspect-ratio: 3/4) {
+  .pintro__stage {
+    height: auto;
+    width: 146vw;
+    top: 47%;
+  }
+  .pintro__menu li button,
+  .pintro__desk {
+    padding: 0.9cqh 2cqw;
+    font-size: 4.8cqw;
+  }
+}

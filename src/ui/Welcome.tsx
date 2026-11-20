@@ -5,6 +5,7 @@ import { useOpenWindow, useRunCommand } from "@/features/openWindow";
 import { checkAddress } from "@/lib/address";
 import { Gel } from "@/ui/Gel";
 import { setWelcomeOn, welcomeOn } from "@/lib/welcome";
+import welcomeSky from "@/assets/quadra-banner.jpg";
 
 /** The Base card's window — `card` once it exists, the profile (where the card began) until then. */
 export function cardWindow(resolve: (id: string) => unknown = resolveFeature): WindowId {
@@ -61,8 +62,15 @@ export function Welcome({ onClose }: { onClose: () => void }) {
         </div>
         <div className="win__body welcome__body">
           <div className="welcome__sky" aria-hidden="true">
-            <img src="/brand/computer-sky-480.webp" width="480" height="320" alt="" />
-            <span>A personal computer.<br /><em>An open world.</em></span>
+            <img className="welcome__sky-img" src={welcomeSky} alt="" />
+            <div className="welcome__sky-copy">
+              <p className="welcome__sky-title">
+                a personal computer.
+                <br />
+                <em>an open world.</em>
+              </p>
+              <p className="welcome__sky-sub">base 8453 · open · verify · sign</p>
+            </div>
           </div>
           <h1 id="welcome-title" className="welcome__head">
             Welcome to <b>{BRAND.name}</b>

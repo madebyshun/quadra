@@ -413,32 +413,6 @@ export function BasketPanel() {
         </button>
       </fieldset>
 
-      {recovery.locked || recovery.note ? <section className="group" aria-label="Basket recovery">
-        <h3>basket / recovery</h3>
-        <p role="status">{recovery.problem ?? recovery.note ?? "A previous basket transaction is unresolved. Do not buy again."}</p>
-        {recovery.pending ? <><p>{recovery.pending.label}</p>{recovery.pending.hash ? <a href={`${BASE.explorer}/tx/${recovery.pending.hash}`} target="_blank" rel="noreferrer">check transaction on Base</a> : <p>The wallet did not return a hash. Check wallet activity; nothing will be resubmitted automatically.</p>}<Gel quiet onClick={() => void recovery.refresh()}>Check previous transaction</Gel></> : null}
-      </section> : null}
-      {ready && resolved.problem === null ? <section className="group" aria-label="Your basket holdings">
-        <h3>Your basket</h3>
-        <Gel quiet disabled={purchaseLocked} onClick={() => setHeldRefresh((n) => n + 1)}>Refresh holdings</Gel>
-        {held === null ? <p className="dim">{heldProblem ? "Holdings value unavailable — a balance or market price could not be read. Top-up is unavailable." : "Reading balances and market prices…"}</p> : <>
-          <table className="basket__review" aria-label="Basket target and current holdings"><thead><tr><th>Asset</th><th>Target</th><th>Now</th><th>Value</th></tr></thead><tbody>{resolved.legs.map((l, i) => <tr key={l.asset.address}><th scope="row">{l.asset.symbol}</th><td>{l.weight}%</td><td>{now![i]}%</td><td>{usd(Number(held[i]!) / 1e6)}</td></tr>)}</tbody></table>
-          <RebalancePreview held={held} weights={resolved.legs.map((l) => l.weight)} symbols={resolved.legs.map((l) => l.asset.symbol)} />
-          <p className="dim">Total {usd(Number(held.reduce((sum, v) => sum + v, 0n)) / 1e6)} · wallet holdings at current DEX prices, not a separately managed account.</p>
-        </>}
-      </section> : null}
-      <section className="group" aria-label="Basket Strength">
-        <h3>Strength</h3>
-        <p className="dim">Test a buy of $100, $1K, $10K and $100K at your target weights. Each leg must have at most 2% quoted impact. Nothing is signed.</p>
-        <Gel quiet disabled={purchaseLocked || resolved.problem !== null} onClick={() => void checkStrength()}>Measure basket Strength</Gel>
-        {strengthProgress ? <p role="status">{strengthProgress}</p> : null}
-        {strength ? <div className="dim">
-          <p>{strength.passed > 0 ? `Measured buy depth ≥ ${usd(strength.passed)}` : "No tested size passed"}{strength.limiting && !strength.problem ? ` · ${strength.limiting} exceeded 2% at a ${usd(strength.tested)} basket buy.` : ""}</p>
-          {strength.problem ? <p>{strength.limiting} at {usd(strength.tested)}: not measured — {strength.problem}.</p> : null}
-          <p>Sampled quotes, not an exact maximum or a guarantee of execution. {new Date(strengthAt!).toLocaleTimeString()} · Relay.</p>
-        </div> : null}
-      </section>
-
       <label className="group__row">
         <span>Put in</span>
         <input
@@ -456,7 +430,7 @@ export function BasketPanel() {
         <span className="unit">USDC</span>
       </label>
       {held && held.some((v) => v > 0n) ? (
-        <label className="group__row">
+        <label className="check">
           <input
             type="checkbox"
             disabled={purchaseLocked}
@@ -545,6 +519,32 @@ export function BasketPanel() {
           />
         </>
       )}
+
+      {recovery.locked || recovery.note ? <section className="group" aria-label="Basket recovery">
+        <h3>basket / recovery</h3>
+        <p role="status">{recovery.problem ?? recovery.note ?? "A previous basket transaction is unresolved. Do not buy again."}</p>
+        {recovery.pending ? <><p>{recovery.pending.label}</p>{recovery.pending.hash ? <a href={`${BASE.explorer}/tx/${recovery.pending.hash}`} target="_blank" rel="noreferrer">check transaction on Base</a> : <p>The wallet did not return a hash. Check wallet activity; nothing will be resubmitted automatically.</p>}<Gel quiet onClick={() => void recovery.refresh()}>Check previous transaction</Gel></> : null}
+      </section> : null}
+      {ready && resolved.problem === null ? <section className="group" aria-label="Your basket holdings">
+        <h3>Your basket</h3>
+        <Gel quiet disabled={purchaseLocked} onClick={() => setHeldRefresh((n) => n + 1)}>Refresh holdings</Gel>
+        {held === null ? <p className="dim">{heldProblem ? "Holdings value unavailable — a balance or market price could not be read. Top-up is unavailable." : "Reading balances and market prices…"}</p> : <>
+          <table className="basket__review" aria-label="Basket target and current holdings"><thead><tr><th>Asset</th><th>Target</th><th>Now</th><th>Value</th></tr></thead><tbody>{resolved.legs.map((l, i) => <tr key={l.asset.address}><th scope="row">{l.asset.symbol}</th><td>{l.weight}%</td><td>{now![i]}%</td><td>{usd(Number(held[i]!) / 1e6)}</td></tr>)}</tbody></table>
+          <RebalancePreview held={held} weights={resolved.legs.map((l) => l.weight)} symbols={resolved.legs.map((l) => l.asset.symbol)} />
+          <p className="dim">Total {usd(Number(held.reduce((sum, v) => sum + v, 0n)) / 1e6)} · wallet holdings at current DEX prices, not a separately managed account.</p>
+        </>}
+      </section> : null}
+      <section className="group" aria-label="Basket Strength">
+        <h3>Strength</h3>
+        <p className="dim">Test a buy of $100, $1K, $10K and $100K at your target weights. Each leg must have at most 2% quoted impact. Nothing is signed.</p>
+        <Gel quiet disabled={purchaseLocked || resolved.problem !== null} onClick={() => void checkStrength()}>Measure basket Strength</Gel>
+        {strengthProgress ? <p role="status">{strengthProgress}</p> : null}
+        {strength ? <div className="dim">
+          <p>{strength.passed > 0 ? `Measured buy depth ≥ ${usd(strength.passed)}` : "No tested size passed"}{strength.limiting && !strength.problem ? ` · ${strength.limiting} exceeded 2% at a ${usd(strength.tested)} basket buy.` : ""}</p>
+          {strength.problem ? <p>{strength.limiting} at {usd(strength.tested)}: not measured — {strength.problem}.</p> : null}
+          <p>Sampled quotes, not an exact maximum or a guarantee of execution. {new Date(strengthAt!).toLocaleTimeString()} · Relay.</p>
+        </div> : null}
+      </section>
     </div>
   );
 }
