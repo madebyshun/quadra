@@ -42,8 +42,8 @@ export const BRAND = {
    */
   tagline:
     "An on-chain supercomputer for Base. Look up any token or wallet, scan for traps before you act, then send, swap or launch a coin — every action checked before it reaches your wallet, and signed there. It never holds your key.",
-  /** shorter, for og:description and link previews — and says it is not finished */
-  blurb: "An on-chain supercomputer for Base: research, safety scans, send, swap and launch — signed in your own wallet. In development.",
+  /** shorter, for og:description and link previews */
+  blurb: "An on-chain supercomputer for Base: research, safety scans, send, swap and launch — signed in your own wallet.",
   /** name the MCP server registers itself under */
   mcpServer: "quadra",
   /** tool namespace: every MCP tool is `quadra_<verb>` */

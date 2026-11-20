@@ -80,9 +80,9 @@ describe("BRAND is internally consistent", () => {
     for (const icon of manifest.icons) expect(statSync(join(ROOT, "public", icon.src)).isFile()).toBe(true);
   });
 
-  /** Nothing is deployed, so the link preview must not read as a finished product. */
-  it("says the product is still in development", () => {
-    expect(BRAND.blurb).toMatch(/In development/);
+  /** The product is live on Base, so link previews should not read as unfinished. */
+  it("does not label the live product as still in development", () => {
+    expect(BRAND.blurb).not.toMatch(/In development/i);
   });
 
   /** The one promise every money window is built around, in the pitch where it is checkable. */

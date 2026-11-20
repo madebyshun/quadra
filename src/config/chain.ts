@@ -6,17 +6,21 @@
  * error naming the constant, never a plausible-looking zero address.
  */
 
+const ENV_RPC =
+  (typeof import.meta !== "undefined" &&
+    (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_BASE_RPC_URL?.trim()) ||
+  (typeof process !== "undefined" && (process.env?.BASE_RPC_URL?.trim() || process.env?.VITE_BASE_RPC_URL?.trim())) ||
+  "";
+
 export const BASE = {
   id: 8453,
   idHex: "0x2105",
   name: "Base",
   /**
-   * MEASURED 2026-09-30 from the owner's side of the world, three `eth_getBalance` each:
-   * base.publicnode.com 0.19–0.29 s, mainnet.base.org 0.66–1.70 s — and the Send/Swap % buttons
-   * felt stuck at 1.8 s a click. Both are public, rate-limited and "not suitable for production
-   * traffic" (docs.base.org, Throughput and Limits); production needs a provider (T3).
+   * Uses `VITE_BASE_RPC_URL` (browser/Vercel build) or `BASE_RPC_URL` (serverless API) when set,
+   * falling back to public Base RPC endpoints.
    */
-  rpc: "https://base.publicnode.com",
+  rpc: ENV_RPC || "https://base.publicnode.com",
   rpcFallback: "https://mainnet.base.org",
   explorer: "https://basescan.org",
 } as const;

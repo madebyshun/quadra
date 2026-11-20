@@ -3403,8 +3403,8 @@ var BRAND = {
    * `index.html` repeats this and the blurb verbatim; `tests/brand.test.ts` keeps them equal.
    */
   tagline: "An on-chain supercomputer for Base. Look up any token or wallet, scan for traps before you act, then send, swap or launch a coin \u2014 every action checked before it reaches your wallet, and signed there. It never holds your key.",
-  /** shorter, for og:description and link previews — and says it is not finished */
-  blurb: "An on-chain supercomputer for Base: research, safety scans, send, swap and launch \u2014 signed in your own wallet. In development.",
+  /** shorter, for og:description and link previews */
+  blurb: "An on-chain supercomputer for Base: research, safety scans, send, swap and launch \u2014 signed in your own wallet.",
   /** name the MCP server registers itself under */
   mcpServer: "quadra",
   /** tool namespace: every MCP tool is `quadra_<verb>` */
@@ -3413,17 +3413,16 @@ var BRAND = {
 };
 
 // src/config/chain.ts
+var ENV_RPC = typeof import.meta !== "undefined" && import.meta.env?.VITE_BASE_RPC_URL?.trim() || typeof process !== "undefined" && (process.env?.BASE_RPC_URL?.trim() || process.env?.VITE_BASE_RPC_URL?.trim()) || "";
 var BASE = {
   id: 8453,
   idHex: "0x2105",
   name: "Base",
   /**
-   * MEASURED 2026-09-30 from the owner's side of the world, three `eth_getBalance` each:
-   * base.publicnode.com 0.19–0.29 s, mainnet.base.org 0.66–1.70 s — and the Send/Swap % buttons
-   * felt stuck at 1.8 s a click. Both are public, rate-limited and "not suitable for production
-   * traffic" (docs.base.org, Throughput and Limits); production needs a provider (T3).
+   * Uses `VITE_BASE_RPC_URL` (browser/Vercel build) or `BASE_RPC_URL` (serverless API) when set,
+   * falling back to public Base RPC endpoints.
    */
-  rpc: "https://base.publicnode.com",
+  rpc: ENV_RPC || "https://base.publicnode.com",
   rpcFallback: "https://mainnet.base.org",
   explorer: "https://basescan.org"
 };
