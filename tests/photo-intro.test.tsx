@@ -14,8 +14,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 afterEach(() => vi.useRealTimers());
 
 describe("the intro's arithmetic", () => {
-  it("rises out of the haze, powers on, shows its icon, welcomes and loads, then finishes", () => {
-    expect([0, AT.power - 1, AT.power, AT.icon, AT.welcome, AT.menu - 1, AT.menu, 99_999].map(phaseAt)).toEqual(["haze", "haze", "power", "icon", "welcome", "welcome", "menu", "menu"]);
+  it("starts cleanly at the logo icon, loads through welcome, then finishes", () => {
+    expect([0, AT.welcome - 1, AT.welcome, AT.menu - 1, AT.menu, 99_999].map(phaseAt)).toEqual(["icon", "icon", "welcome", "welcome", "menu", "menu"]);
     expect([AT.welcome - 5, AT.welcome, (AT.welcome + AT.menu) / 2, AT.menu + 50].map(loaded)).toEqual([0, 0, 0.5, 1]);
   });
 
@@ -62,14 +62,12 @@ describe("the intro on screen", () => {
     return { view, to, onDone };
   }
 
-  it("plays the icon and welcome loading bar, then automatically zooms into the desktop", async () => {
+  it("starts with the logo icon and welcome loading bar, then automatically zooms into the desktop", async () => {
     const { to, onDone } = mount();
     const dialog = screen.getByRole("dialog", { name: "quadra is starting" });
-    expect(dialog).toHaveClass("pintro--haze");
-    expect(screen.getByRole("img", { name: /straight on/ })).toBeInTheDocument();
-    await to(AT.icon + 10);
     expect(dialog).toHaveClass("pintro--icon");
-    await to(AT.welcome + 800);
+    expect(screen.getByRole("img", { name: /straight on/ })).toBeInTheDocument();
+    await to(AT.welcome + (AT.menu - AT.welcome) / 2);
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "50");
     await to(AT.menu + 10);
     expect(dialog).toHaveClass("pintro--zoom");
@@ -119,11 +117,9 @@ describe("the intro on screen", () => {
     unmount();
   });
 
-  it("shows the power line before the page, and nothing on the tube in the haze", async () => {
-    const { to } = mount();
-    expect(screen.queryByRole("progressbar")).toBeNull();
-    await to(AT.power + 10);
-    expect(screen.getByRole("dialog")).toHaveClass("pintro--power");
+  it("shows no progressbar during the initial icon phase", () => {
+    mount();
+    expect(screen.getByRole("dialog")).toHaveClass("pintro--icon");
     expect(screen.queryByRole("progressbar")).toBeNull();
   });
 });

@@ -107,28 +107,33 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  height: 124px;
-  padding: 16px 22px;
+  height: 148px;
+  padding: 18px 22px;
   box-sizing: border-box;
   margin-bottom: 20px;
   overflow: hidden;
   border: 1.5px solid #171b29;
   box-shadow: 3px 3px 0 #17243a33;
-  background: #326eb4;
+  background: #0a3dff;
 }
 .welcome__sky-img {
   position: absolute;
-  inset: 0;
-  width: 100%;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: auto;
+  width: auto;
   height: 100%;
-  object-fit: cover;
-  object-position: right 44%;
+  object-fit: contain;
+  object-position: right center;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 16%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 16%);
 }
 .welcome__sky::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(8, 30, 96, 0.45) 0%, rgba(8, 30, 96, 0.15) 48%, transparent 78%);
+  background: linear-gradient(90deg, rgba(10, 61, 255, 0.92) 0%, rgba(10, 61, 255, 0.35) 48%, transparent 70%);
 }
 .welcome__sky-copy {
   position: relative;

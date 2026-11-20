@@ -32,14 +32,14 @@ export const MENU: readonly { readonly n: string; readonly label: string; readon
 
 export type Phase = "haze" | "power" | "icon" | "welcome" | "menu" | "zoom";
 
-/** When each phase begins, in ms from the start; the menu waits for the visitor. */
-export const AT = { power: 600, icon: 900, welcome: 1700, menu: 3300 } as const;
+/** When each phase begins, in ms from the start: starts straight at the logo icon, then a relaxed ~2.2s loading bar (~3s total). */
+export const AT = { power: 0, icon: 0, welcome: 850, menu: 3050 } as const;
 /** How long the zoom into the tube takes before the desktop shows. */
 export const ZOOM_MS = 650;
 
 /** The phase at `ms` before anything is chosen. */
 export function phaseAt(ms: number): Exclude<Phase, "zoom"> {
-  return ms < AT.power ? "haze" : ms < AT.icon ? "power" : ms < AT.welcome ? "icon" : ms < AT.menu ? "welcome" : "menu";
+  return ms < AT.welcome ? "icon" : ms < AT.menu ? "welcome" : "menu";
 }
 
 /** How full the welcome box's loading bar is at `ms`, 0..1. */

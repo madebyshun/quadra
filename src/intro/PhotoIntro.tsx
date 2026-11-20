@@ -15,7 +15,7 @@ const now = () => performance.now();
 const pct = (x: number) => `${(x * 100).toFixed(3)}%`;
 
 const PHOTO_CANDIDATES = [introPhoto, "/brand/quadra-machine.jpg", "/brand/quadra-machine.png", "/brand/quadra-machine.webp"] as const;
-const PHOTO_SCREEN = { left: 0.404, top: 0.272, width: 0.192, height: 0.254 } as const;
+const PHOTO_SCREEN = { left: 0.401, top: 0.271, width: 0.196, height: 0.273 } as const;
 
 export function PhotoIntro({ onDone, clock = now }: { onDone(open: string | null): void; clock?: () => number }) {
   const [ms, setMs] = useState(0);

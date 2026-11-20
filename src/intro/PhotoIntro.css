@@ -47,17 +47,15 @@
   object-fit: cover;
 }
 
+.pintro--photo .pintro__hill {
+  display: none;
+}
+
 .pintro--photo .pintro__stage {
   height: auto;
   width: max(100vw, 177.78vh);
   aspect-ratio: 16 / 9;
   top: 50%;
-}
-
-/* Cinematic dolly-in out of soft focus */
-.pintro--haze .pintro__stage {
-  transform: translate(-50%, -50%) scale(0.88);
-  filter: blur(8px) saturate(0.75) brightness(1.08);
 }
 
 /* Power LED lights up as soon as the machine powers on */
@@ -80,7 +78,13 @@
 }
 
 .pintro--photo .pintro__screen {
-  border-radius: 2.5% / 3%;
+  border-radius: 5.5% / 7%;
+  background: transparent;
+  box-shadow: none;
+}
+
+.pintro--photo .pintro__screen::after {
+  display: none;
 }
 
 /* Power on: bright CRT horizontal sweep */
@@ -106,6 +110,13 @@
 .pintro--menu .pintro__screen,
 .pintro--zoom .pintro__screen {
   background: var(--paper);
+}
+
+.pintro--photo.pintro--icon .pintro__screen,
+.pintro--photo.pintro--welcome .pintro__screen,
+.pintro--photo.pintro--menu .pintro__screen,
+.pintro--photo.pintro--zoom .pintro__screen {
+  background: transparent;
 }
 
 /* Scanlines, tube vignette, and gentle glass reflection */

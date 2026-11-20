@@ -44,8 +44,8 @@
 .about__button:hover { transform: translate(1px, 1px); box-shadow: 2px 2px 0 #1c1d20; }
 .about__button--small { min-height: 38px; padding: 8px 14px; font-size: 12px; }
 .about__hero { position: relative; isolation: isolate; overflow: hidden; color: #fff9e9; background: #0a3dff; }
-.about__sky { position: absolute; z-index: -2; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: right center; }
-.about__hero::after { content: ""; position: absolute; z-index: -1; inset: 0; background: linear-gradient(90deg, rgba(8, 30, 96, 0.42) 0%, rgba(8, 30, 96, 0.14) 45%, transparent 72%); }
+.about__sky { position: absolute; z-index: -2; top: 0; right: 0; bottom: 0; left: auto; width: auto; max-width: 100%; height: 100%; object-fit: contain; object-position: right bottom; -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 18%); mask-image: linear-gradient(90deg, transparent 0%, #000 18%); }
+.about__hero::after { content: ""; position: absolute; z-index: -1; inset: 0; background: linear-gradient(90deg, rgba(10, 61, 255, 0.78) 0%, rgba(10, 61, 255, 0.18) 46%, transparent 70%); }
 .about__hero-inner { max-width: 1240px; margin: auto; padding: 44px 24px 30px; min-height: 740px; }
 .about__eyebrow { margin: 0 0 16px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; }
 .about__hero h1 { margin: 0 0 30px; font: bold clamp(72px, 8vw, 118px)/.9 Georgia, serif; letter-spacing: -.065em; }

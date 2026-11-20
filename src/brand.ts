@@ -48,7 +48,7 @@ export const BRAND = {
   mcpServer: "quadra",
   /** tool namespace: every MCP tool is `quadra_<verb>` */
   toolPrefix: "quadra",
-  x: "@quadra_computer",
+  x: "@quadracomputer",
 } as const;
 
 export type Brand = typeof BRAND;
