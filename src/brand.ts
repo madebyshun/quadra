@@ -29,7 +29,7 @@ export const BRAND = {
   /** lowercase, url + package safe */
   slug: "quadra",
   ticker: "$QUADRA",
-  domain: "quadra.computer",
+  domain: "quadracomputer.xyz",
   /**
    * The one-line pitch, second person, no jargon.
    *

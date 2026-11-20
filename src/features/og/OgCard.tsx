@@ -63,26 +63,9 @@ export function OgCard({ page, photo = PHOTO }: { page: OgPage; photo?: string }
       <rect x="14" y="14" width={OG_W - 28} height={OG_H - 28} fill="none" stroke={INK} strokeWidth="3" />
       <rect x="22" y="22" width={OG_W - 44} height={OG_H - 44} fill="none" stroke={INK} strokeWidth="1" />
 
-      {/* the subject: Quadra Platinum window over sunlit sky & meadow */}
+      {/* the subject: the Quadra workstation on sunlit grass against Base cobalt halftone clouds */}
       <rect x={px} y="28" width={OG_W - px - 28} height={OG_H - 56} fill={SKY} />
-      <image href={photo} x={px} y="28" width={OG_W - px - 28} height={OG_H - 56} preserveAspectRatio="xMidYMid slice" clipPath="url(#og-photo)" opacity="0.25" />
-      <rect x={px} y="28" width={OG_W - px - 28} height="360" fill="#3a86e8" opacity="0.72" />
-      <rect x={px} y="388" width={OG_W - px - 28} height={OG_H - 28 - 388} fill="#46891a" opacity="0.82" />
-      <ellipse cx={px + 120} cy="130" rx="110" ry="34" fill="#ffffff" opacity="0.55" />
-      <ellipse cx={px + 420} cy="160" rx="130" ry="38" fill="#ffffff" opacity="0.45" />
-      <rect x={px + 72} y="138" width="440" height="310" fill={PAPER} stroke={INK} strokeWidth="3" />
-      <rect x={px + 72} y="138" width="440" height="34" fill="#dedbd3" stroke={INK} strokeWidth="2" />
-      <rect x={px + 84} y="147" width="14" height="14" fill={PAPER} stroke={INK} strokeWidth="2" />
-      <text x={px + 292} y="160" textAnchor="middle" fontFamily={MONO} fontSize="15" fontWeight="700" fill={INK}>
-        quadra / base 8453
-      </text>
-      <Mark x={px + 236} y={208} size={112} />
-      <text x={px + 292} y="372" textAnchor="middle" fontFamily={SERIF} fontWeight="700" fontSize="34" fill={BLUE}>
-        open. verify. sign.
-      </text>
-      <text x={px + 292} y="410" textAnchor="middle" fontFamily={MONO} fontSize="15" fill={INK}>
-        on-chain supercomputer
-      </text>
+      <image href={photo} x={px} y="28" width={OG_W - px - 28} height={OG_H - 56} preserveAspectRatio="xMidYMid slice" clipPath="url(#og-photo)" />
       <line x1={px} y1="28" x2={px} y2={OG_H - 28} stroke={INK} strokeWidth="2" />
 
       {/* the masthead */}

@@ -3391,7 +3391,7 @@ var BRAND = {
   /** lowercase, url + package safe */
   slug: "quadra",
   ticker: "$QUADRA",
-  domain: "quadra.computer",
+  domain: "quadracomputer.xyz",
   /**
    * The one-line pitch, second person, no jargon.
    *
@@ -3409,7 +3409,7 @@ var BRAND = {
   mcpServer: "quadra",
   /** tool namespace: every MCP tool is `quadra_<verb>` */
   toolPrefix: "quadra",
-  x: "@quadra_computer"
+  x: "@quadracomputer"
 };
 
 // src/config/chain.ts
@@ -7040,6 +7040,28 @@ function baseStocks() {
   return catalog;
 }
 
+// src/config/markets.ts
+var CBBTC = { address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf", symbol: "cbBTC", decimals: 8 };
+var DEFAULT_WATCH = [
+  { kind: "token", address: WETH.address, label: "ETH" },
+  { kind: "token", address: CBBTC.address, label: "cbBTC" },
+  { kind: "basestock", symbol: "NVDA" },
+  { kind: "basestock", symbol: "AAPL" },
+  { kind: "stock", symbol: "TSLA" },
+  { kind: "stock", symbol: "SPY" }
+];
+var TRADE_CRYPTO = [
+  { address: USDC.address, symbol: "USDC", name: "USD Coin", decimals: USDC.decimals },
+  { address: CBBTC.address, symbol: CBBTC.symbol, name: "Coinbase Wrapped BTC", decimals: CBBTC.decimals },
+  { address: "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22", symbol: "cbETH", name: "Coinbase Wrapped Staked ETH", decimals: 18 },
+  { address: "0x940181a94A35A4569E4529A3CDfB74e38FD98631", symbol: "AERO", name: "Aerodrome Finance", decimals: 18 },
+  { address: "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b", symbol: "VIRTUAL", name: "Virtuals Protocol", decimals: 18 },
+  { address: "0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42", symbol: "EURC", name: "EURC", decimals: 6 },
+  { address: "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed", symbol: "DEGEN", name: "Degen", decimals: 18 },
+  { address: "0x1111111111166b7FE7bd91427724B487980aFc69", symbol: "ZORA", name: "Zora", decimals: 18 },
+  { address: "0x532f27101965dd16442E59d40670FaF5eBB142E4", symbol: "BRETT", name: "Brett", decimals: 18 }
+];
+
 // src/adapters/http/launchpad.ts
 var LIMITS = { name: 50, symbol: /^\S{1,11}$/, description: 280 };
 var HTTPS = /^https:\/\/[^\s/]+\.[^\s]+$/;
@@ -7086,6 +7108,9 @@ async function quoteOf(factory, quote2) {
   const [enabled, startTick] = decodeFunctionResult({ abi: LAUNCHPAD_ABI, functionName: "quotes", data: await ethCall(factory, data) });
   return { enabled, startTick };
 }
+var ECOSYSTEM_QUOTES = [
+  ...CONTRACTS.token ? [{ address: toChecksumAddress(CONTRACTS.token), symbol: "QUADRA", name: "Quadra", decimals: 18 }] : []
+];
 async function launchPairs(factory) {
   const eth = await quoteOf(factory, ETH_QUOTE2);
   const pairs = eth.enabled ? [{ address: ETH_QUOTE2, symbol: "ETH", name: "Ether", decimals: 18, startTick: eth.startTick }] : [];
@@ -7096,8 +7121,15 @@ async function launchPairs(factory) {
     return { pairs, problem: messageOf(e) };
   }
   const live = stocks.filter((st) => !st.paused.includes(0) && st.nav !== null);
-  const enabled = await Promise.all(live.map(async (st) => ({ st, q: await quoteOf(factory, st.address) })));
-  for (const { st, q } of enabled) {
+  const tokenQuotes = [...ECOSYSTEM_QUOTES, ...TRADE_CRYPTO];
+  const [cryptoQuotes, stockQuotes] = await Promise.all([
+    Promise.all(tokenQuotes.map(async (c) => ({ c, q: await quoteOf(factory, c.address).catch(() => ({ enabled: false, startTick: 0 })) }))),
+    Promise.all(live.map(async (st) => ({ st, q: await quoteOf(factory, st.address) })))
+  ]);
+  for (const { c, q } of cryptoQuotes) {
+    if (q.enabled) pairs.push({ address: c.address, symbol: c.symbol, name: c.name, decimals: c.decimals, startTick: q.startTick });
+  }
+  for (const { st, q } of stockQuotes) {
     if (q.enabled) pairs.push({ address: st.address, symbol: st.symbol, name: st.name, decimals: st.decimals, startTick: q.startTick });
   }
   return { pairs, problem: null };

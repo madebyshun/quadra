@@ -17,7 +17,7 @@ import { OG_PAGES } from "@/server/og";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(ROOT, "public", "og");
 const CHROME = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const PHOTO_FILE = `file://${join(ROOT, "public", "brand", "computer-sky.webp")}`;
+const PHOTO_FILE = `file://${join(ROOT, "public", "brand", "quadra-machine.jpg")}`;
 const FONTS = "https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=JetBrains+Mono:wght@400;500&display=block";
 
 mkdirSync(OUT, { recursive: true });
