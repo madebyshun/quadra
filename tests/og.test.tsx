@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { injectMeta, metaFor, OG_PAGES } from "@/server/og";
 import { OgCard, PHOTO, splitAt } from "@/features/og/OgCard";
-import middleware, { config } from "../middleware";
+import middleware, { config } from "../scripts/og-middleware-draft";
 
 /**
  * Share cards per page: which card a URL gets, the tags written into index.html, a picture on disk
