@@ -106,14 +106,19 @@ describe("the edge middleware", () => {
     expect(["/api/skills", "/og/home.png", "/brand/icon.svg", "/assets/index.js", "/index.html"].some((p) => match.test(p))).toBe(false);
   });
 
-  it("serves the page unchanged on a POST, a missing index or a failure", async () => {
-    expect(await middleware(new Request("https://quadra.test/", { method: "POST" }))).toBeUndefined();
+  it("serves the page unchanged on a POST, bare /, a missing index or a failure", async () => {
+    const post = await middleware(new Request("https://quadra.test/", { method: "POST" }));
+    expect(post.headers.get("x-middleware-next")).toBe("1");
+    const home = await middleware(new Request("https://quadra.test/"));
+    expect(home.headers.get("x-middleware-next")).toBe("1");
     vi.stubGlobal("fetch", async () => new Response("", { status: 404 }));
-    expect(await middleware(new Request("https://quadra.test/"))).toBeUndefined();
+    const missing = await middleware(new Request("https://quadra.test/about"));
+    expect(missing.headers.get("x-middleware-next")).toBe("1");
     vi.stubGlobal("fetch", async () => {
       throw new TypeError("Failed to fetch");
     });
-    expect(await middleware(new Request("https://quadra.test/"))).toBeUndefined();
+    const failed = await middleware(new Request("https://quadra.test/?do=markets"));
+    expect(failed.headers.get("x-middleware-next")).toBe("1");
   });
 });
 
