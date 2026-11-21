@@ -1,4 +1,5 @@
 import { BASE, UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
+import { CLANKER_FACTORIES } from "@/config/launchpads";
 import { BLOCKSCOUT } from "@/skills/blockscout";
 import { blockAt } from "@/skills/blocktime";
 import type { Market } from "@/skills/dexscreener";
@@ -42,10 +43,16 @@ import type { Proven } from "@/skills/launchpads";
 const SERVICE = "Blockscout";
 /** Blockscout's v2 page size — a history with no next page is the whole history. */
 export const PAGE = 50;
-/** How far either side of the estimated block the pool's `Initialize` log is looked for. */
-export const BLOCK_SLACK = 30;
-/** The one public endpoint MEASURED to answer `eth_getLogs` for old blocks. */
-export const ARCHIVE_RPC: readonly string[] = [BASE.rpcFallback];
+/** How far either side of the estimated block the pool's `Initialize` log is looked for (±90s at 5 blocks/s on Base; 900 blocks total stays under public RPC limits). */
+export const BLOCK_SLACK = 450;
+/** Archive-capable Base endpoints tried in order when `eth_getLogs` hits rate limits (HTTP 429/400/403). */
+export const ARCHIVE_RPC: readonly string[] = [
+  BASE.rpcFallback,
+  "https://gateway.tenderly.co/public/base",
+  "https://base.drpc.org",
+  "https://1rpc.io/base",
+  "https://base-rpc.publicnode.com",
+];
 /** Calls that take liquidity OUT: Uniswap v2's router and v3's position manager. */
 const PULLS = /^(removeLiquidity|decreaseLiquidity)/i;
 
@@ -138,16 +145,25 @@ export function summarize(address: string, factory: string | null, history: Hist
 /** The transaction that initialized a v4 pool, found from its id and DexScreener's creation time. */
 async function poolLaunch(pool: string, createdAt: number): Promise<string | null> {
   const block = BigInt(blockAt(Math.floor(createdAt / 1000)));
+  const slack = BigInt(BLOCK_SLACK);
   const hex = (n: bigint) => `0x${(n < 0n ? 0n : n).toString(16)}`;
-  const logs = await rpcOn(BASE.name, ARCHIVE_RPC, "eth_getLogs", [
-    { address: UNISWAP_V4_POOL_MANAGER, topics: [INITIALIZE_TOPIC, pool], fromBlock: hex(block - BigInt(BLOCK_SLACK)), toBlock: hex(block + BigInt(BLOCK_SLACK)) },
-  ]);
-  const first = listOf(logs)[0];
-  return isObj(first) ? strOf(first.transactionHash) : null;
+  const probe = async (from: bigint, to: bigint): Promise<string | null> => {
+    const logs = await rpcOn(BASE.name, ARCHIVE_RPC, "eth_getLogs", [
+      { address: UNISWAP_V4_POOL_MANAGER, topics: [INITIALIZE_TOPIC, pool], fromBlock: hex(from), toBlock: hex(to) },
+    ]);
+    const first = listOf(logs)[0];
+    return isObj(first) ? strOf(first.transactionHash) : null;
+  };
+  // Try ±BLOCK_SLACK first (±90s at 5 blocks/s); if DexScreener's pairCreatedAt lagged, widen to ±4.5 min
+  const hit = await probe(block - slack, block + slack);
+  if (hit || block === 0n) return hit;
+  const earlier = await probe(block - slack * 3n, block - slack - 1n).catch(() => null);
+  if (earlier) return earlier;
+  return probe(block + slack + 1n, block + slack * 3n).catch(() => null);
 }
 
 /** The launch transaction and the token's creator: Blockscout's creation record, or else the token's v4 pool initialization. */
-async function launchTx(token: string, pairs: readonly Market[]): Promise<{ hash: string; creator: string | null } | null> {
+async function launchTx(token: string, pairs: readonly Market[]): Promise<{ hash: string | null; creator: string | null } | null> {
   const record = await getJson(SERVICE, `${BLOCKSCOUT}/addresses/${token}`);
   const creator = isObj(record) ? strOf(record.creator_address_hash) : null;
   const creation = isObj(record) ? strOf(record.creation_transaction_hash) : null;
@@ -155,7 +171,10 @@ async function launchTx(token: string, pairs: readonly Market[]): Promise<{ hash
   // a v4 pool's id is 32 bytes, where a pool contract's address is 20
   const v4 = pairs.find((p) => p.pair?.length === 66 && p.createdAt !== null);
   const hash = v4 ? await poolLaunch(v4.pair!, v4.createdAt!) : null;
-  return hash ? { hash, creator } : null;
+  if (hash) return { hash, creator };
+  // Keep a known factory creator (e.g. Clanker v5) even if the pool Initialize log was outside the window
+  if (creator && CLANKER_FACTORIES[creator.toLowerCase()]) return { hash: null, creator };
+  return null;
 }
 
 /** A wallet's history read into the launcher facts — for a launcher known some other way. */
@@ -186,6 +205,10 @@ export async function originOf(token: string, pairs: readonly Market[], pad: Pro
   if (pad?.launcher) return { via: padVia, launcher: atLeastOne(await launcherProfile(pad.launcher, pad.address)) };
   const found = await launchTx(token, pairs);
   if (!found) return padVia ? { via: padVia, launcher: null, relay: "no launch transaction on record" } : null;
+  if (!found.hash) {
+    const via = padVia ?? (found.creator ? { address: found.creator, name: CLANKER_FACTORIES[found.creator.toLowerCase()] ?? null } : null);
+    return via ? { via, launcher: null, relay: "no launch transaction on record" } : null;
+  }
   const tx = await getJson(SERVICE, `${BLOCKSCOUT}/transactions/${found.hash}`);
   const from = isObj(tx) && isObj(tx.from) ? strOf(tx.from.hash) : null;
   if (!isObj(tx) || !from) return padVia ? { via: padVia, launcher: null, relay: "no launch transaction on record" } : null;
@@ -200,7 +223,8 @@ export async function originOf(token: string, pairs: readonly Market[], pad: Pro
   // the contract that CREATED the token, when Blockscout indexed it — never the transaction's `to` by default
   const creator = found.creator && !same(found.creator, from) ? found.creator : null;
   if (creator) {
-    const via = { address: creator, name: to && same(to, creator) ? toName : null };
+    const known = CLANKER_FACTORIES[creator.toLowerCase()] ?? null;
+    const via = { address: creator, name: (to && same(to, creator) ? toName : null) ?? known };
     if (bundle) return { via, launcher: null, relay: "an ERC-4337 bundle" };
     const l = await launcherProfile(from, creator);
     return { via, launcher: to && same(to, creator) ? l : atLeastOne(l) };

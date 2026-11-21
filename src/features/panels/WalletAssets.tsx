@@ -38,7 +38,7 @@ async function tokenRows(account: string): Promise<Row[]> {
 /** a part of the list: still reading, read, or why it could not be */
 type Part<T> = T | { readonly failed: string } | null;
 
-export function WalletAssets({ account, label, onPick }: { account: string; label: string; onPick: (address: string | null) => void }) {
+export function WalletAssets({ account, label, onPick }: { account: string; label: string; onPick: (address: string | null, symbol?: string) => void }) {
   const [eth, setEth] = useState<Part<Row>>(null);
   const [tokens, setTokens] = useState<Part<readonly Row[]>>(null);
 
@@ -68,7 +68,7 @@ export function WalletAssets({ account, label, onPick }: { account: string; labe
         <ul className="assets" aria-label={label}>
           {rows.map((r) => (
             <li key={r.address ?? "eth"}>
-              <button type="button" className="assets__row" onClick={() => onPick(r.address)}>
+              <button type="button" className="assets__row" onClick={() => onPick(r.address, r.symbol)}>
                 <strong>{r.symbol}</strong>
                 <span className="assets__amount">{r.amount}</span>
                 <span className="assets__value">{r.value ?? "—"}</span>

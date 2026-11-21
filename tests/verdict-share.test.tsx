@@ -50,6 +50,7 @@ describe("a Token Verdict as a picture", () => {
     expect(c.figures).toEqual([
       { label: "Liquidity", value: "$473,011" },
       { label: "Volume 24h", value: "$1,402,338" },
+      { label: "Pool age", value: "18 hours" },
     ]);
   });
 
@@ -121,11 +122,11 @@ describe("a Token Verdict as a picture", () => {
     const card = screen.getByRole("img", { name: "Token Verdict card for TEST" });
     expect(card).toHaveTextContent("✕ Buy → sell, simulated now: the sell reverted");
     expect(card).toHaveTextContent("Checked 4 Nov 2026, 13:19 UTC · block 53,504,505");
-    expect(card).toHaveTextContent(`Check any token free → ${window.location.host}`);
+    expect(card).toHaveTextContent(`Check any token free → ${BRAND.domain}`);
     expect(container.querySelector("#kit-sky stop")).toHaveAttribute("stop-color", "#8a1414");
     expect(card.querySelector("image")).toBeNull();
     rerender(<VerdictSvg c={verdictCard(reboot)!} logo="data:image/png;base64,AA" when="now" />);
-    expect(container.querySelector("#kit-sky stop")).toHaveAttribute("stop-color", "#0b63c4");
+    expect(container.querySelector("#kit-sky stop")).toHaveAttribute("stop-color", "#0A3DFF");
     expect(card.querySelector("image")).toHaveAttribute("href", "data:image/png;base64,AA");
     expect(card).not.toHaveTextContent("block");
     rerender(<VerdictSvg c={verdictCard(verdict("No red flags found — 100/100", "ok"))!} when="now" />);

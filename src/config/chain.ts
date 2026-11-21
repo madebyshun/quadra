@@ -9,7 +9,6 @@
 const ENV_RPC =
   (typeof import.meta !== "undefined" &&
     (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_BASE_RPC_URL?.trim()) ||
-  (typeof process !== "undefined" && (process.env?.BASE_RPC_URL?.trim() || process.env?.VITE_BASE_RPC_URL?.trim())) ||
   "";
 
 export const BASE = {

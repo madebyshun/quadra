@@ -3413,7 +3413,7 @@ var BRAND = {
 };
 
 // src/config/chain.ts
-var ENV_RPC = typeof import.meta !== "undefined" && import.meta.env?.VITE_BASE_RPC_URL?.trim() || typeof process !== "undefined" && (process.env?.BASE_RPC_URL?.trim() || process.env?.VITE_BASE_RPC_URL?.trim()) || "";
+var ENV_RPC = typeof import.meta !== "undefined" && import.meta.env?.VITE_BASE_RPC_URL?.trim() || "";
 var BASE = {
   id: 8453,
   idHex: "0x2105",
@@ -3988,9 +3988,11 @@ async function rpc(method, params = []) {
   return rpcOn(BASE.name, RPC_ENDPOINTS, method, params);
 }
 var ENDPOINT_LIMITS = /* @__PURE__ */ new Set([400, 403, 413, 429]);
+var RPC_LIMIT_MSG = /limit|range|too large|too many|invalid params|archive|pruned|exceed|rate|distance|timeout/i;
 async function rpcOn(chain, endpoints, method, params) {
   let last = `The ${chain} RPC could not be reached for ${method}.`;
-  for (const endpoint of endpoints) {
+  for (let i = 0; i < endpoints.length; i++) {
+    const endpoint = endpoints[i];
     let res;
     try {
       res = await fetch(endpoint, {
@@ -4001,7 +4003,17 @@ async function rpcOn(chain, endpoints, method, params) {
     } catch {
       continue;
     }
-    if (res.ok) return readRpc(chain, method, await res.json());
+    if (res.ok) {
+      try {
+        return readRpc(chain, method, await res.json());
+      } catch (e) {
+        if (e instanceof RpcRefusal && i < endpoints.length - 1 && RPC_LIMIT_MSG.test(e.said)) {
+          last = e.message;
+          continue;
+        }
+        throw e;
+      }
+    }
     last = `The ${chain} RPC answered ${res.status} to ${method}.`;
     if (!ENDPOINT_LIMITS.has(res.status) && res.status < 500) break;
   }
@@ -4230,10 +4242,55 @@ function feePercent(fee) {
   return `${(fee / 1e4).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
 }
 
+// src/config/launchpads.ts
+var BASEPAD = {
+  factory: "0xad60Fe9e5601500449c7d0a87908636a0920307F",
+  /** `LaunchLocker` (Sourcify exact match): no function moves, burns or decreases a position; `collect` removes zero liquidity */
+  locker: "0x93c137BC5b5449D6202D8BdCf1CA398F3E2781c5",
+  /** basepad's share of every collect, and the launcher's recipients' share — constants in the verified source, read back on chain */
+  platformBps: 500,
+  creatorBps: 9500
+};
+var BASEPAD_ABI = parseAbi([
+  "function infoOf(address token) view returns (uint256 tokenId, address launcher, address quote, int24 startTick, uint24 lpFee)",
+  /** every basepad `LaunchToken` names the factory that made it — an impostor can claim the same */
+  "function factory() view returns (address)",
+  "event Launched(address indexed token, uint256 indexed tokenId, address indexed launcher, address quote, bytes32 poolId, int24 startTick, uint24 lpFee, uint256 supply, string metadataURI)"
+]);
+var DOPPLER_AIRLOCK = "0x660eAaEdEBc968f8f3694354FA8EC0b4c5Ba8D12";
+var DOPPLER_NOOP_MIGRATOR = "0x6ddfED58D238Ca3195E49d8ac3d4cEa6386E5C33";
+var DOPPLER_ABI = parseAbi([
+  "function getAssetData(address asset) view returns (address numeraire, address timelock, address governance, address liquidityMigrator, address poolInitializer, address pool, address migrationPool, uint256 numTokensToSell, uint256 totalSupply, address integrator)",
+  "event Create(address asset, address indexed numeraire, address initializer, address poolOrHook)"
+]);
+var FEEL_INTEGRATOR = "0x3879B1Ee8389FfeFb7afd51b1bafb9fAF23d6699";
+var FEEL_SUFFIX = "fee1";
+var CLANKER_FACTORY = "0xE85A59c628F7d27878ACeB4bf3b35733630083a9";
+var CLANKER_V5_FACTORY = "0x572e88D3cD7f23E4241EB6ceDD96667271bF09A0";
+var CLANKER_FACTORIES = {
+  "0x250c9fb2b411b48273f69879007803790a6aea47": "Clanker v0",
+  "0x9b84fce5dcd9a38d2d01d5d72373f6b6b067c3e1": "Clanker v1",
+  "0x732560fa1d1a76350b1a500155ba978031b53833": "Clanker v2",
+  "0x375c15db32d28cecdcab5c03ab889bf15cbd2c5e": "Clanker v3",
+  "0x71cdc0bdf30f5601fb0ac80cf1d20b771342c035": "Clanker v3",
+  "0x2a787b2362021cc3eea3c24c4748a6cd5b687382": "Clanker v3.1",
+  [CLANKER_FACTORY.toLowerCase()]: "Clanker v4",
+  [CLANKER_V5_FACTORY.toLowerCase()]: "Clanker v5"
+};
+var CLANKER_ABI = parseAbi(["function deploymentInfoForToken(address token) view returns (address token, address hook, address locker)"]);
+var ZORA_FACTORY = "0x777777751622c0d3258f214F9DF38E35BF45baF3";
+var ZORA_ABI = parseAbi(["function getVersionForDeployedCoin(address coin) view returns (uint8)"]);
+
 // src/skills/origin.ts
 var SERVICE2 = "Blockscout";
-var BLOCK_SLACK = 30;
-var ARCHIVE_RPC = [BASE.rpcFallback];
+var BLOCK_SLACK = 450;
+var ARCHIVE_RPC = [
+  BASE.rpcFallback,
+  "https://gateway.tenderly.co/public/base",
+  "https://base.drpc.org",
+  "https://1rpc.io/base",
+  "https://base-rpc.publicnode.com"
+];
 var PULLS = /^(removeLiquidity|decreaseLiquidity)/i;
 function parseHistory(body) {
   if (!isObj(body) || !Array.isArray(body.items)) throw new Error("Blockscout did not send the launcher's history.");
@@ -4272,12 +4329,20 @@ function summarize(address2, factory, history) {
 }
 async function poolLaunch(pool, createdAt) {
   const block = BigInt(blockAt(Math.floor(createdAt / 1e3)));
+  const slack = BigInt(BLOCK_SLACK);
   const hex2 = (n) => `0x${(n < 0n ? 0n : n).toString(16)}`;
-  const logs = await rpcOn(BASE.name, ARCHIVE_RPC, "eth_getLogs", [
-    { address: UNISWAP_V4_POOL_MANAGER, topics: [INITIALIZE_TOPIC, pool], fromBlock: hex2(block - BigInt(BLOCK_SLACK)), toBlock: hex2(block + BigInt(BLOCK_SLACK)) }
-  ]);
-  const first = listOf(logs)[0];
-  return isObj(first) ? strOf(first.transactionHash) : null;
+  const probe = async (from, to) => {
+    const logs = await rpcOn(BASE.name, ARCHIVE_RPC, "eth_getLogs", [
+      { address: UNISWAP_V4_POOL_MANAGER, topics: [INITIALIZE_TOPIC, pool], fromBlock: hex2(from), toBlock: hex2(to) }
+    ]);
+    const first = listOf(logs)[0];
+    return isObj(first) ? strOf(first.transactionHash) : null;
+  };
+  const hit = await probe(block - slack, block + slack);
+  if (hit || block === 0n) return hit;
+  const earlier = await probe(block - slack * 3n, block - slack - 1n).catch(() => null);
+  if (earlier) return earlier;
+  return probe(block + slack + 1n, block + slack * 3n).catch(() => null);
 }
 async function launchTx(token, pairs) {
   const record = await getJson(SERVICE2, `${BLOCKSCOUT}/addresses/${token}`);
@@ -4286,7 +4351,9 @@ async function launchTx(token, pairs) {
   if (creation) return { hash: creation, creator };
   const v4 = pairs.find((p) => p.pair?.length === 66 && p.createdAt !== null);
   const hash2 = v4 ? await poolLaunch(v4.pair, v4.createdAt) : null;
-  return hash2 ? { hash: hash2, creator } : null;
+  if (hash2) return { hash: hash2, creator };
+  if (creator && CLANKER_FACTORIES[creator.toLowerCase()]) return { hash: null, creator };
+  return null;
 }
 async function launcherProfile(address2, factory) {
   return summarize(address2, factory, parseHistory(await getJson(SERVICE2, `${BLOCKSCOUT}/addresses/${address2}/transactions`)));
@@ -4301,6 +4368,10 @@ async function originOf(token, pairs, pad3 = null) {
   if (pad3?.launcher) return { via: padVia, launcher: atLeastOne(await launcherProfile(pad3.launcher, pad3.address)) };
   const found = await launchTx(token, pairs);
   if (!found) return padVia ? { via: padVia, launcher: null, relay: "no launch transaction on record" } : null;
+  if (!found.hash) {
+    const via = padVia ?? (found.creator ? { address: found.creator, name: CLANKER_FACTORIES[found.creator.toLowerCase()] ?? null } : null);
+    return via ? { via, launcher: null, relay: "no launch transaction on record" } : null;
+  }
   const tx = await getJson(SERVICE2, `${BLOCKSCOUT}/transactions/${found.hash}`);
   const from = isObj(tx) && isObj(tx.from) ? strOf(tx.from.hash) : null;
   if (!isObj(tx) || !from) return padVia ? { via: padVia, launcher: null, relay: "no launch transaction on record" } : null;
@@ -4314,7 +4385,8 @@ async function originOf(token, pairs, pad3 = null) {
   }
   const creator = found.creator && !same(found.creator, from) ? found.creator : null;
   if (creator) {
-    const via = { address: creator, name: to && same(to, creator) ? toName : null };
+    const known = CLANKER_FACTORIES[creator.toLowerCase()] ?? null;
+    const via = { address: creator, name: (to && same(to, creator) ? toName : null) ?? known };
     if (bundle) return { via, launcher: null, relay: "an ERC-4337 bundle" };
     const l = await launcherProfile(from, creator);
     return { via, launcher: to && same(to, creator) ? l : atLeastOne(l) };
@@ -4526,34 +4598,6 @@ async function quoteUsd(quote2) {
   return quote2.toLowerCase() === ETH_QUOTE ? ethUsd() : markets(quote2).then((m) => deepest(m)?.priceUsd ?? null, () => null);
 }
 
-// src/config/launchpads.ts
-var BASEPAD = {
-  factory: "0xad60Fe9e5601500449c7d0a87908636a0920307F",
-  /** `LaunchLocker` (Sourcify exact match): no function moves, burns or decreases a position; `collect` removes zero liquidity */
-  locker: "0x93c137BC5b5449D6202D8BdCf1CA398F3E2781c5",
-  /** basepad's share of every collect, and the launcher's recipients' share — constants in the verified source, read back on chain */
-  platformBps: 500,
-  creatorBps: 9500
-};
-var BASEPAD_ABI = parseAbi([
-  "function infoOf(address token) view returns (uint256 tokenId, address launcher, address quote, int24 startTick, uint24 lpFee)",
-  /** every basepad `LaunchToken` names the factory that made it — an impostor can claim the same */
-  "function factory() view returns (address)",
-  "event Launched(address indexed token, uint256 indexed tokenId, address indexed launcher, address quote, bytes32 poolId, int24 startTick, uint24 lpFee, uint256 supply, string metadataURI)"
-]);
-var DOPPLER_AIRLOCK = "0x660eAaEdEBc968f8f3694354FA8EC0b4c5Ba8D12";
-var DOPPLER_NOOP_MIGRATOR = "0x6ddfED58D238Ca3195E49d8ac3d4cEa6386E5C33";
-var DOPPLER_ABI = parseAbi([
-  "function getAssetData(address asset) view returns (address numeraire, address timelock, address governance, address liquidityMigrator, address poolInitializer, address pool, address migrationPool, uint256 numTokensToSell, uint256 totalSupply, address integrator)",
-  "event Create(address asset, address indexed numeraire, address initializer, address poolOrHook)"
-]);
-var FEEL_INTEGRATOR = "0x3879B1Ee8389FfeFb7afd51b1bafb9fAF23d6699";
-var FEEL_SUFFIX = "fee1";
-var CLANKER_FACTORY = "0xE85A59c628F7d27878ACeB4bf3b35733630083a9";
-var CLANKER_ABI = parseAbi(["function deploymentInfoForToken(address token) view returns (address token, address hook, address locker)"]);
-var ZORA_FACTORY = "0x777777751622c0d3258f214F9DF38E35BF45baF3";
-var ZORA_ABI = parseAbi(["function getVersionForDeployedCoin(address coin) view returns (uint8)"]);
-
 // src/lib/amount.ts
 var DECIMAL = /^\d*\.?\d*$/;
 function parseAmount(input, decimals) {
@@ -4687,15 +4731,15 @@ function dopplerPad(data) {
     launcher: null
   };
 }
-function clankerPad(admin) {
+function clankerPad(admin, factory = CLANKER_FACTORY, name = "Clanker") {
   const named = admin && !same2(admin, ZERO2) ? { admin: toChecksumAddress(admin) } : {};
-  return { kind: "proven", id: "clanker", name: "Clanker", address: CLANKER_FACTORY, how: "Clanker's factory recorded its deployment", guarantees: [], launcher: null, ...named };
+  return { kind: "proven", id: "clanker", name, address: factory, how: `${name}'s factory recorded its deployment`, guarantees: [], launcher: null, ...named };
 }
 var CLANKER_TOKEN_ABI = parseAbi(["function originalAdmin() view returns (address)"]);
-async function clankerOf(token, info) {
+async function clankerOf(token, info, factory = CLANKER_FACTORY, name = "Clanker") {
   if (same2(info[0], ZERO2)) return null;
   const admin = await read(CLANKER_TOKEN_ABI, token, "originalAdmin", []).then((a) => a, refusedIsNull);
-  return clankerPad(admin);
+  return clankerPad(admin, factory, name);
 }
 function zoraPad(version3) {
   if (version3 === 0) return null;
@@ -4720,6 +4764,7 @@ async function launchpadOf(token, ours = launchOf(token)) {
     read(BASEPAD_ABI, BASEPAD.factory, "infoOf", [token]).then((r) => basepadPad(r)),
     read(DOPPLER_ABI, DOPPLER_AIRLOCK, "getAssetData", [token]).then((r) => dopplerPad(r)),
     read(CLANKER_ABI, CLANKER_FACTORY, "deploymentInfoForToken", [token]).then((r) => clankerOf(token, r)),
+    read(CLANKER_ABI, CLANKER_V5_FACTORY, "deploymentInfoForToken", [token]).then((r) => clankerOf(token, r, CLANKER_V5_FACTORY, "Clanker v5")).catch(refusedIsNull),
     read(ZORA_ABI, ZORA_FACTORY, "getVersionForDeployedCoin", [token]).then((r) => zoraPad(Number(r)))
   ]);
   const proven = found.find((p) => p !== null);
@@ -4734,6 +4779,13 @@ async function launchpadOf(token, ours = launchOf(token)) {
   const claims = await read(BASEPAD_ABI, token, "factory", []).catch(refusedIsNull);
   if (typeof claims === "string" && same2(claims, BASEPAD.factory)) {
     return { kind: "claimed", name: "basepad.si", why: "the token names basepad's factory as its maker, but the factory has no record of it" };
+  }
+  if (typeof claims === "string") {
+    const clankerName = CLANKER_FACTORIES[claims.toLowerCase()];
+    if (clankerName) {
+      const admin = await read(CLANKER_TOKEN_ABI, token, "originalAdmin", []).then((a) => a, refusedIsNull);
+      return clankerPad(admin, toChecksumAddress(claims), clankerName);
+    }
   }
   return { kind: "unknown" };
 }
@@ -5183,7 +5235,7 @@ async function relayQuote(sell, buy, amount) {
       destinationCurrency: buy,
       amount: amount.toString(),
       tradeType: "EXACT_INPUT",
-      slippageTolerance: "500"
+      slippageTolerance: "1500"
     })
   });
   const steps = stepsOf(body);
@@ -5207,13 +5259,22 @@ function parseSimulation(result) {
     };
   });
 }
-async function simulate(txs) {
+async function simulateAt(txs, blockTag = "latest") {
   const calls = txs.map((t) => ({ from: SIM_ACCOUNT, to: t.to, data: t.data, value: `0x${t.value.toString(16)}` }));
-  const result = await rpc("eth_simulateV1", [
-    { blockStateCalls: [{ stateOverrides: { [SIM_ACCOUNT]: { balance: `0x${(10n ** 19n).toString(16)}` } }, calls }], traceTransfers: true },
-    "latest"
-  ]);
-  return parseSimulation(result);
+  const payload = { blockStateCalls: [{ stateOverrides: { [SIM_ACCOUNT]: { balance: `0x${(10n ** 19n).toString(16)}` } }, calls }], traceTransfers: true };
+  let result;
+  try {
+    result = await rpc("eth_simulateV1", [payload, blockTag]);
+  } catch (e) {
+    if (blockTag === "latest") throw e;
+    result = await rpc("eth_simulateV1", [payload, "latest"]);
+  }
+  const first = listOf(result)[0];
+  const num = isObj(first) ? strOf(first.number) : null;
+  return { calls: parseSimulation(result), block: num && /^0x[0-9a-fA-F]+$/.test(num) ? num : null };
+}
+async function simulate(txs, blockTag = "latest") {
+  return (await simulateAt(txs, blockTag)).calls;
 }
 var pad2 = (a) => `0x${a.slice(2).toLowerCase().padStart(64, "0")}`;
 function arrived(calls, asset, to) {
@@ -5238,14 +5299,16 @@ async function roundTrip(token, route = relayQuote) {
   } catch (e) {
     return { kind: "no-route", side: "buy", why: e.message };
   }
-  const bought = await simulate(buy.steps);
+  const buySim = await simulateAt(buy.steps);
+  const bought = buySim.calls;
+  const pin = buySim.block ?? "latest";
   const buyFail = failed(bought);
   if (buyFail) return { kind: "buy-reverted", reason: buyFail.reason };
   const received = arrived(bought, token, SIM_ACCOUNT);
   const half = received / 2n;
   let transfer = { kind: "not-run" };
   if (half > 0n) {
-    const moved = await simulate([...buy.steps, { to: token, data: transferData(PROBE_ACCOUNT, half), value: 0n }]);
+    const moved = await simulate([...buy.steps, { to: token, data: transferData(PROBE_ACCOUNT, half), value: 0n }], pin);
     const last = moved[moved.length - 1];
     transfer = last.ok ? { kind: "ok", arrived: Number(arrived([last], token, PROBE_ACCOUNT)) / Number(half) } : { kind: "reverted", reason: last.reason };
   }
@@ -5255,14 +5318,14 @@ async function roundTrip(token, route = relayQuote) {
   } catch (e) {
     return { kind: "no-route", side: "sell", why: e.message };
   }
-  const traded = await simulate([...buy.steps, ...sell.steps]);
+  const traded = await simulate([...buy.steps, ...sell.steps], pin);
   const sold = traded.slice(buy.steps.length);
   const sellFail = failed(sold);
   if (sellFail) {
     let halfSold = null;
     try {
       const part = await route(token, NATIVE3, received / 2n);
-      halfSold = failed((await simulate([...buy.steps, ...part.steps])).slice(buy.steps.length)) === null;
+      halfSold = failed((await simulate([...buy.steps, ...part.steps], pin)).slice(buy.steps.length)) === null;
     } catch {
       halfSold = null;
     }
@@ -5351,8 +5414,20 @@ function cleanScan(s) {
 function codeRows(s) {
   if (s === void 0) return [row("Code scan", "not checked \u2014 GoPlus could not be reached", { tone: "warn" })];
   if (s === null) return [row("Code scan", "not checked \u2014 GoPlus has no report on this token", { tone: "warn" })];
-  const lines = checksOf(s).map(checkRow).filter((r) => r.tone !== "ok");
-  return lines.length ? lines : [row("Code scan", cleanScan(s), { tone: "ok" })];
+  const all = checksOf(s);
+  const lines = all.map(checkRow).filter((r) => r.tone !== "ok");
+  if (!lines.length) return [row("Code scan", cleanScan(s), { tone: "ok" })];
+  const flags = lines.filter((r) => r.value !== "not checked");
+  const unchecked = lines.filter((r) => r.value === "not checked");
+  if (unchecked.length > 1) {
+    const summary = row(
+      "Code scan",
+      unchecked.length === all.length ? `not checked \u2014 GoPlus left all ${all.length} checks blank` : `partially checked \u2014 GoPlus left ${unchecked.length} of ${all.length} checks blank`,
+      { tone: "warn" }
+    );
+    return [...flags, summary];
+  }
+  return lines;
 }
 function concentration(holders, supply, pools) {
   let set = 0n;
@@ -5362,6 +5437,7 @@ function concentration(holders, supply, pools) {
     if (pools.has(a) || BURN.has(a)) set += h.raw;
     else people.push(h);
   }
+  people.sort((a, b) => b.raw > a.raw ? 1 : b.raw < a.raw ? -1 : 0);
   const top = people.slice(0, TOP);
   const held = top.reduce((sum, h) => sum + h.raw, 0n);
   return { share: Number(held * 10000n / supply) / 1e4, largest: top[0] ?? null, set: Number(set * 10000n / supply) / 1e4 };
@@ -5372,6 +5448,9 @@ function holderRows(info, holders, pairs) {
   if (holders.length === 0) return [row(label, "none indexed yet \u2014 the indexer can lag a new token", { tone: "warn" })];
   const pools = /* @__PURE__ */ new Set([UNISWAP_V4_POOL_MANAGER.toLowerCase(), ...(pairs ?? []).flatMap((p) => p.pair ? [p.pair.toLowerCase()] : [])]);
   const c = concentration(holders, info.totalSupply, pools);
+  if (c.share === 0 && c.set === 0) {
+    return [row(label, "not indexed yet \u2014 Blockscout returned 0% across top holders", { tone: "warn" })];
+  }
   const rows = [
     // amber at most: concentration is a risk, not a trap — DEGEN's top ten hold 62% (MEASURED), mostly its own Safes
     row(label, `${pct2(c.share)} of supply, pools and burns set aside`, { tone: c.share > CONCENTRATED ? "warn" : "ok" })
@@ -5546,9 +5625,20 @@ async function tokenVerdict(input, now) {
   ]);
   const [fee, referrer] = await Promise.all([v3FeeOf(launchpad, address2), v3ReferrerOf(launchpad, address2)]);
   const token = info ?? null;
+  const viaAddr = origin?.via?.address?.toLowerCase();
+  const clankerVer = viaAddr ? CLANKER_FACTORIES[viaAddr] : void 0;
+  const resolvedPad = other?.kind === "unknown" && clankerVer && origin?.via?.address ? {
+    kind: "proven",
+    id: "clanker",
+    name: clankerVer,
+    address: origin.via.address,
+    how: `${clankerVer}'s factory created this token on Base`,
+    guarantees: [],
+    launcher: origin.launcher?.address ?? null
+  } : other ?? void 0;
   const body = [
     ...launchpadRows(launchpad, fee, referrer),
-    ...launchpad ? [] : launchpadRow(other ?? void 0),
+    ...launchpad ? [] : launchpadRow(resolvedPad),
     ...tradeRows(trip),
     ...launchpad ? [LAUNCHPAD_CODE] : codeRows(security),
     ...holderRows(token, holders ?? null, pairs ?? null),
@@ -5626,7 +5716,7 @@ var gateSkill = {
 };
 
 // src/skills/forensics.ts
-var WINDOW = 1800;
+var WINDOW = 1e3;
 var WINDOW_SECONDS = 3600;
 var EARLY = 20;
 var SNIPE_SECONDS = 4;
@@ -8411,7 +8501,7 @@ function snapshot2(state, now, head = null, error = null) {
     creators
   };
 }
-var INDEXER_RPC = [...ARCHIVE_RPC, "https://gateway.tenderly.co/public/base", "https://base-rpc.publicnode.com"];
+var INDEXER_RPC = [.../* @__PURE__ */ new Set([...ARCHIVE_RPC, "https://gateway.tenderly.co/public/base", "https://base-rpc.publicnode.com"])];
 var archiveRpc = (method, params) => rpcOn(BASE.name, INDEXER_RPC, method, params);
 async function readHead(rpc2) {
   const block = await rpc2("eth_getBlockByNumber", ["latest", false]);

@@ -116,8 +116,9 @@ describe("the desktop's folders (2026-10-21)", () => {
     expect(lines[0]).toBe("On the desktop:");
     expect(lines).toContain("Folders:");
     const money = lines.findIndex((l) => l.startsWith("  open money"));
-    expect(lines[money]).toContain("Money — send, swap, trade");
-    expect(lines[money + 1]).toMatch(/^ {4}send /);
+    expect(lines[money]).toContain("Money — treasury basket, bridge");
+    expect(lines[money + 1]).toMatch(/^ {4}open basket /);
+    expect(windowsText()).toMatch(/^ {2}send /m);
     expect(windowsText()).toMatch(/^ {2}wallet +Wallet — connect one you control$/m);
     expect(windowsText()).toMatch(/^ {4}(open )?readme +Read Me — start here$/m);
     expect(windowsText()).toMatch(/^ {2}trash +Trash/m);

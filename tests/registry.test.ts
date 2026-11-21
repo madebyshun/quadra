@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+  ALIAS_FEATURES,
   CORNER,
   DESKTOP,
   FEATURES,
@@ -180,13 +181,13 @@ describe("visibleFeatures", () => {
 describe("the desktop's folders (2026-10-21)", () => {
   const ids = () => desktopItems().map((e) => e.id);
 
-  it("keeps the four doors, Agents and My Computer on the desktop (2026-10-29: one door per job)", () => {
-    expect(ids()).toEqual(["safety", "coins", "launch", "wallet", "folder-agents", "computer"]);
+  it("keeps Markets, Send, Swap, Check, Weekend, Coins, Launch, Wallet, Agents and My Computer on the desktop", () => {
+    expect(ids()).toEqual(["markets", "send", "swap", "safety", "weekend", "coins", "launch", "wallet", "folder-agents", "computer"]);
     expect(DESKTOP).toEqual(ids());
   });
 
   it("files every switched-on program somewhere: a folder, the desktop, or the Trash's corner", () => {
-    const filed = new Set([...DESKTOP, ...CORNER, ...FOLDER_IDS.flatMap((f) => FOLDERS[f])]);
+    const filed = new Set([...DESKTOP, ...CORNER, ...ALIAS_FEATURES, ...FOLDER_IDS.flatMap((f) => FOLDERS[f])]);
     for (const f of FEATURES.filter(isEnabled)) expect(filed.has(f.id), f.id).toBe(true);
     for (const d of ["docs", "api", "verify"] as const) expect(folderOf(d)).toBe("folder-agents");
     expect(folderOf("safety")).toBeNull();
@@ -198,7 +199,7 @@ describe("the desktop's folders (2026-10-21)", () => {
   });
 
   it("lists a folder's switched-on programs only, and Coming Soon while it holds something", () => {
-    expect(folderItems("folder-money").map((e) => e.id)).toEqual(["send", "swap", "trade", "basket"]);
+    expect(folderItems("folder-money").map((e) => e.id)).toEqual(["basket"]);
     expect(folderItems("computer").map((e) => e.id)).toEqual([
       "folder-research",
       "folder-money",

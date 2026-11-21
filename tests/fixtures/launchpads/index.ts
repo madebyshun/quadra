@@ -36,7 +36,7 @@
 import records from "./rpc-records.json";
 import padLogs from "./rpc-pad-logs.json";
 import code from "./rpc-code.json";
-import { BASEPAD, CLANKER_FACTORY, DOPPLER_AIRLOCK, ZORA_FACTORY } from "@/config/launchpads";
+import { BASEPAD, CLANKER_FACTORY, CLANKER_V5_FACTORY, DOPPLER_AIRLOCK, ZORA_FACTORY } from "@/config/launchpads";
 import { RpcError } from "../../net";
 
 export const PX = { records, padLogs, code };
@@ -73,6 +73,7 @@ export function padCalls(as: { [token: string]: Captured } = {}): (method: strin
     if (method !== "eth_call") return undefined;
     const call = params[0] as { to: string; data: string; from?: string };
     if (call.from) return undefined;
+    if (call.to.toLowerCase() === CLANKER_V5_FACTORY.toLowerCase()) return answer(records.degen.clanker);
     const pad = PAD_OF[call.to.toLowerCase()];
     if (pad) return answer(stand(`0x${call.data.slice(34, 74)}`)[pad]);
     // factory() — the selector computed with `cast sig "factory()"`

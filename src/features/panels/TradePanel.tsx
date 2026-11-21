@@ -18,19 +18,10 @@ import { choiceFor } from "@/features/panels/TokenPicker";
 
 /**
  * Trade: buy or sell a token on Base — crypto, or one of Coinbase's tokenized stocks — for USDC
- * or ETH, at a live Relay quote, signed in the user's wallet. The owner's ask of 2026-09-30.
+ * or ETH, at a live Relay quote, signed in the user's wallet.
  *
- * It is a front for Swap, not a second trading engine: the list picks the asset, Buy/Sell and
- * USDC/ETH pick the other side, and `SwapPanel` does the rest — the same quote, the same
- * `checkSwap`, the same exact approval, the same simulation before signing and the same
- * measurement of what arrived. MEASURED before this was built: Relay quotes Coinbase's stocks on
- * Base both ways (USDC → NVDAc, NVDAc → USDC, ETH → AAPLc) through the two Relay contracts
- * `config/routes.ts` already pins.
- *
- * 🔴 A stock is not an ordinary token (docs.base.org, "List Tokenized Stocks"): one token is not
- * always one share (`multiplier`), its issuer can PAUSE transfers — DKNGc was, MEASURED — and it is
- * only for persons in eligible jurisdictions outside the U.S. The window says all three before
- * anything is quoted, and refuses to quote a stock whose transfers are paused.
+ * Redesigned to share Markets' Platinum + Base cobalt visual language and 2-column landscape layout:
+ * asset browser on the left, live Relay execution ticket + StockHealth + facts on the right.
  */
 
 type Tab = "crypto" | "stocks";
@@ -170,98 +161,142 @@ export function TradePanel() {
 
   return (
     <div className="stack">
-      <div className="group__row group__row--actions" role="tablist" aria-label="Market">
-        {(["crypto", "stocks"] as const).map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} className="chip chip--mode" onClick={() => switchTab(t)}>
-            {t === "crypto" ? "Crypto" : "Stocks"}
-          </button>
-        ))}
-        <input className="field" aria-label="Search" placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} />
-      </div>
-
-      {rows === null ? (
-        <p className="dim">Reading {tab === "crypto" ? "prices" : "Coinbase's stocks on Base"}…</p>
-      ) : (
-        <ul className="trade__list" aria-label={tab === "crypto" ? "Crypto on Base" : "Stocks on Base"}>
-          {shown.map((r) => (
-            <li key={r.key}>
-              <button type="button" className="trade__row" aria-pressed={r.key === selectedKey} onClick={() => setSelectedKey(r.key)}>
-                <span className="gadget__sym">
-                  {r.label}
-                  <small>{r.name}</small>
-                </span>
-                <span className="gadget__px">{r.spot?.price == null ? "—" : price(r.spot.price)}</span>
-                <span className={`gadget__chg${r.spot?.change == null ? "" : r.spot.change >= 0 ? " up" : " down"}`}>
-                  {transfersPaused(r.stock) ? "paused" : formatChange(r.spot?.change ?? null)}
-                </span>
-              </button>
-            </li>
-          ))}
-          {shown.length === 0 ? <li className="dim">Nothing matches “{query.trim()}”.</li> : null}
-        </ul>
-      )}
-      {problem ? (
-        <Crt label="Trade prices">
-          <span className="crt__amber">{problem}</span>
-        </Crt>
-      ) : null}
-
-      {selected === null ? (
-        <p className="panel__lede">Pick {tab === "crypto" ? "a token" : "a stock"} to buy or sell it on {BASE.name}.</p>
-      ) : (
-        <>
-          <div className="trade__pick" role="region" aria-label={`${selected.label} at a glance`}>
-            <strong>
-              {selected.label} — {selected.name}
-            </strong>
-            <span>
-              {selected.spot?.price == null ? "no DEX market found" : price(selected.spot.price)} · {formatChange(selected.spot?.change ?? null)} 24h
-              {selected.stock ? ` · 1 token = ${selected.stock.multiplier} share${selected.stock.multiplier === 1 ? "" : "s"} · ${pausedText(selected.stock.paused)}` : ""}
-            </span>
-            {selected.stock ? <small>Coinbase tokenized stocks are only for persons in eligible jurisdictions outside the U.S.</small> : null}
-            {run && selected.address ? (
-              <button type="button" className="gel gel--quiet trade__depth" onClick={() => run(`depth ${selected.address}`)}>
-                Price impact at $1k / $10k / $100k →
-              </button>
-            ) : null}
+      <header className="mk__hero">
+        <div>
+          <p className="mk__eyebrow">BASE 8453 / MARKETS TRADE</p>
+          <h3 className="mk__title">Trade on Base.</h3>
+          <p className="mk__sub">Buy or sell Base crypto and Coinbase tokenized stocks against USDC or ETH via live Relay quotes.</p>
+        </div>
+        <dl className="mk__kpis">
+          <div className="mk__kpi">
+            <dt>Mode</dt>
+            <dd>{tab === "crypto" ? "Crypto" : "Stocks"}</dd>
           </div>
-          {selected.stock ? <StockHealth key={selected.stock.address} stock={selected.stock} /> : null}
-          {transfersPaused(selected.stock) ? (
-            <Crt label="Trading paused">
-              <span className="crt__amber">
-                {selected.label}&apos;s transfers are paused on its token contract, so nothing can be bought or sold until its issuer
-                unpauses them. No quote is asked for.
-              </span>
-            </Crt>
+          <div className="mk__kpi">
+            <dt>Listed</dt>
+            <dd>{rows ? rows.length : "…"}</dd>
+          </div>
+          <div className="mk__kpi">
+            <dt>Router</dt>
+            <dd>Relay</dd>
+          </div>
+        </dl>
+      </header>
+
+      <div className="trade__grid">
+        <section className="stack trade__browser">
+          <div className="mk__toolbar" role="tablist" aria-label="Market">
+            {(["crypto", "stocks"] as const).map((t) => (
+              <button key={t} type="button" role="tab" aria-selected={tab === t} className="chip chip--mode" onClick={() => switchTab(t)}>
+                {t === "crypto" ? "Crypto" : "Stocks"}
+              </button>
+            ))}
+            <input className="field mk__search" aria-label="Search" placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          </div>
+
+          {rows === null ? (
+            <p className="dim">Reading {tab === "crypto" ? "prices" : "Coinbase's stocks on Base"}…</p>
           ) : (
-            <>
-              <div className="group__row group__row--actions" role="group" aria-label="Side">
-                {(["buy", "sell"] as const).map((s) => (
-                  <button key={s} type="button" className="chip chip--mode" aria-pressed={side === s} onClick={() => setSide(s)}>
-                    {s === "buy" ? `Buy ${selected.label}` : `Sell ${selected.label}`}
-                  </button>
-                ))}
-                <span className="trade__sep">{side === "buy" ? "pay with" : "receive"}</span>
-                <span role="group" aria-label={side === "buy" ? "Pay with" : "Receive"} className="trade__counters">
-                  {counters.map((c) => (
-                    <button key={c} type="button" className="chip chip--mode" aria-pressed={using === c} onClick={() => setCounter(c)}>
-                      {c}
-                    </button>
-                  ))}
-                </span>
+            <div className="trade__table-box">
+              <div className="trade__head" aria-hidden="true">
+                <span>Asset</span>
+                <span>Price</span>
+                <span>24h</span>
               </div>
-              <SwapPanel
-                key={`${selected.key}:${side}:${using}`}
-                fixed={side === "buy" ? { sell: COUNTER[using], buy: pickedOf(selected) } : { sell: pickedOf(selected), buy: COUNTER[using] }}
-              />
-            </>
+              <ul className="trade__list" aria-label={tab === "crypto" ? "Crypto on Base" : "Stocks on Base"}>
+                {shown.map((r) => (
+                  <li key={r.key}>
+                    <button type="button" className="trade__row" aria-pressed={r.key === selectedKey} onClick={() => setSelectedKey(r.key)}>
+                      <span className="gadget__sym">
+                        {r.label}
+                        <small>{r.name}</small>
+                      </span>
+                      <span className="gadget__px">{r.spot?.price == null ? "—" : price(r.spot.price)}</span>
+                      <span className={`gadget__chg${r.spot?.change == null ? "" : r.spot.change >= 0 ? " up" : " down"}`}>
+                        {transfersPaused(r.stock) ? "paused" : formatChange(r.spot?.change ?? null)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+                {shown.length === 0 ? <li className="dim" style={{ padding: "8px 10px" }}>Nothing matches “{query.trim()}”.</li> : null}
+              </ul>
+            </div>
           )}
-          <details className="trade__more">
-            <summary>Everything about {selected.label}, with sources</summary>
-            <ReportView report={facts(selected)} />
-          </details>
-        </>
-      )}
+          {problem ? (
+            <Crt label="Trade prices">
+              <span className="crt__amber">{problem}</span>
+            </Crt>
+          ) : null}
+        </section>
+
+        <section className="stack trade__ticket">
+          {selected === null ? (
+            <div className="mk__detail">
+              <p className="panel__lede" style={{ margin: 0 }}>
+                Pick {tab === "crypto" ? "a token" : "a stock"} to buy or sell it on {BASE.name}.
+              </p>
+            </div>
+          ) : (
+            <div className="mk__detail">
+              <div className="trade__pick" role="region" aria-label={`${selected.label} at a glance`}>
+                <div className="mk__detail-head" style={{ paddingBottom: "6px" }}>
+                  <div>
+                    <strong className="mk__detail-title" style={{ display: "block", fontSize: "16px" }}>
+                      {selected.label} — {selected.name}
+                    </strong>
+                    <span className="mono dim">
+                      {selected.spot?.price == null ? "no DEX market found" : price(selected.spot.price)} · {formatChange(selected.spot?.change ?? null)} 24h
+                      {selected.stock ? ` · 1 token = ${selected.stock.multiplier} share${selected.stock.multiplier === 1 ? "" : "s"} · ${pausedText(selected.stock.paused)}` : ""}
+                    </span>
+                  </div>
+                  <span className="mk__tag">{selected.stock ? "STOCK" : "CRYPTO"}</span>
+                </div>
+                {selected.stock ? <small>Coinbase tokenized stocks are only for persons in eligible jurisdictions outside the U.S.</small> : null}
+                {run && selected.address ? (
+                  <button type="button" className="gel gel--quiet trade__depth" onClick={() => run(`depth ${selected.address}`)}>
+                    Price impact at $1k / $10k / $100k →
+                  </button>
+                ) : null}
+              </div>
+              {selected.stock ? <StockHealth key={selected.stock.address} stock={selected.stock} /> : null}
+              {transfersPaused(selected.stock) ? (
+                <Crt label="Trading paused">
+                  <span className="crt__amber">
+                    {selected.label}&apos;s transfers are paused on its token contract, so nothing can be bought or sold until its issuer
+                    unpauses them. No quote is asked for.
+                  </span>
+                </Crt>
+              ) : (
+                <>
+                  <div className="group__row group__row--actions" role="group" aria-label="Side" style={{ marginBottom: 0 }}>
+                    {(["buy", "sell"] as const).map((s) => (
+                      <button key={s} type="button" className="chip chip--mode" aria-pressed={side === s} onClick={() => setSide(s)}>
+                        {s === "buy" ? `Buy ${selected.label}` : `Sell ${selected.label}`}
+                      </button>
+                    ))}
+                    <span className="trade__sep">{side === "buy" ? "pay with" : "receive"}</span>
+                    <span role="group" aria-label={side === "buy" ? "Pay with" : "Receive"} className="trade__counters">
+                      {counters.map((c) => (
+                        <button key={c} type="button" className="chip chip--mode" aria-pressed={using === c} onClick={() => setCounter(c)}>
+                          {c}
+                        </button>
+                      ))}
+                    </span>
+                  </div>
+                  <SwapPanel
+                    key={`${selected.key}:${side}:${using}`}
+                    fixed={side === "buy" ? { sell: COUNTER[using], buy: pickedOf(selected) } : { sell: pickedOf(selected), buy: COUNTER[using] }}
+                  />
+                </>
+              )}
+              <details className="trade__more">
+                <summary>Everything about {selected.label}, with sources</summary>
+                <ReportView report={facts(selected)} />
+              </details>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

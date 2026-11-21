@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { MCP_BUILD, MCP_SERVER, MCP_TOOLS, mcpConfigSnippet, type Reach } from "@/lib/manifest";
 import { Crt } from "@/ui/Crt";
+import { Gel } from "@/ui/Gel";
 import { SKILLS } from "@/skills";
 import { skillTools } from "@/skills/mcp";
 
@@ -37,6 +39,15 @@ export function installLine(published: boolean, name: string): string {
 }
 
 export function McpPanel() {
+  const [copied, setCopied] = useState(false);
+  const snippet = mcpConfigSnippet();
+  const copyConfig = () => {
+    void navigator.clipboard?.writeText(snippet).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  };
+
   return (
     <div className="stack">
       <fieldset className="group">
@@ -85,8 +96,13 @@ export function McpPanel() {
       <fieldset className="group">
         <legend>How to run it</legend>
         <Crt label="MCP server config">
-          <span className="crt__pre">{mcpConfigSnippet()}</span>
+          <span className="crt__pre">{snippet}</span>
         </Crt>
+        <div className="row" style={{ marginTop: "8px" }}>
+          <Gel quiet onClick={copyConfig}>
+            {copied ? "Copied config" : "Copy config JSON"}
+          </Gel>
+        </div>
         <p className="dim">{installLine(MCP_SERVER.published, MCP_SERVER.name)}</p>
       </fieldset>
 

@@ -106,6 +106,10 @@ export function useWalletSession(): WalletSession {
   return session;
 }
 
+export function useOptionalWalletSession(): WalletSession | null {
+  return useContext(WalletContext);
+}
+
 function connectorFailure(err: unknown): Wallet {
   return { kind: "failed", why: err instanceof Error ? err.message : String(err) };
 }

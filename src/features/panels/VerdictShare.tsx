@@ -66,7 +66,9 @@ function tradeTile(r: Row | undefined): Tile {
 function codeTile(rows: readonly Row[]): Tile {
   const labels = new Set(codeLabels());
   const scan = rows.find((r) => r.label === "Code scan" || r.label === LAUNCHPAD_CODE.label);
-  const flags = rows.filter((r) => labels.has(r.label) && r.tone && r.tone !== "ok").sort((a, b) => RANK[a.tone!] - RANK[b.tone!]);
+  const flags = rows
+    .filter((r) => labels.has(r.label) && r.tone && r.tone !== "ok" && r.value !== "not checked")
+    .sort((a, b) => RANK[a.tone!] - RANK[b.tone!]);
   if (flags.length) {
     const worst = flags[0]!;
     return { tone: worst.tone!, title: worst.tone === "bad" ? "Code trap" : flags.length === 1 ? "1 code flag" : `${flags.length} code flags`, sub: words(worst.label, SUB) };
@@ -81,8 +83,17 @@ function codeTile(rows: readonly Row[]): Tile {
 
 function otherTile(rows: readonly Row[]): Tile {
   const worst = [...rows].sort((a, b) => RANK[a.tone!] - RANK[b.tone!])[0];
-  if (!worst || worst.tone === "ok") return { tone: "ok", title: "No other flags", sub: `${rows.length} more checks` };
+  if (!worst || worst.tone === "ok") {
+    const holders = rows.find((r) => r.label.startsWith("Top ") && r.label.includes("holders"));
+    if (holders) return { tone: "ok", title: words(holders.label, TITLE), sub: words(gist(holders.value), SUB) };
+    return { tone: "ok", title: "No other flags", sub: `${rows.length} more checks` };
+  }
   return { tone: worst.tone!, title: words(worst.label, TITLE), sub: words(gist(worst.value), SUB) };
+}
+
+function shortTrades(v: string): string {
+  const m = v.match(/([\d,]+)\s+buys?,\s*([\d,]+)\s+sells?/i);
+  return m ? `${m[1]}B / ${m[2]}S` : words(v, 14);
 }
 
 /** The card's facts, or `null` for any report that is not a finished Token Verdict. */
@@ -94,9 +105,17 @@ export function verdictCard(report: Report): VerdictCard | null {
   const trade = report.rows.find((r) => r.label.startsWith("Buy → sell"));
   const rest = report.rows.filter((r) => r.tone && r !== verdict && r !== trade && !labels.has(r.label));
   const red = report.rows.find((r) => r.tone === "bad" && r !== verdict);
-  const figures = report.rows
-    .filter((r) => (r.label.startsWith("Liquidity") || r.label === "Volume 24h") && r.value.startsWith("$"))
-    .map((r) => ({ label: r.label.startsWith("Liquidity") ? "Liquidity" : "Volume 24h", value: r.value.replace(/\.\d+$/, "") }));
+  const pickFig = (match: (r: Row) => boolean, label: string, fmt = (v: string) => v) => {
+    const found = report.rows.find(match);
+    return found ? [{ label, value: fmt(found.value) }] : [];
+  };
+  const figures = [
+    ...pickFig((r) => r.label === "Price" && r.value.startsWith("$"), "Price"),
+    ...pickFig((r) => r.label.startsWith("Liquidity") && r.value.startsWith("$"), "Liquidity", (v) => v.replace(/\.\d+$/, "")),
+    ...pickFig((r) => r.label === "Volume 24h" && r.value.startsWith("$"), "Volume 24h", (v) => v.replace(/\.\d+$/, "")),
+    ...pickFig((r) => r.label === "Trades 24h", "Trades 24h", shortTrades),
+    ...pickFig((r) => r.label === "Pool age", "Pool age"),
+  ].slice(0, 5);
   return {
     token,
     symbol: report.title.split(" — ")[0]!,
@@ -175,16 +194,22 @@ export function VerdictSvg({ c, logo = null, when, block = null }: { c: VerdictC
         </text>
         <Selected x={150} y={346} text={lead} size={c.reason ? 30 : 40} color={red ? KIT.red : KIT.blue} />
 
-        {c.figures.map((f, i) => (
-          <g key={f.label}>
-            <text x={150 + i * 300} y="420" fontFamily={SANS} fontSize="22" fill={KIT.dim}>
-              {f.label}
-            </text>
-            <text x={150 + i * 300} y="458" fontFamily={SANS} fontWeight="800" fontSize="36" fill={KIT.ink}>
-              {f.value}
-            </text>
-          </g>
-        ))}
+        {c.figures.map((f, i) => {
+          const colW = Math.floor(940 / Math.max(2, c.figures.length));
+          const x = 140 + i * colW;
+          const size = c.figures.length >= 5 ? "21" : c.figures.length >= 4 ? "25" : "32";
+          return (
+            <g key={f.label}>
+              <rect x={x} y="388" width={colW - 12} height="82" fill="#ece8df" stroke="#292a31" strokeWidth="2" />
+              <text x={x + 12} y="414" fontFamily={MONO} fontSize="15" fill={KIT.dim}>
+                {f.label}
+              </text>
+              <text x={x + 12} y="454" fontFamily={MONO} fontWeight="700" fontSize={size} fill={KIT.ink}>
+                {f.value}
+              </text>
+            </g>
+          );
+        })}
 
         {c.tiles.map((t, i) => {
           const x = 130 + i * 335;
@@ -195,10 +220,10 @@ export function VerdictSvg({ c, logo = null, when, block = null }: { c: VerdictC
               <text x={x + 46} y={552} textAnchor="middle" fontFamily={SANS} fontWeight="800" fontSize="32" fill="#fff">
                 {MARK[t.tone]}
               </text>
-              <text x={x + 24} y={630} fontFamily={SANS} fontWeight="800" fontSize="34" fill={KIT.ink}>
+              <text x={x + 24} y={626} fontFamily={SANS} fontWeight="800" fontSize="28" fill={KIT.ink}>
                 {t.title}
               </text>
-              <text x={x + 24} y={670} fontFamily={SANS} fontSize="21" fill="#333">
+              <text x={x + 24} y={668} fontFamily={SANS} fontSize="20" fill="#333">
                 {t.sub}
               </text>
             </g>
@@ -234,7 +259,7 @@ export function VerdictSvg({ c, logo = null, when, block = null }: { c: VerdictC
         </text>
       </Win>
 
-      <Footer x={90} y={CARD_H - 34} text={`Check any token free → ${window.location.host}`} />
+      <Footer x={90} y={CARD_H - 34} text={`Check any token free → ${BRAND.domain}`} />
     </svg>
   );
 }

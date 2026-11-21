@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
 import { toChecksumAddress } from "@/lib/address";
 import { short } from "@/skills/format";
-import { analyze, forensicRows, forensics, forensicsSkill, operators, parseLogs, verdictOf, WINDOW, type Findings, type Wallet } from "@/skills/forensics";
+import { analyze, forensicRows, forensics, forensicsSkill, operators, parseLogs, verdictOf, type Findings, type Wallet } from "@/skills/forensics";
 import { FX_VAMP, VAMP, VAMP_LAUNCH_BLOCK } from "./fixtures/forensics";
 import { DOWN, net, useNet, type Answer } from "./net";
 
@@ -137,7 +137,7 @@ describe("the skill", () => {
     expect(report.title).toBe("VAMP — Launch Forensics");
     const by = (l: string) => report.rows.find((r) => r.label === l)!;
     expect(by("Launch").tone).toBe("bad");
-    expect(by("Window").value).toMatch(new RegExp(`^${WINDOW.toLocaleString("en-US")} blocks \\(~60 min\\) from block 52,073,\\d{3}, pool on uniswap vs \\w+ — \\d+ buys$`));
+    expect(by("Window").value).toMatch(/^1,800 blocks \(~60 min\) from block 52,073,\d{3}, pool on uniswap vs \w+ — \d+ buys$/);
     // MEASURED: all but one of the first buyers delegate to the same contract
     expect(by("One operator")).toMatchObject({ tone: "bad", value: expect.stringMatching(/^1[89] of the first 19 buyers share an EIP-7702 delegate, 0x54c6…230A$/) });
     expect(report.sources).toEqual(["Base (Transfer logs on the archive node, wallet code and nonces, balances)", "DexScreener (the pool and its creation time)"]);

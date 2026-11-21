@@ -10,7 +10,7 @@ import { VerifyBody } from "@/pages/Verify";
  */
 export function DocWindow({ id }: { id: DocId }) {
   return (
-    <div className="stack">
+    <div className="stack doc-body">
       {id === "docs" ? <DocsBody /> : id === "api" ? <ApiBody /> : <VerifyBody />}
     </div>
   );

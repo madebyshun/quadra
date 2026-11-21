@@ -126,7 +126,7 @@ async function relayQuote(sell: string, buy: string, amount: bigint): Promise<{ 
       destinationCurrency: buy,
       amount: amount.toString(),
       tradeType: "EXACT_INPUT",
-      slippageTolerance: "500",
+      slippageTolerance: "1500",
     }),
   });
   const steps = stepsOf(body);
@@ -154,13 +154,23 @@ export function parseSimulation(result: unknown): SimCall[] {
 }
 
 /** Run `txs` from `SIM_ACCOUNT`, given 10 ETH for the block, with transfers traced. */
-export async function simulate(txs: readonly SimTx[]): Promise<SimCall[]> {
+async function simulateAt(txs: readonly SimTx[], blockTag = "latest"): Promise<{ readonly calls: SimCall[]; readonly block: string | null }> {
   const calls = txs.map((t) => ({ from: SIM_ACCOUNT, to: t.to, data: t.data, value: `0x${t.value.toString(16)}` }));
-  const result = await rpc("eth_simulateV1", [
-    { blockStateCalls: [{ stateOverrides: { [SIM_ACCOUNT]: { balance: `0x${(10n ** 19n).toString(16)}` } }, calls }], traceTransfers: true },
-    "latest",
-  ]);
-  return parseSimulation(result);
+  const payload = { blockStateCalls: [{ stateOverrides: { [SIM_ACCOUNT]: { balance: `0x${(10n ** 19n).toString(16)}` } }, calls }], traceTransfers: true };
+  let result: unknown;
+  try {
+    result = await rpc("eth_simulateV1", [payload, blockTag]);
+  } catch (e) {
+    if (blockTag === "latest") throw e;
+    result = await rpc("eth_simulateV1", [payload, "latest"]);
+  }
+  const first = listOf(result)[0];
+  const num = isObj(first) ? strOf(first.number) : null;
+  return { calls: parseSimulation(result), block: num && /^0x[0-9a-fA-F]+$/.test(num) ? num : null };
+}
+
+export async function simulate(txs: readonly SimTx[], blockTag = "latest"): Promise<SimCall[]> {
+  return (await simulateAt(txs, blockTag)).calls;
 }
 
 const pad = (a: string) => `0x${a.slice(2).toLowerCase().padStart(64, "0")}`;
@@ -193,7 +203,10 @@ export async function roundTrip(token: string, route: Router = relayQuote): Prom
   } catch (e) {
     return { kind: "no-route", side: "buy", why: (e as Error).message };
   }
-  const bought = await simulate(buy.steps);
+  // Pin the exact block where buy ran so transfer and sell see the identical pool state (prevents 200ms Base block drift)
+  const buySim = await simulateAt(buy.steps);
+  const bought = buySim.calls;
+  const pin = buySim.block ?? "latest";
   const buyFail = failed(bought);
   if (buyFail) return { kind: "buy-reverted", reason: buyFail.reason };
   const received = arrived(bought, token, SIM_ACCOUNT);
@@ -202,7 +215,7 @@ export async function roundTrip(token: string, route: Router = relayQuote): Prom
   const half = received / 2n;
   let transfer: Transfer = { kind: "not-run" };
   if (half > 0n) {
-    const moved = await simulate([...buy.steps, { to: token, data: transferData(PROBE_ACCOUNT, half), value: 0n }]);
+    const moved = await simulate([...buy.steps, { to: token, data: transferData(PROBE_ACCOUNT, half), value: 0n }], pin);
     const last = moved[moved.length - 1]!;
     transfer = last.ok ? { kind: "ok", arrived: Number(arrived([last], token, PROBE_ACCOUNT)) / Number(half) } : { kind: "reverted", reason: last.reason };
   }
@@ -213,7 +226,7 @@ export async function roundTrip(token: string, route: Router = relayQuote): Prom
   } catch (e) {
     return { kind: "no-route", side: "sell", why: (e as Error).message };
   }
-  const traded = await simulate([...buy.steps, ...sell.steps]);
+  const traded = await simulate([...buy.steps, ...sell.steps], pin);
   const sold = traded.slice(buy.steps.length);
   const sellFail = failed(sold);
   if (sellFail) {
@@ -221,7 +234,7 @@ export async function roundTrip(token: string, route: Router = relayQuote): Prom
     let halfSold: boolean | null = null;
     try {
       const part = await route(token, NATIVE, received / 2n);
-      halfSold = failed((await simulate([...buy.steps, ...part.steps])).slice(buy.steps.length)) === null;
+      halfSold = failed((await simulate([...buy.steps, ...part.steps], pin)).slice(buy.steps.length)) === null;
     } catch {
       halfSold = null;
     }

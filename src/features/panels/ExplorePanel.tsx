@@ -25,7 +25,7 @@ function Glyph() {
 
 function Logo({ src }: { src: string }) {
   const [failed, setFailed] = useState(false);
-  if (failed) return <Glyph />;
+  if (!src || failed) return <Glyph />;
   return <img className="explore__logo" src={src} alt="" width={32} height={32} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
 }
 

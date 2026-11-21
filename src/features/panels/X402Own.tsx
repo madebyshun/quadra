@@ -36,18 +36,28 @@ export function X402Own(props: Props) {
   const [id, setId] = useState(SKILLS[0]!.id);
   const [args, setArgs] = useState<string[]>([]);
   const [target, setTarget] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const skill = SKILLS.find((s) => s.id === id)!;
   const missing = skill.args.find((a, i) => !a.optional && (args[i] ?? "").trim() === "");
+  const previewUrl = ownApiUrl(location.origin, id, args);
 
   const pick = (next: string) => {
     setId(next);
     setArgs([]);
     setTarget(null);
+    setCopied(false);
+  };
+
+  const copyUrl = () => {
+    void navigator.clipboard?.writeText(previewUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
   };
 
   return (
     <>
-      <fieldset className="group">
+      <fieldset className="group x402__card">
         <legend>{BRAND.name}&apos;s own tools</legend>
         <label className="group__row">
           <span>Tool</span>
@@ -77,15 +87,22 @@ export function X402Own(props: Props) {
             />
           </label>
         ))}
+        <div className="x402__endpoint">
+          <code className="mono">{`GET ${API_PATH}/${id}`}</code>
+          <button type="button" className="chip chip--mode" onClick={copyUrl}>
+            {copied ? "Copied" : "Copy URL"}
+          </button>
+        </div>
         <div className="group__row group__row--actions">
-          <Gel onClick={() => setTarget(ownApiUrl(location.origin, id, args))} disabled={missing !== undefined}>
+          <Gel onClick={() => setTarget(previewUrl)} disabled={missing !== undefined}>
             {missing ? `Enter the ${missing.name}` : "Read price"}
           </Gel>
+          <span className="chip">{formatAmount(priceOf(id), USDC.decimals)} USDC / call</span>
         </div>
         <p className="dim">
           This one costs about {formatAmount(priceOf(id), USDC.decimals)} USDC a call, paid to {BRAND.name}&apos;s fee address on Base. The price
           you sign is the one {BRAND.name}&apos;s API states when asked; a call that fails is not charged. The same tools are free in the
-          Research and Safety windows — this is how an agent, or anyone outside this page, pays for them.
+          Check and Research windows — this is how an agent, or anyone outside this page, pays for them.
         </p>
       </fieldset>
       {target ? <X402Url key={target} fixedUrl={target} {...props} /> : null}

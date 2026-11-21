@@ -35,11 +35,11 @@ describe("the desktop", () => {
     }
   });
 
-  it("puts the four doors, Agents and My Computer on the desktop, and the Trash in its corner", async () => {
+  it("puts Markets, Send, Swap, Check, Weekend, Coins, Launch, Wallet, Agents and My Computer on the desktop, and the Trash in its corner", async () => {
     renderAt("/");
     const cards = within(screen.getByLabelText("What you can do")).getAllByRole("button");
     expect(cards.map((c) => c.querySelector(".icon__title")!.textContent)).toEqual(desktopItems().map((e) => e.title));
-    expect(cards.map((c) => c.querySelector(".icon__title")!.textContent)).toEqual(["Check", "Coins", "Launch", "Wallet", "Agents", "My Computer"]);
+    expect(cards.map((c) => c.querySelector(".icon__title")!.textContent)).toEqual(["Markets", "Send", "Swap", "Check", "Weekend", "Coins", "Launch", "Wallet", "Agents", "My Computer"]);
     expect(FEATURES.length - visibleFeatures().length).toBe(1);
     expect(screen.queryByRole("button", { name: /^Bridge/ })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Read about it")).not.toBeInTheDocument();
@@ -56,22 +56,22 @@ describe("the desktop", () => {
   it("opens a folder as an Explorer window: one click selects, a double click or Enter opens", async () => {
     const user = userEvent.setup();
     renderAt("/");
-    // the desktop's My Computer holds the other folders: open it, then Money inside it
+    // the desktop's My Computer holds the other folders: open it, then Research inside it
     await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^My Computer/ }));
-    await user.dblClick(within(screen.getByRole("list", { name: "My Computer" })).getByRole("button", { name: "Money" }));
-    const folder = screen.getByRole("list", { name: "Money" });
-    const win = windowFrame("Money");
-    expect(within(win).getByRole("status")).toHaveTextContent("4 objects");
-    const send = within(folder).getByRole("button", { name: "Send" });
-    await user.click(send);
-    expect(send).toHaveAttribute("aria-pressed", "true");
-    expect(within(win).getByRole("status")).toHaveTextContent("Send — pay any address or Basename");
-    expect(screen.queryByLabelText("Send", { selector: "section" })).not.toBeInTheDocument();
-    await user.dblClick(send);
-    expect(windowFrame("Send")).toBeInTheDocument();
-    within(folder).getByRole("button", { name: "Swap" }).focus();
+    await user.dblClick(within(screen.getByRole("list", { name: "My Computer" })).getByRole("button", { name: "Research" }));
+    const folder = screen.getByRole("list", { name: "Research" });
+    const win = windowFrame("Research");
+    expect(within(win).getByRole("status")).toHaveTextContent("3 objects");
+    const radar = within(folder).getByRole("button", { name: "Radar" });
+    await user.click(radar);
+    expect(radar).toHaveAttribute("aria-pressed", "true");
+    expect(within(win).getByRole("status")).toHaveTextContent("Radar — new launches, stock loans, trade depth");
+    expect(screen.queryByLabelText("Radar · Collateral · Depth", { selector: "section" })).not.toBeInTheDocument();
+    await user.dblClick(radar);
+    expect(windowFrame("Radar · Collateral · Depth")).toBeInTheDocument();
+    within(folder).getByRole("button", { name: "Profile" }).focus();
     await user.keyboard("{Enter}");
-    expect(windowFrame("Swap")).toBeInTheDocument();
+    expect(windowFrame("Profile")).toBeInTheDocument();
   });
 
   it("files every folder's programs where the folder says, each one openable", async () => {

@@ -86,7 +86,7 @@ describe("the wallet's assets", () => {
     await settle();
     await userEvent.click(rows("Yours")[0]!);
     await userEvent.click(rows("Yours")[1]!);
-    expect(onPick.mock.calls).toEqual([[null], [CBETH]]);
+    expect(onPick.mock.calls).toEqual([[null, "ETH"], [CBETH, "CBETH"]]);
   });
 
   it("shows ETH without a dollar value when there is no ETH price, and ETH alone when Blockscout is down", async () => {

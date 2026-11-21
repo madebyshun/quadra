@@ -45,10 +45,9 @@
 .home__brand-link { display: flex; align-items: center; gap: 12px; text-transform: lowercase; color: #2422cf; }
 .home__brand-link img { width: 40px; height: 40px; border: 0; background: transparent; padding: 0; }
 .home__tagline { border: 0; box-shadow: none; padding: 0; background: transparent; color: #171b29; font-size: 12.5px; max-width: 400px; line-height: 1.5; margin: 0; }
-.workspace { grid-area: tools; align-self: start; width: 232px; padding: 0; background: none; border: 0; box-shadow: none; }
-.home .icon-field { position: static; display: block; max-height: none; padding: 0; }
-.home .icons, .workspace__pinned { display: grid; grid-template-columns: repeat(2,104px); gap: 20px 24px; margin: 0; padding: 0; }
-.workspace__pinned { margin-top: 20px; }
+.workspace { grid-area: tools; align-self: start; width: 356px; display: grid; grid-template-columns: repeat(3,104px); gap: 18px 22px; padding: 0; background: none; border: 0; box-shadow: none; }
+.home .icon-field, .home .icons, .workspace__pinned { display: contents; margin: 0; padding: 0; }
+.home .icons > li { list-style: none; margin: 0; padding: 0; }
 .home .icon { width: 104px; min-height: 88px; padding: 8px 2px; gap: 6px; background: transparent; border: 0; align-content: start; text-decoration: none; transition: transform 140ms ease; }
 .home .icon:hover { transform: translateY(-2px); }
 .home .icon__glyph { width: 44px; height: 44px; color: #161822; filter: drop-shadow(0 4px 8px rgba(14, 30, 64, 0.28)); }
@@ -164,9 +163,7 @@
 @media(max-width:650px) {
   .desktop { padding: calc(var(--menubar-h) + 16px) 16px 20px; }
   .home { min-height: calc(100dvh - var(--menubar-h) - 36px); grid-template-columns: 1fr; grid-template-rows: auto auto 1fr auto; grid-template-areas: "tools" "files" "brand" "trash"; gap: 24px; }
-  .workspace { width: 100%; }
-  .home .icons, .workspace__pinned { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px 6px; }
-  .workspace__pinned { margin-top: 12px; }
+  .workspace { width: 100%; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px 6px; }
   .home .icon { width: 100%; min-height: 88px; }
   .home__links { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px 6px; padding-bottom: 0; }
   .home__head { padding-top: 12px; }
@@ -182,9 +179,8 @@
 @media(min-width:1600px) {
   .desktop { padding: calc(var(--menubar-h) + 32px) 32px 28px; }
   .home { min-height: calc(100dvh - var(--menubar-h) - 60px); }
-  .home .icons, .workspace__pinned { gap: 28px 28px; }
-  .home__links { gap: 28px; }
-  .workspace__pinned { margin-top: 28px; }
+  .workspace { gap: 24px 26px; width: 364px; }
+  .home__links { gap: 24px; }
   .home .icon .icon__title { font-size: 13px; line-height: 18px; }
 }
 @media(pointer:coarse) { .gel { min-height: 36px; } }
@@ -265,3 +261,466 @@ html:has(.intro), body:has(.intro) { overflow: hidden; }
 .coins__results > li { padding: 14px 12px; }
 .coins__results .notes__why { margin-top: 6px; line-height: 1.5; }
 @media (max-width: 600px) { .readme__jobs { grid-template-columns: 1fr; } }
+
+
+/* Quadra visual polish for Check, Research & x402 cards */
+.report {
+  border: 1.5px solid #292a31;
+  background: #fffdf6;
+  padding: 12px 14px;
+  box-shadow: 3px 3px 0 #17243a24;
+}
+.report__title {
+  margin: 0 0 10px;
+  padding-bottom: 7px;
+  border-bottom: 2px solid #0a3dff;
+  font: 700 15px/1.2 Georgia, serif;
+  color: #0a3dff;
+  letter-spacing: -0.02em;
+}
+.report__row {
+  padding: 5px 8px;
+  border-left: 3px solid transparent;
+}
+.report__row:nth-child(odd) {
+  background: #f4f0e6;
+}
+.report__sources {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #d4cfc3;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+.x402__card {
+  border: 1.5px solid #292a31;
+  background: #fffdf6;
+  box-shadow: 3px 3px 0 #17243a24;
+}
+.x402__card > legend {
+  padding: 0 6px;
+  font: 700 13px/1 Georgia, serif;
+  color: #0a3dff;
+}
+.x402__endpoint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border: 1px solid #bab6ae;
+  background: #f4f0e6;
+}
+.x402__endpoint code {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: #171b29;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Markets rebuild — Blue Agent Markets structure in Quadra Platinum + Base cobalt visual */
+.mk__hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1.5px solid #171b29;
+  background: #0a3dff;
+  color: #fffdf6;
+  box-shadow: 3px 3px 0 #17243a33;
+}
+.mk__eyebrow {
+  margin: 0 0 4px;
+  font: 600 10px/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 253, 246, 0.8);
+}
+.mk__title {
+  margin: 0;
+  font: 700 22px/1.1 Georgia, serif;
+  letter-spacing: -0.03em;
+  color: #fffdf6;
+}
+.mk__sub {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: rgba(255, 253, 246, 0.88);
+}
+.mk__kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(84px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.mk__kpi {
+  padding: 6px 10px;
+  background: rgba(244, 240, 230, 0.14);
+  border: 1px solid rgba(255, 253, 246, 0.28);
+}
+.mk__kpi dt {
+  font: 500 9.5px/1.2 var(--font-mono);
+  text-transform: uppercase;
+  color: rgba(255, 253, 246, 0.78);
+}
+.mk__kpi dd {
+  margin: 3px 0 0;
+  font: 700 15px/1.1 var(--font-mono);
+  color: #fffdf6;
+}
+.mk__strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 6px 10px;
+  border: 1px solid #bab6ae;
+  background: #fffdf6;
+}
+.mk__strip-tag {
+  flex: none;
+  font: 700 10px/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  color: #0a3dff;
+  text-transform: uppercase;
+}
+.mk__pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid #d4cfc3;
+  background: #f4f0e6;
+  color: #171b29;
+  font: 11.5px/1 var(--font-mono);
+  cursor: pointer;
+}
+.mk__pill:hover,
+.mk__pill[aria-pressed="true"] {
+  border-color: #0a3dff;
+  background: #e4e2ff;
+}
+.mk__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.mk__search {
+  margin-left: auto;
+  width: min(220px, 100%);
+}
+.mk__table-wrap {
+  overflow-x: auto;
+  border: 1.5px solid #292a31;
+  background: #fffdf6;
+  box-shadow: 2px 2px 0 #17243a1f;
+}
+.mk__table {
+  width: 100%;
+  min-width: 660px;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+.mk__table th {
+  padding: 7px 10px;
+  border-bottom: 1.5px solid #292a31;
+  background: #ece8df;
+  font: 600 10px/1 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #49463f;
+  text-align: left;
+  white-space: nowrap;
+}
+.mk__table th.num,
+.mk__table td.num {
+  text-align: right;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.mk__sort {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.mk__sort:hover {
+  color: #0a3dff;
+}
+.mk__table tbody tr {
+  border-bottom: 1px solid #e4e0d7;
+  cursor: pointer;
+}
+.mk__table tbody tr:hover {
+  background: #f4f0e6;
+}
+.mk__table tbody tr[aria-selected="true"] {
+  background: #e4e2ff;
+}
+.mk__table td {
+  padding: 7px 10px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.mk__asset {
+  display: grid;
+  gap: 2px;
+  min-width: 140px;
+}
+.mk__asset small {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mk__asset-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.mk__tag {
+  flex: none;
+  padding: 1px 5px;
+  border: 1px solid #0a3dff;
+  color: #0a3dff;
+  font: 700 9px/1.1 var(--font-mono);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.mk__chg-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  white-space: nowrap;
+}
+.mk__actions {
+  display: inline-flex;
+  gap: 4px;
+  white-space: nowrap;
+}
+.mk__dir-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+.mk__dir-head h3 {
+  margin: 0;
+  font: 700 13px/1.2 Georgia, serif;
+  color: #0a3dff;
+}
+.mk__more {
+  display: flex;
+  justify-content: center;
+  padding: 8px;
+  border-top: 1px solid #e4e0d7;
+  background: #f4f0e6;
+}
+.swap__est {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid #bab6ae;
+  background: #fffdf6;
+  font: 12px/1.2 var(--font-mono);
+}
+.swap__est strong {
+  color: #0a3dff;
+}
+.mk__detail {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1.5px solid #292a31;
+  background: #fffdf6;
+  box-shadow: 3px 3px 0 #17243a24;
+}
+.mk__detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #d4cfc3;
+}
+.mk__detail-title {
+  margin: 0;
+  font: 700 18px/1.1 Georgia, serif;
+  color: #0a3dff;
+}
+.mk__drift {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #bab6ae;
+  background: #f4f0e6;
+  font: 11.5px/1.3 var(--font-mono);
+}
+.up { color: var(--ok); }
+.down { color: var(--bad); }
+
+/* Trade panel — landscape 2-column Markets ticket */
+.trade__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+  gap: 14px;
+  align-items: start;
+}
+.trade__browser,
+.trade__ticket {
+  min-width: 0;
+}
+.trade__table-box {
+  border: 1.5px solid #292a31;
+  background: #fffdf6;
+  box-shadow: 2px 2px 0 #17243a1f;
+  overflow: hidden;
+}
+.trade__head {
+  display: grid;
+  grid-template-columns: minmax(70px, auto) minmax(0, 1fr) auto auto;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1.5px solid #292a31;
+  background: #ece8df;
+  font: 600 10px/1 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #49463f;
+}
+.trade__head .num {
+  text-align: right;
+}
+.trade__table-box .trade__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 380px;
+  overflow-y: auto;
+  border: 0;
+}
+.trade__table-box .trade__row {
+  display: grid;
+  grid-template-columns: minmax(70px, auto) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid #e4e0d7;
+  background: transparent;
+  color: #171b29;
+  text-align: left;
+  cursor: pointer;
+}
+.trade__table-box .trade__row:hover {
+  background: #f4f0e6;
+}
+.trade__table-box .trade__row[aria-pressed="true"] {
+  background: #e4e2ff;
+  box-shadow: inset 3px 0 0 #0a3dff;
+}
+.trade__ticket .trade__pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #d4cfc3;
+}
+.mk__detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  gap: 14px;
+  align-items: start;
+}
+.mk__trade-box {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #bab6ae;
+  background: #f4f0e6;
+}
+.mk__trade-title {
+  margin: 0;
+  font: 700 13px/1.2 Georgia, serif;
+  color: #0a3dff;
+}
+@media (max-width: 780px) {
+  .trade__grid,
+  .mk__detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Documentation window spacing & breathing room */
+.doc-body {
+  gap: 14px;
+  padding: 4px 6px 12px;
+}
+.doc-body .group {
+  padding: 14px 16px 16px;
+}
+.doc-body .group > legend {
+  padding: 0 8px;
+  font-weight: 700;
+}
+.doc-body .panel__lede {
+  margin: 0;
+  line-height: 1.65;
+}
+.doc-body .notes {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.doc-body .notes > li {
+  padding: 10px 12px;
+  line-height: 1.6;
+  background: #fffdf6;
+  border: 1px solid #d4cfc3;
+}
+.doc-body .notes__row {
+  gap: 10px;
+}
+.doc-body .notes__why {
+  margin-top: 4px;
+  line-height: 1.55;
+}
+
+/* Completed Send / Swap receipt box & non-overlapping CTA */
+.mf__cta--static {
+  position: static;
+}
+.tx__result .tx {
+  border: 1.5px solid #1d7a2e;
+  background: #f3fbf4;
+  box-shadow: 2px 2px 0 #17243a1a;
+}
+.tx__result p {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #bab6ae;
+  background: #fffdf6;
+}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useInbox } from "@/features/openWindow";
 import { transfersOf } from "@/skills/profile";
 import { historyOf, historyRow } from "@/skills/sendcheck";
@@ -105,6 +105,7 @@ export function SendPanel() {
   const { wallet, signingProvider } = useWalletSession();
   const [choice, setChoice] = useState<Choice>("ETH");
   const [token, setToken] = useState("");
+  const [pickedSymbol, setPickedSymbol] = useState<string | null>(null);
   const [to, setTo] = useState("");
   const [amount, setAmount] = useState("");
   const [review, setReview] = useState<Review | null>(null);
@@ -146,10 +147,11 @@ export function SendPanel() {
   };
 
   /** A token picked from the wallet list: the known ones by name, anything else by address. */
-  const pick = (address: string | null) => {
+  const pick = (address: string | null, symbol?: string) => {
     const c = choiceFor(address);
     edit((v) => setChoice(v as Choice))(c);
     setToken(c === "other" ? address! : "");
+    setPickedSymbol(c === "other" ? (symbol ?? null) : null);
     // an amount typed for the old token means nothing for the new one
     setAmount("");
   };
@@ -172,6 +174,10 @@ export function SendPanel() {
   };
 
   const done = steps.states.length > 0;
+  const statusRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (done) statusRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+  }, [done, steps.states]);
 
   return (
     <div className="stack">
@@ -182,8 +188,15 @@ export function SendPanel() {
           label="Token"
           choice={choice}
           address={token}
-          onChoice={(c) => edit((v) => setChoice(v as Choice))(c)}
-          onAddress={edit(setToken)}
+          customLabel={pickedSymbol}
+          onChoice={(c) => {
+            if (c !== "other") setPickedSymbol(null);
+            edit((v) => setChoice(v as Choice))(c);
+          }}
+          onAddress={(a) => {
+            setPickedSymbol(null);
+            edit(setToken)(a);
+          }}
         />
         <label className="group__row">
           <span>To</span>
@@ -196,6 +209,18 @@ export function SendPanel() {
         <PercentButtons onPick={(p) => void fill(p)} pending={pending} disabled={!ready || (choice === "other" && token.trim() === "")} />
       </fieldset>
 
+      {done ? (
+        <div ref={statusRef} className="stack tx__result">
+          <TxStepList states={steps.states} label="Send progress" />
+        </div>
+      ) : null}
+
+      {error ? (
+        <Crt label="Send error">
+          <span className="crt__amber">{error}</span>
+        </Crt>
+      ) : null}
+
       {review === null ? (
         <Gel className="mf__cta" onClick={() => void onReview()} disabled={blocker !== null || reading}>
           {reading ? "Reading…" : (blocker ?? "Review")}
@@ -203,18 +228,11 @@ export function SendPanel() {
       ) : (
         <>
           <ReportView report={review.report} />
-          <Gel className="mf__cta" onClick={() => void onSend()} disabled={review.blocked !== null || steps.running || done}>
+          <Gel className={done ? "mf__cta mf__cta--static" : "mf__cta"} onClick={() => void onSend()} disabled={review.blocked !== null || steps.running || done}>
             {review.blocked ?? (done ? "Sent — edit a field to send again" : "Send in wallet")}
           </Gel>
         </>
       )}
-
-      {error ? (
-        <Crt label="Send error">
-          <span className="crt__amber">{error}</span>
-        </Crt>
-      ) : null}
-      <TxStepList states={steps.states} label="Send progress" />
     </div>
   );
 }

@@ -51,6 +51,8 @@ export type Markets = {
   readonly symbols: readonly string[];
   /** every stock Coinbase lists on Base, for "add a Base stock" */
   readonly baseSymbols: readonly string[];
+  /** full Coinbase tokenized stock catalog on Base (with name, address, NAV) */
+  readonly baseCatalog: readonly BaseStock[];
   readonly updatedAt: Date | null;
   readonly focus: string | null;
   /** from the desktop: select an asset and open the Markets window on it */
@@ -234,6 +236,7 @@ export function MarketsProvider({ children, onOpen }: { children: ReactNode; onO
       rows,
       symbols: quotes ? [...quotes.keys()].sort() : [],
       baseSymbols: stocksOnBase ? [...stocksOnBase.keys()].sort() : [],
+      baseCatalog: stocksOnBase ? [...stocksOnBase.values()].sort((a, b) => a.symbol.localeCompare(b.symbol)) : [],
       updatedAt,
       focus,
       pick: (key) => {

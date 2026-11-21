@@ -58,9 +58,13 @@ export async function rpc(method: string, params: readonly unknown[] = []): Prom
 /** HTTP statuses that are ONE endpoint's limit rather than the chain's answer: the next endpoint is asked. */
 export const ENDPOINT_LIMITS: ReadonlySet<number> = new Set([400, 403, 413, 429]);
 
+/** JSON-RPC error messages that indicate an endpoint's own range/rate/archive limit rather than a chain revert. */
+const RPC_LIMIT_MSG = /limit|range|too large|too many|invalid params|archive|pruned|exceed|rate|distance|timeout/i;
+
 export async function rpcOn(chain: string, endpoints: readonly string[], method: string, params: readonly unknown[]): Promise<unknown> {
   let last = `The ${chain} RPC could not be reached for ${method}.`;
-  for (const endpoint of endpoints) {
+  for (let i = 0; i < endpoints.length; i++) {
+    const endpoint = endpoints[i]!;
     let res: Response;
     try {
       res = await fetch(endpoint, {
@@ -71,14 +75,18 @@ export async function rpcOn(chain: string, endpoints: readonly string[], method:
     } catch {
       continue;
     }
-    if (res.ok) return readRpc(chain, method, (await res.json()) as RpcBody);
+    if (res.ok) {
+      try {
+        return readRpc(chain, method, (await res.json()) as RpcBody);
+      } catch (e) {
+        if (e instanceof RpcRefusal && i < endpoints.length - 1 && RPC_LIMIT_MSG.test(e.said)) {
+          last = e.message;
+          continue;
+        }
+        throw e;
+      }
+    }
     last = `The ${chain} RPC answered ${res.status} to ${method}.`;
-    // 403: MEASURED 2026-10-14 — publicnode refuses archive-backed methods such as
-    // eth_getTransactionReceipt with HTTP 403 ("requires a personal token") while mainnet.base.org
-    // answers; the refusal is the endpoint's, not the chain's, so the next endpoint is asked
-    // 400: MEASURED 2026-11-04 — Alchemy's free tier answers eth_getLogs over more than 10 blocks with
-    // HTTP 400, and the indexer on Vercel stopped dead on it; that too is one endpoint's limit, not the chain's
-    // 413: MEASURED the same day, when the index reached block 52,780,272 — a payload limit, again one endpoint's
     if (!ENDPOINT_LIMITS.has(res.status) && res.status < 500) break;
   }
   throw new Error(last);

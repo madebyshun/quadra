@@ -5,7 +5,7 @@ import { OpenWindowProvider } from "@/features/openWindow";
 import { Desktop } from "@/features/Desktop";
 import { FeaturePanel } from "@/features/FeaturePanel";
 import { DocWindow } from "@/features/DocWindow";
-import { resolveDoc, resolveFeature, windowTitle, type WindowId } from "@/features/registry";
+import { comingSoon, folderItems, isFolder, resolveDoc, resolveFeature, windowTitle, type WindowId } from "@/features/registry";
 import { Window } from "@/ui/Window";
 import { Taskbar } from "@/ui/Taskbar";
 import { Docs } from "@/pages/Docs";
@@ -77,26 +77,40 @@ const TALL_PANELS: ReadonlySet<WindowId> = new Set<WindowId>([
  * the Base card measured 452px wide at the default width, the card itself a thumbnail). Still never
  * wider than the viewport allows.
  */
-export const WIDE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["card", "coins", "launch", "readme"]);
+export const WIDE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["card", "coins", "launch", "readme", "markets", "trade"]);
+export const LANDSCAPE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["markets", "trade"]);
 export const WIDE_WIDTH = 760;
+export const LANDSCAPE_WIDTH = 920;
+
+function compactFolderHeight(id: WindowId): number | null {
+  if (!isFolder(id) && id !== "soon") return null;
+  const count = id === "soon" ? comingSoon().length : folderItems(id).length;
+  const rows = Math.max(1, Math.ceil(count / 4));
+  return Math.min(DEFAULT_HEIGHT, 180 + rows * 96);
+}
 
 function openAction(id: WindowId): { type: "open"; id: WindowId; origin: Origin; height: number } {
   const tall = TALL_PANELS.has(id);
+  const folderH = compactFolderHeight(id);
   /**
    * A tall panel never opens SHORTER than an ordinary one. `pageHeight` fits prose to the
    * viewport (innerHeight − 120), and on a 673px viewport that is 553 — below
    * `DEFAULT_HEIGHT`, so "tall" measured shorter than the panel height it was meant to beat.
    * Prose may shrink to fit; a workbench keeps at least the room every panel gets.
+   * Sparse folders open compactly to fit their icon rows without a huge blank tail.
    */
   const height = resolveDoc(id) !== null
     ? pageHeight(window.innerHeight)
-    : tall
-      ? Math.max(DEFAULT_HEIGHT, pageHeight(window.innerHeight))
-      : DEFAULT_HEIGHT;
+    : folderH !== null
+      ? Math.min(folderH, pageHeight(window.innerHeight))
+      : tall
+        ? Math.max(DEFAULT_HEIGHT, pageHeight(window.innerHeight))
+        : DEFAULT_HEIGHT;
   const origin = centeredOrigin(window.innerWidth, window.innerHeight, height);
   if (!WIDE_PANELS.has(id)) return { type: "open", id, origin, height };
+  const targetWidth = LANDSCAPE_PANELS.has(id) ? LANDSCAPE_WIDTH : WIDE_WIDTH;
   // centeredOrigin always fits a width to the viewport; a wide window takes more of it, never less
-  const width = Math.max(origin.width!, Math.min(WIDE_WIDTH, window.innerWidth - 16));
+  const width = Math.max(origin.width!, Math.min(targetWidth, window.innerWidth - 16));
   const x = Math.max(8, Math.round((window.innerWidth - width) / 2));
   return { type: "open", id, origin: { ...origin, x, width, maxX: Math.max(x, window.innerWidth - 8 - width) }, height };
 }

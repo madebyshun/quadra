@@ -5,7 +5,7 @@ import { portraitOf, PIXELS } from "@/lib/cardArt";
 import { cardWords, compact, ships, type CardWords } from "@/lib/cardWords";
 import { dataUrl, lookupWords, parseHandle, pictureData, xProfile, type XUser } from "@/skills/xprofile";
 import { useInbox } from "@/features/openWindow";
-import { DotsPattern, HalftoneSky } from "@/features/panels/cardKit";
+import { DotsPattern, HalftoneSky, KIT, QuadraMark, SERIF } from "@/features/panels/cardKit";
 import "./BaseCard.css";
 
 /**
@@ -139,7 +139,6 @@ export function cellFor(lines: readonly string[], width: number, most: number): 
 const INK = "#000";
 const UI = "Verdana, Tahoma, 'Segoe UI', sans-serif";
 const MONO = "'Courier New', Courier, monospace";
-const FRAME_FACE = "#dddddd";
 
 /** The picture frame: picture at 130,180, 400×400. */
 const PX = 130;
@@ -281,21 +280,21 @@ const MENU: readonly (readonly [string, number])[] = [BRAND.name, "File", "Edit"
   [],
 );
 
-/** The striped title bar of a window of the era: lines either side of a white gap that holds the title. */
+/** The striped title bar of a warm-Platinum Macintosh window: grooves either side of the centred title. */
 function TitleBar({ x, y, w, title }: { x: number; y: number; w: number; title: string }) {
-  const label = Math.min(w - 160, title.length * 17 + 40);
+  const label = Math.min(w - 160, title.length * 17 + 48);
   const mid = x + w / 2;
   return (
     <g shapeRendering="crispEdges">
-      <rect x={x} y={y} width={w} height="44" fill="#fff" />
+      <rect x={x} y={y} width={w} height="44" fill={KIT.chrome} />
       {[8, 14, 20, 26, 32].map((dy) => (
-        <rect key={dy} x={x + 8} y={y + dy} width={w - 16} height="3" fill={INK} />
+        <rect key={dy} x={x + 10} y={y + dy} width={w - 20} height="2" fill={KIT.chromeDark} />
       ))}
-      <rect x={mid - label / 2} y={y + 4} width={label} height="36" fill="#fff" />
-      <rect x={x + 24} y={y + 10} width="24" height="24" fill="#fff" stroke={INK} strokeWidth="3" />
-      <rect x={x + w - 48} y={y + 10} width="24" height="24" fill="#fff" stroke={INK} strokeWidth="3" />
-      <rect x={x + w - 48} y={y + 10} width="14" height="14" fill="none" stroke={INK} strokeWidth="3" />
-      <text x={mid} y={y + 31} textAnchor="middle" fontFamily={UI} fontWeight="bold" fontSize="26" fill={INK} {...fit(title, 26, label - 24, 0.66)}>
+      <rect x={mid - label / 2} y={y + 4} width={label} height="36" fill={KIT.chrome} />
+      <rect x={x + 22} y={y + 10} width="24" height="24" fill={KIT.paper} stroke={INK} strokeWidth="3" />
+      <rect x={x + w - 46} y={y + 10} width="24" height="24" fill={KIT.paper} stroke={INK} strokeWidth="3" />
+      <rect x={x + w - 46} y={y + 10} width="14" height="14" fill="none" stroke={INK} strokeWidth="3" />
+      <text x={mid} y={y + 30} textAnchor="middle" fontFamily={MONO} fontWeight="bold" fontSize="24" fill={KIT.ink} {...fit(title, 24, label - 24, 0.64)}>
         {title}
       </text>
       <rect x={x} y={y + 44} width={w} height="3" fill={INK} />
@@ -308,8 +307,8 @@ export function CardSvg({ user, words, picture }: { user: XUser; words: CardWord
   const facts1 = factLine(user);
   const quote = wrap(words.quote, 40, 3);
   // the balloon grows with the quote: 1 to 3 lines
-  const top = 586;
-  const bottom = top + 34 + quote.length * 48;
+  const top = 582;
+  const bottom = top + 36 + quote.length * 48;
   const caption = `@${user.handle}`;
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${CARD_W} ${CARD_H}`} width={CARD_W} height={CARD_H} role="img" aria-label={`Base card for ${name}`}>
@@ -320,44 +319,46 @@ export function CardSvg({ user, words, picture }: { user: XUser; words: CardWord
         <DotsPattern />
       </defs>
 
-      {/* 2026-11-12: the share cards' sky — halftone clouds (panels/cardKit.tsx) */}
+      {/* Quadra's Base cobalt (#0A3DFF) sky with 45° white halftone clouds */}
       <HalftoneSky w={CARD_W} h={CARD_H} />
 
-      {/* the menu bar across the top, the chain's label on its right */}
+      {/* Warm-Platinum System 7 menu bar with QuadraMark on the left and BASE 8453 badge on the right */}
       <g shapeRendering="crispEdges">
-        <rect width={CARD_W} height="48" fill="#fff" />
-        <rect y="48" width={CARD_W} height="3" fill={INK} />
-        <text y="33" fontFamily={UI} fontWeight="bold" fontSize="24" fill={INK}>
+        <rect width={CARD_W} height="50" fill={KIT.chrome} />
+        <rect y="50" width={CARD_W} height="3" fill={INK} />
+        <QuadraMark x={14} y={8} size={34} />
+        <text y="34" fontFamily={UI} fontWeight="bold" fontSize="23" fill={KIT.ink}>
           {MENU.map(([m, x]) => (
-            <tspan key={m} x={x}>
+            <tspan key={m} x={x + 22}>
               {m}
             </tspan>
           ))}
         </text>
-        <rect x="1366" y="8" width="200" height="34" fill="#0052ff" stroke={INK} strokeWidth="3" />
-        <text x="1466" y="34" textAnchor="middle" fontFamily={UI} fontWeight="bold" fontSize="22" fill="#fff">
+        <rect x="1366" y="8" width="204" height="34" fill={KIT.blue} stroke={INK} strokeWidth="3" />
+        <text x="1468" y="33" textAnchor="middle" fontFamily={MONO} fontWeight="bold" fontSize="21" fill="#fff">
           BASE 8453
         </text>
       </g>
 
-      {/* the window: a hard one-bit shadow, the frame, the striped title bar */}
+      {/* Main warm-Platinum window with hard Macintosh drop shadow and ivory dotted paper */}
       <g shapeRendering="crispEdges">
-        <rect x="70" y="92" width="1470" height="770" fill={INK} />
-        <rect x="60" y="82" width="1470" height="770" fill="#fff" stroke={INK} strokeWidth="4" />
+        <rect x="70" y="92" width="1470" height="770" fill="#000" opacity="0.34" />
+        <rect x="60" y="82" width="1470" height="770" fill={KIT.paper} stroke={INK} strokeWidth="4" />
         <rect x="62" y="84" width="1466" height="766" fill="url(#kit-dots)" />
       </g>
       <TitleBar x={62} y={84} w={1466} title={`${caption} — Base Card`} />
 
-      {/* Get Info: the picture in a bevelled frame, the handle beneath it */}
+      {/* Get Info portrait frame: warm-Platinum bevel with Base cobalt caption */}
       <g shapeRendering="crispEdges">
-        <rect x="104" y="174" width="452" height="514" fill={FRAME_FACE} stroke={INK} strokeWidth="4" />
+        <rect x="110" y="180" width="452" height="514" fill="#000" opacity="0.16" />
+        <rect x="104" y="174" width="452" height="514" fill={KIT.chrome} stroke={INK} strokeWidth="4" />
         <rect x="108" y="178" width="444" height="4" fill="#fff" />
         <rect x="108" y="178" width="4" height="506" fill="#fff" />
-        <rect x="122" y="192" width="416" height="416" fill="#888" />
+        <rect x="122" y="192" width="416" height="416" fill={KIT.chromeDark} />
       </g>
       <Picture handle={user.handle} picture={picture} />
       <rect x={PX} y={PY} width={PS} height={PS} fill="none" stroke={INK} strokeWidth="4" shapeRendering="crispEdges" />
-      <text x="330" y="662" textAnchor="middle" fontFamily={MONO} fontWeight="bold" fontSize="34" fill={INK} {...fit(caption, 34, 400, 0.62)}>
+      <text x="330" y="662" textAnchor="middle" fontFamily={MONO} fontWeight="bold" fontSize="34" fill={KIT.blue} {...fit(caption, 34, 400, 0.62)}>
         {caption}
       </text>
       {ships(user.bio) ? <Shipped /> : null}
@@ -369,31 +370,38 @@ export function CardSvg({ user, words, picture }: { user: XUser; words: CardWord
 
       <BitmapTitle words={words} />
 
-      <text x="620" y="486" fontFamily={UI} fontWeight="bold" fontSize="56" fill={INK} {...fit(name, 56, 880, 0.66)}>
+      {/* Identity block: Georgia serif name + cobalt hairline + monospace handle/followers */}
+      <text x="620" y="486" fontFamily={SERIF} fontWeight="bold" fontSize="58" fill={KIT.ink} {...fit(name, 58, 880, 0.62)}>
         {name}
       </text>
-      <text x="622" y="530" fontFamily={UI} fontSize="28" fill="#333" {...fit(facts1, 28, 880, 0.6)}>
+      <rect x="620" y="500" width="120" height="4" fill={KIT.blue} shapeRendering="crispEdges" />
+      <text x="622" y="538" fontFamily={MONO} fontSize="26" fill={KIT.dim} {...fit(facts1, 26, 880, 0.62)}>
         {facts1}
       </text>
 
-      {/* the quote as a help balloon, its tail pointing back at the picture */}
+      {/* Quote help balloon: crisp white paper with Base cobalt border and subtle shadow */}
       <g>
-        <path d={`M624 ${top + 30}L566 ${top + 70}L624 ${top + 62}Z`} transform="translate(8 8)" fill={INK} />
-        <rect x="628" y={top + 8} width="872" height={bottom - top} rx="26" fill={INK} />
-        <rect x="620" y={top} width="872" height={bottom - top} rx="26" fill="#fffbd6" stroke={INK} strokeWidth="4" />
-        <path d={`M622 ${top + 28}L566 ${top + 70}L622 ${top + 60}`} fill="#fffbd6" stroke={INK} strokeWidth="4" strokeLinejoin="miter" />
+        <path d={`M624 ${top + 30}L566 ${top + 70}L624 ${top + 62}Z`} transform="translate(6 6)" fill="#000" opacity="0.22" />
+        <rect x="626" y={top + 6} width="872" height={bottom - top} rx="22" fill="#000" opacity="0.22" />
+        <rect x="620" y={top} width="872" height={bottom - top} rx="22" fill="#ffffff" stroke={KIT.blue} strokeWidth="4" />
+        <path d={`M622 ${top + 28}L566 ${top + 70}L622 ${top + 60}`} fill="#ffffff" stroke={KIT.blue} strokeWidth="4" strokeLinejoin="miter" />
         {quote.map((line, i) => (
-          <text key={i} x="652" y={top + 54 + i * 48} fontFamily={UI} fontSize="32" fill={INK} {...fit(line, 32, 808, 0.6)}>
+          <text key={i} x="652" y={top + 54 + i * 48} fontFamily={SERIF} fontSize="32" fill={KIT.ink} {...fit(line, 32, 808, 0.58)}>
             {line}
           </text>
         ))}
       </g>
 
+      {/* Warm-Platinum status bar with Quadra branding */}
       <g shapeRendering="crispEdges">
-        <rect x="64" y="806" width="1462" height="3" fill={INK} />
-        <rect x="64" y="809" width="1462" height="41" fill="#eee" />
+        <rect x="64" y="804" width="1462" height="3" fill={INK} />
+        <rect x="64" y="807" width="1462" height="43" fill={KIT.chrome} />
+        <QuadraMark x={80} y={813} size={30} />
       </g>
-      <text x="1500" y="838" textAnchor="end" fontFamily={UI} fontSize="22" fill="#333">
+      <text x="122" y="836" fontFamily={MONO} fontWeight="bold" fontSize="22" fill={KIT.blue}>
+        {BRAND.domain}
+      </text>
+      <text x="1504" y="836" textAnchor="end" fontFamily={MONO} fontSize="20" fill={KIT.dim}>
         {`${host()} · read from X, drawn on Base`}
       </text>
     </svg>

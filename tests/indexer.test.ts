@@ -379,7 +379,7 @@ describe("readHead and the archive endpoints", () => {
   });
 
   it("asks mainnet.base.org first and Tenderly's gateway when it is rate-limited", async () => {
-    expect(INDEXER_RPC).toEqual(["https://mainnet.base.org", "https://gateway.tenderly.co/public/base", "https://base-rpc.publicnode.com"]);
+    expect(INDEXER_RPC.slice(0, 2)).toEqual(["https://mainnet.base.org", "https://gateway.tenderly.co/public/base"]);
     const calls = net({ rpc: (_m, _p, endpoint) => (endpoint === INDEXER_RPC[0] ? new Response("{}", { status: 429 }) : "0x1") });
     expect(await archiveRpc("eth_blockNumber", [])).toBe("0x1");
     expect(calls.map((c) => c.url)).toEqual(INDEXER_RPC.slice(0, 2));

@@ -1,5 +1,8 @@
 import { hasAddressShape, toChecksumAddress } from "@/lib/address";
+import { CONTRACTS } from "@/config/chain";
+import { BLOCKSCOUT } from "@/skills/blockscout";
 import { isObj, listOf, numOf, strOf } from "@/skills/json";
+import { LAUNCHED_TOPIC } from "@/skills/launchpad";
 import { INDEXER_PATH } from "@/server/indexerPath";
 
 /**
@@ -160,9 +163,71 @@ async function ask(path: string): Promise<unknown> {
   return body;
 }
 
-/** Every launch on this app's launchpad, from this app's server — or a thrown sentence saying why not. */
+/** Merge recent LaunchFactoryV3 `Launched` logs from Blockscout when the server snapshot is behind head. */
+async function mergeRecentLaunches(index: LaunchpadIndex): Promise<LaunchpadIndex> {
+  if (index.behind === 0 || !CONTRACTS.launchFactoryV3) return index;
+  try {
+    const res = await fetch(`${BLOCKSCOUT}/addresses/${CONTRACTS.launchFactoryV3}/logs`, { headers: { accept: "application/json" } });
+    if (!res.ok) return index;
+    const body = (await res.json()) as unknown;
+    const items = listOf(isObj(body) ? body.items : null);
+    const seen = new Set(index.coins.map((c) => c.token.toLowerCase()));
+    const fresh: IndexedCoin[] = [];
+    for (const item of items) {
+      if (!isObj(item)) continue;
+      const topics = listOf(item.topics).filter((t): t is string => typeof t === "string");
+      if (topics[0]?.toLowerCase() !== LAUNCHED_TOPIC.toLowerCase() || topics.length < 4) continue;
+      const token = addr(`0x${topics[1]!.slice(-40)}`);
+      const creator = addr(`0x${topics[2]!.slice(-40)}`);
+      const poolId = topics[3]!.toLowerCase();
+      const block = numOf(item.block_number) ?? 0;
+      const tx = strOf(item.transaction_hash) ?? "";
+      if (!token || !creator || seen.has(token.toLowerCase())) continue;
+      seen.add(token.toLowerCase());
+      fresh.push({
+        token,
+        factory: CONTRACTS.launchFactoryV3,
+        creator,
+        poolId,
+        launchBlock: block,
+        launchedAt: Math.floor(Date.now() / 1000),
+        launchTx: tx,
+        name: null,
+        symbol: null,
+        quote: null,
+        quoteSymbol: null,
+        quoteDecimals: null,
+        feeBps: null,
+        opening: null,
+        referrer: null,
+        price: null,
+        mcapInQuote: null,
+        trades: 0,
+        buys: null,
+        sells: null,
+        volume: null,
+        trades24h: 0,
+        buys24h: null,
+        sells24h: null,
+        volume24h: null,
+        traders24h: 0,
+        tradersPending24h: 0,
+        firstTradeAt: null,
+        lastTradeAt: null,
+      });
+    }
+    if (fresh.length === 0) return index;
+    const coins = [...fresh, ...index.coins].sort((a, b) => b.launchBlock - a.launchBlock);
+    return { ...index, coins };
+  } catch {
+    return index;
+  }
+}
+
+/** Every launch on this app's launchpad, from this app's server — merged with latest factory logs when behind. */
 export async function launchpadCoins(): Promise<LaunchpadIndex> {
-  return parseIndex(await ask("/coins"));
+  const index = parseIndex(await ask("/coins"));
+  return mergeRecentLaunches(index);
 }
 
 export type IndexedTrade = {

@@ -305,11 +305,11 @@ describe("the code, as rows", () => {
     expect(codeRows(degen)).toEqual([row("Owner can mint more", "yes", { tone: "warn" })]);
   });
 
-  it("keeps every check GoPlus did not run, as not checked", () => {
+  it("collapses multiple checks GoPlus did not run into one amber Code scan row", () => {
     const brtc = parseScan(FX.goplusBrtc, ADDR.brtc)!;
     const rows = codeRows(brtc);
-    expect(rows.length).toBeGreaterThan(3);
-    expect(rows.filter((r) => r.value === "not checked").every((r) => r.tone === "warn")).toBe(true);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ label: "Code scan", tone: "warn", value: expect.stringMatching(/GoPlus left .* checks blank/) });
   });
 
   it("says when nothing was found, when GoPlus has no report, and when it could not be reached", () => {

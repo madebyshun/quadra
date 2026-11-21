@@ -27,8 +27,8 @@ import { row, type Report, type Row, type Skill, type Tone } from "@/skills/type
  * router → buyer; the router nets to zero), and an operator by a shared delegate or shared code.
  */
 
-/** Blocks per archive call (mainnet.base.org caps a range at 2,000) — a whole hour of 2 s blocks. */
-export const WINDOW = 1_800;
+/** Blocks per archive call (Tenderly and other public gateways cap a range at 1,000). */
+export const WINDOW = 1_000;
 /** How long after the pool opened is read: an hour, however many blocks that is (0.2 s blocks: 18,000 — ten calls). */
 export const WINDOW_SECONDS = 3_600;
 /** The first buyers looked at closely (code, nonce, balance now). */

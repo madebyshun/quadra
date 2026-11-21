@@ -14,27 +14,30 @@
  * To add a project: it is added to base.org's list first (a pull request to base/web), then here.
  */
 
-export type FolderKey = "wallets" | "defi" | "degen" | "bridges" | "cashin" | "payments" | "jpegs" | "social" | "games" | "ai" | "dev" | "daos";
+export type FolderKey = "wallets" | "defi" | "stocks" | "degen" | "bridges" | "cashin" | "payments" | "jpegs" | "social" | "games" | "ai" | "dev" | "daos";
 
 export type BaseApp = {
-  /** as base.org lists it */
+  /** as base.org or docs.base.org lists it */
   readonly name: string;
   readonly folder: FolderKey;
-  /** as base.org lists it — https only */
+  /** https only */
   readonly url: string;
-  /** base.org's own logo for it: `https://www.base.org` + the list's `imageUrl` */
+  /** base.org's own logo for it, or empty string to render the program glyph */
   readonly logo: string;
   /** one true line, this app's words */
   readonly line: string;
+  /** where the entry came from (default: base.org ecosystem list) */
+  readonly source?: "base.org" | "docs.base.org";
 };
 
 export const ECOSYSTEM_SOURCE = "https://www.base.org/ecosystem";
-export const ECOSYSTEM_READ = "2026-10-22";
+export const ECOSYSTEM_READ = "2026-11-20";
 const LOGO_ORIGIN = "https://www.base.org";
 
 export const FOLDERS_OF_BASE: readonly { readonly key: FolderKey; readonly title: string; readonly blurb: string }[] = [
   { key: "wallets", title: "Wallets", blurb: "somewhere to keep your keys" },
   { key: "defi", title: "DeFi", blurb: "lend, borrow, earn" },
+  { key: "stocks", title: "Stocks & RWA", blurb: "tokenized US equities, B20 & Chainlink NAV feeds" },
   { key: "degen", title: "Degen", blurb: "charts, perps and swap routers" },
   { key: "bridges", title: "Bridges", blurb: "move funds between chains" },
   { key: "cashin", title: "Cash In", blurb: "from a bank or card to Base" },
@@ -48,6 +51,7 @@ export const FOLDERS_OF_BASE: readonly { readonly key: FolderKey; readonly title
 ];
 
 const app = (name: string, folder: FolderKey, url: string, image: string, line: string): BaseApp => ({ name, folder, url, logo: `${LOGO_ORIGIN}${image}`, line });
+const stockApp = (name: string, url: string, image: string, line: string): BaseApp => ({ name, folder: "stocks", url, logo: image ? `${LOGO_ORIGIN}${image}` : "", line, source: "docs.base.org" });
 
 export const BASE_APPS: readonly BaseApp[] = [
   app("Coinbase Wallet", "wallets", "https://www.coinbase.com/wallet", "/images/partners/wallet.webp", "Coinbase's self-custody wallet: the keys are yours, not Coinbase's."),
@@ -65,6 +69,13 @@ export const BASE_APPS: readonly BaseApp[] = [
   app("Compound", "defi", "https://compound.finance", "/images/partners/compound.webp", "The money market that started 2020's DeFi summer."),
   app("Balancer", "defi", "https://balancer.fi/", "/images/partners/balancer.webp", "Pools with more than two tokens, and weights other than 50/50."),
   app("PoolTogether", "defi", "https://pooltogether.com/", "/images/partners/pooltogether.png", "Savings with a prize draw: deposit, keep your deposit, maybe win."),
+
+  stockApp("Coinbase Tokenized Stocks", "https://www.coinbase.com/tokenize", "/images/partners/wallet.webp", "Coinbase's B20 tokenized US equities on Base, backed 1:1 by shares in regulated custody (eligible non-US users)."),
+  stockApp("Base B20 Stock Docs", "https://docs.base.org/build-on-base/integrate-defi/list-tokenized-stocks", "", "Official Base documentation for the B20 tokenized stock standard, public API, and Chainlink NAV feeds."),
+  stockApp("Ondo Global Markets", "https://ondo.finance/global-markets", "", "Tokenized US stocks, ETFs, and treasuries with onchain minting and redemption for eligible non-US users."),
+  stockApp("Dinari", "https://www.dinari.com/", "", "1:1 backed tokenized US equities (dShares) issued on Base and other EVM networks."),
+  stockApp("Backed (xStocks)", "https://backed.fi/", "", "Regulated tokenized equities and ETFs giving onchain economic exposure to traditional shares."),
+  stockApp("Chainlink Equities Feeds", "https://docs.base.org/build-on-base/integrate-defi/list-tokenized-stocks", "/images/partners/chainlink.webp", "Total-return Chainlink NAV reference feeds powering Base's B20 tokenized stocks."),
 
   app("Avantis", "degen", "https://www.avantisfi.com/", "/images/partners/avantis.png", "Perpetuals on Base, with leverage. Leverage cuts both ways."),
   app("SynFutures", "degen", "https://www.synfutures.com/", "/images/partners/synfutures.png", "Perpetual futures on Base. Read the liquidation price first."),

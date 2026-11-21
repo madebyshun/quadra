@@ -76,6 +76,25 @@ export const FEEL_SUFFIX = "fee1";
  */
 export const CLANKER_FACTORY = "0xE85A59c628F7d27878ACeB4bf3b35733630083a9";
 
+/**
+ * Clanker v5 (`clanker_tax_base`) factory on Base (8453), verified from
+ * `https://www.clanker.world/api/metadata/factories`.
+ */
+export const CLANKER_V5_FACTORY = "0x572e88D3cD7f23E4241EB6ceDD96667271bF09A0";
+export const CLANKER_V5_LAUNCHED_TOPIC = "0x207384e895174175cc774fe7f7457b37c382f27ebf53d37d5257b862f80eaf9c";
+
+/** All official Clanker factory addresses on Base (v0 through v5), keyed lowercase -> version label. */
+export const CLANKER_FACTORIES: Readonly<Record<string, string>> = {
+  "0x250c9fb2b411b48273f69879007803790a6aea47": "Clanker v0",
+  "0x9b84fce5dcd9a38d2d01d5d72373f6b6b067c3e1": "Clanker v1",
+  "0x732560fa1d1a76350b1a500155ba978031b53833": "Clanker v2",
+  "0x375c15db32d28cecdcab5c03ab889bf15cbd2c5e": "Clanker v3",
+  "0x71cdc0bdf30f5601fb0ac80cf1d20b771342c035": "Clanker v3",
+  "0x2a787b2362021cc3eea3c24c4748a6cd5b687382": "Clanker v3.1",
+  [CLANKER_FACTORY.toLowerCase()]: "Clanker v4",
+  [CLANKER_V5_FACTORY.toLowerCase()]: "Clanker v5",
+};
+
 export const CLANKER_ABI = parseAbi(["function deploymentInfoForToken(address token) view returns (address token, address hook, address locker)"]);
 
 /**

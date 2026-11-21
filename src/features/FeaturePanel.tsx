@@ -12,7 +12,6 @@ import { SendPanel } from "@/features/panels/SendPanel";
 import { LaunchPanel } from "@/features/panels/LaunchPanel";
 import { CoinsPanel } from "@/features/panels/CoinsPanel";
 import { ProfilePanel } from "@/features/panels/ProfilePanel";
-import { TradePanel } from "@/features/panels/TradePanel";
 import { MarketsPanel } from "@/features/panels/MarketsPanel";
 import { SwapPanel } from "@/features/panels/SwapPanel";
 import { BridgePanel } from "@/features/panels/BridgePanel";
@@ -52,8 +51,8 @@ const EXPLAIN: Partial<Record<Feature["id"], string>> = {
   safety:
     "Before you buy: a real buy and sell of the token, run on Base without sending anything, plus what its owner can do, who really holds it, who launched it and how deep its market is.",
   markets:
-    "Prices and charts for what you watch: tokens and Coinbase's stocks on Base. Every number says where it came from.",
-  trade: "Buy or sell a token or a Coinbase stock on Base, for USDC or ETH, at a live quote signed in your wallet.",
+    "Prices, charts, and live trading for Base crypto and Coinbase's tokenized stocks. Every number says where it came from.",
+  trade: "Prices, charts, and live trading for Base crypto and Coinbase's tokenized stocks. Every number says where it came from.",
   send: "Pay any address or Basename from your own wallet.",
   swap: "Trade any token on Base, quoted live and signed in your wallet.",
   bridge: "Move ETH or USDC from Base to Robinhood Chain, to your own address, signed in your wallet.",
@@ -91,7 +90,7 @@ const BUILT: Partial<Record<Feature["id"], () => ReactNode>> = {
   // ONE window to check anything (2026-10-29): a token, a recipient, a launch, a launcher
   safety: () => <SkillWindow label="Check" window="safety" skills={[verdictSkill, sendCheckSkill, forensicsSkill, launcherSkill, gateSkill]} />,
   markets: () => <MarketsPanel />,
-  trade: () => <TradePanel />,
+  trade: () => <MarketsPanel />,
   send: () => <SendPanel />,
   swap: () => <SwapPanel />,
   bridge: () => <BridgePanel />,

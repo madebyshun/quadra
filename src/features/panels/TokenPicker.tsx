@@ -30,12 +30,14 @@ export function TokenPicker({
   label,
   choice,
   address,
+  customLabel,
   onChoice,
   onAddress,
 }: {
   label: string;
   choice: Choice;
   address: string;
+  customLabel?: string | null;
   onChoice: (c: Choice) => void;
   onAddress: (a: string) => void;
 }) {
@@ -47,7 +49,7 @@ export function TokenPicker({
           <option value="ETH">ETH</option>
           <option value="USDC">USDC</option>
           <option value="WETH">WETH</option>
-          <option value="other">Another token…</option>
+          <option value="other">{customLabel || "0x…"}</option>
         </select>
       </label>
       {choice === "other" ? (

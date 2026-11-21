@@ -1,6 +1,7 @@
 import { assertChecksummedAddress, toChecksumAddress } from "@/lib/address";
 import { messageOf } from "@/lib/errors";
 import { UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
+import { CLANKER_FACTORIES } from "@/config/launchpads";
 import { tokenInfo, topHolders, type Holding, type TokenInfo } from "@/skills/blockscout";
 import { deepest, markets, type Market } from "@/skills/dexscreener";
 import { explorer, price, quoteWords, short, usd } from "@/skills/format";
@@ -143,10 +144,23 @@ export function cleanScan(s: Scan): string {
 export function codeRows(s: Scan | null | undefined): Row[] {
   if (s === undefined) return [row("Code scan", "not checked — GoPlus could not be reached", { tone: "warn" })];
   if (s === null) return [row("Code scan", "not checked — GoPlus has no report on this token", { tone: "warn" })];
-  // Only the lines that say something: a wall of "no" buries the one "yes". Unknowns stay.
-  const lines = checksOf(s).map(checkRow).filter((r) => r.tone !== "ok");
-  // all clean: say WHAT was checked, so "clean" is a list a reader can weigh, not a blank
-  return lines.length ? lines : [row("Code scan", cleanScan(s), { tone: "ok" })];
+  const all = checksOf(s);
+  const lines = all.map(checkRow).filter((r) => r.tone !== "ok");
+  if (!lines.length) return [row("Code scan", cleanScan(s), { tone: "ok" })];
+  const flags = lines.filter((r) => r.value !== "not checked");
+  const unchecked = lines.filter((r) => r.value === "not checked");
+  // Collapse multiple blank GoPlus fields into one amber line so an unindexed token does not lose 10×10 points
+  if (unchecked.length > 1) {
+    const summary = row(
+      "Code scan",
+      unchecked.length === all.length
+        ? `not checked — GoPlus left all ${all.length} checks blank`
+        : `partially checked — GoPlus left ${unchecked.length} of ${all.length} checks blank`,
+      { tone: "warn" },
+    );
+    return [...flags, summary];
+  }
+  return lines;
 }
 
 // ── The holders ───────────────────────────────────────────────────────────
@@ -164,6 +178,7 @@ export function concentration(holders: readonly Holding[], supply: bigint, pools
     if (pools.has(a) || BURN.has(a)) set += h.raw;
     else people.push(h);
   }
+  people.sort((a, b) => (b.raw > a.raw ? 1 : b.raw < a.raw ? -1 : 0));
   const top = people.slice(0, TOP);
   const held = top.reduce((sum, h) => sum + h.raw, 0n);
   return { share: Number((held * 10_000n) / supply) / 10_000, largest: top[0] ?? null, set: Number((set * 10_000n) / supply) / 10_000 };
@@ -175,6 +190,9 @@ export function holderRows(info: TokenInfo | null, holders: readonly Holding[] |
   if (holders.length === 0) return [row(label, "none indexed yet — the indexer can lag a new token", { tone: "warn" })];
   const pools = new Set([UNISWAP_V4_POOL_MANAGER.toLowerCase(), ...(pairs ?? []).flatMap((p) => (p.pair ? [p.pair.toLowerCase()] : []))]);
   const c = concentration(holders, info.totalSupply, pools);
+  if (c.share === 0 && c.set === 0) {
+    return [row(label, "not indexed yet — Blockscout returned 0% across top holders", { tone: "warn" })];
+  }
   const rows = [
     // amber at most: concentration is a risk, not a trap — DEGEN's top ten hold 62% (MEASURED), mostly its own Safes
     row(label, `${pct(c.share)} of supply, pools and burns set aside`, { tone: c.share > CONCENTRATED ? "warn" : "ok" }),
@@ -417,9 +435,24 @@ export async function tokenVerdict(input: string, now: number): Promise<Report> 
   ]);
   const [fee, referrer] = await Promise.all([v3FeeOf(launchpad, address), v3ReferrerOf(launchpad, address)]);
   const token = info ?? null;
+  // Recognize Clanker v5 and legacy v0–v3.1 factories when found via the launch transaction's creating contract
+  const viaAddr = origin?.via?.address?.toLowerCase();
+  const clankerVer = viaAddr ? CLANKER_FACTORIES[viaAddr] : undefined;
+  const resolvedPad: Launchpad | undefined =
+    other?.kind === "unknown" && clankerVer && origin?.via?.address
+      ? {
+          kind: "proven",
+          id: "clanker",
+          name: clankerVer,
+          address: origin.via.address,
+          how: `${clankerVer}'s factory created this token on Base`,
+          guarantees: [],
+          launcher: origin.launcher?.address ?? null,
+        }
+      : (other ?? undefined);
   const body = [
     ...launchpadRows(launchpad, fee, referrer),
-    ...(launchpad ? [] : launchpadRow(other ?? undefined)),
+    ...(launchpad ? [] : launchpadRow(resolvedPad)),
     ...tradeRows(trip),
     ...(launchpad ? [LAUNCHPAD_CODE] : codeRows(security)),
     ...holderRows(token, holders ?? null, pairs ?? null),

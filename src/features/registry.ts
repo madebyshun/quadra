@@ -121,7 +121,7 @@ export const FEATURES: readonly Feature[] = [
   {
     id: "markets",
     title: "Markets",
-    blurb: "prices and charts, tokens and stocks",
+    blurb: "prices, charts and trade — crypto & stocks",
     window: "Markets",
     flag: "markets",
   },
@@ -269,7 +269,7 @@ export const FEATURES: readonly Feature[] = [
   */
   { id: "computer", title: "My Computer", blurb: "everything else: tools, games, settings", window: "My Computer" },
   { id: "folder-research", title: "Research", blurb: "radar, markets, profiles, Base apps", window: "Research" },
-  { id: "folder-money", title: "Money", blurb: "send, swap, trade", window: "Money" },
+  { id: "folder-money", title: "Money", blurb: "treasury basket, bridge", window: "Money" },
   { id: "folder-launchpad", title: "Launchpad", blurb: "the leaderboard, your Base card", window: "Launchpad" },
   { id: "folder-games", title: "Games", blurb: "real mines, and trophies", window: "Games" },
   { id: "folder-agents", title: "Agents", blurb: "tools your AI agent can use", window: "Agents" },
@@ -356,10 +356,13 @@ export function comingSoon(): readonly Feature[] {
  * Since 2026-10-29 (the owner: "extremely simple, no overlapping features") the desktop carries the four
  * things people come for and Agents; My Computer holds everything else, the other folders among it.
  */
+/** Features merged into another window: their `?do=` id stays valid, without a duplicate desktop/folder icon. */
+export const ALIAS_FEATURES: ReadonlySet<FeatureId> = new Set<FeatureId>(["trade"]);
+
 export const FOLDERS: Readonly<Record<FolderId, readonly WindowId[]>> = {
   computer: ["folder-research", "folder-money", "folder-launchpad", "folder-games", "terminal", "taskmgr", "control", "readme", "soon"],
-  "folder-research": ["research", "weekend", "markets", "profile", "explore"],
-  "folder-money": ["send", "swap", "trade", "basket", "bridge"],
+  "folder-research": ["research", "profile", "explore"],
+  "folder-money": ["basket", "bridge"],
   "folder-launchpad": ["leaderboard", "card"],
   "folder-games": ["rugsweeper", "achievements"],
   "folder-agents": ["mcp", "x402", "api", "docs", "verify"],
@@ -403,7 +406,7 @@ export function folderOf(id: WindowId): FolderId | null {
  * The desktop's icons since 2026-10-29: Check, Coins, Launch and Wallet — one door for each thing the app
  * does — then Agents and My Computer, which holds the rest. The Trash keeps its corner (`CORNER`).
  */
-export const DESKTOP: readonly WindowId[] = ["safety", "coins", "launch", "wallet", "folder-agents", "computer"];
+export const DESKTOP: readonly WindowId[] = ["markets", "send", "swap", "safety", "weekend", "coins", "launch", "wallet", "folder-agents", "computer"];
 
 export function desktopItems(): readonly Entry[] {
   return DESKTOP.filter(shown).map(entryOf);

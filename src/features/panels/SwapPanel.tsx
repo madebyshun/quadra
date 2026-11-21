@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { isStock, RESTRICTED_TEXT, useStockAddresses, useStocksClosed } from "@/lib/region";
 import { quoteSwap, isRelayNoRoute, type SwapQuote } from "@/adapters/http/relay";
+import { SIM_ACCOUNT } from "@/skills/simulate";
 import { launchOf } from "@/skills/launchpad";
 import { BASE } from "@/config/chain";
 import { BRAND } from "@/brand";
@@ -99,6 +100,7 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
   const openWindow = useOpenWindow();
   const [sellChoice, setSellChoice] = useState<Choice>(fixed?.sell.choice ?? "USDC");
   const [sellAddress, setSellAddress] = useState(fixed?.sell.address ?? "");
+  const [sellLabel, setSellLabel] = useState<string | null>(null);
   const [buyChoice, setBuyChoice] = useState<Choice>(fixed?.buy.choice ?? "ETH");
   const [buyAddress, setBuyAddress] = useState(fixed?.buy.address ?? "");
   const [amount, setAmount] = useState("");
@@ -107,6 +109,8 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
   const [error, setError] = useState<string | null>(null);
   const [noRouteToken, setNoRouteToken] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
+  const [est, setEst] = useState<{ readonly out: bigint; readonly decimals: number; readonly symbol: string } | null>(null);
+  const [quotingEst, setQuotingEst] = useState(false);
   /** what the swap delivered — `amount: null` when it could not be measured */
   const [received, setReceived] = useState<{ amount: bigint | null } | null>(null);
   const steps = useTxSteps();
@@ -123,6 +127,44 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
   const stocks = useStockAddresses(closed);
   const touchesStock = closed && [sellChoice === "other" ? sellAddress : "", buyChoice === "other" ? buyAddress : ""].some((a) => a !== "" && isStock(a, stocks));
   const ready = wallet?.kind === "ready" ? wallet : null;
+
+  // Live debounced "You get" estimate as soon as an amount and both tokens are entered
+  useEffect(() => {
+    if (review !== null || touchesStock || amount.trim() === "") {
+      setEst(null);
+      setQuotingEst(false);
+      return;
+    }
+    if (sellChoice === "other" && sellAddress.trim().length < 42) return;
+    if (buyChoice === "other" && buyAddress.trim().length < 42) return;
+    let live = true;
+    const id = setTimeout(() => {
+      setQuotingEst(true);
+      void (async () => {
+        try {
+          const [sell, buy] = await Promise.all([
+            assetFor(sellChoice, sellAddress, "Token you pay"),
+            assetFor(buyChoice, buyAddress, "Token you get"),
+          ]);
+          const value = parseAmount(amount, sell.decimals);
+          if (value === 0n) {
+            if (live) setEst(null);
+            return;
+          }
+          const q = await quoteSwap({ user: ready?.account ?? SIM_ACCOUNT, sell, buy, amount: value, slippageBps: slippage.bps });
+          if (live) setEst({ out: q.out, decimals: buy.decimals, symbol: buy.symbol });
+        } catch {
+          if (live) setEst(null);
+        } finally {
+          if (live) setQuotingEst(false);
+        }
+      })();
+    }, 450);
+    return () => {
+      live = false;
+      clearTimeout(id);
+    };
+  }, [amount, sellChoice, sellAddress, buyChoice, buyAddress, slippage.bps, touchesStock, ready?.account, review]);
   const blocker = touchesStock
     ? "Not offered in your region"
     : !ready
@@ -180,10 +222,11 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
   );
 
   /** A token picked from the wallet list becomes what you pay. */
-  const pick = (address: string | null) => {
+  const pick = (address: string | null, symbol?: string) => {
     const c = choiceFor(address);
     edit(setSellChoice)(c);
     setSellAddress(c === "other" ? address! : "");
+    setSellLabel(c === "other" ? (symbol ?? null) : null);
     // an amount typed for the old token means nothing for the new one
     setAmount("");
   };
@@ -219,6 +262,10 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
   };
 
   const started = steps.states.length > 0;
+  const statusRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (started || received !== null) statusRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+  }, [started, received, steps.states]);
 
   return (
     <div className="stack">
@@ -226,7 +273,20 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
       <fieldset className="group">
         <legend>{fixed ? `${fixed.sell.symbol} → ${fixed.buy.symbol} on ${BASE.name}` : `Swap on ${BASE.name}`}</legend>
         {fixed ? null : (
-          <TokenPicker label="You pay" choice={sellChoice} address={sellAddress} onChoice={edit(setSellChoice)} onAddress={edit(setSellAddress)} />
+          <TokenPicker
+            label="You pay"
+            choice={sellChoice}
+            address={sellAddress}
+            customLabel={sellLabel}
+            onChoice={(c) => {
+              setSellLabel(null);
+              edit(setSellChoice)(c);
+            }}
+            onAddress={(a) => {
+              setSellLabel(null);
+              edit(setSellAddress)(a);
+            }}
+          />
         )}
         <label className="group__row">
           <span>Amount</span>
@@ -237,6 +297,20 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
         {fixed ? null : (
           <TokenPicker label="You get" choice={buyChoice} address={buyAddress} onChoice={edit(setBuyChoice)} onAddress={edit(setBuyAddress)} />
         )}
+        <div className="group__row">
+          <span>You get (est.)</span>
+          <div className="swap__est" aria-live="polite">
+            {review ? (
+              <strong>{`≈ ${formatAmount(review.quote.out, review.buy.decimals)} ${review.buy.symbol}`}</strong>
+            ) : quotingEst ? (
+              <span className="dim">Quoting…</span>
+            ) : est ? (
+              <strong>{`≈ ${formatAmount(est.out, est.decimals)} ${est.symbol}`}</strong>
+            ) : (
+              <span className="dim">Enter amount to preview</span>
+            )}
+          </div>
+        </div>
         <label className="group__row">
           <span>Slippage</span>
           <select
@@ -255,19 +329,21 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
       </fieldset>
 
       {touchesStock ? <p className="crt__amber">{RESTRICTED_TEXT}</p> : null}
-      {review === null ? (
-        <Gel className="mf__cta" onClick={() => void onReview()} disabled={blocker !== null || reading}>
-          {reading ? "Quoting…" : (blocker ?? "Get a quote")}
-        </Gel>
-      ) : (
-        <>
-          <ReportView report={report(review, review.balance, slippage.label)} />
-          <Gel className="mf__cta" onClick={() => void onSwap()} disabled={review.short || steps.running || started}>
-            {review.short ? `Not enough ${review.sell.symbol}` : started ? "Swapped — edit a field to swap again" : "Swap in wallet"}
-          </Gel>
-        </>
-      )}
-
+      {started || (received !== null && review !== null) ? (
+        <div ref={statusRef} className="stack tx__result">
+          <TxStepList states={steps.states} label="Swap progress" />
+          {received === null || review === null ? null : received.amount === null ? (
+            <p className="tx__warn">
+              Confirmed, but what arrived could not be measured here — check your {review.buy.symbol} balance on Basescan.
+            </p>
+          ) : (
+            <p className={received.amount >= review.quote.min ? "tx__ok" : "tx__bad"}>
+              Received {formatAmount(received.amount < 0n ? 0n : received.amount, review.buy.decimals)} {review.buy.symbol} — the quoted
+              minimum was {formatAmount(review.quote.min, review.buy.decimals)}.
+            </p>
+          )}
+        </div>
+      ) : null}
       {error ? (
         <Crt label="Swap error">
           <span className="crt__amber">{error}</span>
@@ -283,16 +359,17 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
           ) : null}
         </div>
       ) : null}
-      <TxStepList states={steps.states} label="Swap progress" />
-      {received === null || review === null ? null : received.amount === null ? (
-        <p className="tx__warn">
-          Confirmed, but what arrived could not be measured here — check your {review.buy.symbol} balance on Basescan.
-        </p>
+      {review === null ? (
+        <Gel className="mf__cta" onClick={() => void onReview()} disabled={blocker !== null || reading}>
+          {reading ? "Quoting…" : (blocker ?? "Get a quote")}
+        </Gel>
       ) : (
-        <p className={received.amount >= review.quote.min ? "tx__ok" : "tx__bad"}>
-          Received {formatAmount(received.amount < 0n ? 0n : received.amount, review.buy.decimals)} {review.buy.symbol} — the quoted
-          minimum was {formatAmount(review.quote.min, review.buy.decimals)}.
-        </p>
+        <>
+          <ReportView report={report(review, review.balance, slippage.label)} />
+          <Gel className={started ? "mf__cta mf__cta--static" : "mf__cta"} onClick={() => void onSwap()} disabled={review.short || steps.running || started}>
+            {review.short ? `Not enough ${review.sell.symbol}` : started ? "Swapped — edit a field to swap again" : "Swap in wallet"}
+          </Gel>
+        </>
       )}
     </div>
   );

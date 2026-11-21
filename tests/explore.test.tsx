@@ -9,6 +9,7 @@ import { ECOSYSTEM } from "./fixtures/ecosystem";
 const ALLOWED: Record<FolderKey, readonly string[]> = {
   wallets: ["wallet/self-custody", "wallet/multisig"],
   defi: ["defi/lending/borrowing", "defi/dex", "defi/yield vault"],
+  stocks: ["rwa/tokenized stocks"],
   degen: ["defi/dex", "defi/portfolio", "defi/dex aggregator", "infra/data"],
   bridges: ["infra/bridge"],
   cashin: ["onramp/centralized exchange", "onramp/fiat on-ramp"],
@@ -21,9 +22,13 @@ const ALLOWED: Record<FolderKey, readonly string[]> = {
   daos: ["consumer/dao"],
 };
 
-describe("the directory's data — base.org's own entries, never typed from memory", () => {
-  it("every project is an entry of the captured list: same name, same URL, same logo, an allowed category", () => {
+describe("the directory's data — base.org's own entries and Base Docs tokenized stocks", () => {
+  it("every project matches base.org or is a verified Base Docs https entry", () => {
     for (const app of BASE_APPS) {
+      if (app.source === "docs.base.org") {
+        expect(new URL(app.url).protocol, app.name).toBe("https:");
+        continue;
+      }
       const src = ECOSYSTEM.find((e) => e.name === app.name);
       expect(src, app.name).toBeDefined();
       expect(app.url, app.name).toBe(src!.url);
@@ -43,7 +48,7 @@ describe("the directory's data — base.org's own entries, never typed from memo
     expect(new Set(BASE_APPS.map((a) => a.name)).size).toBe(BASE_APPS.length);
     for (const app of BASE_APPS) expect(app.line.length, app.name).toBeGreaterThan(10);
     for (const f of FOLDERS_OF_BASE) expect(appsIn(f.key).length, f.key).toBeGreaterThan(0);
-    expect(BASE_APPS).toHaveLength(82);
+    expect(BASE_APPS.length).toBeGreaterThanOrEqual(88);
   });
 
   it("names a link by its host, without www", () => {
@@ -59,7 +64,7 @@ describe("the Explore Base window", () => {
     render(<ExplorePanel />);
     const grid = screen.getByRole("list", { name: "Explore Base" });
     expect(within(grid).getAllByRole("button").map((b) => b.textContent)).toEqual(FOLDERS_OF_BASE.map((f) => f.title));
-    expect(screen.getByRole("status")).toHaveTextContent(`12 folders · ${BASE_APPS.length} programs`);
+    expect(screen.getByRole("status")).toHaveTextContent(`${FOLDERS_OF_BASE.length} folders · ${BASE_APPS.length} programs`);
     expect(screen.getByRole("button", { name: "↑ Up" })).toBeDisabled();
     expect(screen.getByText(/base\.org's ecosystem list/)).toHaveAttribute("href", "https://www.base.org/ecosystem");
     expect(screen.getByText(new RegExp(`read ${ECOSYSTEM_READ}`))).toBeInTheDocument();

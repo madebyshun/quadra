@@ -452,7 +452,7 @@ export function snapshot(state: IndexState, now: number, head: number | null = n
 // publicnode last: MEASURED 2026-11-04 it served the launchpad's old logs, 1,000 blocks at a time, while
 // mainnet.base.org answered 429 from Vercel — but it has refused old logs before (2026-10-02), as a JSON-RPC
 // error that ends the walk, so it is asked only when the others could not answer at all
-export const INDEXER_RPC: readonly string[] = [...ARCHIVE_RPC, "https://gateway.tenderly.co/public/base", "https://base-rpc.publicnode.com"];
+export const INDEXER_RPC: readonly string[] = [...new Set([...ARCHIVE_RPC, "https://gateway.tenderly.co/public/base", "https://base-rpc.publicnode.com"])];
 export const archiveRpc: Rpc = (method, params) => rpcOn(BASE.name, INDEXER_RPC, method, params);
 
 export type Head = { readonly number: number; readonly timestamp: number };

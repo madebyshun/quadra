@@ -4,7 +4,9 @@ import {
   BASEPAD,
   BASEPAD_ABI,
   CLANKER_ABI,
+  CLANKER_FACTORIES,
   CLANKER_FACTORY,
+  CLANKER_V5_FACTORY,
   DOPPLER_ABI,
   DOPPLER_AIRLOCK,
   DOPPLER_NOOP_MIGRATOR,
@@ -130,18 +132,18 @@ export function dopplerPad(data: AssetData): Proven | null {
  * Read from the token, it needs no log search, so when a rate-limited `eth_getLogs` leaves the launch
  * unread the verdict still has a name to show — as the admin, never as the launcher.
  */
-export function clankerPad(admin: string | null): Proven {
+export function clankerPad(admin: string | null, factory = CLANKER_FACTORY, name = "Clanker"): Proven {
   const named = admin && !same(admin, ZERO) ? { admin: toChecksumAddress(admin) } : {};
-  return { kind: "proven", id: "clanker", name: "Clanker", address: CLANKER_FACTORY, how: "Clanker's factory recorded its deployment", guarantees: [], launcher: null, ...named };
+  return { kind: "proven", id: "clanker", name, address: factory, how: `${name}'s factory recorded its deployment`, guarantees: [], launcher: null, ...named };
 }
 
 const CLANKER_TOKEN_ABI = parseAbi(["function originalAdmin() view returns (address)"]);
 
 /** Clanker's record of a token, with the admin the token itself names; a token that does not answer names none. */
-async function clankerOf(token: string, info: readonly [string, string, string]): Promise<Proven | null> {
+async function clankerOf(token: string, info: readonly [string, string, string], factory = CLANKER_FACTORY, name = "Clanker"): Promise<Proven | null> {
   if (same(info[0], ZERO)) return null;
   const admin = await read(CLANKER_TOKEN_ABI, token, "originalAdmin", []).then((a) => a as string, refusedIsNull);
-  return clankerPad(admin);
+  return clankerPad(admin, factory, name);
 }
 
 export function zoraPad(version: number): Proven | null {
@@ -174,6 +176,9 @@ export async function launchpadOf(token: string, ours: Promise<LaunchRecord | nu
     read(BASEPAD_ABI, BASEPAD.factory, "infoOf", [token]).then((r) => basepadPad(r as never)),
     read(DOPPLER_ABI, DOPPLER_AIRLOCK, "getAssetData", [token]).then((r) => dopplerPad(r as never)),
     read(CLANKER_ABI, CLANKER_FACTORY, "deploymentInfoForToken", [token]).then((r) => clankerOf(token, r as never)),
+    read(CLANKER_ABI, CLANKER_V5_FACTORY, "deploymentInfoForToken", [token])
+      .then((r) => clankerOf(token, r as never, CLANKER_V5_FACTORY, "Clanker v5"))
+      .catch(refusedIsNull),
     read(ZORA_ABI, ZORA_FACTORY, "getVersionForDeployedCoin", [token]).then((r) => zoraPad(Number(r))),
   ]);
   const proven = found.find((p): p is Proven => p !== null);
@@ -188,6 +193,13 @@ export async function launchpadOf(token: string, ours: Promise<LaunchRecord | nu
   const claims = await read(BASEPAD_ABI, token, "factory", []).catch(refusedIsNull);
   if (typeof claims === "string" && same(claims, BASEPAD.factory)) {
     return { kind: "claimed", name: "basepad.si", why: "the token names basepad's factory as its maker, but the factory has no record of it" };
+  }
+  if (typeof claims === "string") {
+    const clankerName = CLANKER_FACTORIES[claims.toLowerCase()];
+    if (clankerName) {
+      const admin = await read(CLANKER_TOKEN_ABI, token, "originalAdmin", []).then((a) => a as string, refusedIsNull);
+      return clankerPad(admin, toChecksumAddress(claims), clankerName);
+    }
   }
   return { kind: "unknown" };
 }
