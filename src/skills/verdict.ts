@@ -1,13 +1,13 @@
 import { assertChecksummedAddress, toChecksumAddress } from "@/lib/address";
 import { messageOf } from "@/lib/errors";
 import { UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
-import { CLANKER_FACTORIES } from "@/config/launchpads";
+import { KNOWN_LAUNCHPADS } from "@/config/launchpads";
 import { tokenInfo, topHolders, type Holding, type TokenInfo } from "@/skills/blockscout";
 import { deepest, markets, type Market } from "@/skills/dexscreener";
 import { explorer, price, quoteWords, short, usd } from "@/skills/format";
 import { scan, type Flag, type Scan } from "@/skills/goplus";
 import { originOf, type Origin } from "@/skills/origin";
-import { launchpadOf, type Launchpad, type Proven } from "@/skills/launchpads";
+import { launchpadOf, type Launchpad, type PadId, type Proven } from "@/skills/launchpads";
 import { isV3, launchOf, launchpadOrigin, poolValue, v3FeeOf, v3ReferrerOf, type CoinFee, type LaunchRecord, type PoolValue } from "@/skills/launchpad";
 import { chainToken } from "@/skills/chaintoken";
 import { BRAND } from "@/brand";
@@ -277,7 +277,7 @@ export function originRows(o: Origin | null | undefined, now: number, pad: Prove
 export function launchpadRow(pad: Launchpad | undefined): Row[] {
   const label = "Launchpad";
   if (pad === undefined) return [row(label, "not checked — the launchpads' records could not be read", { tone: "warn" })];
-  if (pad.kind === "unknown") return [row(label, "none of the known launchpads (basepad.si, Feel.cash, Doppler, Clanker, Zora, this app's) has a record of it")];
+  if (pad.kind === "unknown") return [row(label, "none of the known launchpads (basepad.si, Feel.cash, Doppler, Clanker v0–v5, Zora, Flaunch, Virtuals, Mint Club, Ape.Store, this app's) has a record of it")];
   if (pad.kind === "claimed") return [row(label, `looks like ${pad.name}, but is NOT one: ${pad.why}`, { tone: "bad" })];
   const what = pad.guarantees.length ? ` — ${pad.guarantees.join("; ")}` : "";
   return [row(label, `${pad.name}: ${pad.how}${what}`, { tone: "ok", href: explorer.address(pad.address) })];
@@ -371,7 +371,7 @@ export function marketRows(pairs: readonly Market[] | null, now: number, stock: 
   if (m === null) {
     // MEASURED: DexScreener lists a stock-paired v4 pool only after its first trade
     const why = stock ? ` — DexScreener lists a pool paired with ${stock} only after its first trade; the value above is read from the pool itself` : "";
-    return [row("Market", `no market found on Base${why}`, { tone: "warn" })];
+    return [row("Market", `no market found on Base${why}`, stock ? {} : { tone: "warn" })];
   }
   const rows: Row[] = [
     row("Price", m.priceUsd === null ? "not quoted" : price(m.priceUsd)),
@@ -435,17 +435,22 @@ export async function tokenVerdict(input: string, now: number): Promise<Report> 
   ]);
   const [fee, referrer] = await Promise.all([v3FeeOf(launchpad, address), v3ReferrerOf(launchpad, address)]);
   const token = info ?? null;
-  // Recognize Clanker v5 and legacy v0–v3.1 factories when found via the launch transaction's creating contract
+  // Recognize Clanker v0–v5, Ape.Store, Flaunch, Virtuals, Mint Club, or any Blockscout-verified launchpad/factory contract (e.g. B20LaunchpadFactory)
   const viaAddr = origin?.via?.address?.toLowerCase();
-  const clankerVer = viaAddr ? CLANKER_FACTORIES[viaAddr] : undefined;
+  const knownVia = viaAddr ? KNOWN_LAUNCHPADS[viaAddr] : undefined;
+  const viaPadName = origin?.via?.name && /launchpad|factory|bonding|flaunch|clanker|zora|doppler|virtuals|basepad|ape\.?store|mint\.?club/i.test(origin.via.name)
+    ? origin.via.name
+    : null;
   const resolvedPad: Launchpad | undefined =
-    other?.kind === "unknown" && clankerVer && origin?.via?.address
+    other?.kind === "unknown" && origin?.via?.address && (knownVia || viaPadName)
       ? {
           kind: "proven",
-          id: "clanker",
-          name: clankerVer,
+          id: (knownVia?.id ?? "other") as PadId,
+          name: knownVia?.name ?? viaPadName!,
           address: origin.via.address,
-          how: `${clankerVer}'s factory created this token on Base`,
+          how: knownVia
+            ? `${knownVia.name} created this token on Base`
+            : `Blockscout verified ${viaPadName} as the contract that created this token`,
           guarantees: [],
           launcher: origin.launcher?.address ?? null,
         }

@@ -18,6 +18,7 @@ import { WalletProvider } from "@/ui/WalletProvider";
 import { MarketsProvider } from "@/features/markets/MarketsProvider";
 import { PhotoIntro } from "@/intro/PhotoIntro";
 import { Assistant } from "@/ui/Assistant";
+import { TxToast } from "@/ui/TxToast";
 import { Screensaver } from "@/ui/Screensaver";
 import { Welcome } from "@/ui/Welcome";
 import { showWelcome } from "@/lib/welcome";
@@ -285,6 +286,7 @@ function Home({ introPlayed, onIntroDone }: { introPlayed: boolean; onIntroDone:
       {/* Q no longer greets on its own (2026-10-29, the owner: "extremely simple"): it speaks only when
           something real happens — a red verdict, fees waiting, a Rugsweeper win */}
       {intro ? <PhotoIntro onDone={endIntro} /> : <Assistant greet={false} />}
+      {!intro && <TxToast />}
       <LoanAlerts />
       {!intro && welcome && <Welcome onClose={closeWelcome} />}
       {!intro && <Screensaver />}

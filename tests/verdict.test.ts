@@ -705,6 +705,30 @@ describe("a whole Token Verdict", () => {
     expect(report.rows.find((x) => x.label === "Launched by")?.value).toMatch(/, through Clanker$/);
   });
 
+  it("names a Blockscout-verified launchpad factory like B20LaunchpadFactory when not in KNOWN_LAUNCHPADS", async () => {
+    const b20Factory = "0x111111111111111111111111111111111111b200";
+    world({
+      get: degenSources({
+        [`${BLOCKSCOUT}/addresses/${TOKENS.degen}`]: {
+          ...VX.addressDegen,
+          creation_transaction_hash: VX.creationDegen.hash,
+          creator_address_hash: b20Factory,
+        },
+        [`${BLOCKSCOUT}/transactions/${VX.creationDegen.hash}`]: {
+          ...VX.creationDegen,
+          to: { hash: b20Factory, name: "B20LaunchpadFactory" },
+        },
+      }),
+    });
+    const report = await tokenVerdict(TOKENS.degen, CAPTURED_AT);
+    expect(report.rows.find((x) => x.label === "Launchpad")).toMatchObject({
+      value: "B20LaunchpadFactory: Blockscout verified B20LaunchpadFactory as the contract that created this token",
+      tone: "ok",
+      href: `https://basescan.org/address/${b20Factory}`,
+    });
+    expect(report.rows.find((x) => x.label === "Launcher's track record")?.value).toBe("1+ launch through B20LaunchpadFactory");
+  });
+
   it("is a skill: one token address, checked before anything is read", async () => {
     expect(verdictSkill.args.map((a) => a.name)).toEqual(["token address"]);
     await expect(verdictSkill.run(["degen"])).rejects.toThrow(/Token/);

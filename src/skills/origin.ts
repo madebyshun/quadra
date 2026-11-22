@@ -1,5 +1,5 @@
 import { BASE, UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
-import { CLANKER_FACTORIES } from "@/config/launchpads";
+import { KNOWN_LAUNCHPADS } from "@/config/launchpads";
 import { BLOCKSCOUT } from "@/skills/blockscout";
 import { blockAt } from "@/skills/blocktime";
 import type { Market } from "@/skills/dexscreener";
@@ -172,8 +172,8 @@ async function launchTx(token: string, pairs: readonly Market[]): Promise<{ hash
   const v4 = pairs.find((p) => p.pair?.length === 66 && p.createdAt !== null);
   const hash = v4 ? await poolLaunch(v4.pair!, v4.createdAt!) : null;
   if (hash) return { hash, creator };
-  // Keep a known factory creator (e.g. Clanker v5) even if the pool Initialize log was outside the window
-  if (creator && CLANKER_FACTORIES[creator.toLowerCase()]) return { hash: null, creator };
+  // Keep a known factory creator (e.g. Clanker v0-v5, Flaunch, Ape.Store) even if the pool Initialize log was outside the window
+  if (creator && KNOWN_LAUNCHPADS[creator.toLowerCase()]) return { hash: null, creator };
   return null;
 }
 
@@ -206,7 +206,7 @@ export async function originOf(token: string, pairs: readonly Market[], pad: Pro
   const found = await launchTx(token, pairs);
   if (!found) return padVia ? { via: padVia, launcher: null, relay: "no launch transaction on record" } : null;
   if (!found.hash) {
-    const via = padVia ?? (found.creator ? { address: found.creator, name: CLANKER_FACTORIES[found.creator.toLowerCase()] ?? null } : null);
+    const via = padVia ?? (found.creator ? { address: found.creator, name: KNOWN_LAUNCHPADS[found.creator.toLowerCase()]?.name ?? null } : null);
     return via ? { via, launcher: null, relay: "no launch transaction on record" } : null;
   }
   const tx = await getJson(SERVICE, `${BLOCKSCOUT}/transactions/${found.hash}`);
@@ -223,16 +223,16 @@ export async function originOf(token: string, pairs: readonly Market[], pad: Pro
   // the contract that CREATED the token, when Blockscout indexed it — never the transaction's `to` by default
   const creator = found.creator && !same(found.creator, from) ? found.creator : null;
   if (creator) {
-    const known = CLANKER_FACTORIES[creator.toLowerCase()] ?? null;
+    const known = KNOWN_LAUNCHPADS[creator.toLowerCase()]?.name ?? null;
     const via = { address: creator, name: (to && same(to, creator) ? toName : null) ?? known };
     if (bundle) return { via, launcher: null, relay: "an ERC-4337 bundle" };
     const l = await launcherProfile(from, creator);
-    return { via, launcher: to && same(to, creator) ? l : atLeastOne(l) };
+    return { via, launcher: atLeastOne(l) };
   }
   if (bundle) return { via: null, launcher: null, relay: "an ERC-4337 bundle" };
   if (!to) return { via: null, launcher: await launcherProfile(from, null) };
   // with no creator on record, `to` is the factory only when the sender is a plain wallet calling it
   const code = String(await rpc("eth_getCode", [from, "latest"]));
   if (same(to, from) || DELEGATED.test(code)) return { via: null, launcher: await launcherProfile(from, null), relay: "an EIP-7702 smart account" };
-  return { via: { address: to, name: toName }, launcher: await launcherProfile(from, to) };
+  return { via: { address: to, name: toName }, launcher: atLeastOne(await launcherProfile(from, to)) };
 }

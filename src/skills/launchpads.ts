@@ -12,6 +12,12 @@ import {
   DOPPLER_NOOP_MIGRATOR,
   FEEL_INTEGRATOR,
   FEEL_SUFFIX,
+  FLAUNCH_ABI,
+  FLAUNCH_CONTRACTS,
+  MINT_CLUB_ABI,
+  MINT_CLUB_BOND,
+  VIRTUALS_ABI,
+  VIRTUALS_CONTRACTS,
   ZORA_ABI,
   ZORA_FACTORY,
 } from "@/config/launchpads";
@@ -35,7 +41,7 @@ import { launchOf, type LaunchRecord } from "@/skills/launchpad";
  * A failed read is a thrown error, which the verdict shows as "not checked" (hard rule 12).
  */
 
-export type PadId = "quadra" | "basepad" | "feel" | "doppler" | "clanker" | "zora";
+export type PadId = "quadra" | "basepad" | "feel" | "doppler" | "clanker" | "zora" | "flaunch" | "virtuals" | "mintclub" | "apestore" | "other";
 
 export type Launchpad =
   | {
@@ -159,6 +165,77 @@ export function zoraPad(version: number): Proven | null {
   };
 }
 
+export function flaunchPad(tokenId: bigint, contract: string, label: string): Proven | null {
+  if (tokenId === 0n) return null;
+  return {
+    kind: "proven",
+    id: "flaunch",
+    name: label,
+    address: toChecksumAddress(contract),
+    how: `${label} recorded it as Flaunch token #${tokenId}`,
+    guarantees: [],
+    launcher: null,
+  };
+}
+
+/** Read raw ABI-encoded 32-byte address word at `wordIndex` from hex output. */
+function addressWord(raw: string, wordIndex: number): string | null {
+  const start = 2 + wordIndex * 64;
+  if (raw.length < start + 64) return null;
+  const addr = `0x${raw.slice(start + 24, start + 64)}`;
+  return same(addr, ZERO) ? null : toChecksumAddress(addr);
+}
+
+/**
+ * Virtuals Protocol Bonding: `tokenInfo(token)` returns `struct Token` which contains dynamic
+ * fields (`Data`, `string`, `uint8[]`), so Solidity ABI-encodes word 0 as the `0x20` tuple offset,
+ * followed by `(address creator, address token, address pair, address agentToken, ...)`.
+ */
+export async function virtualsOf(token: string): Promise<Proven | null> {
+  const data = encodeFunctionData({ abi: VIRTUALS_ABI, functionName: "tokenInfo", args: [token as `0x${string}`] });
+  const results = await Promise.all(
+    Object.entries(VIRTUALS_CONTRACTS).map(async ([contract, label]): Promise<Proven | null> => {
+      const raw = await ethCall(contract, data).catch(refusedIsNull);
+      if (!raw || raw.length < 2 + 64 * 3) return null;
+      const isDynamicTuple = raw.slice(2, 66).toLowerCase() === "0000000000000000000000000000000000000000000000000000000000000020";
+      const base = isDynamicTuple ? 1 : 0;
+      const creator = addressWord(raw, base);
+      const recordedToken = addressWord(raw, base + 1);
+      const agentToken = addressWord(raw, base + 3);
+      const matches = (recordedToken && same(recordedToken, token)) || (agentToken && same(agentToken, token));
+      if (!creator || !matches) return null;
+      return {
+        kind: "proven" as const,
+        id: "virtuals" as const,
+        name: label,
+        address: toChecksumAddress(contract),
+        how: `${label}'s Bonding contract recorded its launch`,
+        guarantees: [],
+        launcher: creator,
+      };
+    }),
+  );
+  return results.find((r): r is Proven => r !== null) ?? null;
+}
+
+/** Mint Club V2 `MCV2_Bond`: `tokenBond(token)` returns `(address creator, ...)` as word 0. */
+export async function mintClubOf(token: string): Promise<Proven | null> {
+  const data = encodeFunctionData({ abi: MINT_CLUB_ABI, functionName: "tokenBond", args: [token as `0x${string}`] });
+  const raw = await ethCall(MINT_CLUB_BOND, data).catch(refusedIsNull);
+  if (!raw) return null;
+  const creator = addressWord(raw, 0);
+  if (!creator) return null;
+  return {
+    kind: "proven",
+    id: "mintclub",
+    name: "Mint Club V2",
+    address: MINT_CLUB_BOND,
+    how: "Mint Club V2's Bond contract recorded its bonding curve",
+    guarantees: [],
+    launcher: creator,
+  };
+}
+
 /** A call that reverts is "no claim made"; any other failure is a read that did not happen. */
 const refusedIsNull = (e: unknown): null => {
   if (e instanceof RpcRefusal) return null;
@@ -172,6 +249,11 @@ const refusedIsNull = (e: unknown): null => {
 export async function launchpadOf(token: string, ours: Promise<LaunchRecord | null> = launchOf(token)): Promise<Launchpad> {
   const mine = await ours;
   if (mine) return quadraPad(mine);
+  const flaunchChecks = Object.entries(FLAUNCH_CONTRACTS).map(([addr, label]) =>
+    read(FLAUNCH_ABI, addr, "tokenId", [token])
+      .then((id) => flaunchPad(id as bigint, addr, label))
+      .catch(refusedIsNull),
+  );
   const found = await Promise.all([
     read(BASEPAD_ABI, BASEPAD.factory, "infoOf", [token]).then((r) => basepadPad(r as never)),
     read(DOPPLER_ABI, DOPPLER_AIRLOCK, "getAssetData", [token]).then((r) => dopplerPad(r as never)),
@@ -180,6 +262,9 @@ export async function launchpadOf(token: string, ours: Promise<LaunchRecord | nu
       .then((r) => clankerOf(token, r as never, CLANKER_V5_FACTORY, "Clanker v5"))
       .catch(refusedIsNull),
     read(ZORA_ABI, ZORA_FACTORY, "getVersionForDeployedCoin", [token]).then((r) => zoraPad(Number(r))),
+    ...flaunchChecks,
+    virtualsOf(token),
+    mintClubOf(token),
   ]);
   const proven = found.find((p): p is Proven => p !== null);
   if (token.toLowerCase().endsWith(FEEL_SUFFIX) && proven?.id !== "feel") {

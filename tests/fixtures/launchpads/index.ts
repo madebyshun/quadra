@@ -36,7 +36,7 @@
 import records from "./rpc-records.json";
 import padLogs from "./rpc-pad-logs.json";
 import code from "./rpc-code.json";
-import { BASEPAD, CLANKER_FACTORY, CLANKER_V5_FACTORY, DOPPLER_AIRLOCK, ZORA_FACTORY } from "@/config/launchpads";
+import { BASEPAD, CLANKER_FACTORY, CLANKER_V5_FACTORY, DOPPLER_AIRLOCK, FLAUNCH_CONTRACTS, MINT_CLUB_BOND, VIRTUALS_CONTRACTS, ZORA_FACTORY } from "@/config/launchpads";
 import { RpcError } from "../../net";
 
 export const PX = { records, padLogs, code };
@@ -60,6 +60,8 @@ const PAD_OF: { [to: string]: keyof Record } = {
   [ZORA_FACTORY.toLowerCase()]: "zora",
 };
 
+const ZERO_WORD = "0x" + "0".repeat(64);
+const ZERO_THREE_WORDS = "0x" + "0".repeat(64 * 3);
 const answer = (a: unknown) => (typeof a === "string" ? a : new RpcError((a as { error: { message: string } }).error.message));
 
 /**
@@ -73,8 +75,12 @@ export function padCalls(as: { [token: string]: Captured } = {}): (method: strin
     if (method !== "eth_call") return undefined;
     const call = params[0] as { to: string; data: string; from?: string };
     if (call.from) return undefined;
-    if (call.to.toLowerCase() === CLANKER_V5_FACTORY.toLowerCase()) return answer(records.degen.clanker);
-    const pad = PAD_OF[call.to.toLowerCase()];
+    const to = call.to.toLowerCase();
+    if (to === CLANKER_V5_FACTORY.toLowerCase()) return answer(records.degen.clanker);
+    if (to in FLAUNCH_CONTRACTS) return ZERO_WORD;
+    if (to in VIRTUALS_CONTRACTS) return ZERO_THREE_WORDS;
+    if (to === MINT_CLUB_BOND.toLowerCase()) return ZERO_WORD;
+    const pad = PAD_OF[to];
     if (pad) return answer(stand(`0x${call.data.slice(34, 74)}`)[pad]);
     // factory() — the selector computed with `cast sig "factory()"`
     if (call.data === "0xc45a0155") return answer(stand(call.to).tokenFactory);

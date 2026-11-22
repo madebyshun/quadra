@@ -106,3 +106,62 @@ export const CLANKER_ABI = parseAbi(["function deploymentInfoForToken(address to
 export const ZORA_FACTORY = "0x777777751622c0d3258f214F9DF38E35BF45baF3";
 
 export const ZORA_ABI = parseAbi(["function getVersionForDeployedCoin(address coin) view returns (uint8)"]);
+
+/**
+ * Flaunch (`flayerlabs/flaunchgg-contracts`) on Base (8453).
+ * Each `Flaunch` / `AnyFlaunch` ERC-721 contract exposes `tokenId(address memecoin)` which returns
+ * a non-zero `uint256` when the token was launched through it, and `0` (or reverts) otherwise.
+ */
+export const FLAUNCH_CONTRACTS: Readonly<Record<string, string>> = {
+  "0x6a53f8b799be11a2a3264ef0bff183dcb12d9571": "Flaunch v1.0",
+  "0xb4512bf57d50fbcb64a3adf8b17a79b2a204c18c": "Flaunch v1.1",
+  "0x0cf6bdf0a85a9d6763361037985b76c8893553af": "Flaunch v1.2",
+  "0x516af52d0c629b5e378da4dc64ecb0744ce10109": "Flaunch v1.3",
+  "0xc5b2e8f197407263f4b62a35c71bfc394ecf95d5": "Flaunch (AnyFlaunch)",
+};
+
+export const FLAUNCH_HOOKS: Readonly<Record<string, string>> = {
+  "0xb903b0ab7bcee8f5e4d8c9b10a71aac7135d6fdc": "Flaunch v1.2",
+  "0x23321f11a6d44fd1ab790044fdfde5758c902fdc": "Flaunch v1.3",
+  "0x8dc3b85e1dc1c846ebf3971179a751896842e5dc": "Flaunch (AnyPositionManager)",
+  "0xe753a351fb498051a09dc130fcc29aebc76525dc": "Flaunch (vested)",
+};
+
+export const FLAUNCH_ABI = parseAbi(["function tokenId(address memecoin) view returns (uint256)"]);
+
+/**
+ * Virtuals Protocol `Bonding` proxies on Base (8453).
+ * `tokenInfo(address)` returns a dynamic `Token` struct whose first words are
+ * `(offset 0x20, address creator, address token, address pair, address agentToken, ...)`.
+ */
+export const VIRTUALS_BONDING = "0xF66DeA7b3e897cD44A5a231c61B6B4423d613259";
+export const VIRTUALS_BONDING_V2 = "0x3Ae599aF771bAAE833b040C6f1389FFE134D014A";
+export const VIRTUALS_CONTRACTS: Readonly<Record<string, string>> = {
+  [VIRTUALS_BONDING.toLowerCase()]: "Virtuals Protocol",
+  [VIRTUALS_BONDING_V2.toLowerCase()]: "Virtuals Protocol (BondingV2)",
+};
+export const VIRTUALS_ABI = parseAbi(["function tokenInfo(address token) view returns (address)"]);
+
+/**
+ * Mint Club V2 `MCV2_Bond` on Base (8453).
+ * `tokenBond(address)` returns a tuple whose first word is `address creator`.
+ */
+export const MINT_CLUB_BOND = "0xc5a076cad94176c2996B32d8466Be1cE757FAa27";
+export const MINT_CLUB_ABI = parseAbi(["function tokenBond(address token) view returns (address)"]);
+
+/** Ape.Store deployer/router contract on Base (8453). */
+export const APESTORE_CONTRACT = "0x0bf8edd756ff6caf3f583d67a9fd8b237e40f58a";
+
+/** Unified map of known Base launchpad contracts (factories, proxies, hooks) keyed lowercase. */
+export const KNOWN_LAUNCHPADS: Readonly<Record<string, { readonly id: string; readonly name: string }>> = {
+  [BASEPAD.factory.toLowerCase()]: { id: "basepad", name: "basepad.si" },
+  [DOPPLER_AIRLOCK.toLowerCase()]: { id: "doppler", name: "Doppler" },
+  [ZORA_FACTORY.toLowerCase()]: { id: "zora", name: "Zora" },
+  [VIRTUALS_BONDING.toLowerCase()]: { id: "virtuals", name: "Virtuals Protocol" },
+  [VIRTUALS_BONDING_V2.toLowerCase()]: { id: "virtuals", name: "Virtuals Protocol" },
+  [MINT_CLUB_BOND.toLowerCase()]: { id: "mintclub", name: "Mint Club V2" },
+  [APESTORE_CONTRACT.toLowerCase()]: { id: "apestore", name: "Ape.Store" },
+  ...Object.fromEntries(Object.entries(CLANKER_FACTORIES).map(([addr, name]) => [addr.toLowerCase(), { id: "clanker", name }])),
+  ...Object.fromEntries(Object.entries(FLAUNCH_CONTRACTS).map(([addr, name]) => [addr.toLowerCase(), { id: "flaunch", name }])),
+  ...Object.fromEntries(Object.entries(FLAUNCH_HOOKS).map(([addr, name]) => [addr.toLowerCase(), { id: "flaunch", name }])),
+};

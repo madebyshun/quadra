@@ -3,6 +3,8 @@ import { useCallback, useRef, useState } from "react";
 import { BASE } from "@/config/chain";
 import { messageOf } from "@/lib/errors";
 import { sendTransaction, waitForReceipt, type Receipt, type TxRequest, type WaitOptions } from "@/lib/transact";
+import { play } from "@/lib/sound";
+import { pushTxNotice } from "@/lib/txNotice";
 import type { Eip1193Provider } from "@/lib/wallet";
 
 /**
@@ -44,6 +46,8 @@ export type TxSteps = {
   reset(): void;
 };
 
+let nextRunId = 0;
+
 export function useTxSteps(wait: WaitOptions = {}, durable = false): TxSteps {
   const [states, setStates] = useState<readonly StepState[]>([]);
   const [running, setRunning] = useState(false);
@@ -53,10 +57,25 @@ export function useTxSteps(wait: WaitOptions = {}, durable = false): TxSteps {
   const run = useCallback(
     async (provider: Eip1193Provider, from: string, steps: readonly Step[]) => {
       setRunning(true);
+      const runId = `tx-${++nextRunId}`;
       const now: StepState[] = steps.map((s) => ({ label: s.label, status: "queued" }));
       const show = (i: number, state: StepState) => {
         now[i] = state;
         setStates([...now]);
+        if (state.status !== "queued") {
+          pushTxNotice({
+            id: runId,
+            label: state.label,
+            status: state.status,
+            step: i + 1,
+            total: steps.length,
+            ...("hash" in state ? { hash: state.hash } : {}),
+            ...("block" in state ? { block: state.block } : {}),
+            ...("why" in state ? { why: state.why } : {}),
+          });
+          if (state.status === "confirmed" && i === steps.length - 1) play("ok");
+          else if (state.status === "reverted" || state.status === "failed") play("error");
+        }
       };
       setStates([...now]);
       lastConfirmed.current = 0;

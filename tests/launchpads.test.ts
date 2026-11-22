@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { encodeAbiParameters, keccak256 as viemKeccak, toHex as viemHex } from "viem";
-import { BASEPAD, CLANKER_FACTORY, DOPPLER_AIRLOCK, FEEL_INTEGRATOR, ZORA_FACTORY } from "@/config/launchpads";
+import { BASEPAD, CLANKER_FACTORY, DOPPLER_AIRLOCK, FEEL_INTEGRATOR, MINT_CLUB_BOND, VIRTUALS_BONDING, ZORA_FACTORY } from "@/config/launchpads";
 import { BLOCKSCOUT } from "@/skills/blockscout";
 import { parseMarkets } from "@/skills/dexscreener";
 import {
@@ -135,6 +135,57 @@ describe("which launchpad made a token, from its own record", () => {
     expect(dopplerPad([z, z, z, z, z, z, z, 0n, 0n, z])).toBeNull();
     expect(dopplerPad([z, z, z, z, BASEPAD.factory, z, z, 0n, 0n, FEEL_INTEGRATOR])!.guarantees).toEqual([]);
   });
+
+  it("proves Flaunch, Virtuals Protocol, and Mint Club V2 from their on-chain records", async () => {
+    const flaunchV13 = "0x516af52d0c629b5e378da4dc64ecb0744ce10109";
+    const creator = "0x9F9B1b095831e39b90C56991E1a259304354B09f";
+    const padWord = (a: string) => a.toLowerCase().slice(2).padStart(64, "0");
+
+    // Flaunch v1.3: tokenId(token) -> 42
+    const fRoute = both();
+    net(rpcOf((m, p) => {
+      const call = (p as [{ to: string }])[0];
+      if (m === "eth_call" && call.to.toLowerCase() === flaunchV13) return `0x${(42n).toString(16).padStart(64, "0")}`;
+      return fRoute(m, p);
+    }));
+    expect(await launchpadOf(T.degen)).toMatchObject({
+      kind: "proven",
+      id: "flaunch",
+      name: "Flaunch v1.3",
+      how: "Flaunch v1.3 recorded it as Flaunch token #42",
+    });
+
+    // Virtuals Protocol Bonding: tokenInfo(token) -> dynamic tuple offset 0x20, then (creator, token, pair, agentToken, ...)
+    const offset = `${"0".repeat(62)}20`;
+    net(rpcOf((m, p) => {
+      const call = (p as [{ to: string }])[0];
+      if (m === "eth_call" && call.to.toLowerCase() === VIRTUALS_BONDING.toLowerCase()) {
+        return `0x${offset}${padWord(creator)}${padWord(T.degen)}${"0".repeat(64)}${"0".repeat(64)}`;
+      }
+      return fRoute(m, p);
+    }));
+    expect(await launchpadOf(T.degen)).toMatchObject({
+      kind: "proven",
+      id: "virtuals",
+      name: "Virtuals Protocol",
+      address: VIRTUALS_BONDING,
+      launcher: creator,
+    });
+
+    // Mint Club V2 MCV2_Bond: tokenBond(token) -> (creator, ...)
+    net(rpcOf((m, p) => {
+      const call = (p as [{ to: string }])[0];
+      if (m === "eth_call" && call.to.toLowerCase() === MINT_CLUB_BOND.toLowerCase()) return `0x${padWord(creator)}${"0".repeat(64)}`;
+      return fRoute(m, p);
+    }));
+    expect(await launchpadOf(T.degen)).toMatchObject({
+      kind: "proven",
+      id: "mintclub",
+      name: "Mint Club V2",
+      address: MINT_CLUB_BOND,
+      launcher: creator,
+    });
+  });
 });
 
 describe("the radar's launchpad logs", () => {
@@ -234,10 +285,10 @@ describe("where a token came from, with no launchpad known", () => {
     const created = { ...VX.addressBoar, creation_transaction_hash: VX.creationBoar.hash, creator_address_hash: BASEPAD.factory };
     net({ get: blockscout({ [`${BLOCKSCOUT}/addresses/${TOKENS.boar}`]: created }) });
     const o = (await originOf(TOKENS.boar, []))!;
-    expect(o.via).toEqual({ address: BASEPAD.factory, name: null });
+    expect(o.via).toEqual({ address: BASEPAD.factory, name: "basepad.si" });
     expect(o.launcher).toMatchObject({ factoryCalls: 1, callsComplete: false });
     net({ get: blockscout({ [`${BLOCKSCOUT}/addresses/${TOKENS.boar}`]: created, [`${BLOCKSCOUT}/transactions/${VX.creationBoar.hash}`]: { ...VX.creationBoar, method: "handleOps" } }) });
-    expect(await originOf(TOKENS.boar, [])).toEqual({ via: { address: BASEPAD.factory, name: null }, launcher: null, relay: "an ERC-4337 bundle" });
+    expect(await originOf(TOKENS.boar, [])).toEqual({ via: { address: BASEPAD.factory, name: "basepad.si" }, launcher: null, relay: "an ERC-4337 bundle" });
   });
 
   it("does not take a 7702 account's `to` for the launchpad when no creator is on record", async () => {
