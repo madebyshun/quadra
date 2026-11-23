@@ -149,3 +149,16 @@
 @media (prefers-reduced-motion: reduce) {
   .about__button { transition: none; }
 }
+
+.about__hero h1 {
+  display: flex;
+  align-items: center;
+  gap: .13em;
+  color: #fff;
+}
+
+.about__hero h1 img {
+  width: .72em;
+  height: .72em;
+  flex: none;
+}

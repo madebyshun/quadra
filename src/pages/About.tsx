@@ -10,7 +10,6 @@ import { messageOf } from "@/lib/errors";
 import { launchOf } from "@/skills/launchpad";
 import { explorer, short, tokenAmount } from "@/skills/format";
 import { Flywheel } from "./Flywheel";
-import aboutSky from "@/assets/quadra-banner.jpg";
 import "./About.css";
 
 /**
@@ -88,10 +87,10 @@ export function About() {
       </header>
 
       <section className="about__hero">
-        <img className="about__sky" src={aboutSky} width="1376" height="768" fetchPriority="high" alt="Sunlit wildflower hills, a lone green tree, and summer cumulus clouds under a clear blue sky" />
+        <img className="about__sky" src="/brand/quadra-hero.webp" width="1902" height="827" fetchPriority="high" alt="" />
         <div className="about__hero-inner">
           <p className="about__eyebrow">A personal computer. An open world.</p>
-          <h1>{BRAND.name}</h1>
+          <h1><img src="/brand/icon-white.svg" width="80" height="80" alt="" />{BRAND.name}</h1>
           <h2>Your own<br />on-chain<br /><em>supercomputer.</em></h2>
           <p className="about__lede">Research a token. Build a basket. Launch something new. Your corner of {BASE.name}, signed in your own wallet.</p>
           <div className="about__row">
