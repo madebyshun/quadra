@@ -15,6 +15,7 @@ import { explorer } from "@/skills/format";
 import { row, type Report, type Row, type Tone } from "@/skills/types";
 import { Crt } from "@/ui/Crt";
 import { Gel } from "@/ui/Gel";
+import { QuadraSelect } from "@/ui/Select";
 import { useWalletSession } from "@/ui/WalletProvider";
 import { ReportView } from "@/features/panels/ReportView";
 import { TxStepList, useTxSteps } from "@/features/panels/TxSteps";
@@ -311,21 +312,15 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
             )}
           </div>
         </div>
-        <label className="group__row">
+        <div className="group__row">
           <span>Slippage</span>
-          <select
-            className="field"
-            aria-label="Slippage"
-            value={slippage.bps}
-            onChange={(e) => edit(setSlippage)(SLIPPAGE.find((s) => s.bps === Number(e.target.value))!)}
-          >
-            {SLIPPAGE.map((s) => (
-              <option key={s.bps} value={s.bps}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          <QuadraSelect
+            ariaLabel="Slippage"
+            value={String(slippage.bps)}
+            onChange={(v) => edit(setSlippage)(SLIPPAGE.find((s) => s.bps === Number(v))!)}
+            options={SLIPPAGE.map((s) => ({ value: String(s.bps), label: s.label }))}
+          />
+        </div>
       </fieldset>
 
       {touchesStock ? <p className="crt__amber">{RESTRICTED_TEXT}</p> : null}

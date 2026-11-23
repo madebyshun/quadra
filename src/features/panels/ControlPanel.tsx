@@ -11,6 +11,7 @@ import {
   setWallpaper,
   wallpaper,
 } from "@/lib/settings";
+import { QuadraSelect } from "@/ui/Select";
 import { useSetting } from "@/ui/useSettings";
 
 /**
@@ -61,17 +62,17 @@ export function ControlPanel() {
           <input type="checkbox" checked={saver} onChange={(e) => setSaverOn(e.target.checked)} />
           Show Base's blocks when the machine is idle
         </label>
-        <label className="control__row">
-          Wait
-          <select value={minutes} disabled={!saver} onChange={(e) => setSaverMinutes(Number(e.target.value))}>
-            {SAVER_MINUTES.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-          minutes
-        </label>
+        <div className="control__row">
+          <span>Wait</span>
+          <QuadraSelect
+            ariaLabel="Wait minutes"
+            value={String(minutes)}
+            disabled={!saver}
+            onChange={(v) => setSaverMinutes(Number(v))}
+            options={SAVER_MINUTES.map((m) => ({ value: String(m), label: String(m) }))}
+          />
+          <span>minutes</span>
+        </div>
       </fieldset>
 
       <fieldset className="control__group">

@@ -1,4 +1,5 @@
 import { USDC, WETH } from "@/config/chain";
+import { QuadraSelect } from "@/ui/Select";
 import { assertChecksummedAddress, sameAddress } from "@/lib/address";
 import { formatAmount } from "@/lib/amount";
 import { balanceOf, ETH, ETH_GAS_RESERVE, readToken, type Asset } from "@/lib/erc20";
@@ -43,15 +44,20 @@ export function TokenPicker({
 }) {
   return (
     <>
-      <label className="group__row">
+      <div className="group__row">
         <span>{label}</span>
-        <select className="field" aria-label={label} value={choice} onChange={(e) => onChoice(e.target.value as Choice)}>
-          <option value="ETH">ETH</option>
-          <option value="USDC">USDC</option>
-          <option value="WETH">WETH</option>
-          <option value="other">{customLabel || "0x…"}</option>
-        </select>
-      </label>
+        <QuadraSelect
+          ariaLabel={label}
+          value={choice}
+          onChange={(v) => onChoice(v as Choice)}
+          options={[
+            { value: "ETH", label: "ETH" },
+            { value: "USDC", label: "USDC" },
+            { value: "WETH", label: "WETH" },
+            { value: "other", label: customLabel || "0x…" },
+          ]}
+        />
+      </div>
       {choice === "other" ? (
         <label className="group__row">
           <span>{label} address</span>

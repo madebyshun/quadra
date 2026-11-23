@@ -24,6 +24,7 @@ import {
 import { tokenVerdict, poolValueRows } from "@/skills/verdict";
 import { row, type Report } from "@/skills/types";
 import { Gel } from "@/ui/Gel";
+import { QuadraSelect } from "@/ui/Select";
 import { useWalletSession } from "@/ui/WalletProvider";
 import { ReportView } from "@/features/panels/ReportView";
 import { PoolTrade } from "@/features/panels/PoolTrade";
@@ -491,15 +492,27 @@ export function CoinsPanel() {
               {t === "all" ? "All" : t === "crypto" ? "eth-paired" : "stock-paired"}
             </button>
           ))}
-          <select className="field coins__asset" aria-label="Paired with" value={asset ?? ""} onChange={(e) => setFilter({ pair: e.target.value || null })}>
-            <option value="">All assets</option>
-            {(ready ? assetsOf(filterCoins(ready.coins, tab, null)) : []).map((a) => (
-              <option key={a} value={a}>{a}</option>
-            ))}
-          </select>
+          <QuadraSelect
+            className="coins__asset"
+            ariaLabel="Paired with"
+            value={asset ?? ""}
+            onChange={(v) => setFilter({ pair: v || null })}
+            options={[
+              { value: "", label: "All assets" },
+              ...(ready ? assetsOf(filterCoins(ready.coins, tab, null)) : []).map((a) => ({ value: a, label: a })),
+            ]}
+          />
         </div>
       </div>
-      <label className="coins__sort">sort by <select className="field" aria-label="Sort coins" value={sort} onChange={(e) => setFilter({ sort: e.target.value === "trending" ? null : e.target.value })}>{SORTS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+      <div className="coins__sort">
+        <span>sort by</span>
+        <QuadraSelect
+          ariaLabel="Sort coins"
+          value={sort}
+          onChange={(v) => setFilter({ sort: v === "trending" ? null : v })}
+          options={SORTS.map((item) => ({ value: item.id, label: item.label }))}
+        />
+      </div>
 
       {list === "reading" ? (
         <p className="dim">Reading the launchpad&apos;s launches…</p>

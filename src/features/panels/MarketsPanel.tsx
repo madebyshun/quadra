@@ -10,6 +10,7 @@ import { THIN_MARKET_USD, TRADE_CRYPTO } from "@/config/markets";
 import { row, type Report, type Row } from "@/skills/types";
 import { Crt } from "@/ui/Crt";
 import { Gel } from "@/ui/Gel";
+import { QuadraSelect } from "@/ui/Select";
 import { useOptionalWalletSession } from "@/ui/WalletProvider";
 import { ReportView } from "@/features/panels/ReportView";
 import { StockHealth } from "@/features/panels/StockHealth";
@@ -753,20 +754,21 @@ export function MarketsPanel() {
 
       <fieldset className="group">
         <legend>Add to the watchlist</legend>
-        <label className="group__row">
+        <div className="group__row">
           <span>Base stock</span>
-          <select className="field" aria-label="Base stock" value={baseStock} onChange={(e) => setBaseStock(e.target.value)}>
-            <option value="">{allBaseSymbols.length ? "Pick a Coinbase stock on Base…" : "Coinbase's list is not loaded"}</option>
-            {allBaseSymbols.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          <QuadraSelect
+            ariaLabel="Base stock"
+            value={baseStock}
+            onChange={setBaseStock}
+            options={[
+              { value: "", label: allBaseSymbols.length ? "Pick a Coinbase stock on Base…" : "Coinbase's list is not loaded" },
+              ...allBaseSymbols.map((s) => ({ value: s, label: s })),
+            ]}
+          />
           <Gel onClick={() => (add({ kind: "basestock", symbol: baseStock }), setBaseStock(""))} disabled={baseStock === ""}>
             Add
           </Gel>
-        </label>
+        </div>
         <label className="group__row">
           <span>Base token</span>
           <input
@@ -782,20 +784,21 @@ export function MarketsPanel() {
           </Gel>
         </label>
         {FLAGS.robinhood ? (
-          <label className="group__row">
+          <div className="group__row">
             <span>Robinhood stock</span>
-            <select className="field" aria-label="Robinhood stock" value={stock} onChange={(e) => setStock(e.target.value)}>
-              <option value="">{symbols.length ? "Pick one of Robinhood's stock tokens…" : "Robinhood's list is not loaded"}</option>
-              {symbols.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
+            <QuadraSelect
+              ariaLabel="Robinhood stock"
+              value={stock}
+              onChange={setStock}
+              options={[
+                { value: "", label: symbols.length ? "Pick one of Robinhood's stock tokens…" : "Robinhood's list is not loaded" },
+                ...symbols.map((s) => ({ value: s, label: s })),
+              ]}
+            />
             <Gel onClick={() => (add({ kind: "stock", symbol: stock }), setStock(""))} disabled={stock === ""}>
               Add
             </Gel>
-          </label>
+          </div>
         ) : null}
         <Gel quiet onClick={reset}>
           Reset to the default list

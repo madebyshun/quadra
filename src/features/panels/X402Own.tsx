@@ -6,6 +6,7 @@ import { formatAmount } from "@/lib/amount";
 import { API_PATH } from "@/server/apiPath";
 import { SKILLS } from "@/skills";
 import { Gel } from "@/ui/Gel";
+import { QuadraSelect } from "@/ui/Select";
 import type { WalletSession } from "@/ui/WalletProvider";
 import type { Wallet } from "@/lib/wallet";
 import { X402Url } from "@/features/panels/X402Url";
@@ -59,16 +60,15 @@ export function X402Own(props: Props) {
     <>
       <fieldset className="group x402__card">
         <legend>{BRAND.name}&apos;s own tools</legend>
-        <label className="group__row">
+        <div className="group__row">
           <span>Tool</span>
-          <select className="field" aria-label={`${BRAND.name} tool`} value={id} onChange={(e) => pick(e.target.value)}>
-            {SKILLS.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.title} — {s.summary}
-              </option>
-            ))}
-          </select>
-        </label>
+          <QuadraSelect
+            ariaLabel={`${BRAND.name} tool`}
+            value={id}
+            onChange={pick}
+            options={SKILLS.map((s) => ({ value: s.id, label: `${s.title} — ${s.summary}` }))}
+          />
+        </div>
         {skill.args.map((a, i) => (
           <label key={`${id}:${a.name}`} className="group__row">
             <span>{a.name}</span>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { QuadraSelect, type SelectGroup } from "@/ui/Select";
 import {
   checkFactory,
   collectTx,
@@ -144,17 +145,33 @@ export function readFirstBuy(text: string, decimals: number): { readonly raw: bi
   }
 }
 
+function pairKind(address: string): "eth" | "crypto" | "ecosystem" | "stock" {
+  if (address === ETH_QUOTE) return "eth";
+  const lower = address.toLowerCase();
+  if (TRADE_CRYPTO.some((c) => c.address.toLowerCase() === lower)) return "crypto";
+  if (ECOSYSTEM_QUOTES.some((c) => c.address.toLowerCase() === lower)) return "ecosystem";
+  return "stock";
+}
+
 export function reviewReport(m: Metadata, review: Review, creator: string): Report {
   const { pair } = review;
-  const stock = pair.address !== ETH_QUOTE;
+  const kind = pairKind(pair.address);
+  const stock = kind === "stock";
+  const nonEth = kind !== "eth";
   const opening = openingValue(pair.startTick, pair.decimals);
   const fee = review.v3 ? feePercent(review.v3.fee) : "1%";
+  const pairedLabel =
+    kind === "eth"
+      ? "ETH"
+      : stock
+        ? `${pair.symbol} — ${pair.name}, Coinbase's stock token on ${BASE.name}`
+        : `${pair.symbol} — ${pair.name} on ${BASE.name}`;
   return {
     title: `${m.name.trim()} (${m.symbol.trim()}) — ready to launch on ${BASE.name}`,
     rows: [
       row("Token address", `${review.token} (predicted — it exists once the launch confirms)`),
       row("Supply", `${SUPPLY_WORDS} ${m.symbol.trim()}, fixed — no admin, nobody can mint, pause or seize`, { tone: "ok" }),
-      row("Paired with", stock ? `${pair.symbol} — ${pair.name}, Coinbase's stock token on ${BASE.name}` : "ETH", stock ? { href: explorer.token(pair.address) } : {}),
+      row("Paired with", pairedLabel, nonEth ? { href: explorer.token(pair.address) } : {}),
       row("Pool", `Uniswap v4, ${m.symbol.trim()}/${pair.symbol}, ${fee} fee on every trade${review.v3 ? " — your choice" : ""}`),
       ...(review.v3 ? [row("Opening protection", openingText(review.v3.fee, review.v3.opening), { tone: "ok" as const })] : []),
       row("Opening value", `the whole supply ≈ ${opening.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${pair.symbol} at the first price — read from the launchpad`),
@@ -164,7 +181,7 @@ export function reviewReport(m: Metadata, review: Review, creator: string): Repo
         "First buy",
         review.firstBuy === 0n
           ? "none"
-          : `${tokenAmount(review.firstBuy, pair.decimals, 8)} ${pair.symbol}, in the same transaction, before anyone else can buy${stock ? " — an exact approval first" : ""}`,
+          : `${tokenAmount(review.firstBuy, pair.decimals, 8)} ${pair.symbol}, in the same transaction, before anyone else can buy${nonEth ? " — an exact approval first" : ""}`,
       ),
       row("Creator", toChecksumAddress(creator), { href: explorer.address(toChecksumAddress(creator)) }),
       row("Sends to", `the launchpad ${review.factory} — checked on ${BASE.name}`, { href: explorer.address(review.factory), tone: "ok" }),
@@ -363,6 +380,26 @@ export function BaseLaunch() {
   const ecosystems = pairs.pairs.filter((p) => ecosystemAddresses.has(p.address.toLowerCase()));
   const cryptos = pairs.pairs.filter((p) => p.address !== ETH_QUOTE && cryptoAddresses.has(p.address.toLowerCase()));
   const stocks = closed ? [] : pairs.pairs.filter((p) => p.address !== ETH_QUOTE && !ecosystemAddresses.has(p.address.toLowerCase()) && !cryptoAddresses.has(p.address.toLowerCase()));
+  const selectPair = (address: string) => {
+    setPairAt(address);
+    setFirstBuy("");
+    changed();
+  };
+  const pairGroups: SelectGroup[] = [
+    {
+      label: "Base crypto",
+      options: [
+        { value: ETH_QUOTE, label: "ETH" },
+        ...cryptos.map((p) => ({ value: p.address, label: `${p.symbol} — ${p.name}` })),
+      ],
+    },
+    ...(ecosystems.length > 0
+      ? [{ label: "Ecosystem (Quadra)", options: ecosystems.map((p) => ({ value: p.address, label: `${p.symbol} — ${p.name}` })) }]
+      : []),
+    ...(stocks.length > 0
+      ? [{ label: "Coinbase stocks on Base", options: stocks.map((p) => ({ value: p.address, label: `${p.symbol} — ${p.name}` })) }]
+      : []),
+  ];
   const hasIdentity = meta.name.trim().length > 0 && meta.symbol.trim().length > 0 && metadataProblem(meta) === null;
   const hasPair = !("problem" in buy);
   const currentStep = review !== null ? 4 : !hasIdentity ? 1 : !hasPair ? 2 : 3;
@@ -402,46 +439,10 @@ export function BaseLaunch() {
             </label>
             {field("Image", "image", "https://… link to the picture (optional)")}
             {field("Website", "website", "https://… (optional)")}
-            <label className="group__row">
+            <div className="group__row">
               <span>Paired with</span>
-              <select
-                className="field"
-                aria-label="Paired with"
-                value={pair.address}
-                onChange={(e) => {
-                  setPairAt(e.target.value);
-                  setFirstBuy("");
-                  changed();
-                }}
-              >
-                <optgroup label="Base crypto">
-                  <option value={ETH_QUOTE}>ETH</option>
-                  {cryptos.map((p) => (
-                    <option key={p.address} value={p.address}>
-                      {p.symbol} — {p.name}
-                    </option>
-                  ))}
-                </optgroup>
-                {ecosystems.length > 0 ? (
-                  <optgroup label="Ecosystem (Quadra)">
-                    {ecosystems.map((p) => (
-                      <option key={p.address} value={p.address}>
-                        {p.symbol} — {p.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ) : null}
-                {stocks.length > 0 ? (
-                  <optgroup label="Coinbase stocks on Base">
-                    {stocks.map((p) => (
-                      <option key={p.address} value={p.address}>
-                        {p.symbol} — {p.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ) : null}
-              </select>
-            </label>
+              <QuadraSelect ariaLabel="Paired with" value={pair.address} onChange={selectPair} groups={pairGroups} />
+            </div>
             <label className="group__row">
               <span>First buy</span>
               <input
@@ -493,7 +494,7 @@ export function BaseLaunch() {
               {SUPPLY_WORDS} tokens, all of it in a Uniswap v4 pool against {pair.symbol} that nobody can pull. You earn 80% of the {version === 3 ? feePercent(fee) : "1%"} fee
               on every trade. The first buy happens in the launch itself, before any bot can see the pool.
               {version === 3 ? " In the first seconds the fee starts far higher, so a sniper pays most of it." : null}
-              {pair.address === ETH_QUOTE ? null : ` ${STOCK_PAIR_PRICE_NOTE}`}
+              {pairKind(pair.address) === "stock" ? ` ${STOCK_PAIR_PRICE_NOTE}` : null}
             </p>
           </fieldset>
 

@@ -3542,6 +3542,62 @@
   padding: 10px;
   background: var(--xp-sunken);
 }
+.qselect {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.qselect__btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+.qselect__btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.qselect__val {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qselect__caret {
+  flex: 0 0 auto;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--xp-ink);
+}
+.qselect__dropdown {
+  width: 100%;
+  min-width: 160px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-top: 2px;
+}
+.qselect__head {
+  padding: 4px 10px 2px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--xp-ink-dim);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.qselect__item[aria-selected="true"] {
+  background: var(--pt-select-soft);
+  color: var(--pt-accent);
+  font-weight: 700;
+}
+.qselect__item[aria-selected="true"]:hover,
+.qselect__item[aria-selected="true"]:focus-visible {
+  background: var(--s7-hilite);
+  color: var(--s7-hilite-ink);
+}
 
 /* ===================================================================
    Transaction popup stack (bottom-right corner, Platinum palette)
