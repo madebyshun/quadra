@@ -141,11 +141,11 @@ export function About() {
               <div className="about__launch-art">
                 <span className="about__art-label">AN IDEA, MEET A MARKET.</span>
                 <strong>Something<br /><em>starts here.</em></strong>
-                <span className="about__pair">Your coin <b>↔</b> ETH / Stock</span>
+                <span className="about__pair">Your coin <b>↔</b> ETH / Crypto / Stock</span>
               </div>
             </div>
             <h3>Give an idea a market.</h3>
-            <p>Launch a fixed-supply coin paired with ETH or a supported tokenized stock. Its supply starts in a Uniswap v4 pool with permanently locked liquidity.</p>
+            <p>Launch a fixed-supply coin paired with ETH, Base crypto, or a supported tokenized stock. Its supply starts in a Uniswap v4 pool with permanently locked liquidity.</p>
             <Link to="/?do=launch" className="about__tool-link">Launch a coin <span aria-hidden="true">↗</span></Link>
           </article>
         </div>
@@ -171,16 +171,17 @@ export function About() {
 
       <section className="about__section">
         <p className="about__eyebrow">Follow the flow</p>
-        <h2>Every coin launched here feeds {BRAND.ticker}</h2>
+        <h2>How fees flow across {BRAND.name} and {BRAND.ticker}</h2>
         <Flywheel />
         <p className="about__note">
-            {BRAND.ticker} is <a href={explorer.token(token)}>{short(token)}</a> on {BASE.name}.{" "}
+            {BRAND.ticker} (<a href={explorer.token(token)}>{short(token)}</a> on {BASE.name}) has a fixed supply of 1,000,000,000, no admin, and permanently locked Uniswap v4 liquidity.{" "}
             {furnace !== null && furnace !== "reading" && !("problem" in furnace) ? (
               <>
-                Its fees go to the furnace <a href={explorer.address(furnace.address)}>{short(furnace.address)}</a>: {furnace.burnBps / 100}% burnt, the rest to the treasury.
+                Its creator fees go to the furnace <a href={explorer.address(furnace.address)}>{short(furnace.address)}</a>: {furnace.burnBps / 100}% burnt/buyback, the rest to the treasury.
               </>
             ) : null}{" "}
-            Buybacks are on-chain transactions anyone can read, not a promise of anything.
+            Buybacks are on-chain transactions anyone can read, not a promise of anything.{" "}
+            <Link to={`/?do=coins&t=${token}`}>View {BRAND.ticker} ↗</Link>
         </p>
       </section>
 
