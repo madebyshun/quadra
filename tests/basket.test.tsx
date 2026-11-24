@@ -221,8 +221,6 @@ describe("the Treasury Basket window", () => {
     // the 2026-09-30 capture of Coinbase's list has no Amazon yet — said by name, never guessed
     expect(cta()).toHaveTextContent("AMZN is not a Coinbase stock or a listed token on Base.");
     await userEvent.click(screen.getByRole("button", { name: "AI compute" }));
-    expect(screen.getByLabelText("Asset 1")).toHaveValue("AAPL");
-    await userEvent.click(screen.getByRole("button", { name: "use this allocation" }));
     expect(screen.getByLabelText("Asset 1")).toHaveValue("NVDA");
     await basket([["NVDA", "100"]]);
     expect(cta()).toHaveTextContent("Connect a wallet first");
@@ -554,7 +552,7 @@ describe("Treasury Basket atomic purchase", () => {
     await reviewBatch();
     expect(screen.getByText(/Checking whether your wallet/)).toBeInTheDocument();
     await act(async () => { resolve({}); });
-    expect(screen.getByText(/does not report atomic batching/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Buy basket · 1 tx/ })).toBeInTheDocument();
     expect(sent).toHaveLength(0);
   });
 

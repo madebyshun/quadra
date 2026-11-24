@@ -443,6 +443,7 @@ export function BasketPanel() {
             key={p.name}
             type="button"
             className="mk__pill"
+            aria-label={p.name}
             disabled={purchaseLocked}
             aria-pressed={name === p.name}
             onClick={() => {
@@ -452,7 +453,7 @@ export function BasketPanel() {
             }}
           >
             <strong>{p.name}</strong>
-            <span className="dim">{p.picks.length}</span>
+            <span className="dim" aria-hidden="true">{p.picks.length}</span>
           </button>
         ))}
       </div>
@@ -495,6 +496,7 @@ export function BasketPanel() {
               <button
                 type="button"
                 className="chip chip--mode"
+                aria-label="Add an asset"
                 disabled={purchaseLocked}
                 onClick={() => {
                   edit();
@@ -507,7 +509,7 @@ export function BasketPanel() {
           </div>
 
           <div className="mk__table-wrap">
-            <table className="mk__table" aria-label="Assets and weights">
+            <table className="mk__table">
               <thead>
                 <tr>
                   <th>Asset</th>
@@ -516,7 +518,7 @@ export function BasketPanel() {
                   <th className="num"></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody role="list" aria-label="Assets and weights">
                 {rows.map((r, i) => {
                   const sym = r.symbol.trim().toUpperCase();
                   const meta = list && !("problem" in list) ? list.get(sym) : undefined;
@@ -524,7 +526,7 @@ export function BasketPanel() {
                   const pct = Number.isFinite(w) && w > 0 ? w : 0;
                   const shareUsd = hasValidAmount ? (amountNum * pct) / 100 : null;
                   return (
-                    <tr key={i}>
+                    <tr key={i} role="listitem">
                       <td>
                         <div className="bk__asset-cell">
                           <input
@@ -676,15 +678,15 @@ export function BasketPanel() {
                       return (
                         <tr key={p.leg.asset.address} className={p.problem ? "tone-bad" : undefined}>
                           <th scope="row">{p.leg.asset.symbol}</th>
-                          <td className="num mono">{formatAmount(p.amount, USDC.decimals)}</td>
+                          <td className="num mono">{formatAmount(p.amount, USDC.decimals)} USDC</td>
                           <td className="num mono">
                             {p.problem
                               ? p.problem
                               : p.quote
-                                ? `${tokenAmount(p.quote.out, p.leg.asset.decimals, 4)} (${impact === null ? "n/a" : `${impact.toFixed(1)}%`})`
-                                : "0"}
+                                ? `≈ ${tokenAmount(p.quote.out, p.leg.asset.decimals, 4)} ${p.leg.asset.symbol} · ${impact === null ? "impact not given" : `${impact.toFixed(2)}% impact`}`
+                                : "nothing to add in this allocation"}
                           </td>
-                          {got && p.quote ? <td className="num mono">{got[buyable.indexOf(p)] === null ? "—" : arrived(got[buyable.indexOf(p)]!, p.leg.asset)}</td> : null}
+                          {got && p.quote ? <td className="num mono">{got[buyable.indexOf(p)] === null ? "not measured" : arrived(got[buyable.indexOf(p)]!, p.leg.asset)}</td> : null}
                         </tr>
                       );
                     })}
@@ -703,10 +705,12 @@ export function BasketPanel() {
                   >
                     {batch.working ? "Preparing basket…" : "Buy basket · 1 confirmation"}
                   </Gel>
-                  <p className="dim">Atomic batch: all assets succeed together or revert together.</p>
+                  <p className="dim">
+                    Atomic batch: all assets succeed together or revert together.{batch.capability === "ready" ? " Your wallet may first ask you to enable batching." : ""}
+                  </p>
                 </>
               ) : batch.capability === "checking" ? (
-                <p className="dim">Checking wallet batching capability…</p>
+                <p className="dim">Checking whether your wallet can confirm the basket at once…</p>
               ) : (
                 <>
                   <Gel
@@ -722,7 +726,7 @@ export function BasketPanel() {
 
               {priced.some((p) => p.quote === null && p.problem !== null) ? (
                 <Gel quiet onClick={() => void onRetry()} disabled={purchaseLocked}>
-                  {busy ? "Quoting…" : "Quote failed assets again"}
+                  {busy ? "Quoting…" : "Quote the failed ones again"}
                 </Gel>
               ) : null}
 
@@ -735,7 +739,7 @@ export function BasketPanel() {
                     onClick={() => void onBuy(bought)}
                     disabled={stop !== null || purchaseLocked || batch.complete || steps.states.some((s) => s.status === "slow") || bought >= buyable.length}
                   >
-                    {stop ?? (bought > 0 ? `Buy the rest — ${formatAmount(buyable.slice(bought).reduce((s, p) => s + p.amount, 0n), USDC.decimals)} USDC` : `Buy step by step — ${formatAmount(total, USDC.decimals)} USDC`)}
+                    {stop ?? (bought > 0 ? `Buy the rest — ${formatAmount(buyable.slice(bought).reduce((s, p) => s + p.amount, 0n), USDC.decimals)} USDC` : `Buy the basket — ${formatAmount(total, USDC.decimals)} USDC`)}
                   </Gel>
                 </div>
               </details>
@@ -786,7 +790,7 @@ export function BasketPanel() {
           <summary>
             Your holdings &amp; rebalance{held ? ` (${usd(Number(held.reduce((sum, v) => sum + v, 0n)) / 1e6)})` : ""}
           </summary>
-          <div className="stack" aria-label="Your basket holdings">
+          <section className="stack" aria-label="Your basket holdings">
             <Gel quiet disabled={purchaseLocked} onClick={() => setHeldRefresh((n) => n + 1)}>
               Refresh holdings
             </Gel>
@@ -822,13 +826,13 @@ export function BasketPanel() {
                 <p className="dim">Total {usd(Number(held.reduce((sum, v) => sum + v, 0n)) / 1e6)} · wallet holdings at current DEX prices.</p>
               </>
             )}
-          </div>
+          </section>
         </details>
       ) : null}
 
       <details className="group basket__drawer">
         <summary>Liquidity strength test ($100 – $100K)</summary>
-        <div className="stack" aria-label="Basket Strength">
+        <section className="stack" aria-label="Basket Strength">
           <p className="dim">Test a buy of $100, $1K, $10K and $100K at your target weights. Each leg must have at most 2% quoted impact. Nothing is signed.</p>
           <Gel quiet disabled={purchaseLocked || resolved.problem !== null} onClick={() => void checkStrength()}>
             Measure basket Strength
@@ -844,7 +848,7 @@ export function BasketPanel() {
               <p>Sampled quotes, not an exact maximum or a guarantee of execution. {new Date(strengthAt!).toLocaleTimeString()} · Relay.</p>
             </div>
           ) : null}
-        </div>
+        </section>
       </details>
     </div>
   );
