@@ -78,8 +78,8 @@ const TALL_PANELS: ReadonlySet<WindowId> = new Set<WindowId>([
  * the Base card measured 452px wide at the default width, the card itself a thumbnail). Still never
  * wider than the viewport allows.
  */
-export const WIDE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["card", "coins", "launch", "readme", "markets", "trade"]);
-export const LANDSCAPE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["markets", "trade"]);
+export const WIDE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["card", "coins", "launch", "readme", "markets", "trade", "basket"]);
+export const LANDSCAPE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["markets", "trade", "basket"]);
 export const WIDE_WIDTH = 760;
 export const LANDSCAPE_WIDTH = 920;
 

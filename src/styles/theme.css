@@ -3428,6 +3428,74 @@
 .basket__saved { list-style: none; padding: 0; margin: 0; }
 .basket__review th, .basket__review td { font-variant-numeric: tabular-nums; }
 
+.basket__steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.basket__layout {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+}
+@media (min-width: 680px) {
+  .basket__layout {
+    grid-template-columns: minmax(0, 1fr) 230px;
+  }
+}
+.basket__main {
+  min-width: 0;
+}
+.basket__head-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.basket__quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.basket__summary {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: var(--xp-sunken);
+}
+.basket__alloc {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0 0;
+  border-top: 1px solid var(--xp-border-mid);
+  display: grid;
+  gap: 3px;
+  font-size: 11px;
+}
+.basket__alloc li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+.basket__advanced summary,
+.basket__drawer summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--xp-ink);
+}
+.basket__advanced[open] summary,
+.basket__drawer[open] summary {
+  margin-bottom: 8px;
+}
+
 /* Coins discover: scannable rows on desktop, clean wrapping on mobile */
 .coins__row-head {
   display: flex;
