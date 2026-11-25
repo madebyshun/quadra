@@ -102,13 +102,10 @@ export function topUp(total: bigint, weights: readonly number[], values: readonl
     if (need === 0n) return split(total, weights);
     const parts = shortfalls.map((s) => (s * total) / need);
     const rem = total - parts.reduce((s, p) => s + p, 0n);
-    if (rem > 0n) {
-      let big = -1;
-      for (let i = 0; i < parts.length; i++) {
-        if (shortfalls[i]! > 0n && (big === -1 || parts[i]! > parts[big]!)) big = i;
-      }
-      if (big >= 0) parts[big] = parts[big]! + rem;
-    }
+    // the flooring's crumbs go to the largest part, which is one with a shortfall (need > 0)
+    let big = 0;
+    for (let i = 1; i < parts.length; i++) if (parts[i]! > parts[big]!) big = i;
+    parts[big] = parts[big]! + rem;
     return parts;
   };
   let parts = allocate(short);

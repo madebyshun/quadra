@@ -1137,3 +1137,6 @@ html:has(.intro), body:has(.intro) { overflow: hidden; }
   border: 1px solid #bab6ae;
   background: #fffdf6;
 }
+
+/* Coins: a v1/v2 coin has no fee line */
+.coins__fee:empty { display: none; }

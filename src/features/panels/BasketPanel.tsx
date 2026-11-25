@@ -303,6 +303,23 @@ export function BasketPanel() {
 
   const onBatchBuy = () => batch.buy(async () => {
     const remaining = buyable.slice(bought);
+    const router = CONTRACTS.basketRouter;
+    if (router) {
+      // One confirmation for a wallet that can batch: an exact USDC approval to the router and its `buy`
+      // in the same atomic batch — the router checks every leg's minimum and refunds what is unused.
+      const legs: RouterLeg[] = [];
+      for (const p of remaining) {
+        if (legs.length > 0) await sleep(PACE.gapMs);
+        const { leg, quote } = await retrying(() => routerLeg(router, ready!.account, asAsset(p.leg.asset), p.amount, SLIPPAGE_BPS));
+        const impact = impactOf(quote);
+        if (impact !== null && impact > LOUD) throw new Error(`${p.leg.asset.symbol} now moves its market ${impact.toFixed(2)}% — review the basket again.`);
+        legs.push(leg);
+      }
+      return [
+        { to: USDC.address, data: approveData(router, totalOf(legs)) },
+        { to: router, data: buyData(legs, deadlineFrom(Date.now())) },
+      ];
+    }
     // The batch always signs the Relay quotes the review showed. The Aerodrome/Uniswap multicall
     // quotes different pools (stocks' deep pools sit on CL factory 0x9CB2…7a76, which those
     // published quoters do not serve), so it is never swapped in here behind the review's back.
@@ -421,7 +438,8 @@ export function BasketPanel() {
   const amountNum = Number(amount);
   const hasValidAmount = amount.trim() !== "" && Number.isFinite(amountNum) && amountNum > 0;
   const activeCount = rows.filter((r) => r.symbol.trim() !== "").length;
-  const execMode = CONTRACTS.basketRouter ? "1 TX" : batch.capability === "supported" || batch.capability === "ready" ? "1 SIGN" : "STEP";
+  const canBatch = batch.capability === "supported" || batch.capability === "ready";
+  const execMode = canBatch ? "1 SIGN" : CONTRACTS.basketRouter ? "1 TX" : "STEP";
 
   // with no rows there is nothing to map, so nothing changes
   const equalSplit = () => {
@@ -727,40 +745,34 @@ export function BasketPanel() {
 
               <p className="dim mono">Balance: {formatAmount(review.balance, USDC.decimals)} USDC</p>
 
-              {batch.capability === "checking" ? (
-                <p className="dim">Checking whether your wallet can confirm the basket at once…</p>
-              ) : (
+              {canBatch ? (
                 <>
-                  {CONTRACTS.basketRouter ? (
-                    <>
-                      <Gel
-                        className="mf__cta"
-                        disabled={stop !== null || purchaseLocked || batch.complete || steps.states.some((s) => s.status === "slow") || bought >= buyable.length}
-                        onClick={() => void onRouterBuy(CONTRACTS.basketRouter!)}
-                      >
-                        {routerBusy ? "Preparing basket…" : "Buy basket · 1 transaction"}
-                      </Gel>
-                      <p className="dim">One transaction via BasketRouter: every asset or none. Your wallet may first ask for one USDC signature for exactly this amount — no standing approval.</p>
-                    </>
-                  ) : null}
-                  {batch.capability === "supported" || batch.capability === "ready" ? (
-                    <>
-                      <Gel
-                        quiet={Boolean(CONTRACTS.basketRouter)}
-                        className={CONTRACTS.basketRouter ? undefined : "mf__cta"}
-                        disabled={stop !== null || purchaseLocked || batch.complete || steps.states.some((s) => s.status === "slow") || bought >= buyable.length}
-                        onClick={() => void onBatchBuy()}
-                      >
-                        {batch.working ? "Preparing basket…" : "Buy basket · 1 confirmation"}
-                      </Gel>
-                      <p className="dim">
-                        Atomic batch: all assets succeed together or revert together.{batch.capability === "ready" ? " Your wallet may first ask you to enable batching." : ""}
-                      </p>
-                    </>
-                  ) : !CONTRACTS.basketRouter ? (
-                    <p className="dim">This wallet does not report atomic batching on Base. Buy step by step, or connect a compatible wallet.</p>
-                  ) : null}
+                  <Gel
+                    className="mf__cta"
+                    disabled={stop !== null || purchaseLocked || batch.complete || steps.states.some((s) => s.status === "slow") || bought >= buyable.length}
+                    onClick={() => void onBatchBuy()}
+                  >
+                    {batch.working ? "Preparing basket…" : "Buy basket · 1 confirmation"}
+                  </Gel>
+                  <p className="dim">
+                    Atomic batch: all assets succeed together or revert together.{batch.capability === "ready" ? " Your wallet may first ask you to enable batching." : ""}
+                  </p>
                 </>
+              ) : batch.capability === "checking" ? (
+                <p className="dim">Checking whether your wallet can confirm the basket at once…</p>
+              ) : CONTRACTS.basketRouter ? (
+                <>
+                  <Gel
+                    className="mf__cta"
+                    disabled={stop !== null || purchaseLocked || steps.states.some((s) => s.status === "slow") || bought >= buyable.length}
+                    onClick={() => void onRouterBuy(CONTRACTS.basketRouter!)}
+                  >
+                    {routerBusy ? "Preparing basket…" : "Buy basket · 1 transaction"}
+                  </Gel>
+                  <p className="dim">One transaction via BasketRouter: every asset or none. Your wallet may first ask for one USDC signature for exactly this amount — no standing approval.</p>
+                </>
+              ) : (
+                <p className="dim">This wallet does not report atomic batching on Base. Buy step by step, or connect a compatible wallet.</p>
               )}
 
               {priced.some((p) => p.quote === null && p.problem !== null) ? (

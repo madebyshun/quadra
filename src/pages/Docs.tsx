@@ -55,7 +55,7 @@ export function DocsBody() {
         <legend>Not yet</legend>
         <ul className="notes" aria-label="Not yet">
           <li>Availability depends on this server and its upstream data sources. A failed read is not a successful check.</li>
-          <li>The launchpad contract has not been audited (nor have RevenueShare, QuadraFurnace or BasketRouter — all verified on Sourcify). It holds the liquidity of every coin launched through it, forever.</li>
+          <li>The launchpad contract has not been audited (nor have RevenueShare, {BRAND.name}Furnace or BasketRouter — all verified on Sourcify). It holds the liquidity of every coin launched through it, forever.</li>
         </ul>
       </fieldset>
 

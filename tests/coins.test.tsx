@@ -3,7 +3,8 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { decodeFunctionData } from "viem";
-import { UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
+import { CONTRACTS, UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
+import { BRAND } from "@/brand";
 import { LAUNCHPAD_ABI } from "@/config/launchpad";
 import type { Market } from "@/skills/dexscreener";
 import type { Launch, PoolValue } from "@/skills/launchpad";
@@ -236,6 +237,38 @@ describe("the Coins window", () => {
     const again = await screen.findByLabelText("Coins", { selector: "ul" });
     await waitFor(() => expect(again).toHaveTextContent(/market cap ≈ \$[\d,.]+ · \d+ min ago|market cap ≈ \$[\d,.]+ · \d+ (h|days) ago/));
     expect(again).not.toHaveTextContent("market data unavailable");
+  });
+
+  it("pins the app's own token above the list, marks its row official, opens it, and shows each coin's 24h move up or down", async () => {
+    const own = CONTRACTS.token;
+    (CONTRACTS as { token: string | null }).token = T;
+    try {
+      wallet(null);
+      const traded = copy(marketsOf("WETH")) as unknown as { baseToken: { address: string }; priceChange?: { h24?: number } }[];
+      traded[0]!.baseToken.address = T;
+      for (const h24 of [3.5, -2.25]) {
+        traded[0]!.priceChange = { h24 };
+        net({ rpc: chainRoutes(), get: getRoutes({ coinMarkets: traded }) });
+        const view = mount();
+        const list = await screen.findByLabelText("Coins", { selector: "ul" });
+        await waitFor(() => expect(list).toHaveTextContent(h24 > 0 ? "+3.50%" : "-2.25%"));
+        expect(list.querySelector(".coins__item--official")).not.toBeNull();
+        await waitFor(() => expect(screen.getByText(/Official .* token · .*·/)).toBeInTheDocument());
+        if (h24 > 0) {
+          await userEvent.click(screen.getByRole("button", { name: `Open ${BRAND.ticker}` }));
+          await waitFor(() => expect(screen.getByLabelText("url")).toHaveTextContent(`t=${T}`));
+        }
+        view.unmount();
+      }
+      // with no token set, nothing is pinned
+      (CONTRACTS as { token: string | null }).token = null;
+      net({ rpc: chainRoutes(), get: getRoutes() });
+      mount();
+      await screen.findByLabelText("Coins", { selector: "ul" });
+      expect(screen.queryByRole("button", { name: `Open ${BRAND.ticker}` })).toBeNull();
+    } finally {
+      (CONTRACTS as { token: string | null }).token = own;
+    }
   });
 
   it("says when there are none, when the index ran out of pages, and when it could not be read", async () => {

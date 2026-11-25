@@ -189,6 +189,16 @@ describe("a basket's arithmetic", () => {
     expect(topUp(100n, [70, 30], [0n, 0n])).toEqual([70n, 30n]);
     // nothing to add and nothing short: nothing moves
     expect(topUp(0n, [50, 50], [500n, 500n])).toEqual([0n, 0n]);
+    // the flooring's crumb goes to the largest part
+    expect(topUp(10n, [50, 50], [0n, 3n])).toEqual([7n, 3n]);
+    // too little for any target to move: split by weight instead
+    expect(topUp(1n, [50, 50], [0n, 0n])).toEqual([1n, 0n]);
+  });
+
+  it("drops a top-up leg below the minimum and gives its share to the others, unless every leg is below it", () => {
+    expect(topUp(100n, [50, 50], [0n, 49n], 10n)).toEqual([75n, 25n]);
+    expect(topUp(100n, [50, 50], [0n, 49n], 30n)).toEqual([100n, 0n]);
+    expect(topUp(100n, [50, 50], [0n, 49n], 1000n)).toEqual([75n, 25n]);
     // dust legs under minLeg are dropped to 0 and redistributed to genuinely underweight legs
     expect(topUp(1_000_000n, [10, 10, 10, 70], [0n, 199_800n, 199_900n, 0n], 50_000n)).toEqual([125_000n, 0n, 0n, 875_000n]);
   });
@@ -521,6 +531,10 @@ async function reviewBatch(amount = "10") {
 const batchBuy = () => screen.getByRole("button", { name: "Buy basket · 1 confirmation" });
 
 describe("Treasury Basket atomic purchase", () => {
+  // the Relay-calls batch: the path a wallet that can batch takes while no router is set
+  const ROUTER_DEPLOYED = CONTRACTS.basketRouter;
+  beforeEach(() => { (CONTRACTS as { basketRouter: string | null }).basketRouter = null; });
+  afterEach(() => { (CONTRACTS as { basketRouter: string | null }).basketRouter = ROUTER_DEPLOYED; });
   it("buys below 1 USDC with one batch request and exact per-leg approvals", async () => {
     const wallet = batchWallet();
     const asked = world();
@@ -560,8 +574,7 @@ describe("Treasury Basket atomic purchase", () => {
     await reviewBatch();
     expect(screen.getByText(/Checking whether your wallet/)).toBeInTheDocument();
     await act(async () => { resolve({}); });
-    // a wallet that cannot batch is offered the one-transaction router
-    expect(screen.getByRole("button", { name: "Buy basket · 1 transaction" })).toBeInTheDocument();
+    expect(screen.getByText(/does not report atomic batching/)).toBeInTheDocument();
     expect(sent).toHaveLength(0);
   });
 
@@ -777,6 +790,10 @@ it("restores sequential basket recovery for known, unknown and unreadable pendin
 });
 
 describe("Treasury Basket, the rest of the window", () => {
+  // the Relay-calls batch: the path a wallet that can batch takes while no router is set
+  const ROUTER_DEPLOYED = CONTRACTS.basketRouter;
+  beforeEach(() => { (CONTRACTS as { basketRouter: string | null }).basketRouter = null; });
+  afterEach(() => { (CONTRACTS as { basketRouter: string | null }).basketRouter = ROUTER_DEPLOYED; });
   it("gathers a basket of more than five into one approval per Relay contract, then the swaps, within ten calls", async () => {
     const wallet = batchWallet();
     world();
@@ -854,6 +871,36 @@ describe("Treasury Basket through BasketRouter, for a wallet that cannot batch",
   const DEPLOYED = CONTRACTS.basketRouter;
   afterEach(() => {
     (CONTRACTS as { basketRouter: string | null }).basketRouter = DEPLOYED;
+  });
+
+  it("batches an exact approval to the router and its `buy` into one confirmation, for a wallet that can batch", async () => {
+    const wallet = batchWallet();
+    const asked = world();
+    await reviewBatch("10");
+    await userEvent.click(batchBuy());
+    await waitFor(() => expect(wallet.sent).toHaveLength(1), { timeout: 3000 });
+    const calls = wallet.sent[0]!.calls as Json[];
+    expect(calls).toHaveLength(2);
+    const router = DEPLOYED!.toLowerCase();
+    expect(String(calls[0]!.to).toLowerCase()).toBe(USDC.address.toLowerCase());
+    expect(calls[0]!.data).toBe(approveData(DEPLOYED!, 10_000_000n));
+    expect(String(calls[1]!.to).toLowerCase()).toBe(router);
+    expect(decodeFunctionData({ abi: ROUTER_ABI, data: calls[1]!.data as `0x${string}` }).functionName).toBe("buy");
+    expect(asked.slice(-2).map((q) => String(q.user).toLowerCase())).toEqual([router, router]);
+    expect(screen.getByText("1 SIGN")).toBeInTheDocument();
+  });
+
+  it("refuses a fresh router quote that now moves its market too far, sending nothing", async () => {
+    const wallet = batchWallet();
+    world({ relay: (body, i) => {
+      const q = quoteFor(body) as { details: { totalImpact?: { percent: string } } };
+      if (i >= 2) q.details.totalImpact = { percent: "-9.5" };
+      return json(q);
+    } });
+    await reviewBatch("10");
+    await userEvent.click(batchBuy());
+    expect(await screen.findByText(/now moves its market 9\.50%/, {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(wallet.sent).toHaveLength(0);
   });
 
   it("says a wallet that cannot batch buys step by step while no router is set", async () => {

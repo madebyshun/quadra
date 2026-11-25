@@ -1,3 +1,4 @@
+import { BRAND } from "@/brand";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { collectTx } from "@/adapters/http/launchpad";
@@ -488,7 +489,7 @@ export function CoinsPanel() {
       <header className="coins__mast">
         <div className="coins__mast-copy">
           <h3 className="coins__mast-title">coins / discover</h3>
-          <p className="coins__mast-sub">Explore coins launched on Quadra. Stock-paired coins are not the stocks themselves.</p>
+          <p className="coins__mast-sub">Explore coins launched on {BRAND.name}. Stock-paired coins are not the stocks themselves.</p>
         </div>
         {openWindow ? (
           <Gel onClick={() => openWindow("launch")}>
@@ -516,14 +517,14 @@ export function CoinsPanel() {
       {quadraToken ? (
         <div className="coins__official">
           <div className="coins__official-copy">
-            <strong>Quadra ($QUADRA / ETH)</strong>
+            <strong>{BRAND.name} ({BRAND.ticker} / ETH)</strong>
             <span className="dim">
-              Official Quadra token · {short(quadraToken)}
+              Official {BRAND.name} token · {short(quadraToken)}
               {quadraListed?.value ? ` · ${valueText(quadraListed.value)}` : ""}
             </span>
           </div>
           <button type="button" className="gel gel--quiet" onClick={() => open(quadraToken)}>
-            Open $QUADRA
+            Open {BRAND.ticker}
           </button>
         </div>
       ) : null}
@@ -607,7 +608,8 @@ export function CoinsPanel() {
                   </div>
                   <div className="coins__cell-num">
                     <span className="mono">{c.value === undefined ? "reading…" : valueText(c.value)}</span>
-                    {feeLine ? <span className="bk__now dim">{feeLine}</span> : null}
+                    {/* empty for a v1/v2 coin, hidden by :empty (workspace.css) */}
+                    <span className="bk__now dim coins__fee">{feeLine}</span>
                     <span className="sr-only"> · </span>
                   </div>
                   <div className="coins__cell-num">

@@ -24,7 +24,8 @@ const MIN_QUADRA_WEI = parseEther(process.env.MIN_QUADRA || "10000");
 const FORCE = process.env.FORCE === "1" || process.env.FORCE === "true";
 
 const factoryAbi = parseAbi([
-  "function launches(address) view returns (address creator, address creatorRecipient, bytes32 poolId, address quote)",
+  // LaunchFactoryV3.launches: (creator, creatorRecipient, PoolKey) — the key's currency0 says which amount is the coin
+  "function launches(address) view returns (address creator, address creatorRecipient, (address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key)",
   "function collect(address token) returns (uint256 amount0, uint256 amount1)",
 ]);
 
@@ -40,7 +41,7 @@ async function main() {
   const transport = http(RPC);
   const publicClient = createPublicClient({ chain: base, transport });
 
-  const [, furnace] = await publicClient.readContract({
+  const [, furnace, key] = await publicClient.readContract({
     address: FACTORY,
     abi: factoryAbi,
     functionName: "launches",
@@ -62,7 +63,9 @@ async function main() {
     args: [TOKEN],
     account: DEAD,
   });
-  const [ethFees, quadraFees] = sim.result;
+  // the pool pays in its two currencies, in the key's order; this coin is paired with ETH
+  const tokenIs0 = key.currency0.toLowerCase() === TOKEN.toLowerCase();
+  const [ethFees, quadraFees] = tokenIs0 ? [sim.result[1], sim.result[0]] : [sim.result[0], sim.result[1]];
   const estBurnQuadra = ((quadraFees * 8000n) / 10000n) * burnBps / 10000n;
   const estToBuyEth = ((ethFees * 8000n) / 10000n) * burnBps / 10000n;
 
@@ -83,7 +86,10 @@ async function main() {
     return;
   }
 
-  const account = privateKeyToAccount((pk.startsWith("0x") ? pk : `0x${pk}`) as Hex);
+  const hex = pk.startsWith("0x") ? pk.slice(2) : pk;
+  // say what is wrong with the secret by its shape only — never echo any of it
+  if (!/^[0-9a-fA-F]{64}$/.test(hex)) throw new Error(`HARVEST_PRIVATE_KEY is not 64 hex characters (got ${hex.length} characters). Set the private key itself, not an address or a seed phrase.`);
+  const account = privateKeyToAccount(`0x${hex}` as Hex);
   const walletClient = createWalletClient({ account, chain: base, transport });
 
   const { request } = await publicClient.simulateContract({
