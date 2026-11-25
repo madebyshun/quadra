@@ -24,7 +24,7 @@ import {OddToken3, LateTaker3} from "./LaunchFactoryV3.t.sol";
 /// @dev Stage C against the REAL B20 precompile, a REAL v4 PoolManager and the real v3 factory and hook:
 ///      a coin launched on ETH, real buys and sells, a Backstop band on its own pool and the FeeRouter as the
 ///      factory's protocol recipient.
-contract StageCTest is Test {
+abstract contract StageCBase is Test {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
 
@@ -49,7 +49,7 @@ contract StageCTest is Test {
     address internal bob = makeAddr("bob");
     address internal treasury = makeAddr("treasury");
 
-    function setUp() public {
+    function setUp() public virtual {
         vm.warp(1_760_000_000);
         manager = new PoolManager(address(this));
         router = new PoolSwapTest(manager);
@@ -112,6 +112,12 @@ contract StageCTest is Test {
         b = new Backstop(IBackstopLaunchpad(address(factory)), manager, token);
         vm.deal(address(b), eth);
     }
+
+}
+
+contract StageCTest is StageCBase {
+    using PoolIdLibrary for PoolKey;
+    using StateLibrary for IPoolManager;
 
     // ───────────────────────────────────────────────────────────── Backstop
 
