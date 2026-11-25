@@ -190,7 +190,7 @@ export function About() {
         <ul className="about__list">
           <li>It never holds your key. Nothing moves money without your wallet's signature.</li>
           <li>It never calls a token safe. "No red flags" means the checks found none — not that there are none.</li>
-          <li>Its launchpad, fee-sharing and furnace contracts are verified on Sourcify and not audited.</li>
+          <li>Its launchpad, fee-sharing, furnace and BasketRouter contracts are verified on Sourcify and not audited.</li>
           <li>Coinbase's tokenized stocks are only for eligible persons outside the U.S.</li>
         </ul>
       </section>

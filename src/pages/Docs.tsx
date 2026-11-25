@@ -33,7 +33,13 @@ export function DocsBody() {
           </li>
           <li>The Terminal: every skill above, typed.</li>
           <li>
-            Send ETH or any token on Base to an address or a Basename; swap any token on Base; launch a coin on this app&apos;s own launchpad — a fixed supply nobody
+            Markets &amp; Trade: live prices, on-chain charts and Chainlink NAV drift for Base crypto and Coinbase&apos;s tokenized stocks.
+          </li>
+          <li>
+            Treasury Basket: choose a weighted mix of tokenized stocks and Base crypto, review fresh quotes, and buy the whole basket into your own wallet in one transaction through BasketRouter (EIP-2612 permit or exact allowance, zero router fee).
+          </li>
+          <li>
+            Send ETH or any token on Base to an address or a Basename; swap any token on Base; launch a coin on this app&apos;s own launchpad (paired with ETH, Base crypto or a supported tokenized stock) — a fixed supply nobody
             can mint and liquidity nobody can pull. Each is checked before your
             wallet is asked — where it goes, how much it can take — and signed there.
           </li>
@@ -49,7 +55,7 @@ export function DocsBody() {
         <legend>Not yet</legend>
         <ul className="notes" aria-label="Not yet">
           <li>Availability depends on this server and its upstream data sources. A failed read is not a successful check.</li>
-          <li>The launchpad contract has not been audited. It holds the liquidity of every coin launched through it, forever.</li>
+          <li>The launchpad contract has not been audited (nor have RevenueShare, QuadraFurnace or BasketRouter — all verified on Sourcify). It holds the liquidity of every coin launched through it, forever.</li>
         </ul>
       </fieldset>
 
@@ -79,7 +85,7 @@ export function DocsBody() {
           <li>GoPlus Security — the token scan. It does not run every check on every token; the report says which it skipped.</li>
           <li>DexScreener — prices, liquidity and volume from on-chain markets.</li>
           <li>Relay — swap quotes.</li>
-          <li>Markets — GeckoTerminal for on-chain charts; Coinbase&apos;s Tokenized Stocks API for which contract is a real stock on Base.</li>
+          <li>Markets — GeckoTerminal for on-chain charts, Chainlink for tokenized-stock NAV oracles, and Coinbase&apos;s Tokenized Stocks API for which contract is a real stock on Base.</li>
         </ul>
       </fieldset>
     </>
