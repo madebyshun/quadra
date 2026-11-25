@@ -175,6 +175,9 @@ describe("checking v3 before anything is offered", () => {
   it("accepts it only when its numbers and its hook's are this build's, and hands back the opening it read", async () => {
     net({ rpc: ethCalls({ [V3]: factory(), [HOOK]: hook() }) });
     expect(await checkFactory(V3, 3)).toEqual({ kind: "ok", opening: { hook: HOOK, startFee: 500_000, window: 15 } });
+    // Stage C: the FeeRouter as protocol recipient is this app's fee address too
+    net({ rpc: ethCalls({ [V3]: factory({ protocolRecipient: CONTRACTS.feeRouter! }), [HOOK]: hook() }) });
+    expect((await checkFactory(V3, 3)).kind).toBe("ok");
     // no ETH opening tick is pinned on v3: a re-priced ETH pair does not lock the launchpad
     const other = "0x1111111111111111111111111111111111111111";
     for (const [f, h, why] of [

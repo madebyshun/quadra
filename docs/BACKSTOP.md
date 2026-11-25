@@ -1,6 +1,6 @@
 # Backstop — every coin's fees buying back and burning $QUADRA (Stage C)
 
-Status: BUILT and tested 2026-11-25 (contracts/src/FeeRouter.sol, contracts/src/Backstop.sol, contracts/test/StageC.t.sol; gate:contracts 154 tests, 8 files at 100%) and SIMULATED on mainnet state (scripts/simulate-backstop.ts). NOT deployed, NOT audited. The owner chose the name ("Backstop") and
+Status: BUILT and tested 2026-11-25 (contracts/src/FeeRouter.sol, contracts/src/Backstop.sol, contracts/test/StageC.t.sol; gate:contracts 154 tests, 8 files at 100%) and SIMULATED on mainnet state (scripts/simulate-backstop.ts). DEPLOYED 2026-11-26 by the owner (Backstop 0xc5b6CA155E17a4Ff45ffC056Ff39468d48940409, FeeRouter 0xFad19ece5eB90cC4442589541fa3Be9d0853169c, block 62,181,865, both Sourcify exact) and LIVE: v3 protocolRecipient() = FeeRouter (accept tx 0x7e807735…2c31). Kept by scripts/keep-backstop.ts in the harvest workflow. NOT audited. The owner chose the name ("Backstop") and
 the direction: an automatic, oracle-free buyback-and-burn of $QUADRA funded by the protocol share of every
 coin launched on LaunchFactoryV3, in the spirit of Flaunch's Progressive Bid Wall (a public description of
 the idea only; no Flaunch code was read or used).

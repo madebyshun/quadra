@@ -103,8 +103,8 @@ describe("the fee flow", () => {
     expect(map).toHaveTextContent("20% without a referrer.");
     expect(map).toHaveTextContent("15% with one.");
     expect(map).toHaveTextContent("Approved referrers only");
-    expect(map).toHaveTextContent("Built, not deployed");
-    expect(map).toHaveTextContent("Not live");
+    expect(map).toHaveTextContent("Live");
+    expect(map).toHaveTextContent("Since 2026-11-26");
     expect(map).toHaveTextContent("50%");
     expect(map).toHaveTextContent("To furnace");
     expect(map.textContent).not.toMatch(/[→↓]/);

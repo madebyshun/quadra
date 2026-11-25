@@ -1,4 +1,4 @@
-name: Harvest QuadraFurnace
+name: Harvest QuadraFurnace + Backstop
 
 on:
   schedule:
@@ -29,3 +29,9 @@ jobs:
           MIN_QUADRA: "10000"
           FORCE: ${{ github.event.inputs.force || 'false' }}
         run: npx vite-node scripts/harvest-furnace.ts
+      # Stage C (docs/BACKSTOP.md): split the FeeRouter's ETH, then re-place the Backstop's band and burn what it bought
+      - name: Run Backstop keeper
+        env:
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+          HARVEST_PRIVATE_KEY: ${{ secrets.HARVEST_PRIVATE_KEY }}
+        run: npx vite-node scripts/keep-backstop.ts

@@ -124,6 +124,15 @@ export const CONTRACTS = {
    */
   launchFactoryV3: "0x006Da367654a487bb277fe25ff54f0fE0f741377" as string | null,
   /**
+   * Stage C (docs/BACKSTOP.md), DEPLOYED by the owner 2026-11-26 from quadra-deployer (block 62,181,865), both
+   * Sourcify exact matches, NOT audited. The FeeRouter is v3's protocol recipient since the treasury proposed it
+   * and it accepted (tx 0x7e807735…2c31; read back: protocolRecipient() = feeRouter): half of the protocol's ETH
+   * to the Backstop, the rest and every token to `treasury`. Read back: router.backstop = backstop,
+   * router.treasury = treasury, router.launchpad = v3; backstop.token = `token`, its first band anchored at tick 191400.
+   */
+  feeRouter: "0xFad19ece5eB90cC4442589541fa3Be9d0853169c" as string | null,
+  backstop: "0xc5b6CA155E17a4Ff45ffC056Ff39468d48940409" as string | null,
+  /**
    * `RevenueShareDeployer` (contracts/src/RevenueShare.sol) for launchpad v3 — DEPLOYED by the owner
    * 2026-10-29 (tx 0xaad62e6e…f42b, block 53,235,674, from the deployer 0x00FD…746F). CHECKED before it
    * was written here: Sourcify EXACT match (creation and runtime), `launchpad()` = `launchFactoryV3`,

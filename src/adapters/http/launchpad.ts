@@ -246,6 +246,12 @@ async function readHook(hook: string, functionName: (typeof HOOK_GETTERS)[number
  * and its HOOK, which must say this factory is its own and open at the deploy script's schedule.
  * No opening tick is pinned (the quote admin may re-price a pair; the review shows the tick read now).
  */
+/** v3's protocol share may go to the treasury, or to the FeeRouter that splits it between the treasury and the Backstop. */
+function protocolOk(protocol: string): boolean {
+  const ok = [CONTRACTS.treasury, CONTRACTS.feeRouter].filter((a): a is string => a !== null).map((a) => a.toLowerCase());
+  return ok.includes(protocol.toLowerCase());
+}
+
 async function checkFactoryV3(factory: string): Promise<FactoryCheck> {
   const [supply, low, high, share, referrerShare, spacing, protocol, hookAt] = await Promise.all([
     readV3(factory, "TOTAL_SUPPLY"),
@@ -271,7 +277,7 @@ async function checkFactoryV3(factory: string): Promise<FactoryCheck> {
             ? `its referrer share is ${referrerShare} bps, not ${E.referrerShareBps}`
           : spacing !== E.tickSpacing
             ? `its tick spacing is ${spacing}, not ${E.tickSpacing}`
-            : String(protocol).toLowerCase() !== CONTRACTS.treasury?.toLowerCase()
+            : !protocolOk(String(protocol))
               ? `its protocol share goes to ${protocol}, not to this app's fee address`
               : String(owner).toLowerCase() !== factory.toLowerCase()
                 ? `its hook ${hook} belongs to ${owner}, not to this launchpad`

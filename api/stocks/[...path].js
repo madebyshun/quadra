@@ -3494,6 +3494,15 @@ var CONTRACTS = {
    */
   launchFactoryV3: "0x006Da367654a487bb277fe25ff54f0fE0f741377",
   /**
+   * Stage C (docs/BACKSTOP.md), DEPLOYED by the owner 2026-11-26 from quadra-deployer (block 62,181,865), both
+   * Sourcify exact matches, NOT audited. The FeeRouter is v3's protocol recipient since the treasury proposed it
+   * and it accepted (tx 0x7e807735…2c31; read back: protocolRecipient() = feeRouter): half of the protocol's ETH
+   * to the Backstop, the rest and every token to `treasury`. Read back: router.backstop = backstop,
+   * router.treasury = treasury, router.launchpad = v3; backstop.token = `token`, its first band anchored at tick 191400.
+   */
+  feeRouter: "0xFad19ece5eB90cC4442589541fa3Be9d0853169c",
+  backstop: "0xc5b6CA155E17a4Ff45ffC056Ff39468d48940409",
+  /**
    * `RevenueShareDeployer` (contracts/src/RevenueShare.sol) for launchpad v3 — DEPLOYED by the owner
    * 2026-10-29 (tx 0xaad62e6e…f42b, block 53,235,674, from the deployer 0x00FD…746F). CHECKED before it
    * was written here: Sourcify EXACT match (creation and runtime), `launchpad()` = `launchFactoryV3`,
@@ -3857,6 +3866,8 @@ var tools_default = {
       token: "0xB200000000000000000000bdb78b7B145fB15d7F",
       launchFactory: "0xef1F427bB57e0ECd7BB8051cE8bC7AAb709a0c03",
       launchFactoryV3: "0x006Da367654a487bb277fe25ff54f0fE0f741377",
+      feeRouter: "0xFad19ece5eB90cC4442589541fa3Be9d0853169c",
+      backstop: "0xc5b6CA155E17a4Ff45ffC056Ff39468d48940409",
       revenueShareDeployer: "0x774CD3CD89337cF7e57aF6a04256733F1dd74139",
       basketRouter: "0x6986E0B8Ab5132Bbe676DC2C72fbff6Fe3D05430",
       launchFactoryV1: "0xcDb2eC1c487fbcB6B4AF25cCD86aFf8120FaB8a5"
@@ -7386,6 +7397,10 @@ async function readHook(hook, functionName) {
   const data = encodeFunctionData({ abi: HOOK_GETTERS, functionName });
   return decodeFunctionResult({ abi: HOOK_GETTERS, functionName, data: await ethCall(hook, data) });
 }
+function protocolOk(protocol) {
+  const ok2 = [CONTRACTS.treasury, CONTRACTS.feeRouter].filter((a) => a !== null).map((a) => a.toLowerCase());
+  return ok2.includes(protocol.toLowerCase());
+}
 async function checkFactoryV3(factory) {
   const [supply, low, high, share2, referrerShare, spacing, protocol, hookAt] = await Promise.all([
     readV3(factory, "TOTAL_SUPPLY"),
@@ -7400,7 +7415,7 @@ async function checkFactoryV3(factory) {
   const hook = toChecksumAddress(String(hookAt));
   const [owner, startFee, window] = await Promise.all([readHook(hook, "factory"), readHook(hook, "startFee"), readHook(hook, "window")]);
   const E = LAUNCHPAD_V3_EXPECTS;
-  const why = supply !== E.supply ? `its supply is ${supply}, not ${E.supply}` : low !== E.feeLow || high !== E.feeHigh ? `its fees are ${low} and ${high}, not ${E.feeLow} and ${E.feeHigh}` : share2 !== E.creatorShareBps ? `its launcher share is ${share2} bps, not ${E.creatorShareBps}` : referrerShare !== E.referrerShareBps ? `its referrer share is ${referrerShare} bps, not ${E.referrerShareBps}` : spacing !== E.tickSpacing ? `its tick spacing is ${spacing}, not ${E.tickSpacing}` : String(protocol).toLowerCase() !== CONTRACTS.treasury?.toLowerCase() ? `its protocol share goes to ${protocol}, not to this app's fee address` : String(owner).toLowerCase() !== factory.toLowerCase() ? `its hook ${hook} belongs to ${owner}, not to this launchpad` : startFee !== E.startFee || window !== E.window ? `its hook opens at a fee of ${startFee} over ${window} s, not ${E.startFee} over ${E.window} s` : null;
+  const why = supply !== E.supply ? `its supply is ${supply}, not ${E.supply}` : low !== E.feeLow || high !== E.feeHigh ? `its fees are ${low} and ${high}, not ${E.feeLow} and ${E.feeHigh}` : share2 !== E.creatorShareBps ? `its launcher share is ${share2} bps, not ${E.creatorShareBps}` : referrerShare !== E.referrerShareBps ? `its referrer share is ${referrerShare} bps, not ${E.referrerShareBps}` : spacing !== E.tickSpacing ? `its tick spacing is ${spacing}, not ${E.tickSpacing}` : !protocolOk(String(protocol)) ? `its protocol share goes to ${protocol}, not to this app's fee address` : String(owner).toLowerCase() !== factory.toLowerCase() ? `its hook ${hook} belongs to ${owner}, not to this launchpad` : startFee !== E.startFee || window !== E.window ? `its hook opens at a fee of ${startFee} over ${window} s, not ${E.startFee} over ${E.window} s` : null;
   return why === null ? { kind: "ok", opening: { hook, startFee: Number(startFee), window: Number(window) } } : refusal(factory, why);
 }
 async function predictToken(factory, creator, salt) {

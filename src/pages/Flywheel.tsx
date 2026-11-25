@@ -2,7 +2,7 @@ import { BRAND } from "@/brand";
 import "@/styles/folio.css";
 import "./Flywheel.css";
 
-/** Separate the launch fee split from the token's own furnace; the dashed row is built but carries no funds yet. */
+/** Separate the launch fee split from the token's own furnace; the Stage C row is live since 2026-11-26. */
 export function Flywheel() {
   return (
     <figure className="fee-map folio" aria-label="Where every fee goes">
@@ -19,7 +19,7 @@ export function Flywheel() {
             </div>
           </div>
         </section>
-        <div className="fee-map__planned folio__pending"><span className="folio__status">Built, not deployed</span><p>Stage C / Backstop: half of the treasury’s ETH share waits as a bid under {BRAND.ticker}; what it buys is burnt.</p><b className="folio__pill">Not live</b></div>
+        <div className="fee-map__planned folio__live"><span className="folio__status">Live</span><p>Stage C / Backstop: half of the treasury’s ETH share waits as a bid under {BRAND.ticker}; what it buys is burnt.</p><b className="folio__pill folio__pill--live">Since 2026-11-26</b></div>
         <section className="fee-map__pipeline" aria-labelledby="token-fees-title">
           <header><span className="folio__path">02 / {BRAND.ticker}</span><h3 id="token-fees-title" className="folio__title">Its own pool.<br /><em>Its own fee flow.</em></h3><p>{BRAND.ticker} / ETH · 1% trade fee</p></header>
           <div className="fee-map__token-flow">
