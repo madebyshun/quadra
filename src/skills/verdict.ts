@@ -435,26 +435,7 @@ export async function tokenVerdict(input: string, now: number): Promise<Report> 
   ]);
   const [fee, referrer] = await Promise.all([v3FeeOf(launchpad, address), v3ReferrerOf(launchpad, address)]);
   const token = info ?? null;
-  // Recognize Clanker v0–v5, Ape.Store, Flaunch, Virtuals, Mint Club, or any Blockscout-verified launchpad/factory contract (e.g. B20LaunchpadFactory)
-  const viaAddr = origin?.via?.address?.toLowerCase();
-  const knownVia = viaAddr ? KNOWN_LAUNCHPADS[viaAddr] : undefined;
-  const viaPadName = origin?.via?.name && /launchpad|factory|bonding|flaunch|clanker|zora|doppler|virtuals|basepad|ape\.?store|mint\.?club/i.test(origin.via.name)
-    ? origin.via.name
-    : null;
-  const resolvedPad: Launchpad | undefined =
-    other?.kind === "unknown" && origin?.via?.address && (knownVia || viaPadName)
-      ? {
-          kind: "proven",
-          id: (knownVia?.id ?? "other") as PadId,
-          name: knownVia?.name ?? viaPadName!,
-          address: origin.via.address,
-          how: knownVia
-            ? `${knownVia.name} created this token on Base`
-            : `Blockscout verified ${viaPadName} as the contract that created this token`,
-          guarantees: [],
-          launcher: origin.launcher?.address ?? null,
-        }
-      : (other ?? undefined);
+  const resolvedPad = padFromOrigin(other ?? null, origin ?? null);
   const body = [
     ...launchpadRows(launchpad, fee, referrer),
     ...(launchpad ? [] : launchpadRow(resolvedPad)),
@@ -493,3 +474,25 @@ export const verdictSkill: Skill = {
   args: [{ name: "token address", hint: "0x…" }],
   run: ([input = ""]) => tokenVerdict(input, Date.now()),
 };
+
+/**
+ * When no launchpad proved the token itself, the contract that CREATED it may still be one: a known
+ * factory (Clanker v0–v5, Ape.Store, Flaunch, Virtuals, Mint Club …) or a Blockscout-verified contract
+ * whose name says launchpad/factory (e.g. B20LaunchpadFactory). Anything else stays as it was.
+ */
+export function padFromOrigin(other: Launchpad | null, origin: Origin | null): Launchpad | undefined {
+  const via = origin?.via;
+  if (other?.kind !== "unknown" || !via?.address) return other ?? undefined;
+  const knownVia = KNOWN_LAUNCHPADS[via.address.toLowerCase()];
+  const viaPadName = via.name && /launchpad|factory|bonding|flaunch|clanker|zora|doppler|virtuals|basepad|ape\.?store|mint\.?club/i.test(via.name) ? via.name : null;
+  if (!knownVia && !viaPadName) return other;
+  return {
+    kind: "proven",
+    id: (knownVia?.id ?? "other") as PadId,
+    name: knownVia?.name ?? viaPadName!,
+    address: via.address,
+    how: knownVia ? `${knownVia.name} created this token on Base` : `Blockscout verified ${viaPadName} as the contract that created this token`,
+    guarantees: [],
+    launcher: origin!.launcher?.address ?? null,
+  };
+}

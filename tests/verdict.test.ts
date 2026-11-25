@@ -41,6 +41,7 @@ import { CAPTURED_AT, LAUNCHERS, TOKENS, VX } from "./fixtures/verdict";
 import { factoryCalls } from "./fixtures/launchpad";
 import { DOWN, json, net, RpcError, useNet, type Answer } from "./net";
 import { padCalls, PX } from "./fixtures/launchpads";
+import { BASEPAD, ZORA_FACTORY } from "@/config/launchpads";
 import { withoutV3 } from "./v2only";
 
 // Its fixtures are real v2/v1 captures, so it runs as the app did before v3 was set.
@@ -60,7 +61,7 @@ const QUOTE = `${RELAY.api}/quote`;
 const DAY = 86_400_000;
 
 type SimCallIn = { from: string; to: string; data: string; value: string };
-type Sim = (calls: SimCallIn[]) => Answer;
+type Sim = (calls: SimCallIn[], blockTag?: string) => Answer;
 
 /** The default simulation: the capture matching the shape of what was asked. */
 const captured: Sim = (calls) => {
@@ -96,7 +97,7 @@ function world(w: World = {}) {
       const state = block.blockStateCalls[0]!;
       expect(block.traceTransfers).toBe(true);
       expect(BigInt(state.stateOverrides[SIM_ACCOUNT]!.balance)).toBe(10n ** 19n);
-      return (w.sim ?? captured)(state.calls);
+      return (w.sim ?? captured)(state.calls, String(params[1]));
     },
     get: (url) => w.get?.(url),
   });
@@ -173,6 +174,28 @@ describe("the round trip", () => {
       { sell: NATIVE, amount: SIM_ETH_IN },
       { sell: TOKENS.degen, amount: trip.received },
     ]);
+  });
+
+  it("moves and sells at the very block the buy ran in, and falls back to the latest when that block is refused", async () => {
+    const tags: string[] = [];
+    world({ sim: (calls, tag) => { tags.push(String(tag)); return tag !== "latest" && calls.length > 1 && tags.filter((t) => t !== "latest").length === 1 ? new RpcError("block not found") : captured(calls); } });
+    const trip = await roundTrip(TOKENS.degen);
+    expect(trip.kind).toBe("traded");
+    // buy at latest; the transfer asked at the buy's block, refused, then at latest; the sell at the buy's block
+    expect(tags).toEqual(["latest", "0x319b0d7", "latest", "0x319b0d7"]);
+  });
+
+  it("uses the latest block throughout when the simulation names no block", async () => {
+    const tags: string[] = [];
+    const unnumbered = (r: unknown) => (r as Record<string, unknown>[]).map(({ number: _n, ...rest }) => rest);
+    world({ sim: (calls, tag) => { tags.push(String(tag)); return calls.length === 1 ? unnumbered(VX.simBuy) : captured(calls); } });
+    expect((await roundTrip(TOKENS.degen)).kind).toBe("traded");
+    expect(tags.every((t) => t === "latest")).toBe(true);
+  });
+
+  it("does not take a simulation that is not a list of blocks for a trade", async () => {
+    world({ sim: () => ({ unexpected: true }) });
+    await expect(roundTrip(TOKENS.degen)).rejects.toThrow();
   });
 
   it("says when there is no route to buy or to sell, in Relay's words", async () => {
@@ -312,6 +335,18 @@ describe("the code, as rows", () => {
     expect(rows[0]).toMatchObject({ label: "Code scan", tone: "warn", value: expect.stringMatching(/GoPlus left .* checks blank/) });
   });
 
+  it("says not checked when GoPlus left every check blank", () => {
+    const blank = Object.fromEntries(Object.entries(degen).map(([k, v]) => [k, typeof v === "string" && ["yes", "no"].includes(v) ? "unknown" : v])) as typeof degen;
+    expect(codeRows(blank)).toEqual([row("Code scan", `not checked — GoPlus left all ${checksOf(blank).length} checks blank`, { tone: "warn" })]);
+  });
+
+  it("says partly checked when GoPlus left some checks blank and answered others", () => {
+    const part = { ...degen, honeypot: "unknown", proxy: "unknown" } as typeof degen;
+    const rows = codeRows(part);
+    expect(rows.at(-1)).toEqual(row("Code scan", `partially checked — GoPlus left 2 of ${checksOf(part).length} checks blank`, { tone: "warn" }));
+    expect(rows[0]).toEqual(row("Owner can mint more", "yes", { tone: "warn" }));
+  });
+
   it("says when nothing was found, when GoPlus has no report, and when it could not be reached", () => {
     expect(codeRows({ ...degen, mintable: "no" })).toEqual([row("Code scan", cleanScan({ ...degen, mintable: "no" }), { tone: "ok" })]);
     expect(cleanScan({ ...degen, buyTax: 0, sellTax: 0.05 })).toBe("11 checks passed — not a honeypot, no mint, no pause, no blacklist, source verified, tax 0.00% buy / 5.00% sell");
@@ -340,6 +375,17 @@ describe("the holders, as rows", () => {
       row("Top 10 holders", "61.7% of supply, pools and burns set aside", { tone: "warn" }),
       row("Largest holder", "GnosisSafeProxy — 22.6%", { href: `https://basescan.org/address/${holders[0]!.holder.address}` }),
     ]);
+  });
+
+  it("reads a list of holders that all hold nothing as not indexed, never as unconcentrated", () => {
+    const empty = holders.map((h) => ({ ...h, raw: 0n }));
+    expect(holderRows(info, empty, pairs)).toEqual([row("Top 10 holders", "not indexed yet — Blockscout returned 0% across top holders", { tone: "warn" })]);
+    // ranked by balance whatever order they came in
+    const ranked = concentration([holders[2]!, holders[0]!, holders[1]!], info.totalSupply, new Set());
+    expect(ranked.largest?.holder.address).toBe(holders[0]!.holder.address);
+    // two holders with the same balance keep their order
+    const tie = concentration([holders[0]!, { ...holders[1]!, raw: holders[0]!.raw }], info.totalSupply, new Set());
+    expect(tie.largest?.holder.address).toBe(holders[0]!.holder.address);
   });
 
   it("sets aside a pool, the v4 PoolManager and burned supply, and says how much", () => {
@@ -463,6 +509,38 @@ describe("where a token came from", () => {
     const v3 = parseMarkets([{ pairAddress: "0xc9034c3E7F58003E6ae0C8438e7c8f4598d5ACAA", pairCreatedAt: 1 }]);
     expect(await originOf(TOKENS.boar, v3)).toBeNull();
     expect(await originOf(TOKENS.boar, [{ ...boarPairs[0]!, createdAt: null }])).toBeNull();
+    expect(await originOf(TOKENS.boar, [])).toBeNull();
+  });
+
+  it("widens the search when DexScreener's creation time lagged: earlier first, then later, and a refused range is no answer", async () => {
+    const hit = VX.rpcBoarInitialize;
+    for (const [nth, expected] of [[1, true], [2, true], [3, false]] as const) {
+      let calls = 0;
+      net({
+        get: origins(),
+        rpc: (method, params, endpoint) => {
+          if (method === "eth_getLogs") {
+            calls++;
+            if (nth === 3 && calls > 1) return new RpcError("range too large");
+            return calls === nth + 1 ? hit : [];
+          }
+          return boarChain().answer(method, params, endpoint);
+        },
+      });
+      const o = await originOf(TOKENS.boar, boarPairs);
+      expect(o !== null, `probe ${nth}`).toBe(expected);
+    }
+  });
+
+  it("keeps a known launchpad as the creator when no launch transaction is on record", async () => {
+    const known = { creator_address_hash: BASEPAD.factory, creation_transaction_hash: null };
+    net({ get: origins({ [`${BLOCKSCOUT}/addresses/${TOKENS.boar}`]: known }) });
+    expect(await originOf(TOKENS.boar, [])).toEqual({ via: { address: BASEPAD.factory, name: "basepad.si" }, launcher: null, relay: "no launch transaction on record" });
+    // a launchpad that proved itself is named instead
+    const pad = { kind: "proven" as const, id: "zora" as const, name: "Zora", address: ZORA_FACTORY, how: "x", guarantees: [], launcher: null };
+    expect(await originOf(TOKENS.boar, [], pad)).toEqual({ via: { address: ZORA_FACTORY, name: "Zora" }, launcher: null, relay: "no launch transaction on record" });
+    // an unknown creator with no transaction is nothing to go on
+    net({ get: origins({ [`${BLOCKSCOUT}/addresses/${TOKENS.boar}`]: { creator_address_hash: LAUNCHERS.degen, creation_transaction_hash: null } }) });
     expect(await originOf(TOKENS.boar, [])).toBeNull();
   });
 

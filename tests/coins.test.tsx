@@ -197,7 +197,7 @@ describe("the Coins window", () => {
     await waitFor(() => expect(screen.getByRole("option", { name: "ETH" })).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: "stock-paired" }));
     expect(screen.getByText("No coin matches — try All.")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "eth-paired" }));
+    await userEvent.click(screen.getByRole("button", { name: "crypto-paired" }));
     await userEvent.selectOptions(screen.getByLabelText("Paired with"), "ETH");
     expect(screen.getByLabelText("Coins", { selector: "ul" })).toHaveTextContent("test (test)");
     await userEvent.selectOptions(screen.getByLabelText("Paired with"), "");
@@ -219,7 +219,7 @@ describe("the Coins window", () => {
     const a = mount();
     const list = await screen.findByLabelText("Coins", { selector: "ul" });
     await waitFor(() => expect(list).toHaveTextContent(/pair not read/));
-    expect(list).toHaveTextContent(/value not read · vol \$[\d,.]+ · 1 trade · /);
+    expect(list).toHaveTextContent(/value not read · .*vol \$[\d,.]+ · 1 trade · /);
     a.unmount();
 
     // two trades and no volume figure: said as trades, the volume as $0.00 rather than left out

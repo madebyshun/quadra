@@ -17,8 +17,10 @@ contract DeployQuadraFurnace is Script {
     IFurnaceLaunchpad internal constant LAUNCHPAD_V3 = IFurnaceLaunchpad(0x006Da367654a487bb277fe25ff54f0fE0f741377);
     /// Uniswap v4 PoolManager on Base — UNISWAP_V4_POOL_MANAGER in src/config/chain.ts.
     IPoolManager internal constant POOL_MANAGER = IPoolManager(0x498581fF718922c3f8e6A244956aF099B2652b2b);
-    /// $QUADRA, launched by the owner 2026-10-29 (tx 0x9529911d…2b43, block 53,236,421).
-    address internal constant QUADRA = 0xb200000000000000000000d096efba9896ab0816;
+    /// $QUADRA paired with ETH (2026-11-25; the AAPLc-paired 0xb200…0816 of 2026-10-29 was never traded and
+    /// is abandoned). PREDICTED by eth_call of scripts/prepare-quadra-launch.ts's calldata from
+    /// quadra-deployer; `run` refuses until the launchpad has a record of it, so confirm it after the launch.
+    address internal constant QUADRA = 0xB200000000000000000000bdb78b7B145fB15d7F;
     /// CONTRACTS.treasury — receives what is not burnt, and alone triggers buybacks.
     address internal constant TREASURY = 0xD5C1dFc036F9911348EA8065F73c8123f4013FAB;
     /// The share of every arrival burnt: 50%, the rest to the treasury (owner, 2026-10-29: "keep part of

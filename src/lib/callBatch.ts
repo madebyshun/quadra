@@ -1,4 +1,4 @@
-import { BASE } from "@/config/chain";
+import { BASE, USDC } from "@/config/chain";
 import { readWallet, type Eip1193Provider } from "@/lib/wallet";
 import { parseReceipt, type Receipt, type TxRequest } from "@/lib/transact";
 import { rpc } from "@/skills/http";
@@ -36,17 +36,50 @@ export async function checkBatchWallet(provider: Eip1193Provider, account: strin
   if (await atomicCapability(provider, account) === "unsupported") throw new Error("This wallet cannot buy the basket atomically on Base. Use the step-by-step option.");
 }
 
-/** The caller persists id BEFORE this request. No automatic fallback or resubmission after an error. */
-export async function sendAtomicBatch(provider: Eip1193Provider, account: string, txs: readonly TxRequest[], id: string): Promise<void> {
+/** The caller persists id BEFORE this request. Returns the wallet-acknowledged batch ID (which may differ from the suggested id). */
+export async function sendAtomicBatch(provider: Eip1193Provider, account: string, txs: readonly TxRequest[], id: string): Promise<string> {
   await sameWallet(provider, account);
   const answer = await provider.request({ method: "wallet_sendCalls", params: [{
     version: "2.0.0", id, from: account, chainId: BASE.idHex, atomicRequired: true,
     calls: txs.map((tx) => ({ to: tx.to, data: tx.data, value: `0x${(tx.value ?? 0n).toString(16)}` })),
-  }] }) as { id?: string } | null;
-  if (answer?.id !== id) throw new Error("The wallet did not acknowledge this batch ID. Check its activity before buying again.");
+  }] }) as string | { id?: string } | null;
+  const returnedId = typeof answer === "string" ? answer : typeof answer?.id === "string" ? answer.id : "";
+  if (!returnedId) throw new Error("The wallet did not acknowledge this batch ID. Check its activity before buying again.");
+  return returnedId;
 }
 
-export type BatchStatus = { readonly kind: "pending" } | { readonly kind: "failed" } | { readonly kind: "confirmed"; readonly receipts: readonly Receipt[] };
+const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+/** mainnet.base.org caps eth_getLogs at 2,000 blocks (MEASURED); 30 windows reach ~3.3 h back at 0.2 s blocks. */
+const LOG_WINDOW = 2_000n;
+const MAX_WINDOWS = 30;
+
+/**
+ * The chain's own answer when the wallet's is stuck. MEASURED 2026-11-25: MetaMask kept answering
+ * `wallet_getCallsStatus` with 100 (pending) for a basket confirmed on Base minutes earlier (tx
+ * 0xeaa94ad4…a358). The batch is ONE transaction from `account` whose USDC transfers out of the
+ * account add up to exactly `usdcTotal`; only a successful receipt of such a transaction counts.
+ * `null` = not found yet, never "failed".
+ */
+export async function findBatchOnChain(account: string, fromBlock: bigint, usdcTotal: bigint): Promise<Receipt | null> {
+  const latest = BigInt(await rpc("eth_blockNumber", []) as string);
+  const from = `0x${account.slice(2).toLowerCase().padStart(64, "0")}`;
+  const sums = new Map<string, bigint>();
+  let start = fromBlock;
+  for (let i = 0; i < MAX_WINDOWS && start <= latest; i++) {
+    const end = start + LOG_WINDOW - 1n < latest ? start + LOG_WINDOW - 1n : latest;
+    const logs = await rpc("eth_getLogs", [{ address: USDC.address, topics: [TRANSFER, from], fromBlock: `0x${start.toString(16)}`, toBlock: `0x${end.toString(16)}` }]) as { transactionHash: string; data: string }[];
+    for (const l of logs) sums.set(l.transactionHash, (sums.get(l.transactionHash) ?? 0n) + BigInt(l.data));
+    start = end + 1n;
+  }
+  for (const [hash, sum] of sums) {
+    if (sum !== usdcTotal) continue;
+    const receipt = parseReceipt(await rpc("eth_getTransactionReceipt", [hash]));
+    if (receipt?.status === "success") return receipt;
+  }
+  return null;
+}
+
+export type BatchStatus ={ readonly kind: "pending" } | { readonly kind: "failed" } | { readonly kind: "confirmed"; readonly receipts: readonly Receipt[] };
 
 /** A missing/malformed answer or a partial execution is uncertain, never permission to charge again. */
 export async function getBatchStatus(provider: Eip1193Provider, id: string): Promise<BatchStatus> {

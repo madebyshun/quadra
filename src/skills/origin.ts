@@ -205,10 +205,8 @@ export async function originOf(token: string, pairs: readonly Market[], pad: Pro
   if (pad?.launcher) return { via: padVia, launcher: atLeastOne(await launcherProfile(pad.launcher, pad.address)) };
   const found = await launchTx(token, pairs);
   if (!found) return padVia ? { via: padVia, launcher: null, relay: "no launch transaction on record" } : null;
-  if (!found.hash) {
-    const via = padVia ?? (found.creator ? { address: found.creator, name: KNOWN_LAUNCHPADS[found.creator.toLowerCase()]?.name ?? null } : null);
-    return via ? { via, launcher: null, relay: "no launch transaction on record" } : null;
-  }
+  // no transaction is returned only with a creator that is a known launchpad (launchTx)
+  if (!found.hash) return { via: padVia ?? { address: found.creator!, name: KNOWN_LAUNCHPADS[found.creator!.toLowerCase()]!.name }, launcher: null, relay: "no launch transaction on record" };
   const tx = await getJson(SERVICE, `${BLOCKSCOUT}/transactions/${found.hash}`);
   const from = isObj(tx) && isObj(tx.from) ? strOf(tx.from.hash) : null;
   if (!isObj(tx) || !from) return padVia ? { via: padVia, launcher: null, relay: "no launch transaction on record" } : null;

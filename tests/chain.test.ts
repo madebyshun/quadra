@@ -60,7 +60,7 @@ describe("our own contracts", () => {
     expect(toChecksumAddress(CONTRACTS.treasury!)).toBe(CONTRACTS.treasury);
     expect(requireContract("treasury")).toBe(CONTRACTS.treasury);
     // launched 2026-10-29 and read back from the factory's Launched event; pinned literally like the treasury
-    expect(CONTRACTS.token).toBe("0xb200000000000000000000d096efba9896ab0816");
+    expect(CONTRACTS.token).toBe("0xB200000000000000000000bdb78b7B145fB15d7F");
     expect(toChecksumAddress(CONTRACTS.token!)).toBe(CONTRACTS.token);
   });
 
@@ -129,5 +129,13 @@ describe("flags", () => {
     for (const [name, v] of Object.entries(FLAGS)) {
       expect(typeof v, `FLAGS.${name}`).toBe("boolean");
     }
+  });
+});
+
+describe("the first RPC", () => {
+  it("takes a build's VITE_BASE_RPC_URL, trimmed, and the public endpoint otherwise", async () => {
+    const { baseRpc } = await import("@/config/chain");
+    expect(baseRpc({ VITE_BASE_RPC_URL: " https://rpc.example " })).toBe("https://rpc.example");
+    for (const env of [undefined, {}, { VITE_BASE_RPC_URL: "   " }]) expect(baseRpc(env)).toBe("https://base.publicnode.com");
   });
 });

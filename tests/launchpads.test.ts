@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { encodeAbiParameters, keccak256 as viemKeccak, toHex as viemHex } from "viem";
-import { BASEPAD, CLANKER_FACTORY, DOPPLER_AIRLOCK, FEEL_INTEGRATOR, MINT_CLUB_BOND, VIRTUALS_BONDING, ZORA_FACTORY } from "@/config/launchpads";
+import { BASEPAD, CLANKER_FACTORIES, CLANKER_FACTORY, DOPPLER_AIRLOCK, FEEL_INTEGRATOR, MINT_CLUB_BOND, VIRTUALS_BONDING, ZORA_FACTORY } from "@/config/launchpads";
 import { BLOCKSCOUT } from "@/skills/blockscout";
 import { parseMarkets } from "@/skills/dexscreener";
 import {
@@ -15,13 +15,13 @@ import {
   type Proven,
 } from "@/skills/launchpads";
 import { atLeastOne, originOf, PAGE, type Launcher } from "@/skills/origin";
-import { launchpadRow, originRows } from "@/skills/verdict";
+import { launchpadRow, originRows, padFromOrigin } from "@/skills/verdict";
 import { row } from "@/skills/types";
 import { copy } from "./fixtures/base";
 import { factoryCalls, LAUNCHPAD, LX } from "./fixtures/launchpad";
 import { padCalls, PADS_TOKENS as T, PX } from "./fixtures/launchpads";
 import { LAUNCHERS, TOKENS, VX } from "./fixtures/verdict";
-import { DOWN, net, useNet, type Answer } from "./net";
+import { DOWN, net, RpcError, useNet, type Answer } from "./net";
 import { withoutV3 } from "./v2only";
 
 // Its fixtures are real v2/v1 captures, so it runs as the app did before v3 was set.
@@ -188,6 +188,52 @@ describe("which launchpad made a token, from its own record", () => {
   });
 });
 
+describe("the newer launchpads' record edges", () => {
+  const creator = "0x9F9B1b095831e39b90C56991E1a259304354B09f";
+  const padWord = (a: string) => a.toLowerCase().slice(2).padStart(64, "0");
+  const zero = "0".repeat(64);
+  const fRoute = both();
+  const answering = (to: string, answer: (data: string) => unknown) =>
+    net(rpcOf((m, p) => {
+      const call = (p as [{ to: string; data: string }])[0];
+      if (m === "eth_call" && call.to.toLowerCase() === to.toLowerCase()) return answer(call.data);
+      return fRoute(m, p);
+    }));
+
+  it("reads a Virtuals record laid out flat, matched by its agent token, and ignores a short or foreign one", async () => {
+    // no tuple offset: (creator, token, pair, agentToken) from word 0, the token only as the agent token
+    answering(VIRTUALS_BONDING, () => `0x${padWord(creator)}${zero}${zero}${padWord(T.degen)}`);
+    expect(await launchpadOf(T.degen)).toMatchObject({ id: "virtuals", launcher: creator });
+    for (const raw of [`0x${padWord(creator)}`, `0x${padWord(creator)}${padWord(creator)}${zero}${padWord(creator)}`]) {
+      answering(VIRTUALS_BONDING, () => raw);
+      expect(await launchpadOf(T.degen)).not.toMatchObject({ id: "virtuals" });
+    }
+  });
+
+  it("does not credit Mint Club with a record that names no creator", async () => {
+    answering(MINT_CLUB_BOND, () => `0x${zero}${zero}`);
+    expect(await launchpadOf(T.degen)).not.toMatchObject({ id: "mintclub" });
+    answering(MINT_CLUB_BOND, () => new RpcError("execution reverted"));
+    expect(await launchpadOf(T.degen)).not.toMatchObject({ id: "mintclub" });
+  });
+
+  it("proves an older Clanker token by the factory it names, with the admin it names or none", async () => {
+    const [factory, name] = Object.entries(CLANKER_FACTORIES)[0]!;
+    const FACTORY_SEL = "0xc45a0155"; // factory()
+    const route = (admin: unknown) =>
+      answering(T.degen, (data) => (data.startsWith(FACTORY_SEL) ? `0x${padWord(factory)}` : admin));
+    route(`0x${padWord(creator)}`);
+    expect(await launchpadOf(T.degen)).toMatchObject({ id: "clanker", name, admin: creator });
+    route(new RpcError("execution reverted"));
+    const plain = await launchpadOf(T.degen);
+    expect(plain).toMatchObject({ id: "clanker", name });
+    expect(plain).not.toHaveProperty("admin");
+    // a factory() that is no launchpad's is unknown
+    answering(T.degen, (data) => (data.startsWith(FACTORY_SEL) ? `0x${padWord(creator)}` : new RpcError("execution reverted")));
+    expect(await launchpadOf(T.degen)).toEqual({ kind: "unknown" });
+  });
+});
+
 describe("the radar's launchpad logs", () => {
   it("hashes the two events from their signatures — the captured Create log carries the same topic", () => {
     expect(DOPPLER_CREATE_TOPIC).toBe(PX.padLogs.result[0]!.topics[0]);
@@ -340,5 +386,22 @@ describe("the launchpad and a relayed launch, as rows", () => {
         next: `profile ${LAUNCHERS.chubby}`,
       }),
     );
+  });
+});
+
+describe("a launchpad read from the contract that created the token", () => {
+  const launcher = { address: "0x9F9B1b095831e39b90C56991E1a259304354B09f" } as never;
+  it("names a known factory or a verified contract named like one, and leaves everything else as it was", () => {
+    const unknown = { kind: "unknown" } as const;
+    expect(padFromOrigin(unknown, { via: { address: BASEPAD.factory, name: null }, launcher })).toMatchObject({ kind: "proven", id: "basepad", name: "basepad.si", how: "basepad.si created this token on Base", launcher: "0x9F9B1b095831e39b90C56991E1a259304354B09f" });
+    const b20 = "0x1111111111111111111111111111111111111111";
+    expect(padFromOrigin(unknown, { via: { address: b20, name: "B20LaunchpadFactory" }, launcher: null })).toMatchObject({ id: "other", name: "B20LaunchpadFactory", how: "Blockscout verified B20LaunchpadFactory as the contract that created this token", launcher: null });
+    expect(padFromOrigin(unknown, { via: { address: b20, name: "SomeToken" }, launcher: null })).toBe(unknown);
+    expect(padFromOrigin(unknown, { via: { address: b20, name: null }, launcher: null })).toBe(unknown);
+    expect(padFromOrigin(unknown, { via: null, launcher: null })).toBe(unknown);
+    expect(padFromOrigin(unknown, null)).toBe(unknown);
+    const proven = { kind: "proven", id: "zora", name: "Zora", address: ZORA_FACTORY, how: "x", guarantees: [], launcher: null } as const;
+    expect(padFromOrigin(proven, { via: { address: BASEPAD.factory, name: null }, launcher: null })).toBe(proven);
+    expect(padFromOrigin(null, null)).toBeUndefined();
   });
 });

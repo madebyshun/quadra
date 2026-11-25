@@ -650,7 +650,7 @@ describe("the photo intro on a bare load", () => {
     vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} }));
   }
 
-  it("plays where motion is welcome, and opens the window chosen on the tube", async () => {
+  it("plays where motion is welcome, and Esc skips it", async () => {
     motion();
     vi.useFakeTimers({ toFake: ["setTimeout", "requestAnimationFrame", "cancelAnimationFrame"] });
     try {
@@ -667,6 +667,12 @@ describe("the photo intro on a bare load", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("plays again when asked by ?intro=explore, even after it has played", () => {
+    motion();
+    renderAt("/?intro=explore");
+    expect(screen.getByRole("dialog", { name: "quadra is starting" })).toBeInTheDocument();
   });
 
   it("hands off to the Welcome dialog once the loading bar finishes", async () => {

@@ -5,7 +5,7 @@ import { portraitOf, PIXELS } from "@/lib/cardArt";
 import { cardWords, compact, ships, type CardWords } from "@/lib/cardWords";
 import { dataUrl, lookupWords, parseHandle, pictureData, xProfile, type XUser } from "@/skills/xprofile";
 import { useInbox } from "@/features/openWindow";
-import { DotsPattern, HalftoneSky, KIT, QuadraMark, SERIF } from "@/features/panels/cardKit";
+import { DotsPattern, HalftoneSky, KIT, PixelMark, SERIF } from "@/features/panels/cardKit";
 import "./BaseCard.css";
 
 /**
@@ -319,14 +319,14 @@ export function CardSvg({ user, words, picture }: { user: XUser; words: CardWord
         <DotsPattern />
       </defs>
 
-      {/* Quadra's Base cobalt (#0A3DFF) sky with 45° white halftone clouds */}
+      {/* this app's Base cobalt (#0A3DFF) sky with 45° white halftone clouds */}
       <HalftoneSky w={CARD_W} h={CARD_H} />
 
-      {/* Warm-Platinum System 7 menu bar with QuadraMark on the left and BASE 8453 badge on the right */}
+      {/* Warm-Platinum System 7 menu bar with PixelMark on the left and BASE 8453 badge on the right */}
       <g shapeRendering="crispEdges">
         <rect width={CARD_W} height="50" fill={KIT.chrome} />
         <rect y="50" width={CARD_W} height="3" fill={INK} />
-        <QuadraMark x={14} y={8} size={34} />
+        <PixelMark x={14} y={8} size={34} />
         <text y="34" fontFamily={UI} fontWeight="bold" fontSize="23" fill={KIT.ink}>
           {MENU.map(([m, x]) => (
             <tspan key={m} x={x + 22}>
@@ -392,11 +392,11 @@ export function CardSvg({ user, words, picture }: { user: XUser; words: CardWord
         ))}
       </g>
 
-      {/* Warm-Platinum status bar with Quadra branding */}
+      {/* Warm-Platinum status bar with the brand */}
       <g shapeRendering="crispEdges">
         <rect x="64" y="804" width="1462" height="3" fill={INK} />
         <rect x="64" y="807" width="1462" height="43" fill={KIT.chrome} />
-        <QuadraMark x={80} y={813} size={30} />
+        <PixelMark x={80} y={813} size={30} />
       </g>
       <text x="122" y="836" fontFamily={MONO} fontWeight="bold" fontSize="22" fill={KIT.blue}>
         {BRAND.domain}

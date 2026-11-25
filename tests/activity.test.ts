@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BRAND } from "@/brand";
 import { UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
 import { BLOCKSCOUT } from "@/skills/blockscout";
@@ -57,6 +57,32 @@ function chain(o: { ours?: string[]; ourLogs?: Answer; hooks?: Record<string, An
 }
 
 describe("launchActivity", () => {
+  it("reads a window wider than one request in consecutive chunks, end to end", async () => {
+    const { asked } = chain();
+    // the chain's logs, once: every chunk after the first answers nothing
+    const original = globalThis.fetch;
+    let first = true;
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+      const body = init?.body ? (JSON.parse(String(init.body)) as { method?: string }) : null;
+      if (body?.method === "eth_getLogs" && !first) {
+        const res = await original(url, init);
+        const j = (await res.json()) as { result: unknown };
+        const f = (JSON.parse(String(init!.body)) as { params: [{ address: unknown }] }).params[0];
+        return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: Array.isArray(f.address) ? j.result : [] }));
+      }
+      if (body?.method === "eth_getLogs" && !Array.isArray((JSON.parse(String(init!.body)) as { params: [{ address: unknown }] }).params[0].address)) first = false;
+      return original(url, init);
+    });
+    const a = await launchActivity(60);
+    const span = asked.ranges.at(-1)![1] - asked.ranges[0]![0] + 1;
+    expect(asked.ranges.length).toBeGreaterThan(1);
+    expect(asked.ranges.every(([f, t]) => t - f + 1 <= 900)).toBe(true);
+    asked.ranges.slice(1).forEach(([f], i) => expect(f).toBe(asked.ranges[i]![1] + 1));
+    expect(asked.ranges.at(-1)![1]).toBe(LATEST);
+    expect(span).toBe(LATEST - asked.ranges[0]![0] + 1);
+    expect(a.total).toBe(61);
+  });
+
   it("groups the window's launches by launchpad, busiest first, the rest on one line", async () => {
     const { asked } = chain();
     const a = await launchActivity();

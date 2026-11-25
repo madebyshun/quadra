@@ -1,10 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { decodeFunctionData, erc20Abi } from "viem";
 import { BASE, USDC, WETH } from "@/config/chain";
 import { ACROSS, RELAY, ROBINHOOD } from "@/config/routes";
 import { SwapPanel, impactTone, QUOTE_TTL_MS } from "@/features/panels/SwapPanel";
+import { SIM_ACCOUNT } from "@/skills/simulate";
 import { OpenWindowProvider } from "@/features/openWindow";
 import { BridgePanel } from "@/features/panels/BridgePanel";
 import { WalletProvider } from "@/ui/WalletProvider";
@@ -191,6 +193,74 @@ describe("SwapPanel", () => {
     );
     expect(sent.map((t) => t.to!.toLowerCase())).toEqual([USDC.address.toLowerCase(), RELAY.approvalProxy.toLowerCase()]);
     expect(cta()).toHaveTextContent("Swapped — edit a field to swap again");
+  });
+
+  it("previews what you would get once an amount and both tokens are given, and says when it cannot", async () => {
+    wallet();
+    let refuse = false;
+    world({ quote: () => (refuse ? json({ message: "no route" }, 400) : json(ROUTES_FX.relayUsdcWeth)) });
+    mount(<SwapPanel />);
+    await settle();
+    expect(screen.getByText("Enter amount to preview")).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("You get"), "WETH");
+    await userEvent.type(screen.getByLabelText("Amount"), "5");
+
+    expect(await screen.findByText(/^≈ 0\.0018584615/, {}, { timeout: 2000 })).toBeInTheDocument();
+    // a zero amount previews nothing
+    await userEvent.clear(screen.getByLabelText("Amount"));
+    await userEvent.type(screen.getByLabelText("Amount"), "0");
+    await new Promise((r) => setTimeout(r, 700));
+    await settle();
+    expect(screen.getByText("Enter amount to preview")).toBeInTheDocument();
+    // a refused quote previews nothing either
+    refuse = true;
+    await userEvent.clear(screen.getByLabelText("Amount"));
+    await userEvent.type(screen.getByLabelText("Amount"), "6");
+    await new Promise((r) => setTimeout(r, 700));
+    await settle();
+    expect(screen.getByText("Enter amount to preview")).toBeInTheDocument();
+    // a half-typed token address on either side is not quoted at all
+    for (const side of ["You pay", "You get"]) {
+      await userEvent.selectOptions(screen.getByLabelText(side), "other");
+      await userEvent.type(screen.getByLabelText(`${side} address`), "0x12");
+      await new Promise((r) => setTimeout(r, 500));
+      expect(screen.getByText("Enter amount to preview")).toBeInTheDocument();
+      await userEvent.selectOptions(screen.getByLabelText(side), side === "You pay" ? "USDC" : "WETH");
+    }
+  });
+
+  it("previews a price before any wallet is connected, quoted for a keyless address", async () => {
+    let asked: Json = {};
+    // the captured quote, as Relay answers it for the keyless address (its steps name that sender)
+    const forSim = JSON.parse(JSON.stringify(ROUTES_FX.relayUsdcWeth).replaceAll(USER.toLowerCase(), SIM_ACCOUNT.toLowerCase()).replaceAll(USER, SIM_ACCOUNT)) as Json;
+    world({ quote: () => json(forSim) });
+    const quotes = globalThis.fetch;
+    vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
+      if (url.startsWith(RELAY.api)) asked = JSON.parse(String(init!.body)) as Json;
+      return quotes(url, init);
+    });
+    mount(<SwapPanel />);
+    await settle();
+    await userEvent.selectOptions(screen.getByLabelText("You get"), "WETH");
+    await userEvent.type(screen.getByLabelText("Amount"), "5");
+    expect(await screen.findByText(/^≈ 0\.0018584615/, {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(String(asked.user).toLowerCase()).toBe(SIM_ACCOUNT.toLowerCase());
+  });
+
+  it("opens to sell a token a link names, for USDC", async () => {
+    wallet();
+    world({ quote: () => json(ROUTES_FX.relayUsdcWeth) });
+    const at = (sell: string) => render(<MemoryRouter initialEntries={[`/?do=swap&sell=${sell}`]}><WalletProvider><SwapPanel /></WalletProvider></MemoryRouter>);
+    const a = at(OTHER_TOKEN);
+    await settle();
+    expect(screen.getByLabelText("You pay")).toHaveValue("other");
+    expect(screen.getByLabelText("You pay address")).toHaveValue(OTHER_TOKEN);
+    expect(screen.getByLabelText("You get")).toHaveValue("USDC");
+    a.unmount();
+    at(WETH.address);
+    await settle();
+    expect(screen.getByLabelText("You pay")).toHaveValue("WETH");
+    expect(screen.queryByLabelText("You pay address")).toBeNull();
   });
 
   it("swaps ETH in one step, and flags a result below the quoted minimum", async () => {

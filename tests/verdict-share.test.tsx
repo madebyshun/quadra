@@ -94,6 +94,35 @@ describe("a Token Verdict as a picture", () => {
     expect(verdictCard(verdict("x", "warn", [row("Buy → sell", "odd", {})]))!.tiles[0].title).toBe("Trade not checked");
   });
 
+  it("shows the market's figures, at most five, trades as buys / sells, and holders when nothing else is flagged", () => {
+    const market = verdictCard(
+      verdict("No red flags found — 100/100", "ok", [
+        row("Price", "$0.0042", { tone: "ok" }),
+        row("Liquidity (USD)", "$12,345.67", { tone: "ok" }),
+        row("Volume 24h", "$999.99", { tone: "ok" }),
+        row("Trades 24h", "1,204 buys, 1 sell", { tone: "ok" }),
+        row("Pool age", "3 days", { tone: "ok" }),
+        row("Top 10 holders", "41% of supply, mostly the pool", { tone: "ok" }),
+      ]),
+    )!;
+    expect(market.figures).toEqual([
+      { label: "Price", value: "$0.0042" },
+      { label: "Liquidity", value: "$12,345" },
+      { label: "Volume 24h", value: "$999" },
+      { label: "Trades 24h", value: "1,204B / 1S" },
+      { label: "Pool age", value: "3 days" },
+    ]);
+    expect(market.tiles[2]).toMatchObject({ tone: "ok", title: "Top 10 holders" });
+    // a trades row in other words is shortened, not parsed
+    expect(verdictCard(verdict("x", "warn", [row("Trades 24h", "not read — DexScreener did not answer")]))!.figures).toEqual([{ label: "Trades 24h", value: "not read —…" }]);
+    // figures lay out by how many there are: five, four, two, one
+    for (const n of [5, 4, 2, 1]) {
+      const { unmount } = render(<VerdictSvg c={{ ...market, figures: market.figures.slice(0, n) }} when="now" />);
+      expect(screen.getAllByText(market.figures[0]!.value).length).toBeGreaterThan(0);
+      unmount();
+    }
+  });
+
   it("is no card for any other report, or a verdict without a token", () => {
     expect(verdictCard({ title: "Radar", rows: [row("Launch", "x")], notes: [], sources: [] })).toBeNull();
     expect(verdictCard({ ...reboot, rows: [row("Verdict", "Caution", { tone: "warn" })] })).toBeNull();

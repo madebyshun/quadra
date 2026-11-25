@@ -79,7 +79,7 @@ const TALL_PANELS: ReadonlySet<WindowId> = new Set<WindowId>([
  * wider than the viewport allows.
  */
 export const WIDE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["card", "coins", "launch", "readme", "markets", "trade", "basket"]);
-export const LANDSCAPE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["markets", "trade", "basket"]);
+export const LANDSCAPE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["coins", "markets", "trade", "basket"]);
 export const WIDE_WIDTH = 760;
 export const LANDSCAPE_WIDTH = 920;
 
@@ -141,14 +141,10 @@ function Home({ introPlayed, onIntroDone }: { introPlayed: boolean; onIntroDone:
   const [welcomeAtStart] = useState(() => !fromPage && showWelcome(params.toString()));
   const [welcome, setWelcome] = useState(welcomeAtStart);
   const closeWelcome = useCallback(() => setWelcome(false), []);
-  const endIntro = useCallback((open: string | null = null) => {
+  // the intro always hands over to the desktop (and the Welcome screen after it); it opens no window itself
+  const endIntro = useCallback(() => {
     onIntroDone();
     setIntro(false);
-    // only bypass Welcome when a specific window is opened from the intro
-    if (open !== null) {
-      setWelcome(false);
-      dispatch(openAction(open as WindowId));
-    }
   }, [onIntroDone]);
 
   /** Reads `?do=` exactly once, on mount — after that, the URL follows the topmost window, not the other way round. */

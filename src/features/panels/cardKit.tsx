@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * The share cards' visual kit: Quadra's Base cobalt (#0A3DFF) halftone cloud sky, warm Platinum
+ * The share cards' visual kit: this app's Base cobalt (#0A3DFF) halftone cloud sky, warm Platinum
  * Macintosh windows (#ece8df / #f4f0e6), serif display headlines, monospace readouts, and the
  * pixel Macintosh Q mark. Plain SVG — no external image or web font fetched — so a card saved
  * through a canvas is never tainted and renders identically everywhere.
@@ -29,8 +29,8 @@ export const SANS = "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif";
 export const SERIF = "Georgia, 'Times New Roman', serif";
 export const MONO = "'JetBrains Mono', Menlo, Consolas, monospace";
 
-/** The Quadra pixel Macintosh mark (matching public/brand/icon.svg and OgCard.tsx). */
-export function QuadraMark({ x, y, size }: { x: number; y: number; size: number }) {
+/** The pixel Macintosh mark (matching public/brand/icon.svg and OgCard.tsx). */
+export function PixelMark({ x, y, size }: { x: number; y: number; size: number }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${size / 32})`} shapeRendering="crispEdges">
       <path fill="#000000" d="M6 5h20v1h-20zM5 6h1v1h-1zM26 6h1v1h-1zM5 7h1v1h-1zM7 7h18v1h-18zM26 7h1v1h-1zM5 8h1v1h-1zM7 8h1v1h-1zM24 8h1v1h-1zM26 8h1v1h-1zM5 9h1v1h-1zM7 9h1v1h-1zM24 9h1v1h-1zM26 9h1v1h-1zM5 10h1v1h-1zM7 10h1v1h-1zM24 10h1v1h-1zM26 10h1v1h-1zM5 11h1v1h-1zM7 11h1v1h-1zM24 11h1v1h-1zM26 11h1v1h-1zM5 12h1v1h-1zM7 12h1v1h-1zM24 12h1v1h-1zM26 12h1v1h-1zM5 13h1v1h-1zM7 13h1v1h-1zM24 13h1v1h-1zM26 13h1v1h-1zM5 14h1v1h-1zM7 14h1v1h-1zM24 14h1v1h-1zM26 14h1v1h-1zM5 15h1v1h-1zM7 15h1v1h-1zM24 15h1v1h-1zM26 15h1v1h-1zM5 16h1v1h-1zM7 16h1v1h-1zM24 16h1v1h-1zM26 16h1v1h-1zM5 17h1v1h-1zM7 17h1v1h-1zM24 17h1v1h-1zM26 17h1v1h-1zM5 18h1v1h-1zM7 18h1v1h-1zM24 18h1v1h-1zM26 18h1v1h-1zM5 19h1v1h-1zM7 19h18v1h-18zM26 19h1v1h-1zM5 20h1v1h-1zM26 20h1v1h-1zM5 21h1v1h-1zM26 21h1v1h-1zM5 22h1v1h-1zM17 22h6v1h-6zM26 22h1v1h-1zM5 23h1v1h-1zM26 23h1v1h-1zM5 24h1v1h-1zM26 24h1v1h-1zM5 25h1v1h-1zM26 25h1v1h-1zM6 26h20v1h-20zM7 27h1v1h-1zM24 27h1v1h-1zM7 28h18v1h-18z" />
@@ -44,7 +44,7 @@ export function QuadraMark({ x, y, size }: { x: number; y: number; size: number 
 
 /**
  * Clouds as a field in 0..1: cumulus blobs along the horizon and corners, rendered as crisp white
- * halftone dots over Quadra's Base cobalt sky.
+ * halftone dots over this app's Base cobalt sky.
  */
 const BLOBS: readonly (readonly [number, number, number, number])[] = [
   [140, 120, 150, 1],
@@ -170,14 +170,14 @@ export function Qr({ x, y, size, qr }: { x: number; y: number; size: number; qr:
   );
 }
 
-/** The way back, on the sky: a warm-Platinum bar with Quadra's pixel mark so it reads over any cloud. */
+/** The way back, on the sky: a warm-Platinum bar with this app's pixel mark so it reads over any cloud. */
 export function Footer({ x, y, text }: { x: number; y: number; text: string }) {
   const w = text.length * 18.5 + 96;
   return (
     <g>
       <rect x={x + 5} y={y - 41} width={w} height="62" fill="#000" opacity="0.28" />
       <rect x={x} y={y - 46} width={w} height="62" fill={KIT.paper} stroke="#000" strokeWidth="3" />
-      <QuadraMark x={x + 14} y={y - 36} size={42} />
+      <PixelMark x={x + 14} y={y - 36} size={42} />
       <text x={x + 68} y={y - 3} fontFamily={MONO} fontWeight="700" fontSize="29" fill={KIT.blue}>
         {text}
       </text>

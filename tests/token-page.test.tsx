@@ -67,7 +67,8 @@ describe("useCoinPage", () => {
 describe("NewLaunches", () => {
   it("shows the newest launches and opens one; nothing at all when the index is absent", async () => {
     const index = { coins: [JSON.parse(JSON.stringify(pageOf().coin)), { ...JSON.parse(JSON.stringify(pageOf().coin)), token: COINS.stock, symbol: null }] };
-    net({ get: (u) => (u === "/api/launchpad/coins" ? index : undefined) });
+    // the index is behind, so recent factory logs are asked for too (indexer.ts mergeRecentLaunches): none newer
+    net({ get: (u) => (u === "/api/launchpad/coins" ? index : u.startsWith("https://base.blockscout.com/api/v2/addresses/") ? { items: [] } : undefined) });
     const open = vi.fn();
     const a = render(<NewLaunches onOpen={open} />);
     const strip = await screen.findByRole("group", { name: "Newest launches" });
@@ -76,7 +77,8 @@ describe("NewLaunches", () => {
     expect(within(strip).getByRole("button", { name: "0xb200…E124" })).toBeInTheDocument();
     a.unmount();
 
-    net({ get: (u) => (u === "/api/launchpad/coins" ? new Response("<!doctype html>", { headers: { "content-type": "text/html" } }) : undefined) });
+    // no index, and the factory-log fallback (Blockscout) unreachable too: nothing, never an empty strip
+    net({ get: (u) => (u === "/api/launchpad/coins" ? new Response("<!doctype html>", { headers: { "content-type": "text/html" } }) : u.startsWith("https://base.blockscout.com/api/v2/addresses/") ? new Response("", { status: 502 }) : undefined) });
     const b = render(<NewLaunches onOpen={open} />);
     await act(async () => {});
     expect(b.container).toBeEmptyDOMElement();

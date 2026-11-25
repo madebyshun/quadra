@@ -34,7 +34,10 @@ import { WalletProvider } from "@/ui/WalletProvider";
 import { toChecksumAddress } from "@/lib/address";
 import type { Eip1193Provider, Eip1193Request } from "@/lib/wallet";
 import type { Receipt } from "@/lib/transact";
-import { contractAt, DOWN, ethCalls, net, simulated, useNet, type Answer } from "./net";
+import { contractAt, DOWN, ethCalls, net, RpcError, simulated, useNet, type Answer } from "./net";
+import { TRADE_CRYPTO } from "@/config/markets";
+import { ECOSYSTEM_QUOTES } from "@/adapters/http/launchpad";
+import { BRAND } from "@/brand";
 import { copy } from "./fixtures/base";
 import { LX } from "./fixtures/launchpad";
 import { MARKETS_FX } from "./fixtures/markets";
@@ -301,6 +304,19 @@ describe("the factory on Base", () => {
     expect(await quoteOf(FACTORY, AAPL)).toEqual({ enabled: true, startTick: STOCK_TICK });
     // DraftKings is enabled on the factory but its transfers are paused: it is not offered, nor even asked about
     expect(await launchPairs(FACTORY)).toEqual({ pairs: [ETH_PAIR, AAPL_PAIR], problem: null });
+  });
+
+  it("offers a Base crypto pair the factory enabled, and leaves out one whose quote could not be read", async () => {
+    forgetCatalog();
+    const [usdc, unread] = TRADE_CRYPTO;
+    const base = factory({}, { ...QUOTES, [usdc!.address.toLowerCase()]: [true, 5] });
+    net({
+      get: (u) => (u === `${STOCKS_PATH}/base` ? MARKETS_FX.coinbaseStocks : undefined),
+      rpc: ethCalls({ [FACTORY]: (data) => (decodeFunctionData({ abi: LAUNCHPAD_ABI, data }).args?.[0] === unread!.address ? new RpcError("busy") : base(data)) }),
+    });
+    const { pairs } = await launchPairs(FACTORY);
+    expect(pairs.map((p) => p.symbol)).toEqual(["ETH", usdc!.symbol, "AAPLc"]);
+    forgetCatalog();
   });
 
   it("keeps ETH when the stock list cannot be read, says why, and drops ETH if the factory disabled it", async () => {
@@ -697,6 +713,27 @@ describe("the window", () => {
     expect(by("First buy")?.value).toBe("0.5 AAPLc, in the same transaction, before anyone else can buy — an exact approval first");
     expect(stock.notes.join(" ")).toContain("only for eligible persons outside the U.S.");
     expect(stock.sources).toContain("Coinbase's tokenized stocks API (the list)");
+    const usdc = TRADE_CRYPTO[0]!;
+    const crypto = reviewReport(META, { factory: FACTORY, salt: SALT, token: TOKEN, pair: { ...usdc, startTick: 5 }, firstBuy: 0n }, ME);
+    expect(crypto.rows.find((x) => x.label === "Paired with")?.value).toBe(`${usdc.symbol} — ${usdc.name} on Base`);
+    const own = ECOSYSTEM_QUOTES[0]!;
+    const eco = reviewReport(META, { factory: FACTORY, salt: SALT, token: TOKEN, pair: { ...own, startTick: 7 }, firstBuy: 0n }, ME);
+    expect(eco.rows.find((x) => x.label === "Paired with")?.value).toBe(`${own.symbol} — ${own.name} on Base`);
+  });
+
+  it("groups Base crypto and the ecosystem token apart from the stocks in Paired with", async () => {
+    pinned.factory = FACTORY;
+    wallet(ME);
+    const [usdc] = TRADE_CRYPTO;
+    const own = ECOSYSTEM_QUOTES[0]!;
+    chain({ quotes: { ...QUOTES, [usdc!.address.toLowerCase()]: [true, 5], [own.address.toLowerCase()]: [true, 7] } });
+    mount();
+    const select = await screen.findByLabelText("Paired with");
+    await act(async () => {});
+    await screen.findByRole("option", { name: new RegExp(own.symbol) });
+    expect(select.querySelector(`optgroup[label="Ecosystem (${BRAND.name})"]`)).not.toBeNull();
+    expect(screen.queryByText(/ecosystem pairs \(USDC, cbBTC/)).toBeNull();
+    pinned.factory = null;
   });
 
   it("launches against a stock: lists the enabled ones, approves exactly the first buy, then launches", async () => {

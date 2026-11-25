@@ -3,7 +3,9 @@ import type { Report } from "@/skills/types";
 import { useRunCommand } from "@/features/openWindow";
 import { say } from "@/lib/assistant";
 import { count } from "@/lib/achievements";
-import { collateralCard } from "@/features/panels/CollateralShare";
+import { depthCard, DepthShare } from "@/features/panels/DepthShare";
+import { collateralCard, CollateralShare } from "@/features/panels/CollateralShare";
+import { VerdictShare, verdictCard } from "@/features/panels/VerdictShare";
 import { LoanWatch } from "@/features/loanAlerts";
 
 /**
@@ -77,7 +79,21 @@ export function ReportView({ report }: { report: Report }) {
         </div>
       ) : null}
       {refused ? <p className="tx__warn">{refused}</p> : null}
+      <Shareable report={report} />
       {report.title.endsWith("— Collateral Watch") && collateralCard(report) ? <LoanWatch wallet={collateralCard(report)!.wallet} /> : null}
     </section>
   );
+}
+
+/** A finished Verdict, Depth or Collateral report can be posted as a picture; opened on demand, so the report stays first. */
+function Shareable({ report }: { report: Report }) {
+  const card = verdictCard(report);
+  const depth = card ? null : depthCard(report);
+  const loans = card || depth ? null : collateralCard(report);
+  return card || depth || loans ? (
+    <details className="report__share">
+      <summary>Share as a picture</summary>
+      {card ? <VerdictShare c={card} /> : depth ? <DepthShare c={depth} /> : <CollateralShare c={loans!} />}
+    </details>
+  ) : null;
 }

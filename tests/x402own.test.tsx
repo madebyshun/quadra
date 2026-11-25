@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AdaptersProvider } from "@/adapters/AdaptersProvider";
 import { LocalEnclave } from "@/adapters/local/enclave";
@@ -121,6 +121,29 @@ describe("the x402 window's first way in", () => {
     expect(screen.queryByLabelText("token address")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Read price" })).toBeEnabled();
     expect(screen.getByText(/This one costs about 0.02 USDC a call/)).toBeInTheDocument();
+  });
+
+  it("copies the tool's URL, says so for a moment, and does nothing without a clipboard", async () => {
+    world(facilitator());
+    const writeText = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    await mount();
+    await userEvent.selectOptions(screen.getByLabelText(`${BRAND.name} tool`), "radar");
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "Copy URL" }));
+      await act(async () => {});
+      expect(writeText).toHaveBeenCalledWith(`${location.origin}${API_PATH}/radar`);
+      expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(1800));
+      expect(screen.getByRole("button", { name: "Copy URL" })).toBeInTheDocument();
+      vi.stubGlobal("navigator", { ...navigator, clipboard: undefined });
+      fireEvent.click(screen.getByRole("button", { name: "Copy URL" }));
+      await act(async () => {});
+      expect(screen.getByRole("button", { name: "Copy URL" })).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("marks an optional argument as optional", async () => {

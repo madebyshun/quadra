@@ -28,7 +28,10 @@ import { askQuote, rawAmount } from "@/adapters/http/quotes";
  */
 
 export type SwapRequest = {
+  /** who sends the steps — the wallet, or a contract acting for it (BasketRouter) */
   readonly user: string;
+  /** who receives what is bought; the sender when absent */
+  readonly recipient?: string;
   readonly sell: Asset;
   readonly buy: Asset;
   /** base units of `sell` */
@@ -132,7 +135,7 @@ export async function quoteSwap(req: SwapRequest, treasury: string | null = CONT
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       user: req.user,
-      recipient: req.user,
+      recipient: req.recipient ?? req.user,
       originChainId: BASE.id,
       destinationChainId: BASE.id,
       originCurrency: tokenOf(req.sell),

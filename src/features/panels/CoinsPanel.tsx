@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { collectTx } from "@/adapters/http/launchpad";
 import { BASE, CONTRACTS } from "@/config/chain";
+import { TRADE_CRYPTO } from "@/config/markets";
 import { checkAddress, toChecksumAddress } from "@/lib/address";
 import { messageOf } from "@/lib/errors";
 import { chainToken } from "@/skills/chaintoken";
@@ -24,7 +25,7 @@ import {
 import { tokenVerdict, poolValueRows } from "@/skills/verdict";
 import { row, type Report } from "@/skills/types";
 import { Gel } from "@/ui/Gel";
-import { QuadraSelect } from "@/ui/Select";
+import { PlatinumSelect } from "@/ui/Select";
 import { useWalletSession } from "@/ui/WalletProvider";
 import { ReportView } from "@/features/panels/ReportView";
 import { PoolTrade } from "@/features/panels/PoolTrade";
@@ -105,12 +106,15 @@ export function sortCoins(coins: readonly Listed[], by: Sort): Listed[] {
   return [...coins].sort((a, b) => desc(key[by](a), key[by](b)) || time(b) - time(a));
 }
 
-/** Crypto is an ETH pair, Stocks a stock pair; `asset` narrows to one quote. A pair not read yet shows only under All. */
+const CRYPTO_QUOTES = new Set(["ETH", ...TRADE_CRYPTO.map((c) => c.symbol.toUpperCase())]);
+
+/** Crypto is ETH or a Base crypto pair, Stocks a stock pair; `asset` narrows to one quote. A pair not read yet shows only under All. */
 export function filterCoins(coins: readonly Listed[], tab: Tab, asset: string | null): Listed[] {
   return coins.filter((c) => {
     const quote = c.value ? c.value.quoteSymbol : null;
-    if (tab === "crypto" && quote !== "ETH") return false;
-    if (tab === "stocks" && (quote === null || quote === "ETH")) return false;
+    const isCrypto = quote !== null && CRYPTO_QUOTES.has(quote.toUpperCase());
+    if (tab === "crypto" && !isCrypto) return false;
+    if (tab === "stocks" && (quote === null || isCrypto)) return false;
     return asset === null || quote === asset;
   });
 }
@@ -299,38 +303,44 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
 
   const launchedAt = typeof page === "object" && !("problem" in page) ? page.coin.launchedAt : listed?.at ? Math.floor(listed.at.getTime() / 1000) : null;
   return (
-    <div className="stack">
-      {back}
+    <div className="stack coin-page">
+      <div className="coin__topbar">
+        {back}
+        <ContractAddress address={token} />
+      </div>
       <NewLaunches onOpen={(t) => openWindow?.("coins", { t })} />
+
+      <header className="coin__header">
+        <p className="coin__head">
+          <strong className="coin__hero-name">{facts ? `${facts.name} (${facts.symbol})` : short(token)}</strong>
+          <span className="coin__hero-meta">
+            {" · "}
+            {`vs ${value === null ? "?" : value.quoteSymbol} · ${valueText(value)} · by `}
+            {openWindow ? (
+              <button
+                type="button"
+                className="chip coin__creator-btn"
+                aria-label={`Profile of ${record.creator}`}
+                onClick={() => openWindow("profile", { a: record.creator })}
+              >
+                {short(record.creator)}
+              </button>
+            ) : (
+              short(record.creator)
+            )}
+          </span>
+        </p>
+      </header>
+
       <TokenWarning />
-      {/* the coin at a glance, then the trade — the page's call to action stays above the fold
-          (MEASURED: with the whole report first, the swap's button sat 311px below it) */}
-      <p className="coin__head">
-        <strong>{facts ? `${facts.name} (${facts.symbol})` : short(token)}</strong>
-        {" · "}
-        {`vs ${value === null ? "?" : value.quoteSymbol} · ${valueText(value)} · by `}
-        {openWindow ? (
-          <button
-            type="button"
-            className="chip"
-            aria-label={`Profile of ${record.creator}`}
-            onClick={() => openWindow("profile", { a: record.creator })}
-          >
-            {short(record.creator)}
-          </button>
-        ) : (
-          short(record.creator)
-        )}
-      </p>
-      <ContractAddress address={token} />
 
       <div className="coin__layout">
         <div className="coin__side stack">
-          <fieldset className="group">
-            <legend>Trade {symbol}</legend>
-            <div className="group__row group__row--actions" role="group" aria-label="Side">
+          <fieldset className="group coin__panel">
+            <legend className="mk__trade-title">Trade {symbol}</legend>
+            <div className="coins__seg" role="group" aria-label="Side">
               {(["buy", "sell"] as const).map((s) => (
-                <button key={s} type="button" className="chip chip--mode" aria-pressed={side === s} onClick={() => setSide(s)}>
+                <button key={s} type="button" className="coins__seg-btn" aria-pressed={side === s} onClick={() => setSide(s)}>
                   {s === "buy" ? `Buy ${symbol}` : `Sell ${symbol}`}
                 </button>
               ))}
@@ -342,8 +352,8 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
           </fieldset>
 
           {ready && ready.account.toLowerCase() === record.creatorRecipient.toLowerCase() ? (
-            <fieldset className="group">
-              <legend>Your fees</legend>
+            <fieldset className="group coin__panel">
+              <legend className="mk__trade-title">Your fees</legend>
               <Gel className="gel--quiet" onClick={() => void onCollect()} disabled={collecting.running || nothingWaiting}>
                 {nothingWaiting ? "No fees waiting" : "Collect"}
               </Gel>
@@ -357,8 +367,8 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
             <CoinShare c={{ token, name: facts.name, symbol: facts.symbol, pair: value.quoteSymbol, cap: valueText(value).replace(/^market cap ≈ /, "") }} />
           ) : null}
 
-          <fieldset className="group">
-            <legend>Token Verdict</legend>
+          <fieldset className="group coin__panel">
+            <legend className="mk__trade-title">Token Verdict</legend>
             {verdict === null ? (
               <Gel className="gel--quiet" onClick={onVerdict}>
                 Run a full verdict on {symbol}
@@ -374,15 +384,19 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
         </div>
 
         <div className="coin__main stack">
-          <section className="coin__overview" aria-label="Coin overview">
-            <TokenStats page={page} value={value} holders={holders} />
-          </section>
-          <TokenChart page={page} />
-          <TokenTabs token={token} page={page} now={now} quoteUsd={value?.quoteUsd ?? null} />
+          <TokenStats page={page} value={value} holders={holders} />
+          <div className="coin__section">
+            <TokenChart page={page} />
+          </div>
+          <div className="coin__section">
+            <TokenTabs token={token} page={page} now={now} quoteUsd={value?.quoteUsd ?? null} />
+          </div>
           <PairExposure page={page !== "reading" && !("problem" in page) ? page : null} value={value} now={now} />
           <CoinMoves token={token} />
           <FeeLedger page={page} fee={fee} referrer={referrer} />
-          <TokenInfo page={page} creator={record.creator} launchedAt={launchedAt} quoteUsd={value?.quoteUsd ?? null} fee={fee} referrer={referrer} />
+          <div className="coin__section">
+            <TokenInfo page={page} creator={record.creator} launchedAt={launchedAt} quoteUsd={value?.quoteUsd ?? null} fee={fee} referrer={referrer} />
+          </div>
           <CreatorLaunches creator={record.creator} current={token} />
           <Disclosures factory={record.factory} fee={fee} referrer={referrer} />
 
@@ -466,33 +480,66 @@ export function CoinsPanel() {
   const ready = typeof list === "object" && "coins" in list ? list : null;
   const stats = ready ? statsOf(ready.coins, ready.total, ready.complete) : null;
   const shown = ready ? sortCoins(searchCoins(filterCoins(ready.coins, tab, asset), query), sort) : [];
+  const quadraToken = CONTRACTS.token;
+  const quadraListed = ready && quadraToken ? ready.coins.find((c) => c.token.toLowerCase() === quadraToken.toLowerCase()) ?? null : null;
 
   return (
     <div className="stack coins-discover">
-      <div className="coins__hero">
-        <p className="coins__title">coins / discover</p>
-        <p className="dim">explore coins launched on quadra. stock-paired coins are not the stocks themselves.</p>
+      <header className="coins__mast">
+        <div className="coins__mast-copy">
+          <h3 className="coins__mast-title">coins / discover</h3>
+          <p className="coins__mast-sub">Explore coins launched on Quadra. Stock-paired coins are not the stocks themselves.</p>
+        </div>
         {openWindow ? (
-          <Gel className="coins__cta" onClick={() => openWindow("launch")}>
+          <Gel onClick={() => openWindow("launch")}>
             Launch a token
           </Gel>
         ) : null}
-      </div>
+      </header>
+
+      <dl className="coins__kpi-bar" aria-label="Launchpad numbers">
+        {(
+          [
+            ["Coins launched", stats?.launched],
+            ["Volume 24h", stats?.volume],
+            ["Trades 24h", stats?.trades],
+            ["Highest market cap", stats?.top],
+          ] as const
+        ).map(([label, value]) => (
+          <div key={label} className="coins__kpi-cell">
+            <dt>{label}</dt>
+            <dd>{value ?? "…"}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {quadraToken ? (
+        <div className="coins__official">
+          <div className="coins__official-copy">
+            <strong>Quadra ($QUADRA / ETH)</strong>
+            <span className="dim">
+              Official Quadra token · {short(quadraToken)}
+              {quadraListed?.value ? ` · ${valueText(quadraListed.value)}` : ""}
+            </span>
+          </div>
+          <button type="button" className="gel gel--quiet" onClick={() => open(quadraToken)}>
+            Open $QUADRA
+          </button>
+        </div>
+      ) : null}
 
       {ready && !ready.complete ? <p role="status" className="index-notice">index / partial history. Counts and recent activity may be incomplete; missing trades are not zero activity.</p> : null}
 
-      <div className="coins__filters">
-        <label className="coins__search-label">
-          <span>Find a coin</span>
-          <input className="field coins__search" type="search" aria-label="Search coins" placeholder="Name, ticker, or contract address" value={query} onChange={(e) => setFilter({ q: e.target.value || null })} />
-        </label>
-        <div className="group__row group__row--actions" role="group" aria-label="Coins shown">
+      <div className="mk__toolbar coins__toolbar">
+        <div className="coins__seg" role="group" aria-label="Coins shown">
           {(["all", "crypto", "stocks"] as const).map((t) => (
-            <button key={t} type="button" className="chip chip--mode" aria-pressed={tab === t} onClick={() => setFilter({ tab: t === "all" ? null : t, pair: null })}>
-              {t === "all" ? "All" : t === "crypto" ? "eth-paired" : "stock-paired"}
+            <button key={t} type="button" className="coins__seg-btn" aria-pressed={tab === t} onClick={() => setFilter({ tab: t === "all" ? null : t, pair: null })}>
+              {t === "all" ? "All" : t === "crypto" ? "crypto-paired" : "stock-paired"}
             </button>
           ))}
-          <QuadraSelect
+        </div>
+        <div className="coins__select-wrap">
+          <PlatinumSelect
             className="coins__asset"
             ariaLabel="Paired with"
             value={asset ?? ""}
@@ -503,14 +550,21 @@ export function CoinsPanel() {
             ]}
           />
         </div>
-      </div>
-      <div className="coins__sort">
-        <span>sort by</span>
-        <QuadraSelect
-          ariaLabel="Sort coins"
-          value={sort}
-          onChange={(v) => setFilter({ sort: v === "trending" ? null : v })}
-          options={SORTS.map((item) => ({ value: item.id, label: item.label }))}
+        <div className="coins__select-wrap">
+          <PlatinumSelect
+            ariaLabel="Sort coins"
+            value={sort}
+            onChange={(v) => setFilter({ sort: v === "trending" ? null : v })}
+            options={SORTS.map((item) => ({ value: item.id, label: item.label }))}
+          />
+        </div>
+        <input
+          className="field mk__search"
+          type="search"
+          aria-label="Search coins"
+          placeholder="Name, ticker, or 0x…"
+          value={query}
+          onChange={(e) => setFilter({ q: e.target.value || null })}
         />
       </div>
 
@@ -523,46 +577,73 @@ export function CoinsPanel() {
       ) : shown.length === 0 ? (
         <p className="dim">No coin matches — try All.</p>
       ) : (
-        <ul className="notes coins__results" aria-label="Coins">
-          {shown.map((c) => (
-            <li key={`${c.token}:${c.tx}`} className="coins__item">
-              <span className="notes__row coins__row-head">
-                <button type="button" className="chip" aria-label={`Open ${c.token}`} onClick={() => open(c.token)}>
-                  {c.facts ? `${c.facts.name} (${c.facts.symbol})` : short(c.token)}
-                </button>
-                <CopyCa address={c.token} />
-                <VerdictBadge token={c.token} />
-                <span className="notes__id coins__pair">{c.value === undefined ? "…" : c.value === null ? "pair not read" : `vs ${c.value.quoteSymbol}`}</span>
-              </span>
-              <span className="notes__why coins__meta">
-                {c.value === undefined ? "reading…" : valueText(c.value)}
-                {listFee(c)}
-                {" · "}
-                {c.market === undefined ? "" : c.market === null ? "market data unavailable · " : `vol ${usd(c.market.volume24h ?? 0)} · ${trades(c)} ${trades(c) === 1 ? "trade" : "trades"} · `}
-                {ago(c.at, now)} · by {short(c.creator)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-      <details className="coins__summary"><summary>launchpad / activity summary</summary>
-      <dl className="coins__stats" aria-label="Launchpad numbers">
-        {(
-          [
-            ["Coins launched", stats?.launched],
-            ["Volume 24h", stats?.volume],
-            ["Trades 24h", stats?.trades],
-            ["Highest market cap", stats?.top],
-          ] as const
-        ).map(([label, value]) => (
-          <div key={label} className="coins__stat">
-            <dt>{label}</dt>
-            <dd>{value ?? "…"}</dd>
+        <div className="mk__table-wrap coins__table-wrap">
+          <div className="coins__thead" aria-hidden="true">
+            <span>Coin</span>
+            <span>Pair</span>
+            <span className="num">Market cap</span>
+            <span className="num">24h %</span>
+            <span className="num">24h activity</span>
+            <span className="num">Launched</span>
           </div>
-        ))}
-      </dl>
+          <ul className="coins__results" aria-label="Coins">
+            {shown.map((c) => {
+              const feeLine = listFee(c);
+              const chg = c.market?.change.h24 ?? null;
+              const isOfficial = Boolean(quadraToken && c.token.toLowerCase() === quadraToken.toLowerCase());
+              return (
+                <li key={`${c.token}:${c.tx}`} className={`coins__item${isOfficial ? " coins__item--official" : ""}`}>
+                  <div className="coins__cell-main">
+                    <button type="button" className="coins__name-btn" aria-label={`Open ${c.token}`} onClick={() => open(c.token)}>
+                      {c.facts ? `${c.facts.name} (${c.facts.symbol})` : short(c.token)}
+                    </button>
+                    <div className="coins__sub-actions">
+                      <CopyCa address={c.token} />
+                      <VerdictBadge token={c.token} />
+                    </div>
+                  </div>
+                  <div className="coins__cell-pair">
+                    <span className="coins__pair-text">{c.value === undefined ? "…" : c.value === null ? "pair not read" : `vs ${c.value.quoteSymbol}`}</span>
+                  </div>
+                  <div className="coins__cell-num">
+                    <span className="mono">{c.value === undefined ? "reading…" : valueText(c.value)}</span>
+                    {feeLine ? <span className="bk__now dim">{feeLine}</span> : null}
+                    <span className="sr-only"> · </span>
+                  </div>
+                  <div className="coins__cell-num">
+                    {chg === null ? null : (
+                      <span className={`mono ${chg >= 0 ? "up" : "down"}`}>
+                        {chg >= 0 ? `+${chg.toFixed(2)}%` : `${chg.toFixed(2)}%`}
+                      </span>
+                    )}
+                  </div>
+                  <div className="coins__cell-num">
+                    {c.market === undefined ? null : c.market === null ? (
+                      <>
+                        <span className="dim">market data unavailable</span>
+                        <span className="sr-only"> · </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="mono">vol {usd(c.market.volume24h ?? 0)}</span>
+                        <span className="sr-only"> · </span>
+                        <span className="bk__now dim">{trades(c)} {trades(c) === 1 ? "trade" : "trades"}</span>
+                        <span className="sr-only"> · </span>
+                      </>
+                    )}
+                  </div>
+                  <div className="coins__cell-num">
+                    <span className="mono">{ago(c.at, now)}</span>
+                    <span className="sr-only"> · </span>
+                    <span className="bk__now dim">by {short(c.creator)}</span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
-      </details>
       {ready && ready.coins.length > 0 ? (
         <p className="dim">
           The newest {ready.coins.length}

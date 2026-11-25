@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AdaptersProvider, useAdapters } from "@/adapters/AdaptersProvider";
 import { LocalEnclave } from "@/adapters/local/enclave";
@@ -1072,6 +1072,29 @@ describe("McpPanel", () => {
     const limits = within(screen.getByLabelText("Limits"));
     for (const limit of MCP_BUILD.limits) {
       expect(limits.getByText(limit), limit).toBeInTheDocument();
+    }
+  });
+
+  it("copies its config to the clipboard and says so for a moment; without a clipboard it does nothing", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    try {
+      const writeText = vi.fn(async () => {});
+      vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+      const a = render(<McpPanel />);
+      fireEvent.click(screen.getByRole("button", { name: "Copy config JSON" }));
+      await act(async () => {});
+      expect(writeText).toHaveBeenCalledWith(expect.stringContaining("mcpServers"));
+      expect(screen.getByRole("button", { name: "Copied config" })).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(1800));
+      expect(screen.getByRole("button", { name: "Copy config JSON" })).toBeInTheDocument();
+      a.unmount();
+      vi.stubGlobal("navigator", { ...navigator, clipboard: undefined });
+      render(<McpPanel />);
+      fireEvent.click(screen.getByRole("button", { name: "Copy config JSON" }));
+      await act(async () => {});
+      expect(screen.getByRole("button", { name: "Copy config JSON" })).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
     }
   });
 

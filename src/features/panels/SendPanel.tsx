@@ -147,11 +147,11 @@ export function SendPanel() {
   };
 
   /** A token picked from the wallet list: the known ones by name, anything else by address. */
-  const pick = (address: string | null, symbol?: string) => {
+  const pick = (address: string | null, symbol: string) => {
     const c = choiceFor(address);
     edit((v) => setChoice(v as Choice))(c);
     setToken(c === "other" ? address! : "");
-    setPickedSymbol(c === "other" ? (symbol ?? null) : null);
+    setPickedSymbol(c === "other" ? symbol : null);
     // an amount typed for the old token means nothing for the new one
     setAmount("");
   };
@@ -176,7 +176,7 @@ export function SendPanel() {
   const done = steps.states.length > 0;
   const statusRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (done) statusRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+    if (done) statusRef.current!.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [done, steps.states]);
 
   return (

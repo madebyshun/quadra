@@ -6,10 +6,14 @@
  * error naming the constant, never a plausible-looking zero address.
  */
 
-const ENV_RPC =
-  (typeof import.meta !== "undefined" &&
-    (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_BASE_RPC_URL?.trim()) ||
-  "";
+/**
+ * The first RPC: `VITE_BASE_RPC_URL` when a build sets it, else the public endpoint. 🔴 A VITE_ value
+ * ships IN the browser bundle (hard rule 14): only a keyless URL may go there, never a provider key.
+ * `env` is absent where nothing defines `import.meta.env` (the generated API bundles).
+ */
+export function baseRpc(env: { readonly VITE_BASE_RPC_URL?: string | undefined } | undefined): string {
+  return env?.VITE_BASE_RPC_URL?.trim() || "https://base.publicnode.com";
+}
 
 export const BASE = {
   id: 8453,
@@ -19,7 +23,7 @@ export const BASE = {
    * Uses `VITE_BASE_RPC_URL` (browser/Vercel build) or `BASE_RPC_URL` (serverless API) when set,
    * falling back to public Base RPC endpoints.
    */
-  rpc: ENV_RPC || "https://base.publicnode.com",
+  rpc: baseRpc((import.meta as { env?: { VITE_BASE_RPC_URL?: string } }).env),
   rpcFallback: "https://mainnet.base.org",
   explorer: "https://basescan.org",
 } as const;
@@ -87,12 +91,16 @@ export const CONTRACTS = {
    */
   treasury: "0xD5C1dFc036F9911348EA8065F73c8123f4013FAB" as string | null,
   /**
-   * The product's own token (see BRAND.ticker for its name), LAUNCHED by the owner 2026-10-29 on
-   * launchpad v3, paired with AAPLc, 1%: tx 0x9529911d…2b43, block 53,236,421, read back from the
-   * factory's `Launched` event. Its creator share goes to the furnace for good (`setCreatorRecipient`,
-   * tx 0xe47c4855…3185). No admin, fixed supply — the launchpad's own guarantees.
+   * The product's own token (see BRAND.ticker for its name), RE-LAUNCHED by the owner 2026-11-25 on
+   * launchpad v3 paired with ETH, 1%, no referrer, from quadra-deployer 0x00FD…746F: tx 0xbdd142a1…c13a,
+   * block 61,972,675, read back from the factory's `Launched` event (symbol read from the token). Its
+   * creator share goes for good to its furnace 0x5194…5102 (contracts/src, the furnace contract) (deployed tx 0xe1697dab…0a89, block
+   * 61,973,176, Sourcify-verified; read back: this token, treasury, burnBps 5000; `setCreatorRecipient`
+   * tx 0x5c8b8ee4…6c9a, `launches(token).creatorRecipient` read back). No admin, fixed supply.
+   * The AAPLc-paired 0xb200…0816 of 2026-10-29 (never traded; the only holder is the treasury) and its
+   * furnace 0x7838…a44c are ABANDONED — nothing in the app points at them.
    */
-  token: "0xb200000000000000000000d096efba9896ab0816" as string | null,
+  token: "0xB200000000000000000000bdb78b7B145fB15d7F" as string | null,
   /**
    * The launchpad, version 2 (`contracts/src/LaunchFactory.sol`: ETH OR stock pairs), DEPLOYED BY THE
    * OWNER 2026-10-02 with their own key: tx 0xd05554c5…42f2a293, block 52,068,913, from 0x00FD29B7…
@@ -124,6 +132,16 @@ export const CONTRACTS = {
    * internal review only (contracts/REVIEW-2026-10-29.md). Set back to `null` to stop offering it.
    */
   revenueShareDeployer: "0x774CD3CD89337cF7e57aF6a04256733F1dd74139" as string | null,
+  /**
+   * `BasketRouter` (contracts/src/BasketRouter.sol): Treasury Basket in ONE transaction for any wallet —
+   * the buyer's USDC pulled once (an allowance, or one EIP-2612 signature), each leg a Relay swap
+   * delivered straight to the buyer, checked against its minimum, the rest refunded. DEPLOYED by the owner
+   * 2026-11-25 from quadra-deployer, Sourcify EXACT match. CHECKED before it was written here: usdc() =
+   * USDC, relayProxyA/B = Relay's two pinned approval proxies, MAX_LEGS 10; and MEASURED against this very
+   * address (ROUTER=… scripts/simulate-basket-router.ts, one eth_simulateV1 block): NVDAc + AAPLc delivered
+   * to within a unit of their quotes, 0 USDC left in it. NOT audited. Set back to `null` to stop offering it.
+   */
+  basketRouter: "0x6986E0B8Ab5132Bbe676DC2C72fbff6Fe3D05430" as string | null,
   /**
    * The launchpad, version 1 (`contracts/deployed/LaunchFactory.v1.sol`: ETH pairs only), DEPLOYED BY
    * THE OWNER 2026-10-02: tx 0xc51a517c…4a972764d, block 52,066,273. CHECKED before it was written

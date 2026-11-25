@@ -50,3 +50,6 @@ vi.mock("@/lib/pulse", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/pulse")>();
   return { ...real, PULSE: real.pulseStore(() => new Promise(() => {}), { set: () => 0, clear: () => {} }) };
 });
+
+/** jsdom does not lay out, so it has no scrollIntoView; every browser this app runs in does. */
+if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};

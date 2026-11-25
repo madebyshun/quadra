@@ -1,16 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { AT, BACKDROP, blockLine, loaded, MACHINE, MENU, moveTo, phaseAt, shouldPlayIntro, ZOOM_MS } from "@/intro/photo";
+import { AT, blockLine, loaded, phaseAt, shouldPlayIntro, ZOOM_MS } from "@/intro/photo";
 import { PulseContext } from "@/ui/usePulse";
 import { fakePulse, pulse } from "./pulseFake";
 import { PhotoIntro } from "@/intro/PhotoIntro";
-import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 /** The photo intro: its clock, loading bar, and automatic handoff to the desktop. */
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 afterEach(() => vi.useRealTimers());
 
 describe("the intro's arithmetic", () => {
@@ -30,20 +26,6 @@ describe("the intro's arithmetic", () => {
     expect(shouldPlayIntro({ search: "do=basket", matchMedia: media(false) })).toBe(false);
     expect(shouldPlayIntro({ search: "", matchMedia: media(true) })).toBe(false);
     expect(shouldPlayIntro({ search: "", matchMedia: undefined })).toBe(false);
-  });
-
-  it("moves through the menu with the arrows, wrapping, and ignores other keys", () => {
-    expect(moveTo(0, "ArrowDown")).toBe(1);
-    expect(moveTo(MENU.length - 1, "ArrowDown")).toBe(0);
-    expect(moveTo(0, "ArrowUp")).toBe(MENU.length - 1);
-    expect(moveTo(2, "a")).toBe(2);
-  });
-
-  it("draws over a backdrop that ships, with its glass inside the drawing", () => {
-    expect(existsSync(resolve(ROOT, "public", BACKDROP.slice(1)))).toBe(true);
-    const s = MACHINE.screen;
-    expect(s.left + s.width).toBeLessThan(1);
-    expect(s.top + s.height).toBeLessThan(1);
   });
 });
 
@@ -82,12 +64,18 @@ describe("the intro on screen", () => {
     for (const how of ["esc", "skip", "click"] as const) {
       const { to, onDone, view } = mount();
       await to(AT.welcome + 100);
-      if (how === "esc") fireEvent.keyDown(window, { key: "Escape" });
+      if (how === "esc") {
+        // another key does nothing; a second Esc while it zooms does not hand over twice
+        fireEvent.keyDown(window, { key: "a" });
+        fireEvent.keyDown(window, { key: "Escape" });
+        fireEvent.keyDown(window, { key: "Escape" });
+      }
       if (how === "skip") fireEvent.click(screen.getByRole("button", { name: "skip" }));
       if (how === "click") fireEvent.click(screen.getByRole("dialog"));
       await act(async () => {
         await vi.advanceTimersByTimeAsync(ZOOM_MS);
       });
+      expect(onDone, how).toHaveBeenCalledTimes(1);
       expect(onDone, how).toHaveBeenCalledWith(null);
       view.unmount();
       vi.useRealTimers();
@@ -109,6 +97,13 @@ describe("the intro on screen", () => {
     });
     expect(screen.getByText("welcome to quadra")).toBeInTheDocument();
     expect(screen.getByText("base 8453 / block 59,407,813")).toBeInTheDocument();
+  });
+
+  it("steps aside to the desktop when the photograph cannot load", () => {
+    const onDone = vi.fn();
+    render(<PhotoIntro onDone={onDone} clock={() => 0} />);
+    fireEvent.error(screen.getByRole("img", { name: /straight on/ }));
+    expect(onDone).toHaveBeenCalledWith(null);
   });
 
   it("runs on the page's own clock when none is given", () => {

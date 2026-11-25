@@ -10,7 +10,7 @@ export type SelectGroup = {
   readonly options: readonly SelectOption[];
 };
 
-export function QuadraSelect({
+export function PlatinumSelect({
   ariaLabel,
   value,
   onChange,

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { WalletProvider } from "@/ui/WalletProvider";
+import { OpenWindowProvider } from "@/features/openWindow";
 import userEvent from "@testing-library/user-event";
 import { erc20Abi } from "viem";
 import { WETH } from "@/config/chain";
@@ -1081,5 +1083,195 @@ describe("on the desktop", () => {
     renderAt("/");
     await settle();
     expect(screen.queryByRole("complementary", { name: "Markets" })).toBeNull();
+  });
+});
+
+describe("the Markets window's table and directory", () => {
+  function mountWithCommands() {
+    const open = vi.fn();
+    const view = render(
+      <OpenWindowProvider open={open as never}>
+        <MarketsProvider onOpen={vi.fn()}>
+          <MarketsPanel />
+        </MarketsProvider>
+      </OpenWindowProvider>,
+    );
+    return { open, view };
+  }
+  const watchlist = () => screen.getByRole("region", { name: "Watchlist" });
+  const marketNames = () => within(watchlist()).queryAllByRole("row").slice(1).map((r) => r.querySelector("strong")?.textContent);
+
+  it("filters by kind and by a search, sorts by each column both ways, and says when nothing matches", async () => {
+    markets();
+    mountWithCommands();
+    await settle();
+    const all = marketNames();
+    expect(all.length).toBeGreaterThan(2);
+    await userEvent.click(screen.getByRole("button", { name: "Stock tokens" }));
+    expect(marketNames()).not.toContain("ETH");
+    await userEvent.click(screen.getByRole("button", { name: "Crypto" }));
+    expect(marketNames()).toContain("ETH");
+    expect(marketNames()).not.toContain("NVDA");
+    await userEvent.click(screen.getByRole("button", { name: "All" }));
+    for (const column of ["Price", "24h Change", "Liquidity", "Oracle Gap"]) {
+      await userEvent.click(within(watchlist()).getByRole("button", { name: new RegExp(`^${column}`) }));
+      const once = marketNames();
+      await userEvent.click(within(watchlist()).getByRole("button", { name: new RegExp(`^${column}`) }));
+      expect(marketNames()).toHaveLength(once.length);
+    }
+    await userEvent.type(screen.getByLabelText("Search markets"), "nvidia");
+    expect(marketNames().filter(Boolean)).toContain("NVDA");
+    await userEvent.clear(screen.getByLabelText("Search markets"));
+    await userEvent.type(screen.getByLabelText("Search markets"), WETH.address.toLowerCase());
+    expect(marketNames()).toContain("ETH");
+    await userEvent.clear(screen.getByLabelText("Search markets"));
+    await userEvent.type(screen.getByLabelText("Search markets"), "zzzz-no-such");
+    expect(screen.getByText("No markets match that filter.")).toBeInTheDocument();
+  });
+
+  it("selects from the active strip, a row, its name or its actions, and runs Check, Price impact and Verdict as commands", async () => {
+    markets();
+    const { open } = mountWithCommands();
+    await settle();
+    const pills = screen.getAllByRole("button", { pressed: false }).filter((b) => b.classList.contains("mk__pill"));
+    await userEvent.click(pills[0]!);
+    expect(pills[0]).toHaveAttribute("aria-pressed", "true");
+    const rows = within(watchlist()).getAllByRole("row").slice(1);
+    await userEvent.click(rows[1]!);
+    expect(rows[1]).toHaveAttribute("aria-selected", "true");
+    await userEvent.click(within(rows[0]!).getAllByRole("button")[0]!);
+    expect(rows[0]).toHaveAttribute("aria-selected", "true");
+    const withActions = rows.find((r) => within(r).queryByRole("button", { name: "Trade" }))!;
+    await userEvent.click(within(withActions).getByRole("button", { name: "Trade" }));
+    expect(withActions).toHaveAttribute("aria-selected", "true");
+    await userEvent.click(within(withActions).getByRole("button", { name: "Check" }));
+    expect(open).toHaveBeenLastCalledWith("safety", expect.objectContaining({ "run-safety": expect.stringMatching(/^verdict 0x/) }));
+    const inspect = rows.find((r) => within(r).queryByRole("button", { name: "Inspect" }));
+    if (inspect) {
+      await userEvent.click(within(inspect).getByRole("button", { name: "Inspect" }));
+      expect(inspect).toHaveAttribute("aria-selected", "true");
+    }
+    const nvda = rows.find((r) => r.textContent?.includes("NVDA"))!;
+    await userEvent.click(nvda);
+    const impact = screen.queryByRole("button", { name: "Price impact" });
+    if (impact) {
+      await userEvent.click(impact);
+      expect(open).toHaveBeenLastCalledWith("research", expect.objectContaining({ "run-research": expect.stringMatching(/^depth 0x/) }));
+      await userEvent.click(screen.getByRole("button", { name: "Token Verdict" }));
+      expect(open).toHaveBeenLastCalledWith("safety", expect.objectContaining({ "run-safety": expect.stringMatching(/^verdict 0x/) }));
+    }
+  });
+
+  it("lists every Base market in a directory: watch one, trade one, check one, and show more", async () => {
+    markets();
+    const { open } = mountWithCommands();
+    await settle();
+    const directory = screen.getByRole("region", { name: "All Base markets" });
+    const dirRows = () => within(directory).getAllByRole("row").slice(1);
+    const unwatched = () => dirRows().filter((r) => within(r).queryByRole("button", { name: "+ Watch" }));
+    const before = unwatched().length;
+    await userEvent.click(within(unwatched()[0]!).getByRole("button", { name: "+ Watch" }));
+    expect(unwatched().length).toBe(before - 1);
+    await userEvent.click(within(unwatched()[0]!).getByRole("button", { name: "Trade" }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
+    expect(unwatched().length).toBe(before - 2);
+    await userEvent.click(unwatched()[0]!);
+    expect(unwatched().length).toBe(before - 3);
+    await userEvent.click(within(dirRows()[0]!).getByRole("button", { name: "Check" }));
+    expect(open).toHaveBeenLastCalledWith("safety", expect.objectContaining({ "run-safety": expect.stringMatching(/^verdict 0x/) }));
+    const stocks = dirRows().filter((r) => r.textContent?.includes("STOCK") && within(r).queryByRole("button", { name: "+ Watch" }));
+    if (stocks[0]) {
+      await userEvent.click(within(stocks[0]).getByRole("button", { name: "+ Watch" }));
+    }
+    const more = within(directory).queryByRole("button", { name: /^Show more/ });
+    if (more) {
+      const n = dirRows().length;
+      await userEvent.click(more);
+      expect(dirRows().length).toBeGreaterThan(n);
+    }
+  });
+});
+
+describe("the Markets window's trade box and the edges of its table", () => {
+  function mountAll(open = vi.fn(), withCommands = true) {
+    let latest: ReturnType<typeof useMarkets> | null = null;
+    const inner = (
+      <WalletProvider>
+        <MarketsProvider onOpen={vi.fn()}>
+          <Probe onReady={(m) => (latest = m)} />
+          <MarketsPanel />
+        </MarketsProvider>
+      </WalletProvider>
+    );
+    render(withCommands ? <OpenWindowProvider open={open as never}>{inner}</OpenWindowProvider> : inner);
+    return () => latest!;
+  }
+  const watchlist = () => screen.getByRole("region", { name: "Watchlist" });
+
+  it("trades the selected Base asset on either side for either counter, and says when its transfers are paused", async () => {
+    markets();
+    const m = mountAll();
+    await settle();
+    await act(async () => m().select("basestock:NVDA"));
+    const box = screen.getByRole("complementary", { name: "Trade NVDA" });
+    await userEvent.click(within(box).getByRole("button", { name: "Sell NVDA" }));
+    expect(within(box).getByRole("group", { name: "Receive" })).toBeInTheDocument();
+    await userEvent.click(within(box).getByRole("button", { name: "ETH" }));
+    expect(within(box).getByRole("button", { name: "ETH" })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(within(box).getByRole("button", { name: "Buy NVDA" }));
+    expect(within(box).getByRole("group", { name: "Pay with" })).toBeInTheDocument();
+    await act(async () => m().add({ kind: "basestock", symbol: "DKNG" }));
+    await settle();
+    await act(async () => m().select("basestock:DKNG"));
+    expect(screen.getByText(/transfers are paused on its token contract/)).toBeInTheDocument();
+  });
+
+  it("marks a premium and a discount to NAV, a third click turns a sort back, and a row with no change shows none", async () => {
+    const dex = copy(MARKETS_FX.dexBase) as { baseToken: { symbol: string }; priceUsd: string; priceChange: Json }[];
+    dex.find((p) => p.baseToken.symbol === "NVDAc")!.priceUsd = "240";
+    delete dex.find((p) => p.baseToken.symbol === "cbBTC")!.priceChange.h24;
+    markets({ get: (u) => (u.startsWith(`${DEXSCREENER}/base/`) ? dex : undefined) });
+    const m = mountAll();
+    await settle();
+    expect(within(watchlist()).getByText(/^\+3\.\d\d%$/)).toBeInTheDocument();
+    expect(within(watchlist()).getByText(/^-0\.\d\d%$/)).toBeInTheDocument();
+    await act(async () => m().select("basestock:NVDA"));
+    expect(screen.getByText(/% \(premium\)/)).toBeInTheDocument();
+    await act(async () => m().select("basestock:AAPL"));
+    expect(screen.getByText(/% \(discount\)/)).toBeInTheDocument();
+    const price = within(watchlist()).getByRole("button", { name: /^Price/ });
+    await userEvent.click(price);
+    expect(price).toHaveTextContent("↓");
+    await userEvent.click(price);
+    expect(price).toHaveTextContent("↑");
+    await userEvent.click(price);
+    expect(price).toHaveTextContent("↓");
+  });
+
+  it("offers Inspect where no command can be run, and adds a Base stock from the directory by its row or Trade", async () => {
+    const big = copy(MARKETS_FX.coinbaseStocks) as { tokens: Json[] };
+    const base = big.tokens[0]!;
+    for (let i = 0; i < 30; i++) big.tokens.push({ ...base, contract_address: `0xb2000000000000000000${(1000 + i).toString(16).padStart(20, "0")}`, symbol: `ZZ${i}c`, name: `Test Co ${i}` });
+    markets({ get: (u) => (u === `${STOCKS_PATH}/base` ? big : undefined) });
+    const m = mountAll(vi.fn(), false);
+    await settle();
+    const inspect = within(watchlist()).getAllByRole("button", { name: "Inspect" })[0]!;
+    await userEvent.click(inspect);
+    expect(inspect).toHaveAttribute("aria-pressed", "true");
+    const directory = screen.getByRole("region", { name: "All Base markets" });
+    await userEvent.click(within(directory).getByRole("button", { name: /^Show more/ }));
+    const stockRow = (sym: string) => within(directory).getAllByRole("row").find((r) => r.querySelector("strong")?.textContent === sym)!;
+    await userEvent.click(stockRow("ZZ0c"));
+    expect(m().rows.some((r) => r.watch.kind === "basestock" && r.watch.symbol === "ZZ0")).toBe(true);
+  });
+
+  it("adds a Base stock from the directory's Trade button", async () => {
+    markets();
+    const m = mountAll();
+    await settle();
+    const directory = screen.getByRole("region", { name: "All Base markets" });
+    const row = within(directory).getAllByRole("row").find((r) => r.textContent?.includes("STOCK") && within(r).queryByRole("button", { name: "+ Watch" }))!;
+    await userEvent.click(within(row).getByRole("button", { name: "Trade" }));
+    expect(m().rows.filter((r) => r.watch.kind === "basestock").length).toBeGreaterThan(2);
   });
 });

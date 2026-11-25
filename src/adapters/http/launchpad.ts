@@ -1,3 +1,4 @@
+import { BRAND } from "@/brand";
 import { decodeEventLog, decodeFunctionResult, encodeFunctionData, toHex } from "viem";
 import { CONTRACTS } from "@/config/chain";
 import { LAUNCH_HOOK_ABI, LAUNCHPAD_ABI, LAUNCHPAD_EXPECTS, LAUNCHPAD_SPACING, LAUNCHPAD_V3_ABI, LAUNCHPAD_V3_EXPECTS } from "@/config/launchpad";
@@ -140,12 +141,12 @@ export async function quoteOf(factory: string, quote: string): Promise<{ readonl
 }
 
 export const ECOSYSTEM_QUOTES: readonly { readonly address: string; readonly symbol: string; readonly name: string; readonly decimals: number }[] = [
-  ...(CONTRACTS.token ? [{ address: toChecksumAddress(CONTRACTS.token), symbol: "QUADRA", name: "Quadra", decimals: 18 }] : []),
+  ...(CONTRACTS.token ? [{ address: toChecksumAddress(CONTRACTS.token), symbol: BRAND.ticker.replace("$", ""), name: BRAND.name, decimals: 18 }] : []),
 ];
 
 /**
  * Every pair a launch can use right now: ETH, then each Base crypto / ecosystem token (`USDC`,
- * `cbBTC`, `AERO`, `QUADRA`, ...) and Coinbase stock on Base that the factory has ENABLED.
+ * `cbBTC`, `AERO`, the brand token, ...) and Coinbase stock on Base that the factory has ENABLED.
  */
 export async function launchPairs(factory: string): Promise<{ readonly pairs: readonly Pair[]; readonly problem: string | null }> {
   const eth = await quoteOf(factory, ETH_QUOTE);

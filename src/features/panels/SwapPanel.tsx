@@ -15,7 +15,7 @@ import { explorer } from "@/skills/format";
 import { row, type Report, type Row, type Tone } from "@/skills/types";
 import { Crt } from "@/ui/Crt";
 import { Gel } from "@/ui/Gel";
-import { QuadraSelect } from "@/ui/Select";
+import { PlatinumSelect } from "@/ui/Select";
 import { useWalletSession } from "@/ui/WalletProvider";
 import { ReportView } from "@/features/panels/ReportView";
 import { TxStepList, useTxSteps } from "@/features/panels/TxSteps";
@@ -222,12 +222,27 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
     fixed === undefined,
   );
 
+  // `sell=0x…` (e.g. from Treasury Basket holdings): that token is what you pay, receiving USDC
+  useInbox(
+    "sell",
+    (address) => {
+      const c = choiceFor(address);
+      edit(setSellChoice)(c);
+      setSellAddress(c === "other" ? address : "");
+      setSellLabel(null);
+      edit(setBuyChoice)("USDC");
+      setBuyAddress("");
+      setAmount("");
+    },
+    fixed === undefined,
+  );
+
   /** A token picked from the wallet list becomes what you pay. */
-  const pick = (address: string | null, symbol?: string) => {
+  const pick = (address: string | null, symbol: string) => {
     const c = choiceFor(address);
     edit(setSellChoice)(c);
     setSellAddress(c === "other" ? address! : "");
-    setSellLabel(c === "other" ? (symbol ?? null) : null);
+    setSellLabel(c === "other" ? symbol : null);
     // an amount typed for the old token means nothing for the new one
     setAmount("");
   };
@@ -265,7 +280,7 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
   const started = steps.states.length > 0;
   const statusRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (started || received !== null) statusRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+    if (started) statusRef.current!.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [started, received, steps.states]);
 
   return (
@@ -314,7 +329,7 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
         </div>
         <div className="group__row">
           <span>Slippage</span>
-          <QuadraSelect
+          <PlatinumSelect
             ariaLabel="Slippage"
             value={String(slippage.bps)}
             onChange={(v) => edit(setSlippage)(SLIPPAGE.find((s) => s.bps === Number(v))!)}
@@ -324,17 +339,17 @@ export function SwapPanel({ fixed }: { readonly fixed?: { readonly sell: Picked;
       </fieldset>
 
       {touchesStock ? <p className="crt__amber">{RESTRICTED_TEXT}</p> : null}
-      {started || (received !== null && review !== null) ? (
+      {started ? (
         <div ref={statusRef} className="stack tx__result">
           <TxStepList states={steps.states} label="Swap progress" />
-          {received === null || review === null ? null : received.amount === null ? (
+          {received === null ? null : received.amount === null ? (
             <p className="tx__warn">
-              Confirmed, but what arrived could not be measured here — check your {review.buy.symbol} balance on Basescan.
+              Confirmed, but what arrived could not be measured here — check your {review!.buy.symbol} balance on Basescan.
             </p>
           ) : (
-            <p className={received.amount >= review.quote.min ? "tx__ok" : "tx__bad"}>
-              Received {formatAmount(received.amount < 0n ? 0n : received.amount, review.buy.decimals)} {review.buy.symbol} — the quoted
-              minimum was {formatAmount(review.quote.min, review.buy.decimals)}.
+            <p className={received.amount >= review!.quote.min ? "tx__ok" : "tx__bad"}>
+              Received {formatAmount(received.amount < 0n ? 0n : received.amount, review!.buy.decimals)} {review!.buy.symbol} — the quoted
+              minimum was {formatAmount(review!.quote.min, review!.buy.decimals)}.
             </p>
           )}
         </div>

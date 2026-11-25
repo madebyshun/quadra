@@ -39,6 +39,9 @@ describe("txNotice store", () => {
       pushTxNotice({ id: `tx-${i}`, label: `Tx ${i}`, status: "confirmed" });
     }
     expect(latest.map((n) => n.id)).toEqual(["tx-2", "tx-3", "tx-4"]);
+    // an update to one leaves the others as they were, in place
+    pushTxNotice({ id: "tx-3", label: "Tx 3", status: "reverted" });
+    expect(latest.map((n) => `${n.id}:${n.status}`)).toEqual(["tx-2:confirmed", "tx-3:reverted", "tx-4:confirmed"]);
     unsub();
   });
 });

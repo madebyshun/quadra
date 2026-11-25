@@ -3646,6 +3646,7 @@
   min-width: 160px;
   max-height: 240px;
   overflow-y: auto;
+  overflow-x: hidden;
   margin-top: 2px;
 }
 .qselect__head {
@@ -3656,6 +3657,16 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+.menu__item.qselect__item {
+  text-transform: none;
+  white-space: normal;
+  line-height: 1.35;
+  padding: 5px 10px;
+}
+.menu__item.qselect__item > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .qselect__item[aria-selected="true"] {
   background: var(--pt-select-soft);
   color: var(--pt-accent);
@@ -3665,6 +3676,64 @@
 .qselect__item[aria-selected="true"]:focus-visible {
   background: var(--s7-hilite);
   color: var(--s7-hilite-ink);
+}
+
+/* TokenPicker searchable wallet dropdown */
+.tp__menu {
+  width: 100%;
+  min-width: 240px;
+  padding: 6px 0 4px;
+}
+.tp__search-wrap {
+  padding: 0 6px 6px;
+}
+.tp__search {
+  width: 100%;
+  font-size: 11.5px;
+}
+.tp__list {
+  max-height: 220px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: grid;
+}
+.menu__item.tp__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 10px;
+  text-transform: none;
+}
+.tp__left,
+.tp__right {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.tp__right {
+  text-align: right;
+  font-family: var(--font-mono);
+  flex: none;
+}
+.tp__left small,
+.tp__right small {
+  font-size: 10.5px;
+  color: var(--xp-ink-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tp__row:hover small,
+.tp__row:focus-visible small {
+  color: inherit;
+  opacity: 0.85;
+}
+.tp__empty {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--xp-ink-dim);
 }
 
 /* ===================================================================

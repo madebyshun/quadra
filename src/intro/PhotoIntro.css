@@ -59,7 +59,6 @@
 }
 
 /* Power LED lights up as soon as the machine powers on */
-.pintro--power .pintro__led,
 .pintro--icon .pintro__led,
 .pintro--welcome .pintro__led,
 .pintro--menu .pintro__led,

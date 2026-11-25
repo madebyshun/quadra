@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { erc20Abi } from "viem";
-import { BASE, USDC } from "@/config/chain";
+import { decodeFunctionData, erc20Abi } from "viem";
+import { BASE, CONTRACTS, USDC } from "@/config/chain";
+import { ROUTER_ABI } from "@/lib/basketRouter";
 import { RELAY } from "@/config/routes";
 import { forgetCatalog, parseBaseStocks } from "@/adapters/http/markets";
 import { approveData } from "@/lib/erc20";
@@ -11,6 +12,7 @@ import { TRANSFER_TOPIC } from "@/lib/transact";
 import { STOCKS_PATH } from "@/server/stocks";
 import { BasketPanel, catalog, PACE, quoteLeg } from "@/features/panels/BasketPanel";
 import { WalletProvider } from "@/ui/WalletProvider";
+import { OpenWindowProvider } from "@/features/openWindow";
 import type { Eip1193Provider, Eip1193Request } from "@/lib/wallet";
 import { copy } from "./fixtures/base";
 import { AAPL_ON_BASE, MARKETS_FX, NVDA_ON_BASE } from "./fixtures/markets";
@@ -77,12 +79,14 @@ function delivered(token: string, amount: bigint): unknown {
   return r;
 }
 
-type World = { readonly relay?: (body: Json, i: number) => Response; readonly usdc?: bigint; readonly held?: bigint; readonly receipt?: (i: number) => unknown; readonly stocks?: unknown; readonly region?: string; readonly batchSim?: (params: readonly unknown[]) => unknown; readonly noPrices?: boolean; readonly spotsError?: boolean };
+type World = { readonly routerAllowance?: bigint; readonly relay?: (body: Json, i: number) => Response; readonly usdc?: bigint; readonly held?: bigint; readonly receipt?: (i: number) => unknown; readonly stocks?: unknown; readonly region?: string; readonly batchSim?: (params: readonly unknown[]) => unknown; readonly noPrices?: boolean; readonly spotsError?: boolean };
 
 function world(w: World = {}) {
   const asked: Json[] = [];
   const token = (balance: bigint) => contractAt(erc20Abi, { balanceOf: balance, decimals: 8, symbol: "X", allowance: 0n });
-  const usdc = contractAt(erc20Abi, { balanceOf: w.usdc ?? 5_000_000_000n, allowance: 0n });
+  const usdcErc20 = contractAt(erc20Abi, { balanceOf: w.usdc ?? 5_000_000_000n, allowance: w.routerAllowance ?? 0n });
+  // USDC's EIP-2612 nonce (nonces(address), 0x7ecebe00) for the permit; everything else is plain ERC-20
+  const usdc = (data: `0x${string}`) => (data.startsWith("0x7ecebe00") ? `0x${"0".repeat(63)}7` : usdcErc20(data));
   const nvda = token(w.held ?? 0n);
   // every other token in a basket holds nothing
   const other = token(0n);
@@ -100,6 +104,8 @@ function world(w: World = {}) {
       return undefined;
     },
     rpc: (m, p) => {
+      if (m === "eth_blockNumber") return "0x3ae8b00";
+      if (m === "eth_getLogs") return [];
       if (m === "eth_simulateV1") return w.batchSim ? w.batchSim(p) : [{ calls: ((p[0] as { blockStateCalls: { calls: unknown[] }[] }).blockStateCalls[0]!.calls).map(() => ({ status: "0x1" })) }];
       const sim = simulated()(m, p);
       if (sim !== undefined) return sim;
@@ -552,7 +558,8 @@ describe("Treasury Basket atomic purchase", () => {
     await reviewBatch();
     expect(screen.getByText(/Checking whether your wallet/)).toBeInTheDocument();
     await act(async () => { resolve({}); });
-    expect(screen.getByRole("button", { name: /Buy basket · 1 tx/ })).toBeInTheDocument();
+    // a wallet that cannot batch is offered the one-transaction router
+    expect(screen.getByRole("button", { name: "Buy basket · 1 transaction" })).toBeInTheDocument();
     expect(sent).toHaveLength(0);
   });
 
@@ -765,4 +772,215 @@ it("restores sequential basket recovery for known, unknown and unreadable pendin
     }
     view.unmount(); localStorage.removeItem(`quadra.basket.sequence.v1:${USER.toLowerCase()}`);
   }
+});
+
+describe("Treasury Basket, the rest of the window", () => {
+  it("gathers a basket of more than five into one approval per Relay contract, then the swaps, within ten calls", async () => {
+    const wallet = batchWallet();
+    world();
+    mount();
+    await settle();
+    await basket([["NVDA", "20"], ["AAPL", "20"], ["AMD", "20"], ["GOOGL", "20"], ["TSLA", "10"], ["cbBTC", "10"]]);
+    await userEvent.type(screen.getByLabelText("USDC to put in"), "10");
+    await userEvent.click(cta());
+    await settle();
+    await userEvent.click(await screen.findByRole("button", { name: "Buy basket · 1 confirmation" }, { timeout: 3000 }));
+    await waitFor(() => expect(wallet.sent).toHaveLength(1), { timeout: 3000 });
+    const calls = wallet.sent[0]!.calls as Json[];
+    expect(calls).toHaveLength(7);
+    expect(calls[0]!.data).toBe(approveData(RELAY.approvalProxy, 10_000_000n));
+    expect(calls.slice(1).every((c) => String(c.to).toLowerCase() !== USDC.address.toLowerCase())).toBe(true);
+  });
+
+  it("splits the weights evenly, the remainder to the first rows, and does nothing with no rows", async () => {
+    world();
+    mount();
+    await settle();
+    await basket([["NVDA", "1"], ["AAPL", "1"], ["AMD", "1"]]);
+    await userEvent.click(screen.getByRole("button", { name: "Equal split" }));
+    expect([1, 2, 3].map((i) => (screen.getByLabelText(`Weight ${i}`) as HTMLInputElement).value)).toEqual(["34", "33", "33"]);
+    // a weight that is not a number counts as nothing toward the total
+    await userEvent.clear(screen.getByLabelText("Weight 3"));
+    await userEvent.type(screen.getByLabelText("Weight 3"), "x");
+    expect(screen.getByText("67% / 100%")).toBeInTheDocument();
+    await basket([]);
+    await userEvent.click(screen.getByRole("button", { name: "Equal split" }));
+    expect(screen.queryByLabelText("Weight 1")).toBeNull();
+  });
+
+  it("fills the amount from the quick buttons, and clears a stuck batch by hand", async () => {
+    const wallet = batchWallet();
+    wallet.outcome("pending");
+    world();
+    await reviewBatch();
+    await userEvent.click(screen.getByRole("button", { name: "$25" }));
+    expect(screen.getByLabelText("USDC to put in")).toHaveValue("25");
+    await userEvent.click(cta());
+    await settle();
+    await userEvent.click(batchBuy());
+    await settle();
+    expect(screen.getByText(/still pending/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Clear stuck batch" }));
+    expect(screen.queryByRole("button", { name: "Clear stuck batch" })).toBeNull();
+  });
+
+  it("offers to sell a held asset through Swap, and nothing to sell where nothing is held", async () => {
+    wallet();
+    world({ held: 100_000_000n });
+    const open = vi.fn();
+    render(
+      <OpenWindowProvider open={open as never}>
+        <WalletProvider>
+          <BasketPanel />
+        </WalletProvider>
+      </OpenWindowProvider>,
+    );
+    await settle();
+    await basket([["NVDA", "60"], ["AAPL", "40"]]);
+    await settle();
+    const table = await screen.findByRole("table", { name: "Basket target and current holdings" });
+    const sells = within(table).getAllByRole("button", { name: "Sell" });
+    expect(sells[1]).toBeDisabled();
+    await userEvent.click(sells[0]!);
+    expect(open).toHaveBeenCalledWith("swap", { sell: NVDA_ON_BASE });
+  });
+});
+
+describe("Treasury Basket through BasketRouter, for a wallet that cannot batch", () => {
+  const ROUTER = "0x00000000000000000000000000000000ba5ce701";
+  const SIGNATURE = `0x${"11".repeat(32)}${"22".repeat(32)}1b`;
+  const DEPLOYED = CONTRACTS.basketRouter;
+  afterEach(() => {
+    (CONTRACTS as { basketRouter: string | null }).basketRouter = DEPLOYED;
+  });
+
+  it("says a wallet that cannot batch buys step by step while no router is set", async () => {
+    (CONTRACTS as { basketRouter: string | null }).basketRouter = null;
+    plainWallet();
+    world();
+    await reviewPlain();
+    expect(screen.getByText(/does not report atomic batching/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Buy basket · 1 transaction" })).toBeNull();
+  });
+
+  /** A plain wallet: no batching, signs a permit, sends a transaction. */
+  function plainWallet(sign: () => unknown = () => SIGNATURE) {
+    const sent: Record<string, string>[] = [];
+    const signed: unknown[][] = [];
+    vi.stubGlobal("ethereum", { request: async ({ method, params }: Eip1193Request) => {
+      if (method === "eth_accounts") return [USER];
+      if (method === "eth_chainId") return BASE.idHex;
+      if (method === "eth_signTypedData_v4") { signed.push(params as unknown[]); return sign(); }
+      if (method === "eth_sendTransaction") { sent.push(params![0] as Record<string, string>); return HASH; }
+      throw Object.assign(new Error(`unsupported ${method}`), { code: 4200 });
+    } });
+    return { sent, signed };
+  }
+
+  async function reviewPlain(amount = "10") {
+    mount();
+    await settle();
+    await basket([["NVDA", "60"], ["AAPL", "40"]]);
+    await userEvent.type(screen.getByLabelText("USDC to put in"), amount);
+    await userEvent.click(cta());
+    await settle();
+  }
+  const routerBuy = () => screen.getByRole("button", { name: /Buy basket · 1 transaction|Preparing basket/ });
+
+  it("asks for one USDC permit for exactly the total, then sends one transaction to the router, and measures what arrived", async () => {
+    (CONTRACTS as { basketRouter: string | null }).basketRouter = ROUTER;
+    const wallet = plainWallet();
+    const asked = world({ receipt: () => delivered(NVDA_ON_BASE, 30_000_000n) });
+    await reviewPlain();
+    await userEvent.click(routerBuy());
+    await waitFor(() => expect(wallet.sent).toHaveLength(1), { timeout: 3000 });
+    // the fresh legs were quoted with the router sending and this wallet receiving
+    expect(asked.slice(-2).map((q) => [String(q.user).toLowerCase(), String(q.recipient).toLowerCase()])).toEqual([[ROUTER, USER.toLowerCase()], [ROUTER, USER.toLowerCase()]]);
+    const permit = JSON.parse(String(wallet.signed[0]![1])) as { primaryType: string; message: Record<string, string> };
+    expect(permit.primaryType).toBe("Permit");
+    expect({ ...permit.message, owner: permit.message.owner!.toLowerCase() }).toMatchObject({ owner: USER.toLowerCase(), spender: ROUTER, value: "10000000", nonce: "7" });
+    expect(wallet.sent[0]!.to!.toLowerCase()).toBe(ROUTER);
+    const call = decodeFunctionData({ abi: ROUTER_ABI, data: wallet.sent[0]!.data as `0x${string}` });
+    expect(call.functionName).toBe("buyWithPermit");
+    expect((call.args[0] as readonly { amountIn: bigint }[]).map((l) => l.amountIn)).toEqual([6_000_000n, 4_000_000n]);
+    expect(await screen.findByText(/arrived: 0\.3 NVDAc/)).toBeInTheDocument();
+  });
+
+  it("sends `buy` with no signature when the allowance already covers the total", async () => {
+    (CONTRACTS as { basketRouter: string | null }).basketRouter = ROUTER;
+    const wallet = plainWallet();
+    world({ routerAllowance: 10_000_000n });
+    await reviewPlain();
+    await userEvent.click(routerBuy());
+    await waitFor(() => expect(wallet.sent).toHaveLength(1), { timeout: 3000 });
+    expect(wallet.signed).toHaveLength(0);
+    expect(decodeFunctionData({ abi: ROUTER_ABI, data: wallet.sent[0]!.data as `0x${string}` }).functionName).toBe("buy");
+  });
+
+  it("sends nothing when the permit is declined, or a fresh quote moves its market too far", async () => {
+    (CONTRACTS as { basketRouter: string | null }).basketRouter = ROUTER;
+    const wallet = plainWallet(() => { throw Object.assign(new Error("denied"), { code: 4001 }); });
+    world();
+    await reviewPlain();
+    await userEvent.click(routerBuy());
+    expect(await screen.findByText(/You declined the USDC signature/, {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(wallet.sent).toHaveLength(0);
+  });
+
+  it("measures nothing when the wallet refuses the transaction", async () => {
+    (CONTRACTS as { basketRouter: string | null }).basketRouter = ROUTER;
+    vi.stubGlobal("ethereum", { request: async ({ method }: Eip1193Request) => {
+      if (method === "eth_accounts") return [USER];
+      if (method === "eth_chainId") return BASE.idHex;
+      if (method === "eth_signTypedData_v4") return SIGNATURE;
+      if (method === "eth_sendTransaction") throw Object.assign(new Error("User rejected"), { code: 4001 });
+      throw Object.assign(new Error(`unsupported ${method}`), { code: 4200 });
+    } });
+    world();
+    await reviewPlain();
+    await userEvent.click(routerBuy());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Buy basket · 1 transaction" })).toBeEnabled(), { timeout: 3000 });
+    expect(screen.queryByText(/arrived:/)).toBeNull();
+  });
+
+  it("measures nothing for a wallet that switched accounts while the transaction was out", async () => {
+    (CONTRACTS as { basketRouter: string | null }).basketRouter = ROUTER;
+    let account = USER;
+    let notify: () => void = () => {};
+    let approve!: (hash: string) => void;
+    vi.stubGlobal("ethereum", {
+      on: (event: string, callback: () => void) => { if (event === "accountsChanged") notify = callback; },
+      removeListener: () => {},
+      request: async ({ method }: Eip1193Request) => {
+        if (method === "eth_accounts") return [account];
+        if (method === "eth_chainId") return BASE.idHex;
+        if (method === "eth_signTypedData_v4") return SIGNATURE;
+        if (method === "eth_sendTransaction") return new Promise<string>((resolve) => { approve = resolve; });
+        throw Object.assign(new Error(`unsupported ${method}`), { code: 4200 });
+      },
+    });
+    world({ receipt: () => delivered(NVDA_ON_BASE, 30_000_000n) });
+    await reviewPlain();
+    await userEvent.click(routerBuy());
+    await waitFor(() => expect(approve).toBeDefined(), { timeout: 3000 });
+    await act(async () => { account = `0x${"12".repeat(20)}`; notify(); });
+    await settle();
+    await act(async () => { approve(HASH); });
+    await settle();
+    expect(screen.queryByText(/arrived:/)).toBeNull();
+  });
+
+  it("refuses a fresh quote that now moves its market too far", async () => {
+    (CONTRACTS as { basketRouter: string | null }).basketRouter = ROUTER;
+    const wallet = plainWallet();
+    world({ relay: (body, i) => {
+      const q = quoteFor(body) as { details: { totalImpact?: { percent: string } } };
+      if (i >= 2) q.details.totalImpact = { percent: "-9.5" };
+      return json(q);
+    } });
+    await reviewPlain();
+    await userEvent.click(routerBuy());
+    expect(await screen.findByText(/now moves its market 9\.50%/, {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(wallet.sent).toHaveLength(0);
+  });
 });

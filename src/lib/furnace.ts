@@ -6,7 +6,7 @@ import type { LaunchRecord } from "@/skills/launchpad";
 /**
  * A coin whose creator share goes to a furnace (the furnace contract in contracts/src/, 2026-10-29):
  * `burnBps` of every arrival burnt — the coin side at once, the quote side set aside and bought back by
- * the treasury — the rest to the treasury. The app's own token has one, `0x7838…a44c`. A recipient is a furnace for
+ * the treasury — the rest to the treasury. The app's own token has one, `0x5194…5102` (since 2026-11-25; the abandoned AAPLc-paired token's was `0x7838…a44c`). A recipient is a furnace for
  * THIS coin only when it says so itself: its `token()` and `launchpad()` (the shape check `shareOf`
  * uses for a RevenueShare), and it answers `burnBps()`, which a RevenueShare does not have.
  */

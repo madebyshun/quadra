@@ -1,5 +1,6 @@
+import { BRAND } from "@/brand";
 import { useEffect, useState } from "react";
-import { QuadraSelect, type SelectGroup } from "@/ui/Select";
+import { PlatinumSelect, type SelectGroup } from "@/ui/Select";
 import {
   checkFactory,
   collectTx,
@@ -394,7 +395,7 @@ export function BaseLaunch() {
       ],
     },
     ...(ecosystems.length > 0
-      ? [{ label: "Ecosystem (Quadra)", options: ecosystems.map((p) => ({ value: p.address, label: `${p.symbol} — ${p.name}` })) }]
+      ? [{ label: `Ecosystem (${BRAND.name})`, options: ecosystems.map((p) => ({ value: p.address, label: `${p.symbol} — ${p.name}` })) }]
       : []),
     ...(stocks.length > 0
       ? [{ label: "Coinbase stocks on Base", options: stocks.map((p) => ({ value: p.address, label: `${p.symbol} — ${p.name}` })) }]
@@ -413,7 +414,7 @@ export function BaseLaunch() {
       ) : null}
 
       <ol className="launch__steps" aria-label="Launch steps">
-        <li className={currentStep === 1 ? "launch__step launch__step--active" : hasIdentity ? "launch__step launch__step--done" : "launch__step"}>
+        <li className={currentStep === 1 ? "launch__step launch__step--active" : "launch__step launch__step--done"}>
           <span>1. identity</span>
         </li>
         <li className={currentStep === 2 ? "launch__step launch__step--active" : hasPair && hasIdentity ? "launch__step launch__step--done" : "launch__step"}>
@@ -441,7 +442,7 @@ export function BaseLaunch() {
             {field("Website", "website", "https://… (optional)")}
             <div className="group__row">
               <span>Paired with</span>
-              <QuadraSelect ariaLabel="Paired with" value={pair.address} onChange={selectPair} groups={pairGroups} />
+              <PlatinumSelect ariaLabel="Paired with" value={pair.address} onChange={selectPair} groups={pairGroups} />
             </div>
             <label className="group__row">
               <span>First buy</span>
@@ -488,7 +489,7 @@ export function BaseLaunch() {
               <p className="dim">No stock is enabled on the launchpad yet — its quote admin turns each one on (setQuote). ETH works now.</p>
             ) : null}
             {cryptos.length === 0 && ecosystems.length === 0 ? (
-              <p className="dim">Base crypto &amp; ecosystem pairs (USDC, cbBTC, AERO, QUADRA) and more stocks appear here once enabled on the factory via setQuote.</p>
+              <p className="dim">Base crypto &amp; ecosystem pairs (USDC, cbBTC, AERO, {BRAND.ticker.replace("$", "")}) and more stocks appear here once enabled on the factory via setQuote.</p>
             ) : null}
             <p className="dim">
               {SUPPLY_WORDS} tokens, all of it in a Uniswap v4 pool against {pair.symbol} that nobody can pull. You earn 80% of the {version === 3 ? feePercent(fee) : "1%"} fee

@@ -49,7 +49,7 @@ describe("the About page", () => {
     expect(figure("launchers")).toBe("2");
     expect(figure("trades on their pools")).toBe("15");
     expect(figure(`${BRAND.ticker} burnt`)).toBe("1,813,116");
-    expect(screen.getByText(/Its fees go to the furnace/)).toHaveTextContent("50% burnt");
+    expect(screen.getByText(/Its creator fees go to the furnace/)).toHaveTextContent("50% burnt/buyback");
   });
 
   it("says a number it could not read is not read — never zero — and has no furnace figure when there is none", async () => {
@@ -59,7 +59,7 @@ describe("the About page", () => {
     await settle();
     expect(figure("coins launched here")).toBe("not read");
     expect(figure(`${BRAND.ticker} burnt`)).toBe("not read");
-    expect(screen.queryByText(/Its fees go to the furnace/)).toBeNull();
+    expect(screen.queryByText(/Its creator fees go to the furnace/)).toBeNull();
     a.unmount();
     launchOf.mockResolvedValue(null);
     renderAt("/about");

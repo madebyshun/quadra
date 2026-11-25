@@ -23,7 +23,7 @@ const SERIF = "Georgia, 'Times New Roman', serif";
 const SANS = "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif";
 const MONO = "'JetBrains Mono', Menlo, Consolas, monospace";
 
-/** The Quadra pixel mark (public/brand/icon.svg), at `size` px. */
+/** The pixel mark (public/brand/icon.svg), at `size` px. */
 function Mark({ x, y, size }: { x: number; y: number; size: number }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${size / 32})`} shapeRendering="crispEdges">
@@ -63,7 +63,7 @@ export function OgCard({ page, photo = PHOTO }: { page: OgPage; photo?: string }
       <rect x="14" y="14" width={OG_W - 28} height={OG_H - 28} fill="none" stroke={INK} strokeWidth="3" />
       <rect x="22" y="22" width={OG_W - 44} height={OG_H - 44} fill="none" stroke={INK} strokeWidth="1" />
 
-      {/* the subject: the Quadra workstation on sunlit grass against Base cobalt halftone clouds */}
+      {/* the subject: the workstation on sunlit grass against Base cobalt halftone clouds */}
       <rect x={px} y="28" width={OG_W - px - 28} height={OG_H - 56} fill={SKY} />
       <image href={photo} x={px} y="28" width={OG_W - px - 28} height={OG_H - 56} preserveAspectRatio="xMidYMid slice" clipPath="url(#og-photo)" />
       <line x1={px} y1="28" x2={px} y2={OG_H - 28} stroke={INK} strokeWidth="2" />

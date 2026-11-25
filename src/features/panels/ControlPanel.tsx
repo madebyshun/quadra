@@ -11,7 +11,7 @@ import {
   setWallpaper,
   wallpaper,
 } from "@/lib/settings";
-import { QuadraSelect } from "@/ui/Select";
+import { PlatinumSelect } from "@/ui/Select";
 import { useSetting } from "@/ui/useSettings";
 
 /**
@@ -64,7 +64,7 @@ export function ControlPanel() {
         </label>
         <div className="control__row">
           <span>Wait</span>
-          <QuadraSelect
+          <PlatinumSelect
             ariaLabel="Wait minutes"
             value={String(minutes)}
             disabled={!saver}

@@ -6,7 +6,7 @@ import { formatAmount } from "@/lib/amount";
 import { API_PATH } from "@/server/apiPath";
 import { SKILLS } from "@/skills";
 import { Gel } from "@/ui/Gel";
-import { QuadraSelect } from "@/ui/Select";
+import { PlatinumSelect } from "@/ui/Select";
 import type { WalletSession } from "@/ui/WalletProvider";
 import type { Wallet } from "@/lib/wallet";
 import { X402Url } from "@/features/panels/X402Url";
@@ -62,7 +62,7 @@ export function X402Own(props: Props) {
         <legend>{BRAND.name}&apos;s own tools</legend>
         <div className="group__row">
           <span>Tool</span>
-          <QuadraSelect
+          <PlatinumSelect
             ariaLabel={`${BRAND.name} tool`}
             value={id}
             onChange={pick}

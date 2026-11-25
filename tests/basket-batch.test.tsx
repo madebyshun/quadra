@@ -1,10 +1,12 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useBasketBatch, BATCH_KEY } from "@/features/panels/useBasketBatch";
-import { atomicCapability, checkBatchWallet, getBatchStatus, sendAtomicBatch, simulateBatch } from "@/lib/callBatch";
+import { atomicCapability, checkBatchWallet, findBatchOnChain, getBatchStatus, sendAtomicBatch, simulateBatch } from "@/lib/callBatch";
+import { rpc } from "@/skills/http";
 import { USER } from "./fixtures/routes";
 
-vi.mock("@/lib/callBatch", () => ({ atomicCapability: vi.fn(), checkBatchWallet: vi.fn(), getBatchStatus: vi.fn(), sendAtomicBatch: vi.fn(), simulateBatch: vi.fn() }));
+vi.mock("@/skills/http", () => ({ rpc: vi.fn() }));
+vi.mock("@/lib/callBatch", () => ({ atomicCapability: vi.fn(), checkBatchWallet: vi.fn(), findBatchOnChain: vi.fn(), getBatchStatus: vi.fn(), sendAtomicBatch: vi.fn(), simulateBatch: vi.fn() }));
 const provider = () => ({ request: async () => null });
 const prepare = vi.fn(async () => [{ to: USER }]);
 const storeKey = `${BATCH_KEY}:${USER.toLowerCase()}`;
@@ -15,7 +17,7 @@ beforeEach(() => {
   vi.mocked(atomicCapability).mockResolvedValue("supported");
   vi.mocked(checkBatchWallet).mockResolvedValue();
   vi.mocked(simulateBatch).mockResolvedValue();
-  vi.mocked(sendAtomicBatch).mockResolvedValue();
+  vi.mocked(sendAtomicBatch).mockImplementation(async (_w, _a, _c, id) => id);
   vi.mocked(getBatchStatus).mockResolvedValue({ kind: "pending" });
 });
 
@@ -157,4 +159,64 @@ describe("basket batch lifecycle", () => {
     expect(hook.result.current.pending?.id).toBe("0xnew");
   });
 
+});
+
+describe("when the wallet's status is stuck", () => {
+  it("records where to look on chain, and takes the chain's confirmed receipt over the wallet's 'pending'", async () => {
+    vi.mocked(findBatchOnChain).mockResolvedValue(null);
+    vi.mocked(rpc).mockResolvedValue("0x3ae8b00");
+    const { result } = mount();
+    await waitFor(() => expect(result.current.capability).toBe("supported"));
+    await act(async () => { await result.current.buy(prepare, 1_000_000n); });
+    expect(localStorage.getItem(storeKey)).toBe(`${result.current.pending!.id}|61770496|1000000`);
+    expect(findBatchOnChain).toHaveBeenCalledWith(USER, 61770496n, 1_000_000n);
+    expect(result.current.message).toContain("still pending");
+    const found = { status: "success" as const, block: 1n, logs: [], fee: null };
+    vi.mocked(findBatchOnChain).mockResolvedValue(found);
+    await act(async () => { await result.current.refresh(); });
+    expect(result.current.complete).toBe(true);
+    expect(result.current.receipts).toEqual([found]);
+  });
+
+  it("reads a record saved before the chain check as an ID alone, and a record with one as all three", async () => {
+    localStorage.setItem(storeKey, "0xabc");
+    const old = mount();
+    await waitFor(() => expect(old.result.current.pending).toEqual({ account: USER, id: "0xabc" }));
+    old.unmount();
+    for (const raw of ["0xabc|5|oops", "0xabc|5"]) {
+      localStorage.setItem(storeKey, raw);
+      const half = mount();
+      await waitFor(() => expect(half.result.current.pending).toEqual({ account: USER, id: "0xabc" }));
+      half.unmount();
+    }
+    localStorage.setItem(storeKey, "0xdef|5|7");
+    const now = mount();
+    await waitFor(() => expect(now.result.current.pending).toEqual({ account: USER, id: "0xdef", from: 5n, usdc: 7n }));
+  });
+
+  it("clears a stuck batch by hand, and treats a wallet's parameter refusal as nothing sent", async () => {
+    localStorage.setItem(storeKey, "0xabc");
+    const { result } = mount();
+    await waitFor(() => expect(result.current.pending).not.toBeNull());
+    act(() => result.current.clear());
+    expect(result.current.pending).toBeNull();
+    expect(localStorage.getItem(storeKey)).toBeNull();
+    act(() => result.current.clear());
+    // the wallet names its own batch: that ID is the one kept, with the chain check beside it
+    vi.mocked(rpc).mockResolvedValue("0x10");
+    vi.mocked(findBatchOnChain).mockResolvedValue(null);
+    vi.mocked(sendAtomicBatch).mockResolvedValueOnce("0xwallet");
+    await act(async () => { await result.current.buy(prepare, 5n); });
+    expect(result.current.pending).toEqual({ account: USER, id: "0xwallet", from: 16n, usdc: 5n });
+    expect(localStorage.getItem(storeKey)).toBe("0xwallet|16|5");
+    // storage refusing the removal still clears the window
+    const remove = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new Error("denied"); });
+    act(() => result.current.clear());
+    remove.mockRestore();
+    expect(result.current.pending).toBeNull();
+    vi.mocked(sendAtomicBatch).mockRejectedValueOnce(Object.assign(new Error("Batch size cannot exceed 10"), { code: -32602 }));
+    await act(async () => { await result.current.buy(prepare); });
+    expect(result.current.pending).toBeNull();
+    expect(result.current.message).toBe("Batch size cannot exceed 10");
+  });
 });

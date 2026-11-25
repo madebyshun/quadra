@@ -422,3 +422,22 @@ base-forge script script/DeployRevenueShareDeployer.s.sol --rpc-url https://main
 
 The deployer has no owner; after it, every coin's share contract is created by whoever sets one up.
 Blue Agent's integration: `REVENUE_SHARE_INTEGRATION.md`.
+
+## BasketRouter (Treasury Basket in one transaction) — DEPLOYED 2026-11-25 at `0x6986E0B8Ab5132Bbe676DC2C72fbff6Fe3D05430` (Sourcify exact match), NOT audited
+
+`src/BasketRouter.sol`: the buyer's USDC is pulled once (`buy` with an existing allowance, or
+`buyWithPermit` with one EIP-2612 signature), split across up to 10 legs, and each leg is a Relay swap
+whose output Relay delivers STRAIGHT to the buyer — the router never holds a bought asset (a Coinbase
+stock's transfer policy could refuse a contract). Per leg: exact USDC approval to one of Relay's two
+PINNED approval proxies (constructor arguments, immutable), the call, the approval back to zero, and the
+buyer's balance of the leg's token checked against `minOut`; unused USDC is refunded in the same
+transaction. A leg can name no target but those two proxies, so approving the router cannot let anyone
+spend another user's allowance (`test_callsNothingButTheTwoRelayProxies`). No owner, no fee, no upgrade.
+
+MEASURED 2026-11-25 (`scripts/simulate-basket-router.ts`, one `eth_simulateV1` block on mainnet: deploy →
+approve → buy, real USDC, real Relay quotes asked with the router as sender and the buyer as recipient):
+NVDAc + AAPLc at 0.25 USDC each, buy status 0x1, 725,080 gas, NVDAc quoted 0.00164355 / arrived
+0.00164354, AAPLc quoted 0.00070654 / arrived 0.00070655, 0 USDC left in the router.
+
+Deploy (the owner's step): `new BasketRouter(USDC 0x8335…2913, Relay approval proxy 0xCcC8…15bE,
+Relay v3.2 approval proxy 0x5567…2E58)`, then set `CONTRACTS.basketRouter` to the verified address.

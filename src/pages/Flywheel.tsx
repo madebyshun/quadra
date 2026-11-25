@@ -20,10 +20,10 @@ export function Flywheel() {
         </section>
         <div className="fee-map__planned"><span>Not connected</span><p>Stage C / A share of launch fees routed to the furnace.</p><b>Planned</b></div>
         <section className="fee-map__pipeline fee-map__pipeline--token" aria-labelledby="token-fees-title">
-          <header><span className="fee-map__path">02 / {BRAND.ticker}</span><h3 id="token-fees-title">Its own pool.<br /><em>Its own fee flow.</em></h3><p>{BRAND.ticker} / AAPLc · 1% trade fee</p></header>
+          <header><span className="fee-map__path">02 / {BRAND.ticker}</span><h3 id="token-fees-title">Its own pool.<br /><em>Its own fee flow.</em></h3><p>{BRAND.ticker} / ETH · 1% trade fee</p></header>
           <div className="fee-map__token-flow">
             <div className="fee-map__allocation"><div><strong>20%</strong><span>→ Treasury</span></div><div><strong>80%</strong><span>↓ Furnace</span></div></div>
-            <div className="fee-map__furnace"><div className="fee-map__furnace-title"><span>Furnace /</span><span>Fixed at deploy</span></div><div className="fee-map__outputs"><div><strong>50%</strong><h4>Burn &amp; buyback</h4><p>{BRAND.ticker} burnt at once.<br />AAPLc held for buybacks.</p></div><div><strong>50%</strong><h4>To treasury</h4><p>Remaining 50% of fees<br />sent to treasury.</p></div></div></div>
+            <div className="fee-map__furnace"><div className="fee-map__furnace-title"><span>Furnace /</span><span>Fixed at deploy</span></div><div className="fee-map__outputs"><div><strong>50%</strong><h4>Burn &amp; buyback</h4><p>{BRAND.ticker} burnt at once.<br />ETH held for buybacks.</p></div><div><strong>50%</strong><h4>To treasury</h4><p>Remaining 50% of fees<br />sent to treasury.</p></div></div></div>
           </div>
         </section>
         <figcaption>Base / Fixed supply / No admin / Permanently locked liquidity / Contracts not audited</figcaption>

@@ -164,9 +164,11 @@ async function simulateAt(txs: readonly SimTx[], blockTag = "latest"): Promise<{
     if (blockTag === "latest") throw e;
     result = await rpc("eth_simulateV1", [payload, "latest"]);
   }
-  const first = listOf(result)[0];
-  const num = isObj(first) ? strOf(first.number) : null;
-  return { calls: parseSimulation(result), block: num && /^0x[0-9a-fA-F]+$/.test(num) ? num : null };
+  const parsed = parseSimulation(result);
+  // an answer that does not account for every step is no simulation — never a trade that "went through"
+  if (parsed.length !== calls.length) throw new Error(`Base simulated ${parsed.length} of ${calls.length} steps.`);
+  const num = strOf((listOf(result)[0] as Record<string, unknown>).number);
+  return { calls: parsed, block: num && /^0x[0-9a-fA-F]+$/.test(num) ? num : null };
 }
 
 export async function simulate(txs: readonly SimTx[], blockTag = "latest"): Promise<SimCall[]> {

@@ -3,13 +3,14 @@ import { RebalancePreview } from "@/features/panels/RebalancePreview";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { baseStocks, spots, type BaseStock } from "@/adapters/http/markets";
 import { quoteSwap, type SwapQuote } from "@/adapters/http/relay";
-import { BASE, USDC } from "@/config/chain";
+import { BASE, CONTRACTS, USDC } from "@/config/chain";
 import { TRADE_CRYPTO } from "@/config/markets";
 import { RELAY_PAIRS } from "@/config/routes";
 import { sameAddress } from "@/lib/address";
 import { formatAmount, parseAmount } from "@/lib/amount";
 import { basketProblem, PRESETS, split, topUp, weightsNow, type BasketAsset, type Leg } from "@/lib/basket";
-import { approveData, balanceOf, type Asset } from "@/lib/erc20";
+import { allowance, approveData, balanceOf, type Asset } from "@/lib/erc20";
+import { buyData, buyWithPermitData, deadlineFrom, routerLeg, signPermit, totalOf, type RouterLeg } from "@/lib/basketRouter";
 import { messageOf } from "@/lib/errors";
 import { RESTRICTED_TEXT, useStocksClosed } from "@/lib/region";
 import { tokenReceived, type TxRequest } from "@/lib/transact";
@@ -25,8 +26,7 @@ import { BasketRecipes } from "@/features/panels/BasketRecipes";
 import { parseRecipe, recipeLink } from "@/lib/basketRecipes";
 import { measureStrength, type Strength } from "@/lib/basketStrength";
 import { BasketShare } from "@/features/panels/BasketShare";
-import { buildBasketMulticallPlan } from "@/lib/basketMulticall";
-import { simulateBatch } from "@/lib/callBatch";
+import { useOpenWindow } from "@/features/openWindow";
 
 /**
  * Treasury Basket (2026-11-13): buy a basket of Coinbase stocks and verified crypto on Base with
@@ -56,20 +56,25 @@ export const PACE = { gapMs: 1200, retryMs: [2500, 6000] as readonly number[] };
 const BUSY = /could not process request|try again later/i;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** One leg's quote, asked again while Relay says it is busy. */
-export async function quoteLeg(user: string, asset: BasketAsset, amount: bigint): Promise<SwapQuote> {
+/** A Relay request, asked again while Relay says it is busy. */
+async function retrying<T>(ask: () => Promise<T>): Promise<T> {
   const tries = [0, ...PACE.retryMs];
   let last: unknown;
   for (const [i, wait] of tries.entries()) {
     if (i > 0) await sleep(wait);
     try {
-      return await quoteSwap({ user, sell: USDC_ASSET, buy: asAsset(asset), amount, slippageBps: SLIPPAGE_BPS });
+      return await ask();
     } catch (e) {
       if (!BUSY.test(messageOf(e))) throw e;
       last = e;
     }
   }
   throw last;
+}
+
+/** One leg's quote, asked again while Relay says it is busy. */
+export async function quoteLeg(user: string, asset: BasketAsset, amount: bigint): Promise<SwapQuote> {
+  return retrying(() => quoteSwap({ user, sell: USDC_ASSET, buy: asAsset(asset), amount, slippageBps: SLIPPAGE_BPS }));
 }
 
 type Row = { readonly symbol: string; readonly weight: string };
@@ -94,6 +99,7 @@ export function catalog(stocks: ReadonlyMap<string, BaseStock>): Map<string, Bas
 
 export function BasketPanel() {
   const { wallet, signingProvider } = useWalletSession();
+  const openWindow = useOpenWindow();
   const closed = useStocksClosed();
   const [list, setList] = useState<ReturnType<typeof catalog> | { readonly problem: string } | null>(null);
   const [rows, setRows] = useState<readonly Row[]>(PRESETS[0]!.picks.map(([s, w]) => ({ symbol: s, weight: String(w) })));
@@ -109,7 +115,6 @@ export function BasketPanel() {
   const [review, setReview] = useState<{ readonly priced: readonly Priced[]; readonly balance: bigint; readonly at: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [multicallBusy, setMulticallBusy] = useState(false);
   /** what each buyable leg delivered — `null` for one not bought yet, or whose receipt could not be read */
   const [got, setGot] = useState<readonly (bigint | null)[] | null>(null);
   /** how many legs at the FRONT of the plan have confirmed — a failed leg is retried from here */
@@ -120,7 +125,8 @@ export function BasketPanel() {
   const activeAccount = useRef(ready?.account);
   activeAccount.current = ready?.account;
   const batch = useBasketBatch(ready?.account ?? null, signingProvider);
-  const purchaseLocked = recovery.locked || strengthProgress !== null || busy || multicallBusy || steps.running || batch.working || batch.pending !== null;
+  const [routerBusy, setRouterBusy] = useState(false);
+  const purchaseLocked = routerBusy || recovery.locked || strengthProgress !== null || busy || steps.running || batch.working || batch.pending !== null;
 
   useEffect(() => {
     setReview(null);
@@ -296,21 +302,24 @@ export function BasketPanel() {
   };
 
   const onBatchBuy = () => batch.buy(async () => {
+    const remaining = buyable.slice(bought);
+    // The batch always signs the Relay quotes the review showed. The Aerodrome/Uniswap multicall
+    // quotes different pools (stocks' deep pools sit on CL factory 0x9CB2…7a76, which those
+    // published quoters do not serve), so it is never swapped in here behind the review's back.
+
     const priced: Priced[] = [];
-    const calls: TxRequest[] = [];
+    const rawLegs: { readonly proxy: string; readonly amount: bigint; readonly swap: TxRequest }[] = [];
     const started = Date.now();
-    for (const p of buyable.slice(bought)) {
-      if (calls.length > 0) await sleep(PACE.gapMs);
+    for (const p of remaining) {
+      if (rawLegs.length > 0) await sleep(PACE.gapMs);
       const q = await quoteLeg(ready!.account, p.leg.asset, p.amount);
       const impact = impactOf(q);
       if (impact !== null && impact > LOUD) throw new Error(`${p.leg.asset.symbol} now moves its market ${impact.toFixed(2)}% — review the basket again.`);
-      // A fresh exact approval for EVERY leg, even if Relay saw an old allowance. Interleaving
-      // approve/buy avoids overwriting an earlier leg's allowance when a proxy is shared.
       if (q.steps.filter((step) => !step.label.startsWith("Approve")).length !== 1) throw new Error("A basket leg needs one same-chain swap. Nothing was sent.");
       for (const step of q.steps) {
         if (!step.label.startsWith("Approve")) {
           const pair = RELAY_PAIRS.find((x) => sameAddress(x.approvalProxy, step.tx.to))!;
-          calls.push({ to: USDC.address, data: approveData(pair.approvalProxy, p.amount) }, step.tx);
+          rawLegs.push({ proxy: pair.approvalProxy, amount: p.amount, swap: step.tx });
         }
       }
       priced.push({ ...p, quote: q });
@@ -319,49 +328,61 @@ export function BasketPanel() {
     // simulates the final atomic execution too; on-chain slippage/deadline checks still apply.
     if (Date.now() - started > 30_000) throw new Error("Refreshing the basket took too long. Nothing was sent — try again for fresh quotes.");
     setReview({ ...review!, at: Date.now(), priced: review!.priced.map((p) => priced.find((fresh) => fresh.leg === p.leg) ?? p) });
-    return calls;
-  });
 
-  const onMulticallBuy = async () => {
-    const account = ready!.account;
-    const remaining = buyable.slice(bought);
-    if (remaining.length === 0) return;
-    setError(null);
-    setMulticallBusy(true);
-    try {
-      const plan = await buildBasketMulticallPlan(
-        account,
-        remaining.map((p) => ({ address: p.leg.asset.address, symbol: p.leg.asset.symbol, amountUsdc: p.amount })),
-        SLIPPAGE_BPS,
-      );
-      if (activeAccount.current !== account) return;
-      const allTxs: TxRequest[] = [...plan.approvals.map((a) => a.tx), ...plan.groups.map((g) => g.tx)];
-      await simulateBatch(account, allTxs);
-      if (activeAccount.current !== account) return;
-      const mcSteps: Step[] = [
-        ...plan.approvals.map((a) => ({
-          label: `Approve ${formatAmount(a.amount, USDC.decimals)} USDC for ${a.dex === "aerodrome" ? "Aerodrome Slipstream" : "Uniswap V3"}`,
-          build: () => a.tx,
-        })),
-        ...plan.groups.map((g) => ({
-          label: `Buy ${g.legs.length} ${g.legs.length === 1 ? "asset" : "assets"} in 1 tx (${g.dex === "aerodrome" ? "Aerodrome Slipstream" : "Uniswap V3"} multicall)`,
-          build: () => g.tx,
-        })),
+    // When >5 legs fall back to Relay, merge approvals per proxy (1 approve + N swaps) to stay within the 10-call wallet limit.
+    if (rawLegs.length > 5) {
+      const totals = new Map<string, { readonly proxy: string; amount: bigint }>();
+      for (const leg of rawLegs) {
+        const k = leg.proxy.toLowerCase();
+        const prev = totals.get(k);
+        if (prev) prev.amount += leg.amount;
+        else totals.set(k, { proxy: leg.proxy, amount: leg.amount });
+      }
+      return [
+        ...[...totals.values()].map(({ proxy, amount }) => ({ to: USDC.address, data: approveData(proxy, amount) })),
+        ...rawLegs.map((l) => l.swap),
       ];
-      setMulticallBusy(false);
-      const done = await steps.run(signingProvider(), account, mcSteps);
+    }
+    // For <=5 legs, keep fresh exact interleaved approvals per leg (<=10 calls total).
+    return rawLegs.flatMap((l) => [{ to: USDC.address, data: approveData(l.proxy, l.amount) }, l.swap]);
+  }, buyable.slice(bought).reduce((s, p) => s + p.amount, 0n));
+
+  /**
+   * One transaction through BasketRouter, for a wallet that cannot batch: fresh legs quoted with the
+   * router as sender and this wallet as recipient, then `buy` (an allowance already covers the total)
+   * or one USDC permit signature and `buyWithPermit`. Simulated before the wallet sees it (TxSteps).
+   */
+  const onRouterBuy = async (router: string) => {
+    const account = ready!.account;
+    setError(null);
+    setRouterBusy(true);
+    try {
+      const remaining = buyable.slice(bought);
+      const legs: RouterLeg[] = [];
+      for (const p of remaining) {
+        if (legs.length > 0) await sleep(PACE.gapMs);
+        const { leg, quote } = await retrying(() => routerLeg(router, account, asAsset(p.leg.asset), p.amount, SLIPPAGE_BPS));
+        const impact = impactOf(quote);
+        if (impact !== null && impact > LOUD) throw new Error(`${p.leg.asset.symbol} now moves its market ${impact.toFixed(2)}% — review the basket again.`);
+        legs.push(leg);
+      }
+      const total = totalOf(legs);
+      const deadline = deadlineFrom(Date.now());
+      const data = (await allowance(USDC.address, account, router)) >= total ? buyData(legs, deadline) : buyWithPermitData(legs, deadline, await signPermit(signingProvider(), account, router, total, deadline));
+      // the step runner re-reads the wallet at the click and refuses if the account moved
+      setRouterBusy(false);
+      const done = await steps.run(signingProvider(), account, [{ label: `Buy the basket (${legs.length} legs) in one transaction`, build: () => ({ to: router, data }) }]);
       if (activeAccount.current !== account || done === null) return;
-      const swapReceipts = done.slice(plan.approvals.length);
       const measured = [...(got ?? buyable.map(() => null as bigint | null))];
-      remaining.forEach((p, idx) => {
-        measured[bought + idx] = swapReceipts.reduce((sum, rcpt) => sum + tokenReceived(rcpt, p.leg.asset.address, account), 0n);
+      remaining.forEach((p, i) => {
+        measured[bought + i] = tokenReceived(done[0]!, p.leg.asset.address, account);
       });
       setGot(measured);
       setBought(buyable.length);
     } catch (e) {
       if (activeAccount.current === account) setError(messageOf(e));
     } finally {
-      if (activeAccount.current === account) setMulticallBusy(false);
+      if (activeAccount.current === account) setRouterBusy(false);
     }
   };
 
@@ -396,14 +417,14 @@ export function BasketPanel() {
   };
 
   const totalWeight = rows.reduce((s, r) => s + (Number.isFinite(Number(r.weight)) ? Number(r.weight) : 0), 0);
-  const weightRounded = Number.isFinite(totalWeight) ? Math.round(totalWeight * 100) / 100 : 0;
+  const weightRounded = Math.round(totalWeight * 100) / 100;
   const amountNum = Number(amount);
   const hasValidAmount = amount.trim() !== "" && Number.isFinite(amountNum) && amountNum > 0;
   const activeCount = rows.filter((r) => r.symbol.trim() !== "").length;
   const execMode = batch.capability === "supported" || batch.capability === "ready" ? "1 SIGN" : "1 TX";
 
+  // with no rows there is nothing to map, so nothing changes
   const equalSplit = () => {
-    if (rows.length === 0) return;
     edit();
     const base = Math.floor(100 / rows.length);
     const rem = 100 - base * rows.length;
@@ -650,9 +671,14 @@ export function BasketPanel() {
               <p className="dim">
                 Batch ID: <code style={{ overflowWrap: "anywhere" }}>{batch.pending.id}</code>
               </p>
-              <Gel quiet disabled={batch.working} onClick={() => void batch.refresh()}>
-                Check basket status
-              </Gel>
+              <div className="row">
+                <Gel quiet disabled={batch.working} onClick={() => void batch.refresh()}>
+                  Check basket status
+                </Gel>
+                <button type="button" className="chip" disabled={batch.working} onClick={() => batch.clear()}>
+                  Clear stuck batch
+                </button>
+              </div>
             </div>
           ) : null}
 
@@ -680,11 +706,16 @@ export function BasketPanel() {
                           <th scope="row">{p.leg.asset.symbol}</th>
                           <td className="num mono">{formatAmount(p.amount, USDC.decimals)} USDC</td>
                           <td className="num mono">
-                            {p.problem
-                              ? p.problem
-                              : p.quote
-                                ? `≈ ${tokenAmount(p.quote.out, p.leg.asset.decimals, 4)} ${p.leg.asset.symbol} · ${impact === null ? "impact not given" : `${impact.toFixed(2)}% impact`}`
-                                : "nothing to add in this allocation"}
+                            {p.problem ? (
+                              p.problem
+                            ) : p.quote ? (
+                              <>
+                                <div>≈ {tokenAmount(p.quote.out, p.leg.asset.decimals, 4)} {p.leg.asset.symbol}</div>
+                                <div className="bk__now dim">{impact === null ? "impact not given" : `${impact.toFixed(2)}% impact`}</div>
+                              </>
+                            ) : (
+                              "nothing to add in this allocation"
+                            )}
                           </td>
                           {got && p.quote ? <td className="num mono">{got[buyable.indexOf(p)] === null ? "not measured" : arrived(got[buyable.indexOf(p)]!, p.leg.asset)}</td> : null}
                         </tr>
@@ -711,17 +742,19 @@ export function BasketPanel() {
                 </>
               ) : batch.capability === "checking" ? (
                 <p className="dim">Checking whether your wallet can confirm the basket at once…</p>
-              ) : (
+              ) : CONTRACTS.basketRouter ? (
                 <>
                   <Gel
                     className="mf__cta"
-                    disabled={stop !== null || purchaseLocked || batch.complete || steps.states.some((s) => s.status === "slow") || bought >= buyable.length}
-                    onClick={() => void onMulticallBuy()}
+                    disabled={stop !== null || purchaseLocked || steps.states.some((s) => s.status === "slow") || bought >= buyable.length}
+                    onClick={() => void onRouterBuy(CONTRACTS.basketRouter!)}
                   >
-                    {multicallBusy ? "Building 1-tx multicall…" : `Buy basket · 1 tx (${buyable.length - bought} ${buyable.length - bought === 1 ? "asset" : "assets"})`}
+                    {routerBusy ? "Preparing basket…" : "Buy basket · 1 transaction"}
                   </Gel>
-                  <p className="dim">1-tx Aerodrome Slipstream / Uniswap V3 multicall (+ 1 USDC approval if needed), simulated on Base first.</p>
+                  <p className="dim">One transaction: every asset or none. Your wallet may first ask for one USDC signature for exactly this amount — no standing approval.</p>
                 </>
+              ) : (
+                <p className="dim">This wallet does not report atomic batching on Base. Buy step by step, or connect a compatible wallet.</p>
               )}
 
               {priced.some((p) => p.quote === null && p.problem !== null) ? (
@@ -808,6 +841,7 @@ export function BasketPanel() {
                         <th className="num">Target</th>
                         <th className="num">Now</th>
                         <th className="num">Value</th>
+                        {openWindow ? <th className="num">Action</th> : null}
                       </tr>
                     </thead>
                     <tbody>
@@ -817,6 +851,18 @@ export function BasketPanel() {
                           <td className="num mono">{l.weight}%</td>
                           <td className="num mono">{now![i]}%</td>
                           <td className="num mono">{usd(Number(held[i]!) / 1e6)}</td>
+                          {openWindow ? (
+                            <td className="num">
+                              <button
+                                type="button"
+                                className="chip chip--mode"
+                                disabled={held[i]! === 0n}
+                                onClick={() => openWindow("swap", { sell: l.asset.address })}
+                              >
+                                Sell
+                              </button>
+                            </td>
+                          ) : null}
                         </tr>
                       ))}
                     </tbody>

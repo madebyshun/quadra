@@ -3413,7 +3413,9 @@ var BRAND = {
 };
 
 // src/config/chain.ts
-var ENV_RPC = typeof import.meta !== "undefined" && import.meta.env?.VITE_BASE_RPC_URL?.trim() || "";
+function baseRpc(env) {
+  return env?.VITE_BASE_RPC_URL?.trim() || "https://base.publicnode.com";
+}
 var BASE = {
   id: 8453,
   idHex: "0x2105",
@@ -3422,7 +3424,7 @@ var BASE = {
    * Uses `VITE_BASE_RPC_URL` (browser/Vercel build) or `BASE_RPC_URL` (serverless API) when set,
    * falling back to public Base RPC endpoints.
    */
-  rpc: ENV_RPC || "https://base.publicnode.com",
+  rpc: baseRpc(import.meta.env),
   rpcFallback: "https://mainnet.base.org",
   explorer: "https://basescan.org"
 };
@@ -3459,12 +3461,16 @@ var CONTRACTS = {
    */
   treasury: "0xD5C1dFc036F9911348EA8065F73c8123f4013FAB",
   /**
-   * The product's own token (see BRAND.ticker for its name), LAUNCHED by the owner 2026-10-29 on
-   * launchpad v3, paired with AAPLc, 1%: tx 0x9529911d…2b43, block 53,236,421, read back from the
-   * factory's `Launched` event. Its creator share goes to the furnace for good (`setCreatorRecipient`,
-   * tx 0xe47c4855…3185). No admin, fixed supply — the launchpad's own guarantees.
+   * The product's own token (see BRAND.ticker for its name), RE-LAUNCHED by the owner 2026-11-25 on
+   * launchpad v3 paired with ETH, 1%, no referrer, from quadra-deployer 0x00FD…746F: tx 0xbdd142a1…c13a,
+   * block 61,972,675, read back from the factory's `Launched` event (symbol read from the token). Its
+   * creator share goes for good to its furnace 0x5194…5102 (contracts/src, the furnace contract) (deployed tx 0xe1697dab…0a89, block
+   * 61,973,176, Sourcify-verified; read back: this token, treasury, burnBps 5000; `setCreatorRecipient`
+   * tx 0x5c8b8ee4…6c9a, `launches(token).creatorRecipient` read back). No admin, fixed supply.
+   * The AAPLc-paired 0xb200…0816 of 2026-10-29 (never traded; the only holder is the treasury) and its
+   * furnace 0x7838…a44c are ABANDONED — nothing in the app points at them.
    */
-  token: "0xb200000000000000000000d096efba9896ab0816",
+  token: "0xB200000000000000000000bdb78b7B145fB15d7F",
   /**
    * The launchpad, version 2 (`contracts/src/LaunchFactory.sol`: ETH OR stock pairs), DEPLOYED BY THE
    * OWNER 2026-10-02 with their own key: tx 0xd05554c5…42f2a293, block 52,068,913, from 0x00FD29B7…
@@ -3496,6 +3502,16 @@ var CONTRACTS = {
    * internal review only (contracts/REVIEW-2026-10-29.md). Set back to `null` to stop offering it.
    */
   revenueShareDeployer: "0x774CD3CD89337cF7e57aF6a04256733F1dd74139",
+  /**
+   * `BasketRouter` (contracts/src/BasketRouter.sol): Treasury Basket in ONE transaction for any wallet —
+   * the buyer's USDC pulled once (an allowance, or one EIP-2612 signature), each leg a Relay swap
+   * delivered straight to the buyer, checked against its minimum, the rest refunded. DEPLOYED by the owner
+   * 2026-11-25 from quadra-deployer, Sourcify EXACT match. CHECKED before it was written here: usdc() =
+   * USDC, relayProxyA/B = Relay's two pinned approval proxies, MAX_LEGS 10; and MEASURED against this very
+   * address (ROUTER=… scripts/simulate-basket-router.ts, one eth_simulateV1 block): NVDAc + AAPLc delivered
+   * to within a unit of their quotes, 0 USDC left in it. NOT audited. Set back to `null` to stop offering it.
+   */
+  basketRouter: "0x6986E0B8Ab5132Bbe676DC2C72fbff6Fe3D05430",
   /**
    * The launchpad, version 1 (`contracts/deployed/LaunchFactory.v1.sol`: ETH pairs only), DEPLOYED BY
    * THE OWNER 2026-10-02: tx 0xc51a517c…4a972764d, block 52,066,273. CHECKED before it was written
@@ -3838,10 +3854,11 @@ var tools_default = {
     },
     contracts: {
       treasury: "0xD5C1dFc036F9911348EA8065F73c8123f4013FAB",
-      token: "0xb200000000000000000000d096efba9896ab0816",
+      token: "0xB200000000000000000000bdb78b7B145fB15d7F",
       launchFactory: "0xef1F427bB57e0ECd7BB8051cE8bC7AAb709a0c03",
       launchFactoryV3: "0x006Da367654a487bb277fe25ff54f0fE0f741377",
       revenueShareDeployer: "0x774CD3CD89337cF7e57aF6a04256733F1dd74139",
+      basketRouter: "0x6986E0B8Ab5132Bbe676DC2C72fbff6Fe3D05430",
       launchFactoryV1: "0xcDb2eC1c487fbcB6B4AF25cCD86aFf8120FaB8a5"
     },
     limits: [
@@ -4280,6 +4297,42 @@ var CLANKER_FACTORIES = {
 var CLANKER_ABI = parseAbi(["function deploymentInfoForToken(address token) view returns (address token, address hook, address locker)"]);
 var ZORA_FACTORY = "0x777777751622c0d3258f214F9DF38E35BF45baF3";
 var ZORA_ABI = parseAbi(["function getVersionForDeployedCoin(address coin) view returns (uint8)"]);
+var FLAUNCH_CONTRACTS = {
+  "0x6a53f8b799be11a2a3264ef0bff183dcb12d9571": "Flaunch v1.0",
+  "0xb4512bf57d50fbcb64a3adf8b17a79b2a204c18c": "Flaunch v1.1",
+  "0x0cf6bdf0a85a9d6763361037985b76c8893553af": "Flaunch v1.2",
+  "0x516af52d0c629b5e378da4dc64ecb0744ce10109": "Flaunch v1.3",
+  "0xc5b2e8f197407263f4b62a35c71bfc394ecf95d5": "Flaunch (AnyFlaunch)"
+};
+var FLAUNCH_HOOKS = {
+  "0xb903b0ab7bcee8f5e4d8c9b10a71aac7135d6fdc": "Flaunch v1.2",
+  "0x23321f11a6d44fd1ab790044fdfde5758c902fdc": "Flaunch v1.3",
+  "0x8dc3b85e1dc1c846ebf3971179a751896842e5dc": "Flaunch (AnyPositionManager)",
+  "0xe753a351fb498051a09dc130fcc29aebc76525dc": "Flaunch (vested)"
+};
+var FLAUNCH_ABI = parseAbi(["function tokenId(address memecoin) view returns (uint256)"]);
+var VIRTUALS_BONDING = "0xF66DeA7b3e897cD44A5a231c61B6B4423d613259";
+var VIRTUALS_BONDING_V2 = "0x3Ae599aF771bAAE833b040C6f1389FFE134D014A";
+var VIRTUALS_CONTRACTS = {
+  [VIRTUALS_BONDING.toLowerCase()]: "Virtuals Protocol",
+  [VIRTUALS_BONDING_V2.toLowerCase()]: "Virtuals Protocol (BondingV2)"
+};
+var VIRTUALS_ABI = parseAbi(["function tokenInfo(address token) view returns (address)"]);
+var MINT_CLUB_BOND = "0xc5a076cad94176c2996B32d8466Be1cE757FAa27";
+var MINT_CLUB_ABI = parseAbi(["function tokenBond(address token) view returns (address)"]);
+var APESTORE_CONTRACT = "0x0bf8edd756ff6caf3f583d67a9fd8b237e40f58a";
+var KNOWN_LAUNCHPADS = {
+  [BASEPAD.factory.toLowerCase()]: { id: "basepad", name: "basepad.si" },
+  [DOPPLER_AIRLOCK.toLowerCase()]: { id: "doppler", name: "Doppler" },
+  [ZORA_FACTORY.toLowerCase()]: { id: "zora", name: "Zora" },
+  [VIRTUALS_BONDING.toLowerCase()]: { id: "virtuals", name: "Virtuals Protocol" },
+  [VIRTUALS_BONDING_V2.toLowerCase()]: { id: "virtuals", name: "Virtuals Protocol" },
+  [MINT_CLUB_BOND.toLowerCase()]: { id: "mintclub", name: "Mint Club V2" },
+  [APESTORE_CONTRACT.toLowerCase()]: { id: "apestore", name: "Ape.Store" },
+  ...Object.fromEntries(Object.entries(CLANKER_FACTORIES).map(([addr, name]) => [addr.toLowerCase(), { id: "clanker", name }])),
+  ...Object.fromEntries(Object.entries(FLAUNCH_CONTRACTS).map(([addr, name]) => [addr.toLowerCase(), { id: "flaunch", name }])),
+  ...Object.fromEntries(Object.entries(FLAUNCH_HOOKS).map(([addr, name]) => [addr.toLowerCase(), { id: "flaunch", name }]))
+};
 
 // src/skills/origin.ts
 var SERVICE2 = "Blockscout";
@@ -4352,7 +4405,7 @@ async function launchTx(token, pairs) {
   const v4 = pairs.find((p) => p.pair?.length === 66 && p.createdAt !== null);
   const hash2 = v4 ? await poolLaunch(v4.pair, v4.createdAt) : null;
   if (hash2) return { hash: hash2, creator };
-  if (creator && CLANKER_FACTORIES[creator.toLowerCase()]) return { hash: null, creator };
+  if (creator && KNOWN_LAUNCHPADS[creator.toLowerCase()]) return { hash: null, creator };
   return null;
 }
 async function launcherProfile(address2, factory) {
@@ -4368,10 +4421,7 @@ async function originOf(token, pairs, pad3 = null) {
   if (pad3?.launcher) return { via: padVia, launcher: atLeastOne(await launcherProfile(pad3.launcher, pad3.address)) };
   const found = await launchTx(token, pairs);
   if (!found) return padVia ? { via: padVia, launcher: null, relay: "no launch transaction on record" } : null;
-  if (!found.hash) {
-    const via = padVia ?? (found.creator ? { address: found.creator, name: CLANKER_FACTORIES[found.creator.toLowerCase()] ?? null } : null);
-    return via ? { via, launcher: null, relay: "no launch transaction on record" } : null;
-  }
+  if (!found.hash) return { via: padVia ?? { address: found.creator, name: KNOWN_LAUNCHPADS[found.creator.toLowerCase()].name }, launcher: null, relay: "no launch transaction on record" };
   const tx = await getJson(SERVICE2, `${BLOCKSCOUT}/transactions/${found.hash}`);
   const from = isObj(tx) && isObj(tx.from) ? strOf(tx.from.hash) : null;
   if (!isObj(tx) || !from) return padVia ? { via: padVia, launcher: null, relay: "no launch transaction on record" } : null;
@@ -4385,17 +4435,17 @@ async function originOf(token, pairs, pad3 = null) {
   }
   const creator = found.creator && !same(found.creator, from) ? found.creator : null;
   if (creator) {
-    const known = CLANKER_FACTORIES[creator.toLowerCase()] ?? null;
+    const known = KNOWN_LAUNCHPADS[creator.toLowerCase()]?.name ?? null;
     const via = { address: creator, name: (to && same(to, creator) ? toName : null) ?? known };
     if (bundle) return { via, launcher: null, relay: "an ERC-4337 bundle" };
     const l = await launcherProfile(from, creator);
-    return { via, launcher: to && same(to, creator) ? l : atLeastOne(l) };
+    return { via, launcher: atLeastOne(l) };
   }
   if (bundle) return { via: null, launcher: null, relay: "an ERC-4337 bundle" };
   if (!to) return { via: null, launcher: await launcherProfile(from, null) };
   const code = String(await rpc("eth_getCode", [from, "latest"]));
   if (same(to, from) || DELEGATED.test(code)) return { via: null, launcher: await launcherProfile(from, null), relay: "an EIP-7702 smart account" };
-  return { via: { address: to, name: toName }, launcher: await launcherProfile(from, to) };
+  return { via: { address: to, name: toName }, launcher: atLeastOne(await launcherProfile(from, to)) };
 }
 
 // src/skills/dexscreener.ts
@@ -4753,6 +4803,66 @@ function zoraPad(version3) {
     launcher: null
   };
 }
+function flaunchPad(tokenId, contract, label) {
+  if (tokenId === 0n) return null;
+  return {
+    kind: "proven",
+    id: "flaunch",
+    name: label,
+    address: toChecksumAddress(contract),
+    how: `${label} recorded it as Flaunch token #${tokenId}`,
+    guarantees: [],
+    launcher: null
+  };
+}
+function addressWord(raw, wordIndex) {
+  const start = 2 + wordIndex * 64;
+  if (raw.length < start + 64) return null;
+  const addr = `0x${raw.slice(start + 24, start + 64)}`;
+  return same2(addr, ZERO2) ? null : toChecksumAddress(addr);
+}
+async function virtualsOf(token) {
+  const data = encodeFunctionData({ abi: VIRTUALS_ABI, functionName: "tokenInfo", args: [token] });
+  const results = await Promise.all(
+    Object.entries(VIRTUALS_CONTRACTS).map(async ([contract, label]) => {
+      const raw = await ethCall(contract, data).catch(refusedIsNull);
+      if (!raw || raw.length < 2 + 64 * 3) return null;
+      const isDynamicTuple = raw.slice(2, 66).toLowerCase() === "0000000000000000000000000000000000000000000000000000000000000020";
+      const base = isDynamicTuple ? 1 : 0;
+      const creator = addressWord(raw, base);
+      const recordedToken = addressWord(raw, base + 1);
+      const agentToken = addressWord(raw, base + 3);
+      const matches = recordedToken && same2(recordedToken, token) || agentToken && same2(agentToken, token);
+      if (!creator || !matches) return null;
+      return {
+        kind: "proven",
+        id: "virtuals",
+        name: label,
+        address: toChecksumAddress(contract),
+        how: `${label}'s Bonding contract recorded its launch`,
+        guarantees: [],
+        launcher: creator
+      };
+    })
+  );
+  return results.find((r) => r !== null) ?? null;
+}
+async function mintClubOf(token) {
+  const data = encodeFunctionData({ abi: MINT_CLUB_ABI, functionName: "tokenBond", args: [token] });
+  const raw = await ethCall(MINT_CLUB_BOND, data).catch(refusedIsNull);
+  if (!raw) return null;
+  const creator = addressWord(raw, 0);
+  if (!creator) return null;
+  return {
+    kind: "proven",
+    id: "mintclub",
+    name: "Mint Club V2",
+    address: MINT_CLUB_BOND,
+    how: "Mint Club V2's Bond contract recorded its bonding curve",
+    guarantees: [],
+    launcher: creator
+  };
+}
 var refusedIsNull = (e) => {
   if (e instanceof RpcRefusal) return null;
   throw e;
@@ -4760,12 +4870,18 @@ var refusedIsNull = (e) => {
 async function launchpadOf(token, ours = launchOf(token)) {
   const mine = await ours;
   if (mine) return quadraPad(mine);
+  const flaunchChecks = Object.entries(FLAUNCH_CONTRACTS).map(
+    ([addr, label]) => read(FLAUNCH_ABI, addr, "tokenId", [token]).then((id) => flaunchPad(id, addr, label)).catch(refusedIsNull)
+  );
   const found = await Promise.all([
     read(BASEPAD_ABI, BASEPAD.factory, "infoOf", [token]).then((r) => basepadPad(r)),
     read(DOPPLER_ABI, DOPPLER_AIRLOCK, "getAssetData", [token]).then((r) => dopplerPad(r)),
     read(CLANKER_ABI, CLANKER_FACTORY, "deploymentInfoForToken", [token]).then((r) => clankerOf(token, r)),
     read(CLANKER_ABI, CLANKER_V5_FACTORY, "deploymentInfoForToken", [token]).then((r) => clankerOf(token, r, CLANKER_V5_FACTORY, "Clanker v5")).catch(refusedIsNull),
-    read(ZORA_ABI, ZORA_FACTORY, "getVersionForDeployedCoin", [token]).then((r) => zoraPad(Number(r)))
+    read(ZORA_ABI, ZORA_FACTORY, "getVersionForDeployedCoin", [token]).then((r) => zoraPad(Number(r))),
+    ...flaunchChecks,
+    virtualsOf(token),
+    mintClubOf(token)
   ]);
   const proven = found.find((p) => p !== null);
   if (token.toLowerCase().endsWith(FEEL_SUFFIX) && proven?.id !== "feel") {
@@ -5269,9 +5385,10 @@ async function simulateAt(txs, blockTag = "latest") {
     if (blockTag === "latest") throw e;
     result = await rpc("eth_simulateV1", [payload, "latest"]);
   }
-  const first = listOf(result)[0];
-  const num = isObj(first) ? strOf(first.number) : null;
-  return { calls: parseSimulation(result), block: num && /^0x[0-9a-fA-F]+$/.test(num) ? num : null };
+  const parsed = parseSimulation(result);
+  if (parsed.length !== calls.length) throw new Error(`Base simulated ${parsed.length} of ${calls.length} steps.`);
+  const num = strOf(listOf(result)[0].number);
+  return { calls: parsed, block: num && /^0x[0-9a-fA-F]+$/.test(num) ? num : null };
 }
 async function simulate(txs, blockTag = "latest") {
   return (await simulateAt(txs, blockTag)).calls;
@@ -5514,7 +5631,7 @@ function originRows(o, now, pad3 = null) {
 function launchpadRow(pad3) {
   const label = "Launchpad";
   if (pad3 === void 0) return [row(label, "not checked \u2014 the launchpads' records could not be read", { tone: "warn" })];
-  if (pad3.kind === "unknown") return [row(label, "none of the known launchpads (basepad.si, Feel.cash, Doppler, Clanker, Zora, this app's) has a record of it")];
+  if (pad3.kind === "unknown") return [row(label, "none of the known launchpads (basepad.si, Feel.cash, Doppler, Clanker v0\u2013v5, Zora, Flaunch, Virtuals, Mint Club, Ape.Store, this app's) has a record of it")];
   if (pad3.kind === "claimed") return [row(label, `looks like ${pad3.name}, but is NOT one: ${pad3.why}`, { tone: "bad" })];
   const what = pad3.guarantees.length ? ` \u2014 ${pad3.guarantees.join("; ")}` : "";
   return [row(label, `${pad3.name}: ${pad3.how}${what}`, { tone: "ok", href: explorer.address(pad3.address) })];
@@ -5575,7 +5692,7 @@ function marketRows(pairs, now, stock = null) {
   const m = deepest(pairs);
   if (m === null) {
     const why = stock ? ` \u2014 DexScreener lists a pool paired with ${stock} only after its first trade; the value above is read from the pool itself` : "";
-    return [row("Market", `no market found on Base${why}`, { tone: "warn" })];
+    return [row("Market", `no market found on Base${why}`, stock ? {} : { tone: "warn" })];
   }
   const rows = [
     row("Price", m.priceUsd === null ? "not quoted" : price(m.priceUsd)),
@@ -5625,17 +5742,7 @@ async function tokenVerdict(input, now) {
   ]);
   const [fee, referrer] = await Promise.all([v3FeeOf(launchpad, address2), v3ReferrerOf(launchpad, address2)]);
   const token = info ?? null;
-  const viaAddr = origin?.via?.address?.toLowerCase();
-  const clankerVer = viaAddr ? CLANKER_FACTORIES[viaAddr] : void 0;
-  const resolvedPad = other?.kind === "unknown" && clankerVer && origin?.via?.address ? {
-    kind: "proven",
-    id: "clanker",
-    name: clankerVer,
-    address: origin.via.address,
-    how: `${clankerVer}'s factory created this token on Base`,
-    guarantees: [],
-    launcher: origin.launcher?.address ?? null
-  } : other ?? void 0;
+  const resolvedPad = padFromOrigin(other ?? null, origin ?? null);
   const body = [
     ...launchpadRows(launchpad, fee, referrer),
     ...launchpad ? [] : launchpadRow(resolvedPad),
@@ -5673,6 +5780,22 @@ var verdictSkill = {
   args: [{ name: "token address", hint: "0x\u2026" }],
   run: ([input = ""]) => tokenVerdict(input, Date.now())
 };
+function padFromOrigin(other, origin) {
+  const via = origin?.via;
+  if (other?.kind !== "unknown" || !via?.address) return other ?? void 0;
+  const knownVia = KNOWN_LAUNCHPADS[via.address.toLowerCase()];
+  const viaPadName = via.name && /launchpad|factory|bonding|flaunch|clanker|zora|doppler|virtuals|basepad|ape\.?store|mint\.?club/i.test(via.name) ? via.name : null;
+  if (!knownVia && !viaPadName) return other;
+  return {
+    kind: "proven",
+    id: knownVia?.id ?? "other",
+    name: knownVia?.name ?? viaPadName,
+    address: via.address,
+    how: knownVia ? `${knownVia.name} created this token on Base` : `Blockscout verified ${viaPadName} as the contract that created this token`,
+    guarantees: [],
+    launcher: origin.launcher?.address ?? null
+  };
+}
 
 // src/skills/gate.ts
 function codeOf(label) {
@@ -7145,6 +7268,11 @@ var TRADE_CRYPTO = [
   { address: "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22", symbol: "cbETH", name: "Coinbase Wrapped Staked ETH", decimals: 18 },
   { address: "0x940181a94A35A4569E4529A3CDfB74e38FD98631", symbol: "AERO", name: "Aerodrome Finance", decimals: 18 },
   { address: "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b", symbol: "VIRTUAL", name: "Virtuals Protocol", decimals: 18 },
+  { address: "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf", symbol: "VVV", name: "Venice Token", decimals: 18 },
+  { address: "0x1bc0c42215582d5A085795f4baDbaC3ff36d1Bcb", symbol: "CLANKER", name: "tokenbot", decimals: 18 },
+  { address: "0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b", symbol: "BNKR", name: "BankrCoin", decimals: 18 },
+  { address: "0xBAa5CC21fd487B8Fcc2F632f3F4E8D37262a0842", symbol: "MORPHO", name: "Morpho", decimals: 18 },
+  { address: "0xAC1Bd2486aAf3B5C0fc3Fd868558b082a531B2B4", symbol: "TOSHI", name: "Toshi", decimals: 18 },
   { address: "0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42", symbol: "EURC", name: "EURC", decimals: 6 },
   { address: "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed", symbol: "DEGEN", name: "Degen", decimals: 18 },
   { address: "0x1111111111166b7FE7bd91427724B487980aFc69", symbol: "ZORA", name: "Zora", decimals: 18 },
@@ -7198,7 +7326,7 @@ async function quoteOf(factory, quote2) {
   return { enabled, startTick };
 }
 var ECOSYSTEM_QUOTES = [
-  ...CONTRACTS.token ? [{ address: toChecksumAddress(CONTRACTS.token), symbol: "QUADRA", name: "Quadra", decimals: 18 }] : []
+  ...CONTRACTS.token ? [{ address: toChecksumAddress(CONTRACTS.token), symbol: BRAND.ticker.replace("$", ""), name: BRAND.name, decimals: 18 }] : []
 ];
 async function launchPairs(factory) {
   const eth = await quoteOf(factory, ETH_QUOTE2);

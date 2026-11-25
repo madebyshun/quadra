@@ -125,10 +125,10 @@ export function NewLaunches({ onOpen }: { onOpen: (token: string) => void }) {
   }, []);
   if (coins.length === 0) return null;
   return (
-    <div className="newstrip" role="group" aria-label="Newest launches">
-      <span className="newstrip__tag">● NEW</span>
+    <div className="mk__strip coin__new-strip" role="group" aria-label="Newest launches">
+      <span className="coin__new-label">New</span>
       {coins.map((c) => (
-        <button key={c.token} type="button" className="chip" onClick={() => onOpen(c.token)}>
+        <button key={c.token} type="button" className="mk__pill" onClick={() => onOpen(c.token)}>
           {c.symbol ?? short(c.token)}
         </button>
       ))}

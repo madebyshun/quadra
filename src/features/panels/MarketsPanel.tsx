@@ -10,7 +10,7 @@ import { THIN_MARKET_USD, TRADE_CRYPTO } from "@/config/markets";
 import { row, type Report, type Row } from "@/skills/types";
 import { Crt } from "@/ui/Crt";
 import { Gel } from "@/ui/Gel";
-import { QuadraSelect } from "@/ui/Select";
+import { PlatinumSelect } from "@/ui/Select";
 import { useOptionalWalletSession } from "@/ui/WalletProvider";
 import { ReportView } from "@/features/panels/ReportView";
 import { StockHealth } from "@/features/panels/StockHealth";
@@ -24,7 +24,7 @@ import { useRunCommand } from "@/features/openWindow";
 /**
  * The Markets window — rebuilt along Blue Agent's `/markets` structure (KPI strip, 24h trending
  * ticker, category filters, search, sortable dense market table with inline 24h sparklines,
- * DEX-vs-Chainlink NAV drift readout, and 1-click Trade/Check actions) in Quadra's Platinum +
+ * DEX-vs-Chainlink NAV drift readout, and 1-click Trade/Check actions) in this app's Platinum +
  * Base cobalt visual identity.
  */
 
@@ -296,21 +296,16 @@ export function MarketsPanel() {
   const visibleDirKey = useMemo(() => visibleDir.map((d) => d.address.toLowerCase()).join(","), [visibleDir]);
   useEffect(() => {
     if (!visibleDirKey) return;
-    let live = true;
-    const addrs = visibleDirKey.split(",").filter(Boolean);
-    void spots("base", addrs)
-      .then((found) => {
-        if (!live) return;
+    // prices are keyed by address, so a late answer for rows no longer shown is still right where it lands
+    void spots("base", visibleDirKey.split(","))
+      .then((found) =>
         setDirSpots((prev) => {
           const next = new Map(prev);
           for (const [k, v] of found) next.set(k, v);
           return next;
-        });
-      })
+        }),
+      )
       .catch(() => {});
-    return () => {
-      live = false;
-    };
   }, [visibleDirKey]);
 
   const toggleSort = (next: SortKey) =>
@@ -367,7 +362,8 @@ export function MarketsPanel() {
               onClick={() => select(r.key)}
             >
               <strong>{r.label}</strong>
-              <span>{r.price === null ? "—" : price(r.price)}</span>
+              {/* the strip lists priced rows only */}
+              <span>{price(r.price!)}</span>
               {r.change !== null ? <span className={r.change >= 0 ? "up" : "down"}>{formatChange(r.change)}</span> : null}
             </button>
           ))}
@@ -494,7 +490,7 @@ export function MarketsPanel() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   select(r.key);
-                                  detailRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+                                  detailRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
                                 }}
                               >
                                 Trade
@@ -605,7 +601,7 @@ export function MarketsPanel() {
                                   e.stopPropagation();
                                   if (item.kind === "stocks") add({ kind: "basestock", symbol: item.ticker });
                                   else add({ kind: "token", address: item.address, label: item.symbol });
-                                  setTimeout(() => detailRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" }), 50);
+                                  setTimeout(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
                                 }}
                               >
                                 Trade
@@ -756,7 +752,7 @@ export function MarketsPanel() {
         <legend>Add to the watchlist</legend>
         <div className="group__row">
           <span>Base stock</span>
-          <QuadraSelect
+          <PlatinumSelect
             ariaLabel="Base stock"
             value={baseStock}
             onChange={setBaseStock}
@@ -786,7 +782,7 @@ export function MarketsPanel() {
         {FLAGS.robinhood ? (
           <div className="group__row">
             <span>Robinhood stock</span>
-            <QuadraSelect
+            <PlatinumSelect
               ariaLabel="Robinhood stock"
               value={stock}
               onChange={setStock}
