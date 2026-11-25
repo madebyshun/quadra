@@ -15,10 +15,13 @@ const RPC = process.env.BASE_RPC_URL?.trim() || "https://base.publicnode.com";
 const ROUTER = "0xFad19ece5eB90cC4442589541fa3Be9d0853169c" as const;
 const BACKSTOP = "0xc5b6CA155E17a4Ff45ffC056Ff39468d48940409" as const;
 const ETH = "0x0000000000000000000000000000000000000000" as const;
+// $QUADRA (CONTRACTS.token): its pool pays the protocol share in the coin too, all of it to the treasury
+const QUADRA = "0xB200000000000000000000bdb78b7B145fB15d7F" as const;
 /** Below this the router's ETH is left to grow: a distribute costs gas for nothing. */
 const MIN_DISTRIBUTE = parseEther(process.env.MIN_DISTRIBUTE || "0.0002");
 
 const routerAbi = parseAbi(["function distribute(address[] currencies)"]);
+const erc20Abi = parseAbi(["function balanceOf(address) view returns (uint256)"]);
 const backstopAbi = parseAbi([
   "function poke()",
   "function liquidity() view returns (uint128)",
@@ -59,6 +62,8 @@ async function main() {
   console.log("FeeRouter ETH:", formatEther(routerEth));
   if (routerEth >= MIN_DISTRIBUTE) await send("distribute([ETH])", ROUTER, routerAbi, "distribute", [[ETH]]);
   else console.log(`below ${formatEther(MIN_DISTRIBUTE)} ETH, not distributed`);
+  const routerCoins = await pub.readContract({ address: QUADRA, abi: erc20Abi, functionName: "balanceOf", args: [ROUTER] });
+  if (routerCoins > 0n) await send("distribute([QUADRA])", ROUTER, routerAbi, "distribute", [[QUADRA]]);
 
   const read = (functionName: string) => pub.readContract({ address: BACKSTOP, abi: backstopAbi, functionName } as never) as Promise<bigint>;
   const [eth, liquidity, minEth, lastPoke, interval, burned] = await Promise.all([

@@ -42,7 +42,7 @@ glowing, paper text. No gradients except the CRT's glow. No purple, no pink, no 
 - **JetBrains Mono** (OFL): labels, addresses, numbers, tick marks, coordinates. Small, uppercase allowed
   here only ("STATE: IDLE", "49 HZ", "BLOCK 56,054,550").
 - Window titles: Inter 600, small, inside a title bar.
-- No pixel fonts, no Apple fonts or artwork, no script or serif display faces.
+- No pixel fonts, no Apple fonts or artwork, no script faces. Serif (Newsreader) only on editorial surfaces, see 6b.
 - Copy follows the brand voice: lowercase, short lines, plain ASCII, `/` for folder-like headings,
   `-` for entries, no emoji, no arrows, no hype.
 
@@ -144,3 +144,25 @@ Examples of SUBJECT / TEXT:
 Checklist before posting: one ink, paper ground, one texture, lowercase headline, real numbers,
 no logos, no emoji. If it looks like vaporwave, it is wrong; if it looks like a printed manual from a
 computer company in 1991 that happens to be about Base, it is right.
+
+## 9 / the Q-001 computer asset
+
+Use `public/brand/quadra-q001.svg` when composing banners or share cards in code.
+The SVG is a transparent illustration with a `620 × 680` viewBox and no external
+fonts or images. Embed the SVG as an image to keep the blank cobalt screen.
+
+```html
+<img src="/brand/quadra-q001.svg" alt="Quadra Q-001 compact CRT"
+     width="620" height="680">
+```
+
+For screen content, inline the SVG and insert SVG elements in
+`<g id="screen-content"/>`. Start with x=170–330 and y=170–335, then check the
+composition at the final output size. The screen group clips content to the
+curved glass. Keep the upright casing, recessed bezel, narrow disk slot,
+stepped foot and low side vents. For previews with multiple inline instances,
+prefix the IDs and matching references in each instance.
+
+Handoff for Claude or Gemini: attach the SVG and this section if the model
+cannot read the repo. Ask it to reuse the vector paths, place the machine in the
+right column of a paper folio, and change only `screen-content` as needed.
