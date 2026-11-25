@@ -204,17 +204,23 @@ export function About() {
       </header>
 
       <section className="about__hero">
-        <img className="about__sky" src="/brand/quadra-hero.webp" width="1902" height="827" fetchPriority="high" alt="" />
+        <div className="about__hero-bar">System / About {BRAND.name}</div>
         <div className="about__hero-inner">
-          <p className="about__eyebrow">A personal computer. An open world.</p>
-          <h1><img src="/brand/icon-white.svg" width="80" height="80" alt="" />{BRAND.name}</h1>
-          <h2>Your own<br />on-chain<br /><em>supercomputer.</em></h2>
-          <p className="about__lede">Research a token. Build a basket. Launch something new. Your corner of {BASE.name}, signed in your own wallet.</p>
-          <div className="about__row">
-            <Link to="/" state={{ fromPage: true }} className="about__button">Open the computer <span aria-hidden="true">↗</span></Link>
-            <a href="#tools" className="about__text-link">Take a look around <span aria-hidden="true">↓</span></a>
+          <div>
+            <p className="about__eyebrow">A personal computer. An open world.</p>
+            <h1><img src="/brand/icon.svg" width="80" height="80" alt="" />{BRAND.name}</h1>
+            <h2>An on-chain<br />supercomputer<br /><em>for Base.</em></h2>
+            <p className="about__lede">Research a token. Build a basket. Launch something new. Your corner of {BASE.name}, signed in your own wallet.</p>
+            <div className="about__row">
+              <Link to="/" state={{ fromPage: true }} className="about__button">Open the computer <span aria-hidden="true">↗</span></Link>
+              <a href="#tools" className="about__text-link">Take a look around <span aria-hidden="true">↓</span></a>
+            </div>
+            <p className="about__hero-note">Built on {BASE.name} · Your wallet holds the keys</p>
           </div>
-          <p className="about__hero-note">Built on {BASE.name} · Your wallet holds the keys</p>
+          <figure className="about__machine">
+            <img src="/brand/quadra-q001.svg" width="620" height="680" fetchPriority="high" alt={`${BRAND.name} Q-001 compact CRT`} />
+            <figcaption>fig. 1 / q-001</figcaption>
+          </figure>
         </div>
       </section>
 

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" role="img">
+<title>Quadra / Trade Depth</title>
+<g stroke="#24221e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><rect x="40" y="39" width="245" height="164" fill="#24221e"/>
+<rect x="35" y="34" width="245" height="164" fill="#f4f0e6"/>
+<path d="M35 55h245V34H35Z" fill="#d6d6d6"/>
+<path d="M43 41h63m-63 4h63m-63 4h63m103-8h63m-63 4h63m-63 4h63" stroke="#888" stroke-width="1"/>
+<text x="157.5" y="49" text-anchor="middle" font-family="Arial" font-size="11" font-weight="600" fill="#24221e" stroke="none">Trade Depth</text>
+<g stroke="#2422cf" fill="none"><path d="M79 158h154m-154 0V89" stroke="#aaa398" stroke-width="1"/>
+<path d="M86 149h24v-13h27v-14h29v-13h28V92h31" />
+<path d="M142 174h35" stroke="#aaa398" stroke-width="1"/></g>
+</g></svg>

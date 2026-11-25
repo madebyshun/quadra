@@ -331,9 +331,10 @@ export function MarketsPanel() {
       <header className="mk__hero">
         <div>
           <p className="mk__eyebrow">BASE 8453 / MARKETS</p>
-          <h3 className="mk__title">The market never closes.</h3>
+          <h3 className="mk__title">Trade stock tokens</h3>
           <p className="mk__sub">Tokenized stocks and crypto on Base — live DEX pools, 24h sparklines, and Chainlink NAV drift.</p>
         </div>
+        <img className="feature-banner__art" src="/brand/banners/quadra-trade-depth.svg" width="160" height="120" alt="" />
         <dl className="mk__kpis">
           <div className="mk__kpi">
             <dt>Watchlist</dt>

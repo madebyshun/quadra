@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" role="img">
+<title>Quadra / Stock Pair</title>
+<g stroke="#24221e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><rect x="40" y="39" width="245" height="164" fill="#24221e"/>
+<rect x="35" y="34" width="245" height="164" fill="#f4f0e6"/>
+<path d="M35 55h245V34H35Z" fill="#d6d6d6"/>
+<path d="M43 41h63m-63 4h63m-63 4h63m103-8h63m-63 4h63m-63 4h63" stroke="#888" stroke-width="1"/>
+<text x="157.5" y="49" text-anchor="middle" font-family="Arial" font-size="11" font-weight="600" fill="#24221e" stroke="none">Stock Pair</text>
+<g stroke="#2422cf" fill="none"><circle cx="109" cy="125" r="37"/><circle cx="208" cy="125" r="37"/>
+<path d="M151 121h15m-15 8h15"/>
+<text x="109" y="129" text-anchor="middle" font-family="Menlo" font-size="12" fill="#2422cf" stroke="none">COIN</text>
+<text x="208" y="129" text-anchor="middle" font-family="Menlo" font-size="12" fill="#2422cf" stroke="none">AAPLc</text></g>
+</g></svg>

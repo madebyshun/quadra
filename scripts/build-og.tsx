@@ -6,7 +6,7 @@
  * has no picture.
  */
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,7 +24,11 @@ mkdirSync(OUT, { recursive: true });
 const work = mkdtempSync(join(tmpdir(), "og-"));
 for (const page of OG_PAGES) {
   const html = join(work, `${page.id}.html`);
-  writeFileSync(html, `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="${FONTS}"><style>html,body{margin:0}</style></head><body>${renderToStaticMarkup(<OgCard page={page} photo={PHOTO_FILE} />)}</body></html>`);
+  const artwork = join(ROOT, "public", "brand", "banners", `og-${page.id}.svg`);
+  const card = existsSync(artwork)
+    ? readFileSync(artwork, "utf8")
+    : renderToStaticMarkup(<OgCard page={page} photo={PHOTO_FILE} />);
+  writeFileSync(html, `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="${FONTS}"><style>html,body{margin:0}</style></head><body>${card}</body></html>`);
   execFileSync(CHROME, ["--headless", "--disable-gpu", "--hide-scrollbars", "--virtual-time-budget=4000", `--window-size=${OG_W},${OG_H}`, `--screenshot=${join(OUT, `${page.id}.png`)}`, `file://${html}`], { stdio: "ignore" });
   console.log(`og/${page.id}.png`);
 }

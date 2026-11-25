@@ -413,6 +413,14 @@ export function BaseLaunch() {
         </Crt>
       ) : null}
 
+      <header className="feature-banner">
+        <div>
+          <h3>Launch a coin</h3>
+          <p>Pair your coin with a supported stock token or crypto asset.</p>
+        </div>
+        <img className="feature-banner__art" src="/brand/banners/quadra-stock-pair.svg" width="160" height="120" alt="" />
+      </header>
+
       <ol className="launch__steps" aria-label="Launch steps">
         <li className={currentStep === 1 ? "launch__step launch__step--active" : "launch__step launch__step--done"}>
           <span>1. identity</span>
