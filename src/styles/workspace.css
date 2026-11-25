@@ -102,59 +102,38 @@
 .welcome__head { font: bold 30px/1.1 var(--font-serif); letter-spacing: -.03em; text-transform: lowercase; }
 .welcome__lede { font-size: 12px; text-transform: lowercase; margin: 0 0 18px; }
 .welcome__sky {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  height: 148px;
-  padding: 18px 22px;
-  box-sizing: border-box;
-  margin-bottom: 20px;
-  overflow: hidden;
-  border: 1.5px solid #171b29;
-  box-shadow: 3px 3px 0 #17243a33;
-  background: #0a3dff;
-}
-.welcome__sky-img {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: auto;
-  width: auto;
-  height: 100%;
-  object-fit: contain;
-  object-position: right center;
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 16%);
-  mask-image: linear-gradient(90deg, transparent 0%, #000 16%);
-}
-.welcome__sky::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, rgba(10, 61, 255, 0.92) 0%, rgba(10, 61, 255, 0.35) 48%, transparent 70%);
-}
-.welcome__sky-copy {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 29%;
+  align-items: center;
   gap: 8px;
+  height: auto;
+  min-height: 126px;
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  border: 1px solid #24221e;
+  box-shadow: 3px 3px #24221e;
+  background: #f4f0e6;
 }
+.welcome__sky img.welcome__sky-img {
+  grid-column: 2;
+  grid-row: 1;
+  width: 100%;
+  height: auto;
+  max-height: 132px;
+  object-fit: contain;
+}
+.welcome__sky-copy { grid-column: 1; grid-row: 1; }
 .welcome__sky-title {
   margin: 0;
-  color: #fffdf6;
-  font: 25px/1.08 var(--font-serif);
+  color: #24221e;
+  font: clamp(20px, 5vw, 29px)/1.08 var(--font-serif);
   letter-spacing: -.03em;
-  text-transform: lowercase;
-  text-shadow: 0 2px 10px rgba(12, 34, 78, 0.35);
 }
+.welcome__sky-title em { color: #2422cf; }
 .welcome__sky-sub {
-  margin: 0;
-  color: rgba(255, 253, 246, 0.9);
-  font: 11px/1.2 var(--font-mono);
-  letter-spacing: .04em;
-  text-transform: lowercase;
+  margin: 8px 0 0;
+  color: #5d584e;
+  font: 10px/1.25 var(--font-mono);
 }
 .welcome__check { padding: 14px; background: #e7e3d9; }
 .welcome__doors .gel { min-height: 30px; text-transform: lowercase; }
@@ -172,8 +151,7 @@
   .home .desk-trash { position: static; grid-area: trash; width: 104px; justify-self: end; }
   .menubar__tray { gap: 4px; }
   .welcome__head { font-size: 27px; }
-  .welcome__sky { height: 90px; margin-bottom: 16px; }
-  .welcome__sky span { font-size: 20px; }
+  .welcome__sky { height: auto; min-height: 104px; margin-bottom: 16px; }
   .welcome__body { padding: 14px; }
 }
 @media(min-width:1600px) {

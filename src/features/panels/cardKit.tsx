@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * The share cards' visual kit: this app's Base cobalt (#0A3DFF) halftone cloud sky, warm Platinum
+ * The share cards' visual kit: a paper-and-cobalt halftone field, warm Platinum
  * Macintosh windows (#ece8df / #f4f0e6), serif display headlines, monospace readouts, and the
  * pixel Macintosh Q mark. Plain SVG — no external image or web font fetched — so a card saved
  * through a canvas is never tainted and renders identically everywhere.
@@ -9,8 +9,8 @@ import type { ReactNode } from "react";
 
 export const KIT = {
   blue: "#0A3DFF",
-  sky: "#0A3DFF",
-  skyLight: "#1D4EFF",
+  sky: "#fffdf6",
+  skyLight: "#ece8df",
   /** the sky of a high-risk card */
   alarm: "#8a1414",
   alarmLight: "#c62828",
@@ -43,7 +43,7 @@ export function PixelMark({ x, y, size }: { x: number; y: number; size: number }
 }
 
 /**
- * Clouds as a field in 0..1: cumulus blobs along the horizon and corners, rendered as crisp white
+ * Clouds as a field in 0..1: cumulus blobs along the horizon and corners, rendered as crisp
  * halftone dots over this app's Base cobalt sky.
  */
 const BLOBS: readonly (readonly [number, number, number, number])[] = [
@@ -57,7 +57,7 @@ const BLOBS: readonly (readonly [number, number, number, number])[] = [
   [1040, 880, 180, 0.9],
 ];
 
-/** Below this the sky stays pure Base cobalt — clouds, not fog. */
+/** Below this the paper stays clear. */
 const CLEAR = 0.32;
 
 export function cloud(x: number, y: number): number {
@@ -66,7 +66,7 @@ export function cloud(x: number, y: number): number {
   return Math.max(0, Math.min(1, (v - CLEAR) / (1 - CLEAR)));
 }
 
-/** The halftone sky behind a card: Base cobalt gradient and a 45° grid of crisp white halftone dots. */
+/** The halftone sky behind a card: paper gradient and a grid of cobalt halftone dots, with red reserved for alarms. */
 export function HalftoneSky({ w, h, step = 18, alarm = false }: { w: number; h: number; step?: number; alarm?: boolean }) {
   const dots: ReactNode[] = [];
   for (let y = step / 2; y < h; y += step) {
@@ -84,7 +84,7 @@ export function HalftoneSky({ w, h, step = 18, alarm = false }: { w: number; h: 
         </linearGradient>
       </defs>
       <rect width={w} height={h} fill="url(#kit-sky)" />
-      <g fill="#fff" opacity="0.94">
+      <g fill={alarm ? "#fff" : KIT.blue} opacity={alarm ? "0.94" : "0.32"}>
         {dots}
       </g>
     </g>
@@ -96,8 +96,8 @@ export function Win({ x, y, w, h, title, dotted = false, children }: { x: number
   const bar = 36;
   return (
     <g>
-      <rect x={x + 8} y={y + 8} width={w} height={h} fill="#000" opacity="0.32" />
-      <rect x={x} y={y} width={w} height={h} fill={KIT.chrome} stroke="#000" strokeWidth="3" />
+      <rect x={x + 8} y={y + 8} width={w} height={h} fill={KIT.ink} />
+      <rect x={x} y={y} width={w} height={h} fill={KIT.chrome} stroke={KIT.ink} strokeWidth="2" />
       {[0, 1, 2, 3, 4].map((i) => (
         <rect key={i} x={x + 8} y={y + 8 + i * 5} width={w - 16} height="2" fill={KIT.chromeDark} />
       ))}
@@ -175,8 +175,8 @@ export function Footer({ x, y, text }: { x: number; y: number; text: string }) {
   const w = text.length * 18.5 + 96;
   return (
     <g>
-      <rect x={x + 5} y={y - 41} width={w} height="62" fill="#000" opacity="0.28" />
-      <rect x={x} y={y - 46} width={w} height="62" fill={KIT.paper} stroke="#000" strokeWidth="3" />
+      <rect x={x + 5} y={y - 41} width={w} height="62" fill={KIT.ink} />
+      <rect x={x} y={y - 46} width={w} height="62" fill={KIT.paper} stroke={KIT.ink} strokeWidth="2" />
       <PixelMark x={x + 14} y={y - 36} size={42} />
       <text x={x + 68} y={y - 3} fontFamily={MONO} fontWeight="700" fontSize="29" fill={KIT.blue}>
         {text}

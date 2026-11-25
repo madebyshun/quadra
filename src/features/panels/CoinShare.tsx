@@ -3,6 +3,7 @@ import { BRAND } from "@/brand";
 import { messageOf } from "@/lib/errors";
 import { short } from "@/skills/format";
 import { CARD_H, CARD_W, drawCard } from "@/features/panels/BaseCard";
+import { HalftoneSky, KIT, MONO, SANS, SERIF, Win } from "@/features/panels/cardKit";
 import { Gel } from "@/ui/Gel";
 
 /**
@@ -26,30 +27,27 @@ export function postUrl(c: CoinCard): string {
 export function CardSvg({ c }: { c: CoinCard }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${CARD_W} ${CARD_H}`} width={CARD_W} height={CARD_H} role="img" aria-label={`Share card for ${c.symbol}`}>
-      <rect width={CARD_W} height={CARD_H} fill="#4a6fa5" />
-      <rect x="80" y="80" width={CARD_W - 160} height={CARD_H - 160} fill="#dddddd" stroke="#000" strokeWidth="4" />
-      <rect x="80" y="80" width={CARD_W - 160} height="64" fill="#eeeeee" stroke="#000" strokeWidth="4" />
-      <text x={CARD_W / 2} y="124" textAnchor="middle" fontFamily="Inter, Helvetica, Arial, sans-serif" fontWeight="700" fontSize="30">
-        {BRAND.name} launchpad · Base
-      </text>
-      <text x="140" y="300" fontFamily="Inter, Helvetica, Arial, sans-serif" fontWeight="700" fontSize="104">
-        ${c.symbol}
-      </text>
-      <text x="144" y="370" fontFamily="Inter, Helvetica, Arial, sans-serif" fontSize="44" fill="#333">
-        {c.name} · paired with {c.pair}
-      </text>
-      <text x="144" y="500" fontFamily="Inter, Helvetica, Arial, sans-serif" fontSize="40" fill="#555">
-        Market cap
-      </text>
-      <text x="144" y="580" fontFamily="Inter, Helvetica, Arial, sans-serif" fontWeight="700" fontSize="72">
-        {c.cap}
-      </text>
-      <text x="144" y="690" fontFamily="JetBrains Mono, Menlo, monospace" fontSize="34" fill="#333">
-        CA {short(c.token)}
-      </text>
-      <text x="144" y="760" fontFamily="Inter, Helvetica, Arial, sans-serif" fontSize="32" fill="#1d5e1a">
-        No admin · fixed supply · liquidity locked for good
-      </text>
+      <HalftoneSky w={CARD_W} h={CARD_H} />
+      <Win x={80} y={80} w={CARD_W - 160} h={CARD_H - 160} title={`${BRAND.name} launchpad / base`}>
+        <text x="140" y="300" fontFamily={SERIF} fontSize="104" fill={KIT.blue}>
+          ${c.symbol}
+        </text>
+        <text x="144" y="370" fontFamily={SANS} fontSize="44" fill={KIT.ink}>
+          {c.name} · paired with {c.pair}
+        </text>
+        <text x="144" y="500" fontFamily={SANS} fontSize="40" fill={KIT.dim}>
+          Market cap
+        </text>
+        <text x="144" y="580" fontFamily={SANS} fontWeight="700" fontSize="72">
+          {c.cap}
+        </text>
+        <text x="144" y="690" fontFamily={MONO} fontSize="34" fill={KIT.ink}>
+          CA {short(c.token)}
+        </text>
+        <text x="144" y="760" fontFamily={SANS} fontSize="32" fill={KIT.dim}>
+          No admin · fixed supply · liquidity locked for good
+        </text>
+      </Win>
     </svg>
   );
 }

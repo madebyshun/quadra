@@ -155,7 +155,7 @@ describe("a Token Verdict as a picture", () => {
     expect(container.querySelector("#kit-sky stop")).toHaveAttribute("stop-color", "#8a1414");
     expect(card.querySelector("image")).toBeNull();
     rerender(<VerdictSvg c={verdictCard(reboot)!} logo="data:image/png;base64,AA" when="now" />);
-    expect(container.querySelector("#kit-sky stop")).toHaveAttribute("stop-color", "#0A3DFF");
+    expect(container.querySelector("#kit-sky stop")).toHaveAttribute("stop-color", "#fffdf6");
     expect(card.querySelector("image")).toHaveAttribute("href", "data:image/png;base64,AA");
     expect(card).not.toHaveTextContent("block");
     rerender(<VerdictSvg c={verdictCard(verdict("No red flags found — 100/100", "ok"))!} when="now" />);

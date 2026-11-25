@@ -5,7 +5,6 @@ import { useOpenWindow, useRunCommand } from "@/features/openWindow";
 import { checkAddress } from "@/lib/address";
 import { Gel } from "@/ui/Gel";
 import { setWelcomeOn, welcomeOn } from "@/lib/welcome";
-import welcomeSky from "@/assets/quadra-banner.jpg";
 
 /** The Base card's window — `card` once it exists, the profile (where the card began) until then. */
 export function cardWindow(resolve: (id: string) => unknown = resolveFeature): WindowId {
@@ -62,7 +61,7 @@ export function Welcome({ onClose }: { onClose: () => void }) {
         </div>
         <div className="win__body welcome__body">
           <div className="welcome__sky" aria-hidden="true">
-            <img className="welcome__sky-img" src={welcomeSky} alt="" />
+            <img className="welcome__sky-img" src="/brand/quadra-q001.svg" width="620" height="680" alt="" />
             <div className="welcome__sky-copy">
               <p className="welcome__sky-title">
                 a personal computer.
