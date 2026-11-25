@@ -60,7 +60,7 @@ describe("the About page", () => {
     expect(figure("launchers")).toBe("2");
     expect(figure("trades on their pools")).toBe("15");
     expect(burntHead()).toBe("1,814,116");
-    expect(screen.getByText(/burnt · 0\.1814% of the supply/)).toBeInTheDocument();
+    expect(screen.getByText(/burnt \/ 0\.1814% of the supply/)).toBeInTheDocument();
     expect(screen.getByText(/Its creator fees go to the furnace/)).toHaveTextContent("50% burnt/buyback");
     // what waits to be bought back, what was spent, what the buybacks burnt — and when they happen
     expect(figure("burnt from fees, at once")).toBe("135,484");

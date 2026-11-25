@@ -11,6 +11,7 @@ import { messageOf } from "@/lib/errors";
 import { launchOf } from "@/skills/launchpad";
 import { explorer, short, tokenAmount } from "@/skills/format";
 import { Flywheel } from "./Flywheel";
+import "@/styles/folio.css";
 import "./About.css";
 
 /**
@@ -81,57 +82,94 @@ export function gauge(toBuy: bigint): number {
   return Number((toBuy >= BUYBACK.minWei ? BUYBACK.minWei : toBuy) * 100n / BUYBACK.minWei);
 }
 
-/** The furnace, as one card: what is burnt, what waits, and how it gets there. */
-function FurnaceCard({ furnace, burnt }: { furnace: Read<Furnace | null>; burnt: Read<bigint> | null }) {
+/**
+ * Live on Base, as one folio (src/styles/folio.css): the burnt total on the page's one indigo slab, then the
+ * furnace and the backstop as two folders, then the launchpad's numbers, then the caveat. Every figure is read
+ * from the chain when the page opens; one not read says so.
+ */
+function LiveFolio({
+  furnace,
+  burnt,
+  backstop,
+  stats,
+  index,
+}: {
+  furnace: Read<Furnace | null>;
+  burnt: Read<bigint> | null;
+  backstop: Read<Backstop>;
+  stats: Read<Stats>;
+  index: Read<LaunchpadIndex>;
+}) {
   const f = furnace !== null && furnace !== "reading" && !("problem" in furnace) ? furnace : null;
-  return (
-    <div className="about__furnace" aria-label="The furnace">
-      <p className="about__card-head">furnace / {BRAND.ticker}</p>
-      <div className="about__burnt">
-        <strong>{burnt === null ? "—" : shown(burnt, (b) => tokenAmount(b, LAUNCHPAD_DECIMALS, 0))}</strong>
-        <span>{BRAND.ticker} burnt{typeof burnt === "bigint" ? ` · ${(Number((burnt * 1_000_000n) / SUPPLY) / 10_000).toFixed(4)}% of the supply` : ""}</span>
-      </div>
-      <div className="about__gauge">
-        <div className="about__gauge-head">
-          <span>next buyback</span>
-          <span>{f ? `${tokenAmount(f.toBuy, 18, 6)} / ${tokenAmount(BUYBACK.minWei, 18, 4)} ETH` : furnace === "reading" ? "…" : "not read"}</span>
-        </div>
-        <div className="about__gauge-bar" role="progressbar" aria-label="ETH waiting toward the next buyback" aria-valuemin={0} aria-valuemax={100} aria-valuenow={f ? gauge(f.toBuy) : 0}>
-          <i style={{ width: `${f ? Math.max(gauge(f.toBuy), 1) : 0}%` }} />
-        </div>
-        <p>{BUYBACK_POLICY}</p>
-      </div>
-      <dl className="about__furnace-rows">
-        <div><dt>burnt from fees, at once</dt><dd>{f ? tokenAmount(f.burnedFromFees, LAUNCHPAD_DECIMALS, 0) : shownMissing(furnace)}</dd></div>
-        <div><dt>burnt by buybacks</dt><dd>{f ? tokenAmount(f.burnedFromBuybacks, LAUNCHPAD_DECIMALS, 0) : shownMissing(furnace)}</dd></div>
-        <div><dt>ETH spent on buybacks</dt><dd>{f ? `${tokenAmount(f.quoteSpent, 18, 6)} ETH` : shownMissing(furnace)}</dd></div>
-      </dl>
-      <ol className="about__flow" aria-label="How a trade feeds the furnace">
-        <li>every trade pays 1%</li>
-        <li>80% reaches the furnace</li>
-        <li>half the {BRAND.ticker} burns at once</li>
-        <li>half the ETH buys back and burns</li>
-      </ol>
-    </div>
-  );
-}
-
-/** The Backstop, as one card: the bid under the price, and what it has bought and burnt. */
-function BackstopCard({ backstop }: { backstop: Read<Backstop> }) {
   const b = backstop !== "reading" && !("problem" in backstop) ? backstop : null;
-  const missing = backstop === "reading" ? "…" : "not read";
+  const bMissing = backstop === "reading" ? "…" : "not read";
   return (
-    <div className="about__furnace about__backstop" aria-label="The backstop">
-      <p className="about__card-head">backstop / {BRAND.ticker}</p>
-      <p>Half of the protocol's ETH from every coin waits as a bid just under {BRAND.ticker}'s price in its own pool. A seller fills it; what it buys is burnt.</p>
-      <dl className="about__furnace-rows">
-        <div><dt>bid in the pool</dt><dd>{b ? (b.placed ? "placed" : "waiting for ETH") : missing}</dd></div>
-        <div><dt>burnt by the backstop</dt><dd>{b ? tokenAmount(b.burned, LAUNCHPAD_DECIMALS, 0) : missing}</dd></div>
-        <div><dt>ETH waiting for the next poke</dt><dd>{b ? `${tokenAmount(b.waiting, 18, 6)} ETH` : missing}</dd></div>
-        <div><dt>last poke</dt><dd>{b ? (b.lastPoke === 0 ? "never" : utc(b.lastPoke)) : missing}</dd></div>
-      </dl>
-      {b ? <p><a href={explorer.address(b.address)}>{short(b.address)}</a> on {BASE.name}</p> : null}
-    </div>
+    <figure className="folio about__live-folio" aria-label={`Live on ${BASE.name}`}>
+      <div className="folio__bar"><span aria-hidden="true">▣</span><span>System / Live on {BASE.name}</span><span>Read when you arrived</span></div>
+      <div className="folio__body">
+        <div className="about__live-top">
+          <section className="folio__slab about__slab" aria-label="Burnt">
+            <span className="folio__path about__slab-path">00 / burnt</span>
+            <div className="about__burnt">
+              <strong className="folio__figure">{burnt === null ? "—" : shown(burnt, (v) => tokenAmount(v, LAUNCHPAD_DECIMALS, 0))}</strong>
+              <span>{BRAND.ticker} burnt{typeof burnt === "bigint" ? ` / ${(Number((burnt * 1_000_000n) / SUPPLY) / 10_000).toFixed(4)}% of the supply` : ""}</span>
+            </div>
+            <dl className="about__rows about__rows--slab">
+              <div><dt>burnt from fees, at once</dt><dd>{f ? tokenAmount(f.burnedFromFees, LAUNCHPAD_DECIMALS, 0) : shownMissing(furnace)}</dd></div>
+              <div><dt>burnt by buybacks</dt><dd>{f ? tokenAmount(f.burnedFromBuybacks, LAUNCHPAD_DECIMALS, 0) : shownMissing(furnace)}</dd></div>
+              <div><dt>burnt by the backstop</dt><dd>{b ? tokenAmount(b.burned, LAUNCHPAD_DECIMALS, 0) : bMissing}</dd></div>
+            </dl>
+          </section>
+
+          <section className="folio__card folio__card--tab about__panel" aria-label="The furnace">
+            <span className="about__panel-head">Furnace /</span>
+            <div className="about__gauge">
+              <div className="about__gauge-head">
+                <span>next buyback</span>
+                <span>{f ? `${tokenAmount(f.toBuy, 18, 6)} / ${tokenAmount(BUYBACK.minWei, 18, 4)} ETH` : furnace === "reading" ? "…" : "not read"}</span>
+              </div>
+              <div className="about__gauge-bar" role="progressbar" aria-label="ETH waiting toward the next buyback" aria-valuemin={0} aria-valuemax={100} aria-valuenow={f ? gauge(f.toBuy) : 0}>
+                <i style={{ width: `${f ? Math.max(gauge(f.toBuy), 1) : 0}%` }} />
+              </div>
+            </div>
+            <p>{BUYBACK_POLICY}</p>
+            <dl className="about__rows">
+              <div><dt>ETH spent on buybacks</dt><dd>{f ? `${tokenAmount(f.quoteSpent, 18, 6)} ETH` : shownMissing(furnace)}</dd></div>
+            </dl>
+            <ol className="about__flow" aria-label="How a trade feeds the furnace">
+              <li>every trade pays 1%</li>
+              <li>80% reaches the furnace</li>
+              <li>half the {BRAND.ticker} burns at once</li>
+              <li>half the ETH buys back and burns</li>
+            </ol>
+          </section>
+
+          <section className="folio__card folio__card--tab about__panel" aria-label="The backstop">
+            <span className="about__panel-head">Backstop /</span>
+            <p>Half of the protocol's ETH from every coin waits as a bid just under {BRAND.ticker}'s price in its own pool. A seller fills it; what it buys is burnt.</p>
+            <dl className="about__rows">
+              <div><dt>bid in the pool</dt><dd>{b ? (b.placed ? "placed" : "waiting for ETH") : bMissing}</dd></div>
+              <div><dt>ETH waiting for the next poke</dt><dd>{b ? `${tokenAmount(b.waiting, 18, 6)} ETH` : bMissing}</dd></div>
+              <div><dt>last poke</dt><dd>{b ? (b.lastPoke === 0 ? "never" : utc(b.lastPoke)) : bMissing}</dd></div>
+            </dl>
+            {b ? <p className="about__panel-foot"><a href={explorer.address(b.address)}>{short(b.address)}</a> on {BASE.name}</p> : null}
+          </section>
+        </div>
+
+        <section className="about__launch-row" aria-label="The launchpad">
+          <span className="folio__path">01 / launchpad, since v1</span>
+          <dl className="about__stats">
+            <div><dt>coins launched here</dt><dd>{shown(stats, (s) => s.coins.toLocaleString("en-US"))}</dd></div>
+            <div><dt>launchers</dt><dd>{shown(stats, (s) => s.creators.toLocaleString("en-US"))}</dd></div>
+            <div><dt>trades on their pools</dt><dd>{shown(stats, (s) => s.trades.toLocaleString("en-US"))}</dd></div>
+          </dl>
+          {index !== "reading" && !("problem" in index) ? <IndexNotice behind={index.behind} error={index.error} /> : null}
+          <Link to="/?do=coins" className="about__tool-link">see every coin</Link>
+        </section>
+
+        <figcaption className="folio__caveat">Read from {BASE.name} when this page opened: the launchpad's own logs, the furnace and the backstop / a figure not read says so, never zero</figcaption>
+      </div>
+    </figure>
   );
 }
 
@@ -220,7 +258,7 @@ export function About() {
               <div className="about__launch-art">
                 <span className="about__art-label">AN IDEA, MEET A MARKET.</span>
                 <strong>Something<br /><em>starts here.</em></strong>
-                <span className="about__pair">Your coin <b>↔</b> ETH / Crypto / Stock</span>
+                <span className="about__pair">Your coin / paired with ETH, crypto or a stock</span>
               </div>
             </div>
             <h3>Give an idea a market.</h3>
@@ -238,21 +276,7 @@ export function About() {
       <section className="about__section about__live" aria-label="Live">
         <p className="about__eyebrow">from the chain, when you arrive</p>
         <h2>Live on {BASE.name}</h2>
-        <div className="about__live-grid">
-          <FurnaceCard furnace={furnace} burnt={burnt} />
-          <BackstopCard backstop={backstop} />
-          <div className="about__launchpad" aria-label="The launchpad">
-            <p className="about__card-head">launchpad / since v1</p>
-            <dl className="about__stats">
-              <div><dt>coins launched here</dt><dd>{shown(stats, (s) => s.coins.toLocaleString("en-US"))}</dd></div>
-              <div><dt>launchers</dt><dd>{shown(stats, (s) => s.creators.toLocaleString("en-US"))}</dd></div>
-              <div><dt>trades on their pools</dt><dd>{shown(stats, (s) => s.trades.toLocaleString("en-US"))}</dd></div>
-            </dl>
-            {index !== "reading" && !("problem" in index) ? <IndexNotice behind={index.behind} error={index.error} /> : null}
-            <Link to="/?do=coins" className="about__tool-link">See every coin <span aria-hidden="true">↗</span></Link>
-          </div>
-        </div>
-        <p className="about__note">Read from {BASE.name} when this page opened: the launchpad's own logs, and the token's furnace.</p>
+        <LiveFolio furnace={furnace} burnt={burnt} backstop={backstop} stats={stats} index={index} />
       </section>
 
       <section className="about__section">
