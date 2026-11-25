@@ -15,5 +15,5 @@ jobs:
     steps:
       - name: Step the index and report where it stands
         run: |
-          curl -sS -m 90 -H "x-quadra: 1" https://quadra-eta.vercel.app/api/launchpad/creators \
+          curl -sS -m 90 -H "x-quadra: 1" https://quadracomputer.xyz/api/launchpad/creators \
             | python3 -c "import sys,json; d=json.load(sys.stdin); print('syncedTo', d.get('syncedTo'), 'behind', d.get('behind'), 'error', d.get('error'))"
