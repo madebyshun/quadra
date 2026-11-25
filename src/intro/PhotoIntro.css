@@ -164,7 +164,7 @@
 
 .pintro__welcome {
   margin: 0 0 1.5cqh;
-  font: 700 6.2cqw/1.1 Georgia, "Times New Roman", serif;
+  font: 700 6.2cqw/1.1 var(--font-serif);
   color: var(--cobalt);
 }
 
@@ -214,7 +214,7 @@
 
 .pintro__title {
   margin: 0 0 3cqh;
-  font: 700 9cqw/1 Georgia, "Times New Roman", serif;
+  font: 700 9cqw/1 var(--font-serif);
   color: var(--cobalt);
   letter-spacing: -0.03em;
 }

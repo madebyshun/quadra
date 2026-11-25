@@ -22,6 +22,8 @@
  */
 
 :root {
+  /* editorial serif: headlines and figures, never controls (docs/VISUAL_SYSTEM.md) */
+  --font-serif: "Newsreader", Georgia, "Times New Roman", serif;
   /* ---- Platinum ---- */
   --pt-ink: #000000;
   --pt-paper: #ffffff;
@@ -3040,7 +3042,7 @@
   padding: 14px;
   background: linear-gradient(90deg, #123b728c, transparent 65%);
   color: #fff9e9;
-  font: 25px/1.05 Georgia, serif;
+  font: 25px/1.05 var(--font-serif);
   letter-spacing: -.03em;
 }
 
