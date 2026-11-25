@@ -84,7 +84,7 @@ contract TestRelayProxy {
     }
 }
 
-contract BasketRouterTest is Test {
+abstract contract BasketRouterBase is Test {
     TestUSDC usdc;
     TestToken nvda;
     TestToken aapl;
@@ -94,7 +94,7 @@ contract BasketRouterTest is Test {
     address buyer = address(0xB0B);
     uint256 constant DEADLINE = 2_000_000_000;
 
-    function setUp() public {
+    function setUp() public virtual {
         vm.warp(1_800_000_000);
         usdc = new TestUSDC();
         nvda = new TestToken();
@@ -121,6 +121,9 @@ contract BasketRouterTest is Test {
         legs[1] = _leg(proxyB, 40e6, 40e6, aapl, 1e8, 1e8);
     }
 
+}
+
+contract BasketRouterTest is BasketRouterBase {
     function test_buysEveryLegInOneTransaction_straightToTheBuyer() public {
         vm.prank(buyer);
         usdc.approve(address(router), 100e6);

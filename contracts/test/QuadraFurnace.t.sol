@@ -21,7 +21,7 @@ import {OddToken3, LateTaker3} from "./LaunchFactoryV3.t.sol";
 /// @dev Against the REAL B20 precompile, a REAL v4 PoolManager and the real v3 factory and hook, as
 ///      the v3 suite: a coin launched on a stock pair or on ETH, its creator share pointed at a furnace,
 ///      real buys and sells making real fees.
-contract QuadraFurnaceTest is Test {
+abstract contract QuadraFurnaceBase is Test {
     int24 internal constant START = 191_200;
     int24 internal constant STOCK_START = 382_000;
     uint24 internal constant ONE = 10_000;
@@ -40,7 +40,7 @@ contract QuadraFurnaceTest is Test {
     address internal bob = makeAddr("bob");
     address internal treasury = makeAddr("treasury");
 
-    function setUp() public {
+    function setUp() public virtual {
         vm.warp(1_760_000_000);
         manager = new PoolManager(address(this));
         router = new PoolSwapTest(manager);
@@ -112,6 +112,9 @@ contract QuadraFurnaceTest is Test {
         _swap(bob, token, false, (IB20(token).balanceOf(bob) - before) / 2);
     }
 
+}
+
+contract QuadraFurnaceTest is QuadraFurnaceBase {
     // ───────────────────────────────────────────────────────────── tests
 
     function test_refusesACoinNotLaunchedOrABadSplit() public {
