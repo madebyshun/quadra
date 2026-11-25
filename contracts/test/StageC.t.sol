@@ -346,4 +346,20 @@ contract StageCTest is Test {
         vm.expectRevert(FeeRouter.Reentrancy.selector);
         r.distribute(new address[](0));
     }
+
+    /// REVIEW 2026-11-26 B1 (PoC): an EMPTY poke after a day resets the drag clock without moving the band.
+    function test_review_emptyPokeResetsTheDragClock() public {
+        address token = _tradedCoin();
+        Backstop b = _backstop(token, 0);
+        int24 anchor = b.lower();
+        _swap(alice, token, true, 300 ether);
+        for (uint256 d; d < 5; ++d) {
+            vm.warp(block.timestamp + 1 days);
+            b.poke(); // anyone, no ETH: nothing placed
+        }
+        assertEq(b.lower(), anchor, "never moved");
+        vm.deal(address(b), 1 ether);
+        b.poke();
+        assertEq(b.lower(), anchor, "five days later the first funded band is still at the deploy anchor");
+    }
 }
