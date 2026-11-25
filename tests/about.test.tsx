@@ -68,7 +68,7 @@ describe("the About page", () => {
     expect(figure("ETH spent on buybacks")).toBe("0 ETH");
     expect(screen.getByText("0 / 0.05 ETH")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "ETH waiting toward the next buyback" })).toHaveAttribute("aria-valuenow", "0");
-    expect(screen.getByText(/Each Monday, once 0\.05 ETH or more is waiting/)).toBeInTheDocument();
+    expect(screen.getByText(/buys back and burns with it, by hand: once 0\.05 ETH or more is waiting, at no more than 2% slippage/)).toBeInTheDocument();
     // the backstop, read from its contract
     expect(figure("bid in the pool")).toBe("placed");
     expect(figure("burnt by the backstop")).toBe("1,000");

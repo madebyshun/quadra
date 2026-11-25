@@ -65,15 +65,15 @@ function useRead<T>(read: () => Promise<T>): Read<T> {
 
 const shown = <T,>(r: Read<T>, f: (v: T) => string) => (r === "reading" ? "…" : typeof r === "object" && r !== null && "problem" in r ? "not read" : f(r as T));
 
-/** The schedule the treasury keeps for the furnace's ETH (the owner's to set): day, threshold, worst price. */
-export const BUYBACK = { day: "Monday", minWei: 5n * 10n ** 16n, maxSlipPct: 2 } as const;
+/** What the treasury keeps to for the furnace's ETH, by hand (the owner's to set): threshold and most slippage. */
+export const BUYBACK = { minWei: 5n * 10n ** 16n, maxSlipPct: 2 } as const;
 
 /**
  * When the ETH waiting in the furnace is spent. Only the treasury may call `buyAndBurn` (a v4 pool has no
  * oracle, so a permissionless buyback could be front-run), so this is a schedule the treasury keeps,
  * said as such — every buyback is a public transaction anyone can check against it.
  */
-export const BUYBACK_POLICY = `Each ${BUYBACK.day}, once ${tokenAmount(BUYBACK.minWei, 18, 4)} ETH or more is waiting, the treasury spends all of it buying back and burning, at no worse than ${BUYBACK.maxSlipPct}% under the pool's price. Each one is a public transaction.`;
+export const BUYBACK_POLICY = `The furnace's ETH waits here until the treasury buys back and burns with it, by hand: once ${tokenAmount(BUYBACK.minWei, 18, 4)} ETH or more is waiting, at no more than ${BUYBACK.maxSlipPct}% slippage. Each one is a public transaction. The backstop's bid needs no one: a seller fills it, and what it buys is burnt.`;
 
 const SUPPLY = 10n ** 27n;
 
