@@ -79,26 +79,44 @@ export function split(total: bigint, weights: readonly number[]): bigint[] {
   return parts;
 }
 
+/** Minimum per-leg top-up allocation ($0.05 in USDC base units) before dust is dropped to 0. */
+export const MIN_TOP_UP_LEG = 50_000n;
+
 /**
  * A top-up of `total` that brings the basket toward its weights: each leg's shortfall against its
  * target after the top-up, scaled down if the shortfalls exceed `total`; whatever is left goes by
- * weight. `values` are what each leg is worth now, in USDC base units.
+ * weight. `values` are what each leg is worth now, in USDC base units. When `minLeg > 0n`, any leg
+ * whose allocation falls below `minLeg` (while at least one leg meets it) is dropped to `0n` and
+ * redistributed across the remaining underweight legs so tiny dust never fails Relay's minimum swap.
  */
-export function topUp(total: bigint, weights: readonly number[], values: readonly bigint[]): bigint[] {
+export function topUp(total: bigint, weights: readonly number[], values: readonly bigint[], minLeg = 0n): bigint[] {
+  if (total === 0n) return weights.map(() => 0n);
   const now = values.reduce((s, v) => s + v, 0n);
   const after = now + total;
   const short = weights.map((w, i) => {
     const target = (after * BigInt(w)) / 100n;
     return target > values[i]! ? target - values[i]! : 0n;
   });
-  const need = short.reduce((s, v) => s + v, 0n);
-  if (need === 0n) return split(total, weights);
-  // the shortfalls add up to at least `total` (the targets sum to what is held plus `total`), so they
-  // are always scaled down to it; the floors' crumbs go by weight below
-  const parts = short.map((s) => (s * total) / need);
-  const used = parts.reduce((s, p) => s + p, 0n);
-  const extra = split(total - used, weights);
-  return parts.map((p, i) => p + extra[i]!);
+  const allocate = (shortfalls: readonly bigint[]): bigint[] => {
+    const need = shortfalls.reduce((s, v) => s + v, 0n);
+    if (need === 0n) return split(total, weights);
+    const parts = shortfalls.map((s) => (s * total) / need);
+    const rem = total - parts.reduce((s, p) => s + p, 0n);
+    if (rem > 0n) {
+      let big = -1;
+      for (let i = 0; i < parts.length; i++) {
+        if (shortfalls[i]! > 0n && (big === -1 || parts[i]! > parts[big]!)) big = i;
+      }
+      if (big >= 0) parts[big] = parts[big]! + rem;
+    }
+    return parts;
+  };
+  let parts = allocate(short);
+  if (minLeg > 0n && parts.some((p) => p >= minLeg)) {
+    const active = short.map((s, i) => (parts[i]! >= minLeg ? s : 0n));
+    if (active.some((s, i) => s !== short[i])) parts = allocate(active);
+  }
+  return parts;
 }
 
 /** Each leg's share of the basket now, in whole percent of `values`' sum (0 for an empty basket). */

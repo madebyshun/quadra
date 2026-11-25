@@ -189,6 +189,8 @@ describe("a basket's arithmetic", () => {
     expect(topUp(100n, [70, 30], [0n, 0n])).toEqual([70n, 30n]);
     // nothing to add and nothing short: nothing moves
     expect(topUp(0n, [50, 50], [500n, 500n])).toEqual([0n, 0n]);
+    // dust legs under minLeg are dropped to 0 and redistributed to genuinely underweight legs
+    expect(topUp(1_000_000n, [10, 10, 10, 70], [0n, 199_800n, 199_900n, 0n], 50_000n)).toEqual([125_000n, 0n, 0n, 875_000n]);
   });
 
   it("says each leg's share now, and zero for an empty basket", () => {

@@ -8,7 +8,7 @@ import { TRADE_CRYPTO } from "@/config/markets";
 import { RELAY_PAIRS } from "@/config/routes";
 import { sameAddress } from "@/lib/address";
 import { formatAmount, parseAmount } from "@/lib/amount";
-import { basketProblem, PRESETS, split, topUp, weightsNow, type BasketAsset, type Leg } from "@/lib/basket";
+import { basketProblem, MIN_TOP_UP_LEG, PRESETS, split, topUp, weightsNow, type BasketAsset, type Leg } from "@/lib/basket";
 import { allowance, approveData, balanceOf, type Asset } from "@/lib/erc20";
 import { buyData, buyWithPermitData, deadlineFrom, routerLeg, signPermit, totalOf, type RouterLeg } from "@/lib/basketRouter";
 import { messageOf } from "@/lib/errors";
@@ -199,7 +199,7 @@ export function BasketPanel() {
 
   const amounts = (total: bigint): bigint[] => {
     const w = resolved.legs.map((l) => l.weight);
-    return top && held ? topUp(total, w, held) : split(total, w);
+    return top && held ? topUp(total, w, held, MIN_TOP_UP_LEG) : split(total, w);
   };
 
   const blocker = resolved.problem ?? (!ready ? "Connect a wallet first" : amount.trim() === "" ? "Enter how much USDC to put in" : null);
@@ -421,7 +421,7 @@ export function BasketPanel() {
   const amountNum = Number(amount);
   const hasValidAmount = amount.trim() !== "" && Number.isFinite(amountNum) && amountNum > 0;
   const activeCount = rows.filter((r) => r.symbol.trim() !== "").length;
-  const execMode = batch.capability === "supported" || batch.capability === "ready" ? "1 SIGN" : "1 TX";
+  const execMode = CONTRACTS.basketRouter ? "1 TX" : batch.capability === "supported" || batch.capability === "ready" ? "1 SIGN" : "STEP";
 
   // with no rows there is nothing to map, so nothing changes
   const equalSplit = () => {
@@ -727,34 +727,40 @@ export function BasketPanel() {
 
               <p className="dim mono">Balance: {formatAmount(review.balance, USDC.decimals)} USDC</p>
 
-              {batch.capability === "supported" || batch.capability === "ready" ? (
-                <>
-                  <Gel
-                    className="mf__cta"
-                    disabled={stop !== null || purchaseLocked || batch.complete || steps.states.some((s) => s.status === "slow") || bought >= buyable.length}
-                    onClick={() => void onBatchBuy()}
-                  >
-                    {batch.working ? "Preparing basket…" : "Buy basket · 1 confirmation"}
-                  </Gel>
-                  <p className="dim">
-                    Atomic batch: all assets succeed together or revert together.{batch.capability === "ready" ? " Your wallet may first ask you to enable batching." : ""}
-                  </p>
-                </>
-              ) : batch.capability === "checking" ? (
+              {batch.capability === "checking" ? (
                 <p className="dim">Checking whether your wallet can confirm the basket at once…</p>
-              ) : CONTRACTS.basketRouter ? (
-                <>
-                  <Gel
-                    className="mf__cta"
-                    disabled={stop !== null || purchaseLocked || steps.states.some((s) => s.status === "slow") || bought >= buyable.length}
-                    onClick={() => void onRouterBuy(CONTRACTS.basketRouter!)}
-                  >
-                    {routerBusy ? "Preparing basket…" : "Buy basket · 1 transaction"}
-                  </Gel>
-                  <p className="dim">One transaction: every asset or none. Your wallet may first ask for one USDC signature for exactly this amount — no standing approval.</p>
-                </>
               ) : (
-                <p className="dim">This wallet does not report atomic batching on Base. Buy step by step, or connect a compatible wallet.</p>
+                <>
+                  {CONTRACTS.basketRouter ? (
+                    <>
+                      <Gel
+                        className="mf__cta"
+                        disabled={stop !== null || purchaseLocked || batch.complete || steps.states.some((s) => s.status === "slow") || bought >= buyable.length}
+                        onClick={() => void onRouterBuy(CONTRACTS.basketRouter!)}
+                      >
+                        {routerBusy ? "Preparing basket…" : "Buy basket · 1 transaction"}
+                      </Gel>
+                      <p className="dim">One transaction via BasketRouter: every asset or none. Your wallet may first ask for one USDC signature for exactly this amount — no standing approval.</p>
+                    </>
+                  ) : null}
+                  {batch.capability === "supported" || batch.capability === "ready" ? (
+                    <>
+                      <Gel
+                        quiet={Boolean(CONTRACTS.basketRouter)}
+                        className={CONTRACTS.basketRouter ? undefined : "mf__cta"}
+                        disabled={stop !== null || purchaseLocked || batch.complete || steps.states.some((s) => s.status === "slow") || bought >= buyable.length}
+                        onClick={() => void onBatchBuy()}
+                      >
+                        {batch.working ? "Preparing basket…" : "Buy basket · 1 confirmation"}
+                      </Gel>
+                      <p className="dim">
+                        Atomic batch: all assets succeed together or revert together.{batch.capability === "ready" ? " Your wallet may first ask you to enable batching." : ""}
+                      </p>
+                    </>
+                  ) : !CONTRACTS.basketRouter ? (
+                    <p className="dim">This wallet does not report atomic batching on Base. Buy step by step, or connect a compatible wallet.</p>
+                  ) : null}
+                </>
               )}
 
               {priced.some((p) => p.quote === null && p.problem !== null) ? (
