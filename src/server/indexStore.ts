@@ -69,8 +69,10 @@ export type Store = {
   readonly save: (text: string) => Promise<void>;
 };
 
-/** The two Blob calls the store makes — the SDK's `get` and `put`, passed in so a test can stand in. */
+/** The Blob calls the store makes — the SDK's `head`, `get` and `put`, passed in so a test can stand in. */
 export type BlobCalls = {
+  /** the blob's metadata from the Blob API — its etag is the one `put`'s `ifMatch` is compared with; throws `BlobNotFoundError` when absent */
+  readonly head: (path: string, options: { token?: string }) => Promise<{ readonly url: string; readonly etag: string }>;
   readonly get: (path: string, options: { access: "public" | "private"; useCache: false; token?: string }) => Promise<{ stream: ReadableStream | null; blob?: { etag: string } } | null>;
   readonly put: (
     path: string,
@@ -89,10 +91,33 @@ export function blobStore(calls: BlobCalls, token: string | null, access: "publi
   const auth = token === null ? {} : { token };
   let expected: string | null | undefined;
   return {
+    /**
+     * 🔴 MEASURED 2026-11-25: production answered every save with "Precondition failed: ETag mismatch" and
+     * the index stood still 7.4M blocks behind. The etag was taken from the GET response's header — the
+     * blob's DOWNLOAD, which a CDN may cache or re-encode — while `put`'s `ifMatch` is compared with the
+     * Blob API's own etag. The version is now read from the API (`head`), and a public store's copy is
+     * fetched keyed by that version, so the CDN cannot hand back an older one under it.
+     */
     load: async () => {
-      const found = await calls.get(STATE_PATH, { access, useCache: false, ...auth });
-      expected = found === null ? null : found.blob?.etag;
-      return found?.stream ? await new Response(found.stream).text() : null;
+      expected = undefined;
+      let meta: { readonly url: string; readonly etag: string } | null;
+      try {
+        meta = await calls.head(STATE_PATH, auth);
+      } catch (e) {
+        if ((e as { name?: unknown } | null)?.name !== "BlobNotFoundError") throw e;
+        meta = null;
+      }
+      if (meta === null) {
+        expected = null;
+        return null;
+      }
+      const where = access === "public" ? `${meta.url}?v=${encodeURIComponent(meta.etag)}` : STATE_PATH;
+      const found = await calls.get(where, { access, useCache: false, ...auth });
+      // gone between the two reads: nothing to build on, so nothing may be saved over it
+      if (!found?.stream) return null;
+      const text = await new Response(found.stream).text();
+      expected = meta.etag;
+      return text;
     },
     save: async (text) => {
       if (expected === undefined) throw new Error("The index needs a versioned storage read before saving. Nothing was overwritten.");

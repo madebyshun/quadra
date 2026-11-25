@@ -4,6 +4,7 @@ import { screen, within } from "@testing-library/react";
 import { BRAND } from "@/brand";
 import { renderAt, settle } from "./helpers";
 import { WELCOME_KEY } from "@/lib/welcome";
+import { BUYBACK, gauge } from "@/pages/About";
 
 /**
  * The About page: one scroll that says what the app is, with every number read when it opens — the
@@ -19,7 +20,10 @@ vi.mock("@/lib/furnace", async (orig) => ({ ...(await orig<typeof import("@/lib/
 
 const FURNACE = "0x78386A3c1888f89EF4C874675069Cb930536a44c";
 const coin = (trades: number) => ({ trades }) as never;
-const figure = (label: string) => screen.getByText(label).previousElementSibling!.textContent;
+/** A launchpad or furnace row: its label (dt) and the number beside it (dd). */
+const figure = (label: string) => screen.getByText(label).nextElementSibling!.textContent;
+/** The furnace's headline: how much of the token is burnt. */
+const burntHead = () => document.querySelector(".about__burnt strong")!.textContent;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -42,14 +46,26 @@ describe("the About page", () => {
     await settle();
   });
 
+  it("fills the buyback gauge toward its threshold, capped at full", () => {
+    expect([0n, BUYBACK.minWei / 2n, BUYBACK.minWei, BUYBACK.minWei * 3n].map(gauge)).toEqual([0, 50, 100, 100]);
+  });
+
   it("reads its numbers from the index and the furnace", async () => {
     renderAt("/about");
     await settle();
     expect(figure("coins launched here")).toBe("3");
     expect(figure("launchers")).toBe("2");
     expect(figure("trades on their pools")).toBe("15");
-    expect(figure(`${BRAND.ticker} burnt`)).toBe("1,813,116");
+    expect(burntHead()).toBe("1,813,116");
+    expect(screen.getByText(/burnt · 0\.1813% of the supply/)).toBeInTheDocument();
     expect(screen.getByText(/Its creator fees go to the furnace/)).toHaveTextContent("50% burnt/buyback");
+    // what waits to be bought back, what was spent, what the buybacks burnt — and when they happen
+    expect(figure("burnt from fees, at once")).toBe("135,484");
+    expect(figure("burnt by buybacks")).toBe("1,677,632");
+    expect(figure("ETH spent on buybacks")).toBe("0 ETH");
+    expect(screen.getByText("0 / 0.05 ETH")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "ETH waiting toward the next buyback" })).toHaveAttribute("aria-valuenow", "0");
+    expect(screen.getByText(/Each Monday, once 0\.05 ETH or more is waiting/)).toBeInTheDocument();
   });
 
   it("says a number it could not read is not read — never zero — and has no furnace figure when there is none", async () => {
@@ -58,13 +74,16 @@ describe("the About page", () => {
     const a = renderAt("/about");
     await settle();
     expect(figure("coins launched here")).toBe("not read");
-    expect(figure(`${BRAND.ticker} burnt`)).toBe("not read");
+    expect(burntHead()).toBe("not read");
+    expect(figure("burnt by buybacks")).toBe("not read");
+    expect(screen.getByText("not read", { selector: ".about__gauge-head span" })).toBeInTheDocument();
     expect(screen.queryByText(/Its creator fees go to the furnace/)).toBeNull();
     a.unmount();
     launchOf.mockResolvedValue(null);
     renderAt("/about");
     await settle();
-    expect(figure(`${BRAND.ticker} burnt`)).toBe("—");
+    expect(burntHead()).toBe("—");
+    expect(figure("ETH spent on buybacks")).toBe("—");
   });
 
   it("is linked from the Welcome screen", async () => {

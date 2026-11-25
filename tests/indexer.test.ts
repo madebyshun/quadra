@@ -720,33 +720,60 @@ describe("the index kept between function runs (T3, 2026-11-04)", () => {
     expect(decodeState(JSON.stringify({ v: STATE_VERSION, syncedTo: 7 }))).toMatchObject({ syncedTo: 7 });
   });
 
-  it("keeps the index in a Blob at one path, private by default, read past the CDN's cache", async () => {
+  /** A Blob store: the API's metadata (`head`), the download (`get`) and the write (`put`), each call recorded. */
+  const notFound = () => Object.assign(new Error("not found"), { name: "BlobNotFoundError" });
+  function fakeBlob(o: { meta?: { url: string; etag: string } | Error; body?: string | null } = {}) {
     const calls: unknown[][] = [];
     const blob = {
-      get: async (...a: unknown[]) => (calls.push(["get", ...a]), { stream: new Response("saved").body, blob: { etag: "v1" } }),
+      head: async (...a: unknown[]) => {
+        calls.push(["head", ...a]);
+        const m = o.meta ?? { url: "https://store.blob.example/launchpad/index.json", etag: '"v1"' };
+        if (m instanceof Error) throw m;
+        return m;
+      },
+      get: async (...a: unknown[]) => (calls.push(["get", ...a]), o.body === null ? null : { stream: new Response(o.body ?? "saved").body, blob: { etag: 'W/"other"' } }),
       put: async (...a: unknown[]) => void calls.push(["put", ...a]),
     };
+    return { blob, calls };
+  }
+
+  it("keeps the index in a Blob at one path, private by default: the version from the Blob API, the copy read past the cache", async () => {
+    const { blob, calls } = fakeBlob();
     const store = blobStore(blob, "tok");
     expect(await store.load()).toBe("saved");
     await store.save("next");
+    // the download's own etag ('W/"other"' here) is never what ifMatch is given — the API's version is
     expect(calls).toEqual([
+      ["head", STATE_PATH, { token: "tok" }],
       ["get", STATE_PATH, { access: "private", useCache: false, token: "tok" }],
-      ["put", STATE_PATH, "next", { access: "private", allowOverwrite: true, ifMatch: "v1", addRandomSuffix: false, contentType: "application/json", token: "tok" }],
+      ["put", STATE_PATH, "next", { access: "private", allowOverwrite: true, ifMatch: '"v1"', addRandomSuffix: false, contentType: "application/json", token: "tok" }],
     ]);
-    const none = blobStore({ get: async () => null, put: async () => undefined }, "tok", "public");
-    expect(await none.load()).toBeNull();
-    expect(await blobStore({ get: async () => ({ stream: null }), put: async () => undefined }, "tok").load()).toBeNull();
   });
 
-  it("conditionally creates snapshots and refuses an unversioned overwrite", async () => {
-    const put = vi.fn(async () => undefined);
-    const a = blobStore({ get: async () => null, put }, null);
+  it("reads a public store's copy keyed by its version, so a CDN cannot answer with an older one", async () => {
+    const { blob, calls } = fakeBlob({ meta: { url: "https://pub.blob.example/launchpad/index.json", etag: '"v 2"' } });
+    const store = blobStore(blob, null, "public");
+    await store.load();
+    expect(calls[1]).toEqual(["get", 'https://pub.blob.example/launchpad/index.json?v=%22v%202%22', { access: "public", useCache: false }]);
+  });
+
+  it("creates the first snapshot only where there is none, and saves nothing it could not read first", async () => {
+    const created = fakeBlob({ meta: notFound() });
+    const a = blobStore(created.blob, null);
     await expect(a.save("early")).rejects.toThrow("versioned");
-    await a.load(); await a.save("first");
-    expect(put).toHaveBeenCalledWith(STATE_PATH, "first", expect.objectContaining({ allowOverwrite: false }));
+    expect(await a.load()).toBeNull();
+    await a.save("first");
+    expect(created.calls.at(-1)).toEqual(["put", STATE_PATH, "first", expect.objectContaining({ allowOverwrite: false })]);
+    expect(created.calls.at(-1)![3]).not.toHaveProperty("ifMatch");
     await expect(a.save("again")).rejects.toThrow("versioned");
-    const b = blobStore({ get: async () => ({ stream: new Response("old").body }), put }, null);
-    await b.load(); await expect(b.save("unsafe")).rejects.toThrow("versioned");
+    // gone between the version and the download: nothing to build on, nothing saved
+    const vanished = blobStore(fakeBlob({ body: null }).blob, null);
+    expect(await vanished.load()).toBeNull();
+    await expect(vanished.save("unsafe")).rejects.toThrow("versioned");
+    // any other failure of the version read is an error, never "no index yet"
+    const broken = blobStore(fakeBlob({ meta: new Error("rate limited") }).blob, null);
+    await expect(broken.load()).rejects.toThrow("rate limited");
+    await expect(broken.save("unsafe")).rejects.toThrow("versioned");
   });
 
   it("serves a persisted snapshot without log scans and fails explicitly when storage or the head cannot be checked", async () => {

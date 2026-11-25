@@ -1,0 +1,19 @@
+name: Step the launchpad index
+
+# Vercel Hobby allows one cron a day, and Base makes ~432,000 blocks a day (0.2 s blocks): one daily step of
+# ≤20 s cannot keep up. This asks the public index route every 10 minutes; each request steps the stored
+# index forward for its budget and saves it (src/server/indexer.ts). It holds no secret and changes nothing
+# but the index's own Blob.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  step:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Step the index and report where it stands
+        run: |
+          curl -sS -m 90 -H "x-quadra: 1" https://quadra-eta.vercel.app/api/launchpad/creators \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print('syncedTo', d.get('syncedTo'), 'behind', d.get('behind'), 'error', d.get('error'))"

@@ -37,9 +37,9 @@ export const FUNCTIONS = [
 /** One function's text. */
 export async function bundleFunction(fn) {
   const contents =
-    `import { get, put } from "@vercel/blob";\n` +
+    `import { get, head, put } from "@vercel/blob";\n` +
     `import { routes } from "./src/server/vercel";\n` +
-    `const blob = { get: (path, options) => get(path, options), put: (path, body, options) => put(path, body, options) };\n` +
+    `const blob = { head: (path, options) => head(path, options), get: (path, options) => get(path, options), put: (path, body, options) => put(path, body, options) };\n` +
     `const handle = routes(process.env, fetch, blob).${fn.route};\n` +
     fn.methods.map((m) => `export function ${m}(request) { return handle(request); }\n`).join("");
   const result = await build({

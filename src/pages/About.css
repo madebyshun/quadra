@@ -162,3 +162,34 @@
   height: .72em;
   flex: none;
 }
+
+/* Live on Base (2026-11-25): the furnace as the lead card, the launchpad beside it */
+.about__live-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 20px; margin-top: 30px; align-items: stretch; }
+.about__card-head { margin: 0 0 18px; font: 600 11px/1 "JetBrains Mono", Menlo, monospace; letter-spacing: .08em; }
+.about__furnace { display: grid; gap: 22px; padding: 26px; background: var(--about-blue); color: var(--about-paper); border: 2px solid var(--about-ink); box-shadow: 6px 6px 0 var(--about-ink); }
+.about__furnace .about__card-head { color: #c9c8ff; margin: 0; }
+.about__burnt { display: grid; gap: 6px; }
+.about__burnt strong { font: 400 clamp(52px, 7vw, 96px)/.95 Georgia, serif; letter-spacing: -.04em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.about__burnt span { font-size: 13px; color: #dcdbff; }
+.about__gauge { display: grid; gap: 8px; padding: 14px; background: #1a18a8; border: 1px solid #ffffff40; }
+.about__gauge-head { display: flex; justify-content: space-between; gap: 12px; font: 500 12px/1.2 "JetBrains Mono", Menlo, monospace; }
+.about__gauge-bar { height: 14px; background: #0e0c6b; border: 1px solid #ffffff55; overflow: hidden; }
+.about__gauge-bar i { display: block; height: 100%; background: repeating-linear-gradient(90deg, #f4f0e6 0 6px, #ffb547 6px 12px); transition: width .6s ease; }
+.about__gauge p { margin: 0; font-size: 12px; line-height: 1.5; color: #dcdbff; }
+.about__furnace-rows { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.about__furnace-rows div { display: grid; gap: 4px; padding-top: 10px; border-top: 1px solid #ffffff40; }
+.about__furnace-rows dt { font-size: 11px; color: #c9c8ff; }
+.about__furnace-rows dd { margin: 0; font: 400 22px/1.1 Georgia, serif; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.about__flow { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; counter-reset: flow; }
+.about__flow li { counter-increment: flow; padding: 6px 10px; border: 1px solid #ffffff55; font: 500 11px/1.2 "JetBrains Mono", Menlo, monospace; }
+.about__flow li::before { content: counter(flow) " / "; color: #ffb547; }
+.about__launchpad { display: grid; align-content: start; gap: 18px; padding: 26px; border: 2px solid var(--about-ink); background: #fffdf7; }
+.about__stats { display: grid; gap: 14px; margin: 0; }
+.about__stats div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid #191b2030; }
+.about__stats dt { font-size: 13px; }
+.about__stats dd { margin: 0; color: var(--about-blue); font: 400 34px/1 Georgia, serif; font-variant-numeric: tabular-nums; }
+.about__launchpad .index-notice { margin: 0; font-size: 11px; }
+@media (max-width: 860px) {
+  .about__live-grid { grid-template-columns: 1fr; }
+  .about__furnace-rows { grid-template-columns: 1fr; }
+}

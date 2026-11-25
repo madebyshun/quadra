@@ -27,7 +27,8 @@ describe("the production routes", () => {
 
 describe("the launchpad index and its cron, in production", () => {
   const never = (() => Promise.reject(new Error("must not be called"))) as unknown as typeof fetch;
-  const blob = { get: async () => null, put: async () => undefined };
+  const absent = async () => { throw Object.assign(new Error("not found"), { name: "BlobNotFoundError" }); };
+  const blob = { head: absent, get: async () => null, put: async () => undefined };
 
   it("is a named 503 without a Blob store", async () => {
     const res = await routes({}, never, blob).launchpad(new Request("https://x/api/launchpad/coins", { headers: { "x-quadra": "1" } }));
@@ -38,21 +39,25 @@ describe("the launchpad index and its cron, in production", () => {
 
   it("takes a store connected through Vercel's OIDC (a store id, no token), and passes no token then", async () => {
     const seen: unknown[] = [];
-    const watching = { get: async (_: string, o: unknown) => (seen.push(o), null), put: async () => undefined };
+    const watching = { head: async (_: string, o: unknown) => (seen.push(o), absent()), get: async () => null, put: async () => undefined };
     const rpc = async () => Promise.reject(new Error("node down"));
     const res = await routes({ BLOB_STORE_ID: "store_1" }, never, watching, { rpc }).launchpad(new Request("https://x/api/launchpad/coins", { headers: { "x-quadra": "1" } }));
     expect(res.status).toBe(502);
-    expect(seen).toEqual([{ access: "private", useCache: false }]);
+    expect(seen).toEqual([{}]);
   });
 
   it("reads the stored index with the store's token, public when the owner says so", async () => {
     const seen: unknown[] = [];
-    const watching = { get: async (_: string, o: unknown) => (seen.push(o), null), put: async () => undefined };
+    const watching = {
+      head: async (_: string, o: unknown) => (seen.push(o), { url: "https://pub.blob.example/launchpad/index.json", etag: "e" }),
+      get: async (_: string, o: unknown) => (seen.push(o), null),
+      put: async () => undefined,
+    };
     const rpc = async () => Promise.reject(new Error("node down"));
     const r = routes({ BLOB_READ_WRITE_TOKEN: "tok", BLOB_ACCESS: "public" }, never, watching, { rpc });
     const res = await r.launchpad(new Request("https://x/api/launchpad/coins", { headers: { "x-quadra": "1" } }));
     expect(res.status).toBe(502);
-    expect(seen).toEqual([{ access: "public", useCache: false, token: "tok" }]);
+    expect(seen).toEqual([{ token: "tok" }, { access: "public", useCache: false, token: "tok" }]);
   });
 
   it("runs the cron's step only for Vercel Cron when a secret is set, and as the index's own request", async () => {
@@ -80,7 +85,7 @@ describe("the indexer's own RPC", () => {
   });
 
   it("takes the owner's RPC into the stored index", async () => {
-    const blob = { get: async () => null, put: async () => undefined };
+    const blob = { head: async () => { throw Object.assign(new Error("not found"), { name: "BlobNotFoundError" }); }, get: async () => null, put: async () => undefined };
     const asked: string[] = [];
     vi.stubGlobal("fetch", async (url: string) => (asked.push(url), new Response("down", { status: 503 })));
     try {

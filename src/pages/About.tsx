@@ -54,16 +54,65 @@ function useRead<T>(read: () => Promise<T>): Read<T> {
   return value;
 }
 
-function Figure({ label, value }: { label: string; value: string }) {
+
+const shown = <T,>(r: Read<T>, f: (v: T) => string) => (r === "reading" ? "…" : typeof r === "object" && r !== null && "problem" in r ? "not read" : f(r as T));
+
+/** The schedule the treasury keeps for the furnace's ETH (the owner's to set): day, threshold, worst price. */
+export const BUYBACK = { day: "Monday", minWei: 5n * 10n ** 16n, maxSlipPct: 2 } as const;
+
+/**
+ * When the ETH waiting in the furnace is spent. Only the treasury may call `buyAndBurn` (a v4 pool has no
+ * oracle, so a permissionless buyback could be front-run), so this is a schedule the treasury keeps,
+ * said as such — every buyback is a public transaction anyone can check against it.
+ */
+export const BUYBACK_POLICY = `Each ${BUYBACK.day}, once ${tokenAmount(BUYBACK.minWei, 18, 4)} ETH or more is waiting, the treasury spends all of it buying back and burning, at no worse than ${BUYBACK.maxSlipPct}% under the pool's price. Each one is a public transaction.`;
+
+const SUPPLY = 10n ** 27n;
+
+/** How far the waiting ETH is toward the next buyback, 0..100 (whole percent, capped). */
+export function gauge(toBuy: bigint): number {
+  return Number((toBuy >= BUYBACK.minWei ? BUYBACK.minWei : toBuy) * 100n / BUYBACK.minWei);
+}
+
+/** The furnace, as one card: what is burnt, what waits, and how it gets there. */
+function FurnaceCard({ furnace, burnt }: { furnace: Read<Furnace | null>; burnt: Read<bigint> | null }) {
+  const f = furnace !== null && furnace !== "reading" && !("problem" in furnace) ? furnace : null;
   return (
-    <div className="about__figure">
-      <strong>{value}</strong>
-      <span>{label}</span>
+    <div className="about__furnace" aria-label="The furnace">
+      <p className="about__card-head">furnace / {BRAND.ticker}</p>
+      <div className="about__burnt">
+        <strong>{burnt === null ? "—" : shown(burnt, (b) => tokenAmount(b, LAUNCHPAD_DECIMALS, 0))}</strong>
+        <span>{BRAND.ticker} burnt{typeof burnt === "bigint" ? ` · ${(Number((burnt * 1_000_000n) / SUPPLY) / 10_000).toFixed(4)}% of the supply` : ""}</span>
+      </div>
+      <div className="about__gauge">
+        <div className="about__gauge-head">
+          <span>next buyback</span>
+          <span>{f ? `${tokenAmount(f.toBuy, 18, 6)} / ${tokenAmount(BUYBACK.minWei, 18, 4)} ETH` : furnace === "reading" ? "…" : "not read"}</span>
+        </div>
+        <div className="about__gauge-bar" role="progressbar" aria-label="ETH waiting toward the next buyback" aria-valuemin={0} aria-valuemax={100} aria-valuenow={f ? gauge(f.toBuy) : 0}>
+          <i style={{ width: `${f ? Math.max(gauge(f.toBuy), 1) : 0}%` }} />
+        </div>
+        <p>{BUYBACK_POLICY}</p>
+      </div>
+      <dl className="about__furnace-rows">
+        <div><dt>burnt from fees, at once</dt><dd>{f ? tokenAmount(f.burnedFromFees, LAUNCHPAD_DECIMALS, 0) : shownMissing(furnace)}</dd></div>
+        <div><dt>burnt by buybacks</dt><dd>{f ? tokenAmount(f.burnedFromBuybacks, LAUNCHPAD_DECIMALS, 0) : shownMissing(furnace)}</dd></div>
+        <div><dt>ETH spent on buybacks</dt><dd>{f ? `${tokenAmount(f.quoteSpent, 18, 6)} ETH` : shownMissing(furnace)}</dd></div>
+      </dl>
+      <ol className="about__flow" aria-label="How a trade feeds the furnace">
+        <li>every trade pays 1%</li>
+        <li>80% reaches the furnace</li>
+        <li>half the {BRAND.ticker} burns at once</li>
+        <li>half the ETH buys back and burns</li>
+      </ol>
     </div>
   );
 }
 
-const shown = <T,>(r: Read<T>, f: (v: T) => string) => (r === "reading" ? "…" : typeof r === "object" && r !== null && "problem" in r ? "not read" : f(r as T));
+/** A furnace figure that is not there: still reading, not read, or no furnace at all. */
+function shownMissing(furnace: Read<Furnace | null>): string {
+  return furnace === "reading" ? "…" : furnace === null ? "—" : "not read";
+}
 
 export function About() {
   const index = useRead(launchpadCoins);
@@ -157,14 +206,20 @@ export function About() {
       </section>
 
       <section className="about__section about__live" aria-label="Live">
-        <p className="about__eyebrow">From the chain, when you arrive</p>
+        <p className="about__eyebrow">from the chain, when you arrive</p>
         <h2>Live on {BASE.name}</h2>
-        {index !== "reading" && !("problem" in index) ? <IndexNotice behind={index.behind} error={index.error} /> : null}
-        <div className="about__figures">
-          <Figure label="coins launched here" value={shown(stats, (s) => s.coins.toLocaleString("en-US"))} />
-          <Figure label="launchers" value={shown(stats, (s) => s.creators.toLocaleString("en-US"))} />
-          <Figure label="trades on their pools" value={shown(stats, (s) => s.trades.toLocaleString("en-US"))} />
-          <Figure label={`${BRAND.ticker} burnt`} value={burnt === null ? "—" : shown(burnt, (b) => tokenAmount(b, LAUNCHPAD_DECIMALS, 0))} />
+        <div className="about__live-grid">
+          <FurnaceCard furnace={furnace} burnt={burnt} />
+          <div className="about__launchpad" aria-label="The launchpad">
+            <p className="about__card-head">launchpad / since v1</p>
+            <dl className="about__stats">
+              <div><dt>coins launched here</dt><dd>{shown(stats, (s) => s.coins.toLocaleString("en-US"))}</dd></div>
+              <div><dt>launchers</dt><dd>{shown(stats, (s) => s.creators.toLocaleString("en-US"))}</dd></div>
+              <div><dt>trades on their pools</dt><dd>{shown(stats, (s) => s.trades.toLocaleString("en-US"))}</dd></div>
+            </dl>
+            {index !== "reading" && !("problem" in index) ? <IndexNotice behind={index.behind} error={index.error} /> : null}
+            <Link to="/?do=coins" className="about__tool-link">See every coin <span aria-hidden="true">↗</span></Link>
+          </div>
         </div>
         <p className="about__note">Read from {BASE.name} when this page opened: the launchpad's own logs, and the token's furnace.</p>
       </section>

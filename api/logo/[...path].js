@@ -3382,7 +3382,7 @@ var init_abis = __esm({
 });
 
 // api/logo/[...path].js
-import { get, put } from "@vercel/blob";
+import { get, head, put } from "@vercel/blob";
 
 // src/brand.ts
 var BRAND = {
@@ -8415,10 +8415,32 @@ function blobStore(calls, token, access = "private") {
   const auth = token === null ? {} : { token };
   let expected;
   return {
+    /**
+     * 🔴 MEASURED 2026-11-25: production answered every save with "Precondition failed: ETag mismatch" and
+     * the index stood still 7.4M blocks behind. The etag was taken from the GET response's header — the
+     * blob's DOWNLOAD, which a CDN may cache or re-encode — while `put`'s `ifMatch` is compared with the
+     * Blob API's own etag. The version is now read from the API (`head`), and a public store's copy is
+     * fetched keyed by that version, so the CDN cannot hand back an older one under it.
+     */
     load: async () => {
-      const found = await calls.get(STATE_PATH, { access, useCache: false, ...auth });
-      expected = found === null ? null : found.blob?.etag;
-      return found?.stream ? await new Response(found.stream).text() : null;
+      expected = void 0;
+      let meta;
+      try {
+        meta = await calls.head(STATE_PATH, auth);
+      } catch (e) {
+        if (e?.name !== "BlobNotFoundError") throw e;
+        meta = null;
+      }
+      if (meta === null) {
+        expected = null;
+        return null;
+      }
+      const where = access === "public" ? `${meta.url}?v=${encodeURIComponent(meta.etag)}` : STATE_PATH;
+      const found = await calls.get(where, { access, useCache: false, ...auth });
+      if (!found?.stream) return null;
+      const text = await new Response(found.stream).text();
+      expected = meta.etag;
+      return text;
     },
     save: async (text) => {
       if (expected === void 0) throw new Error("The index needs a versioned storage read before saving. Nothing was overwritten.");
@@ -8599,7 +8621,7 @@ function coinDetail(state, token, now) {
   const points = [...open, ...trades.map((t) => ({ at: t.at, price: t.price }))];
   return { coin: row2, trades: trades.reverse().slice(0, TRADES_SHOWN), candles, points, feesQuote: units2(feesQuote, d.quoteDecimals), feesToken: units2(feesToken, 18), feeBps, maxPaidBps };
 }
-function snapshot2(state, now, head = null, error = null) {
+function snapshot2(state, now, head2 = null, error = null) {
   const coins = [...state.coins.values()].sort((a, b) => b.block - a.block || a.token.localeCompare(b.token)).map((c) => rowOf(state, c, now));
   const byCreator = /* @__PURE__ */ new Map();
   for (const c of coins) {
@@ -8615,8 +8637,8 @@ function snapshot2(state, now, head = null, error = null) {
   return {
     source: "Base: the launchpad factories' Launched and Referred logs and the v4 PoolManager's Swap logs for their pools",
     syncedTo: state.syncedTo,
-    head,
-    behind: head === null ? null : Math.max(0, head - state.syncedTo),
+    head: head2,
+    behind: head2 === null ? null : Math.max(0, head2 - state.syncedTo),
     generatedAt: now,
     error,
     totals: {
@@ -8672,15 +8694,15 @@ async function hookFee(rpc2, hook, id) {
   const window = decodeFunctionResult({ abi: LAUNCH_HOOK_ABI, functionName: "window", data: await call2(rpc2, hook, encodeFunctionData({ abi: LAUNCH_HOOK_ABI, functionName: "window" })) });
   return { fee, opening: { startFee, window } };
 }
-async function syncOnce(state, rpc2, head, maxChunks = MAX_CHUNKS) {
-  const clock = (block) => head.timestamp - (timeOf(head.number) - timeOf(block));
+async function syncOnce(state, rpc2, head2, maxChunks = MAX_CHUNKS) {
+  const clock = (block) => head2.timestamp - (timeOf(head2.number) - timeOf(block));
   let chunks = 0;
   let launches = 0;
   let swaps = 0;
   try {
-    while (chunks < maxChunks && state.syncedTo < head.number) {
+    while (chunks < maxChunks && state.syncedTo < head2.number) {
       const from = state.syncedTo + 1;
-      const to = Math.min(from + CHUNK - 1, head.number);
+      const to = Math.min(from + CHUNK - 1, head2.number);
       const range = { fromBlock: hex(from), toBlock: hex(to) };
       const logs = await rpc2("eth_getLogs", [{ address: factories(), topics: [[LAUNCHED_TOPIC, REFERRED_TOPIC]], ...range }]);
       launches += applyLaunches(state, logs, clock);
@@ -8696,7 +8718,7 @@ async function syncOnce(state, rpc2, head, maxChunks = MAX_CHUNKS) {
     for (const coin of [...state.coins.values()].filter((c) => c.detail === null).slice(0, MAX_DETAILS)) {
       coin.detail = await readDetail(state, rpc2, coin);
     }
-    const since = head.timestamp - DAY;
+    const since = head2.timestamp - DAY;
     const pending = new Set([...state.swaps.values()].flat().filter((s) => s.at > since && !state.traders.has(s.tx)).map((s) => s.tx));
     for (const tx of [...pending].slice(0, MAX_TRADERS)) {
       const body = await rpc2("eth_getTransactionByHash", [tx]);
@@ -8741,9 +8763,9 @@ function indexerHandler(deps = {}) {
       const saved = decodeState(await store.load().catch(() => null));
       if (saved && saved.syncedTo > state.syncedTo) adopt(state, saved);
     }
-    let head;
+    let head2;
     try {
-      head = await readHead(rpc2);
+      head2 = await readHead(rpc2);
     } catch (e) {
       last = { at: now(), head: last?.head ?? null, error: messageOf(e) };
       return;
@@ -8752,8 +8774,8 @@ function indexerHandler(deps = {}) {
     do {
       const before = state.syncedTo;
       const previous = encodeState(state);
-      const result = await syncOnce(state, rpc2, head, maxChunks);
-      last = { at: now(), head: head.number, error: result.error };
+      const result = await syncOnce(state, rpc2, head2, maxChunks);
+      last = { at: now(), head: head2.number, error: result.error };
       if (store && state.syncedTo > before) {
         try {
           await store.save(encodeState(state));
@@ -8765,7 +8787,7 @@ function indexerHandler(deps = {}) {
           return;
         }
       }
-      if (result.error !== null || state.syncedTo >= head.number) return;
+      if (result.error !== null || state.syncedTo >= head2.number) return;
       if (!store) {
         later(() => void sync(), CATCH_UP_MS);
         return;
@@ -8786,13 +8808,13 @@ function indexerHandler(deps = {}) {
         const saved = decodeState(await store.load());
         if (saved === null) return problem7(503, "The index snapshot is unavailable. The sync worker must publish one first.");
         adopt(state, saved);
-        const head2 = await readHead(rpc2);
-        last = { at: now(), head: head2.number, error: null };
+        const head3 = await readHead(rpc2);
+        last = { at: now(), head: head3.number, error: null };
       } catch (e) {
         return problem7(503, `The index snapshot could not be verified: ${messageOf(e)}`);
       }
     } else if (last === null || now() - last.at >= FRESH_MS3) await sync();
-    const { head, error } = last;
+    const { head: head2, error } = last;
     if (state.syncedTo < FIRST_BLOCK) {
       return problem7(502, `The launchpad index has read nothing from Base yet: ${error ?? "the chain is still being read"}`);
     }
@@ -8801,12 +8823,12 @@ function indexerHandler(deps = {}) {
       if (!/^0x[0-9a-fA-F]{40}$/.test(token)) return problem7(400, "/coin takes ?token=0x\u2026 \u2014 a 20-byte address.");
       const detail = coinDetail(state, token, Math.floor(now() / 1e3));
       if (detail === null) return problem7(404, `${token} is not a coin of this launchpad, or the index has not reached its launch yet.`);
-      return new Response(JSON.stringify({ ...detail, syncedTo: state.syncedTo, head, behind: head === null ? null : Math.max(0, head - state.syncedTo), error }), {
+      return new Response(JSON.stringify({ ...detail, syncedTo: state.syncedTo, head: head2, behind: head2 === null ? null : Math.max(0, head2 - state.syncedTo), error }), {
         status: 200,
         headers: { "content-type": "application/json", "cache-control": "public, max-age=10, s-maxage=15, stale-while-revalidate=60" }
       });
     }
-    const snap = snapshot2(state, Math.floor(now() / 1e3), head, error);
+    const snap = snapshot2(state, Math.floor(now() / 1e3), head2, error);
     const body = path === "/coins" ? snap : { ...snap, coins: void 0 };
     return new Response(JSON.stringify(body), {
       status: 200,
@@ -8865,7 +8887,7 @@ function routes(env, fetchImpl = fetch, blob2 = null, indexer = {}) {
 }
 
 // api/logo/[...path].js
-var blob = { get: (path, options) => get(path, options), put: (path, body, options) => put(path, body, options) };
+var blob = { head: (path, options) => head(path, options), get: (path, options) => get(path, options), put: (path, body, options) => put(path, body, options) };
 var handle = routes(process.env, fetch, blob).logo;
 function GET(request) {
   return handle(request);
