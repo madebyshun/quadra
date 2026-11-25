@@ -5,7 +5,6 @@ import { say } from "@/lib/assistant";
 import { count } from "@/lib/achievements";
 import { depthCard, DepthShare } from "@/features/panels/DepthShare";
 import { collateralCard, CollateralShare } from "@/features/panels/CollateralShare";
-import { VerdictShare, verdictCard } from "@/features/panels/VerdictShare";
 import { LoanWatch } from "@/features/loanAlerts";
 
 /**
@@ -85,15 +84,14 @@ export function ReportView({ report }: { report: Report }) {
   );
 }
 
-/** A finished Verdict, Depth or Collateral report can be posted as a picture; opened on demand, so the report stays first. */
+/** A finished Depth or Collateral report can be posted as a picture; opened on demand, so the report stays first. */
 function Shareable({ report }: { report: Report }) {
-  const card = verdictCard(report);
-  const depth = card ? null : depthCard(report);
-  const loans = card || depth ? null : collateralCard(report);
-  return card || depth || loans ? (
+  const depth = depthCard(report);
+  const loans = depth ? null : collateralCard(report);
+  return depth || loans ? (
     <details className="report__share">
       <summary>Share as a picture</summary>
-      {card ? <VerdictShare c={card} /> : depth ? <DepthShare c={depth} /> : <CollateralShare c={loans!} />}
+      {depth ? <DepthShare c={depth} /> : <CollateralShare c={loans!} />}
     </details>
   ) : null;
 }

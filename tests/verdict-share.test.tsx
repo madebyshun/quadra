@@ -181,12 +181,14 @@ describe("a Token Verdict as a picture", () => {
     expect(await logoOf(TOKEN)).toBeNull();
   });
 
-  it("sits under a verdict's report, folded, shows the logo when it arrives, and downloads exactly the picture shown", async () => {
+  it("is not shown under ReportView, shows the logo when rendered directly, and downloads the picture shown", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(new Uint8Array([1]), { status: 200, headers: { "content-type": "image/png" } }));
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     drawCard.mockResolvedValueOnce({ toDataURL: () => "data:image/png;base64,AA" }).mockRejectedValueOnce(new Error("no canvas"));
-    render(<ReportView report={reboot} />);
-    expect(screen.getByText("Share as a picture")).toBeInTheDocument();
+    const reportView = render(<ReportView report={reboot} />);
+    expect(screen.queryByText("Share as a picture")).toBeNull();
+    reportView.unmount();
+    render(<VerdictShare c={verdictCard(reboot)!} />);
     await settle();
     const card = screen.getByRole("img", { name: "Token Verdict card for TEST" });
     expect(card.querySelector("image")).not.toBeNull();
