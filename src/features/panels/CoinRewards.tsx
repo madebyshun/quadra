@@ -1,3 +1,4 @@
+import { FLAGS } from "@/config/chain";
 import { useEffect, useState } from "react";
 import { LAUNCHPAD_DECIMALS } from "@/config/launchpad";
 import { checkAddress, toChecksumAddress } from "@/lib/address";
@@ -298,6 +299,8 @@ function Redirect({ token, record, me, provider, onDone }: { token: string; reco
         Send the 80% there
       </Gel>
       <p className="dim">The new recipient can send it on again. Only the current recipient can change it.</p>
+      {FLAGS.revenueShare ? (
+        <>
       <hr />
       <p>
         <strong>Share it with holders who stake the coin.</strong> The 80% goes to a share contract that releases it to stakers gradually (each arrival spread over the next seven days), with an optional cut for an
@@ -323,6 +326,8 @@ function Redirect({ token, record, me, provider, onDone }: { token: string; reco
           </Gel>
         </>
       )}
+        </>
+      ) : null}
       {problem ? <p className="tx__warn">{problem}</p> : null}
       <TxStepList states={steps.states} label="Fee recipient progress" />
     </div>

@@ -15,6 +15,12 @@ const stakerOf = vi.fn();
 const predictShare = vi.fn();
 const deployer = vi.fn<() => string | null>(() => null);
 const hasCode = vi.fn();
+// the offer to share with stakers is switched off in the app (FLAGS.revenueShare); these tests turn it on
+const flags = vi.hoisted(() => ({ revenueShare: true }));
+vi.mock("@/config/chain", async (orig) => {
+  const real = await orig<typeof import("@/config/chain")>();
+  return { ...real, FLAGS: new Proxy(real.FLAGS, { get: (t, k) => (k === "revenueShare" ? flags.revenueShare : t[k as keyof typeof t]) }) };
+});
 vi.mock("@/lib/revenueShare", async (orig) => ({
   ...(await orig<typeof import("@/lib/revenueShare")>()),
   shareOf: (...a: unknown[]) => shareOf(...a),
@@ -103,6 +109,20 @@ describe("where the 80% goes", () => {
     expect(sendTransaction).toHaveBeenCalledWith(provider, ME, expect.objectContaining({ to: FACTORY }));
     // read again afterwards
     expect(shareOf).toHaveBeenCalledTimes(2);
+  });
+
+  it("offers no share with stakers while the switch is off, and still lets the 80% be sent elsewhere", async () => {
+    flags.revenueShare = false;
+    try {
+      deployer.mockReturnValue(DEPLOYER);
+      render(<CoinRewards token={COIN} symbol="TEST" record={recordTo(ME)} />);
+      await settle();
+      expect(screen.queryByText(/Share it with holders who stake the coin/)).toBeNull();
+      expect(screen.queryByRole("button", { name: "Share with stakers" })).toBeNull();
+      expect(button("Send the 80% there")).toBeInTheDocument();
+    } finally {
+      flags.revenueShare = true;
+    }
   });
 
   it("waits on the deployer before offering to share with stakers", async () => {

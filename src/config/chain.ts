@@ -228,6 +228,13 @@ export const FLAGS = {
    * Both halves are kept and tested; this one line brings them back.
    */
   x402Others: false,
+  /**
+   * Offering a creator to hand the 80% to a RevenueShare for stakers, HIDDEN on the owner's call of
+   * 2026-11-25: deployed 2026-10-29, never used by any coin (read back from every v3 coin's recipient), and
+   * easy to confuse with the app token's furnace. A coin whose recipient already IS a RevenueShare is still
+   * recognised and can be staked; this one line brings the offer back.
+   */
+  revenueShare: false,
   x402: true,
   mcp: true,
   inference: false,

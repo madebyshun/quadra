@@ -122,7 +122,8 @@ describe("flags", () => {
       .sort();
     // robinhood: Robinhood Chain hidden on the owner's call, 2026-10-02 — Base first
     // x402Others: the x402 window sells only this app's own tools, 2026-10-02
-    expect(off).toEqual(["audit", "hooks", "inference", "robinhood", "webhooks", "x402Others"]);
+    // revenueShare: the offer to share a coin's 80% with stakers, unused, hidden 2026-11-25
+    expect(off).toEqual(["audit", "hooks", "inference", "revenueShare", "robinhood", "webhooks", "x402Others"]);
   });
 
   it("is all booleans", () => {
