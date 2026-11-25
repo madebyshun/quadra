@@ -120,6 +120,13 @@ contract Backstop is IUnlockCallback {
         return tick - (((tick % s) + s) % s) + s;
     }
 
+    /// @dev Keep the band inside the ticks a pool can use (REVIEW-2026-11-26 B3: near a worthless coin's price the
+    ///      band's top could pass the last usable tick, and a placed band could then never be taken out).
+    function _clamp(int24 next, int24 s) internal pure returns (int24) {
+        int24 last = TickMath.maxUsableTick(s) - WIDTH_SPACINGS * s;
+        return next > last ? last : next;
+    }
+
     /// @notice ETH from the FeeRouter, from anyone, and from the PoolManager when a band comes out.
     receive() external payable {}
 
@@ -157,8 +164,8 @@ contract Backstop is IUnlockCallback {
             uint256 periods = (block.timestamp - movedUpAt) / DRAG_PERIOD;
             int24 floorTick = periods == 0 ? lower : lower - s;
             if (next < floorTick) next = floorTick;
-            if (next < lower) movedUpAt = block.timestamp;
         }
+        next = _clamp(next, s);
         // casting to int256 is safe: a balance is far below 2^255
         // forge-lint: disable-next-line(unsafe-typecast)
         uint256 available = address(this).balance + uint256(eth);
@@ -170,6 +177,9 @@ contract Backstop is IUnlockCallback {
             // forge-lint: disable-next-line(unsafe-typecast)
             (BalanceDelta added,) = poolManager.modifyLiquidity(key, ModifyLiquidityParams(next, top, int256(uint256(placed)), 0), "");
             eth += added.amount0();
+            // the clock restarts only when a band is really placed higher (REVIEW-2026-11-26 B1: an empty poke
+            // used to restart it without moving the band, so daily empty pokes pinned the band to the anchor)
+            if (next < lower) movedUpAt = block.timestamp;
             lower = next;
             upper = top;
             // casting to uint256 is safe: adding a band only ever takes ETH in, so its amount0 is at most zero

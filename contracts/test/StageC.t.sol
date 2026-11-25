@@ -347,19 +347,37 @@ contract StageCTest is Test {
         r.distribute(new address[](0));
     }
 
-    /// REVIEW 2026-11-26 B1 (PoC): an EMPTY poke after a day resets the drag clock without moving the band.
-    function test_review_emptyPokeResetsTheDragClock() public {
+    /// REVIEW 2026-11-26 B1 (fixed in the next Backstop; the deployed one is deployed/Backstop.v1.sol): empty pokes
+    /// no longer restart the drag clock, so the first funded band after a pump moves up one step.
+    function test_backstop_anEmptyPokeDoesNotHoldTheBandDown() public {
         address token = _tradedCoin();
         Backstop b = _backstop(token, 0);
         int24 anchor = b.lower();
+        uint256 deployedAt = b.movedUpAt();
         _swap(alice, token, true, 300 ether);
         for (uint256 d; d < 5; ++d) {
             vm.warp(block.timestamp + 1 days);
             b.poke(); // anyone, no ETH: nothing placed
         }
-        assertEq(b.lower(), anchor, "never moved");
+        assertEq(b.movedUpAt(), deployedAt, "the clock did not restart");
         vm.deal(address(b), 1 ether);
         b.poke();
-        assertEq(b.lower(), anchor, "five days later the first funded band is still at the deploy anchor");
+        assertEq(b.lower(), anchor - SPACING, "one step up once funded");
+    }
+
+    /// REVIEW 2026-11-26 B3: the band never passes the last usable tick.
+    function test_backstop_clampsTheBandToUsableTicks() public {
+        ClampHarness h = new ClampHarness(IBackstopLaunchpad(address(factory)), manager, _tradedCoin());
+        int24 last = TickMath.maxUsableTick(SPACING) - SPACING;
+        assertEq(h.clamp(TickMath.MAX_TICK, SPACING), last);
+        assertEq(h.clamp(0, SPACING), 0);
+    }
+}
+
+contract ClampHarness is Backstop {
+    constructor(IBackstopLaunchpad l, IPoolManager m, address t) Backstop(l, m, t) {}
+
+    function clamp(int24 next, int24 s) external pure returns (int24) {
+        return _clamp(next, s);
     }
 }
