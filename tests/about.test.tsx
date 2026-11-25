@@ -16,6 +16,8 @@ vi.mock("@/adapters/http/indexer", async (orig) => ({ ...(await orig<typeof impo
 const launchOf = vi.fn();
 vi.mock("@/skills/launchpad", async (orig) => ({ ...(await orig<typeof import("@/skills/launchpad")>()), launchOf: (t: string) => launchOf(t) }));
 const furnaceOf = vi.fn();
+const readBackstop = vi.fn();
+vi.mock("@/lib/backstop", async (orig) => ({ ...(await orig<typeof import("@/lib/backstop")>()), readBackstop: (...a: unknown[]) => readBackstop(...a) }));
 vi.mock("@/lib/furnace", async (orig) => ({ ...(await orig<typeof import("@/lib/furnace")>()), furnaceOf: (...a: unknown[]) => furnaceOf(...a) }));
 
 const FURNACE = "0x78386A3c1888f89EF4C874675069Cb930536a44c";
@@ -29,6 +31,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   launchpadCoins.mockResolvedValue({ syncedTo: 1, behind: 0, error: null, coins: [coin(7), coin(8), coin(0)], creators: [{}, {}] });
   launchOf.mockResolvedValue({ factory: "0x006Da367654a487bb277fe25ff54f0fE0f741377", creator: "0x1", creatorRecipient: FURNACE });
+  readBackstop.mockResolvedValue({ address: "0xc5b6CA155E17a4Ff45ffC056Ff39468d48940409", placed: true, waiting: 0n, burned: 1_000n * 10n ** 18n, lastPoke: 1_764_000_000 });
   furnaceOf.mockResolvedValue({ address: FURNACE, treasury: "0xD5C1", burnBps: 5_000, toBuy: 0n, burnedFromFees: 135_484n * 10n ** 18n, burnedFromBuybacks: 1_677_632n * 10n ** 18n, quoteSpent: 0n });
 });
 
@@ -56,8 +59,8 @@ describe("the About page", () => {
     expect(figure("coins launched here")).toBe("3");
     expect(figure("launchers")).toBe("2");
     expect(figure("trades on their pools")).toBe("15");
-    expect(burntHead()).toBe("1,813,116");
-    expect(screen.getByText(/burnt · 0\.1813% of the supply/)).toBeInTheDocument();
+    expect(burntHead()).toBe("1,814,116");
+    expect(screen.getByText(/burnt · 0\.1814% of the supply/)).toBeInTheDocument();
     expect(screen.getByText(/Its creator fees go to the furnace/)).toHaveTextContent("50% burnt/buyback");
     // what waits to be bought back, what was spent, what the buybacks burnt — and when they happen
     expect(figure("burnt from fees, at once")).toBe("135,484");
@@ -66,6 +69,28 @@ describe("the About page", () => {
     expect(screen.getByText("0 / 0.05 ETH")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "ETH waiting toward the next buyback" })).toHaveAttribute("aria-valuenow", "0");
     expect(screen.getByText(/Each Monday, once 0\.05 ETH or more is waiting/)).toBeInTheDocument();
+    // the backstop, read from its contract
+    expect(figure("bid in the pool")).toBe("placed");
+    expect(figure("burnt by the backstop")).toBe("1,000");
+    expect(figure("ETH waiting for the next poke")).toBe("0 ETH");
+    expect(figure("last poke")).toBe("2025-11-24 16:00 UTC");
+    expect(screen.getByRole("link", { name: "view " + BRAND.ticker })).toBeInTheDocument();
+  });
+
+  it("says the backstop's numbers were not read, makes the burnt total not read, and words an empty one", async () => {
+    readBackstop.mockRejectedValue(new Error("rpc down"));
+    const a = renderAt("/about");
+    await settle();
+    expect(burntHead()).toBe("not read");
+    expect(figure("bid in the pool")).toBe("not read");
+    a.unmount();
+    readBackstop.mockResolvedValue({ address: "0xc5b6CA155E17a4Ff45ffC056Ff39468d48940409", placed: false, waiting: 5n * 10n ** 14n, burned: 0n, lastPoke: 0 });
+    renderAt("/about");
+    expect(figure("bid in the pool")).toBe("…");
+    await settle();
+    expect(figure("bid in the pool")).toBe("waiting for ETH");
+    expect(figure("last poke")).toBe("never");
+    expect(figure("ETH waiting for the next poke")).toBe("0.0005 ETH");
   });
 
   it("says a number it could not read is not read — never zero — and has no furnace figure when there is none", async () => {
@@ -108,7 +133,7 @@ describe("the fee flow", () => {
     expect(map).toHaveTextContent("50%");
     expect(map).toHaveTextContent("To furnace");
     expect(map.textContent).not.toMatch(/[→↓]/);
-    expect(map).toHaveTextContent("Contracts not audited");
+    expect(map).toHaveTextContent("Contracts internally reviewed, not independently audited");
     a.unmount();
   });
 });

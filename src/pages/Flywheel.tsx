@@ -27,7 +27,7 @@ export function Flywheel() {
             <div className="fee-map__furnace folio__end"><div className="fee-map__furnace-title"><span>Furnace /</span><span>Fixed at deploy</span></div><div className="fee-map__outputs"><div><strong className="folio__figure">50%</strong><h4>Burn &amp; buyback</h4><p>{BRAND.ticker} burnt at once.<br />ETH held for buybacks.</p></div><div><strong className="folio__figure">50%</strong><h4>To treasury</h4><p>Remaining 50% of fees<br />sent to treasury.</p></div></div></div>
           </div>
         </section>
-        <figcaption className="folio__caveat">Base / Fixed supply / No admin / Permanently locked liquidity / Contracts not audited</figcaption>
+        <figcaption className="folio__caveat">Base / Fixed supply / No admin / Permanently locked liquidity / Contracts internally reviewed, not independently audited</figcaption>
       </div>
     </figure>
   );

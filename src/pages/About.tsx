@@ -6,6 +6,7 @@ import { BASE, requireContract } from "@/config/chain";
 import { LAUNCHPAD_DECIMALS } from "@/config/launchpad";
 import { launchpadCoins, type LaunchpadIndex } from "@/adapters/http/indexer";
 import { furnaceOf, type Furnace } from "@/lib/furnace";
+import { readBackstop, type Backstop } from "@/lib/backstop";
 import { messageOf } from "@/lib/errors";
 import { launchOf } from "@/skills/launchpad";
 import { explorer, short, tokenAmount } from "@/skills/format";
@@ -38,6 +39,12 @@ async function tokenFurnace(token: string): Promise<Furnace | null> {
 
 /** The token's furnace, or `null` when the token's share goes elsewhere. */
 const readFurnace = () => tokenFurnace(requireContract("token"));
+
+/** Stage C's Backstop for the token. */
+const readTokenBackstop = () => readBackstop(requireContract("backstop"));
+
+/** A poke's time, as UTC. */
+const utc = (secs: number) => new Date(secs * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC";
 
 function useRead<T>(read: () => Promise<T>): Read<T> {
   const [value, setValue] = useState<Read<T>>("reading");
@@ -109,6 +116,25 @@ function FurnaceCard({ furnace, burnt }: { furnace: Read<Furnace | null>; burnt:
   );
 }
 
+/** The Backstop, as one card: the bid under the price, and what it has bought and burnt. */
+function BackstopCard({ backstop }: { backstop: Read<Backstop> }) {
+  const b = backstop !== "reading" && !("problem" in backstop) ? backstop : null;
+  const missing = backstop === "reading" ? "…" : "not read";
+  return (
+    <div className="about__furnace about__backstop" aria-label="The backstop">
+      <p className="about__card-head">backstop / {BRAND.ticker}</p>
+      <p>Half of the protocol's ETH from every coin waits as a bid just under {BRAND.ticker}'s price in its own pool. A seller fills it; what it buys is burnt.</p>
+      <dl className="about__furnace-rows">
+        <div><dt>bid in the pool</dt><dd>{b ? (b.placed ? "placed" : "waiting for ETH") : missing}</dd></div>
+        <div><dt>burnt by the backstop</dt><dd>{b ? tokenAmount(b.burned, LAUNCHPAD_DECIMALS, 0) : missing}</dd></div>
+        <div><dt>ETH waiting for the next poke</dt><dd>{b ? `${tokenAmount(b.waiting, 18, 6)} ETH` : missing}</dd></div>
+        <div><dt>last poke</dt><dd>{b ? (b.lastPoke === 0 ? "never" : utc(b.lastPoke)) : missing}</dd></div>
+      </dl>
+      {b ? <p><a href={explorer.address(b.address)}>{short(b.address)}</a> on {BASE.name}</p> : null}
+    </div>
+  );
+}
+
 /** A furnace figure that is not there: still reading, not read, or no furnace at all. */
 function shownMissing(furnace: Read<Furnace | null>): string {
   return furnace === "reading" ? "…" : furnace === null ? "—" : "not read";
@@ -119,7 +145,11 @@ export function About() {
   const token = requireContract("token");
   const furnace = useRead(readFurnace);
   const stats = index === "reading" || "problem" in index ? index : statsOf(index);
-  const burnt = furnace === "reading" || (furnace !== null && "problem" in furnace) ? furnace : furnace === null ? null : furnace.burnedFromFees + furnace.burnedFromBuybacks;
+  const backstop = useRead(readTokenBackstop);
+  const furnaceBurnt = furnace === "reading" || (furnace !== null && "problem" in furnace) ? furnace : furnace === null ? null : furnace.burnedFromFees + furnace.burnedFromBuybacks;
+  // the headline is furnace + backstop; a part not read makes the whole "not read", never a smaller number
+  const burnt =
+    furnaceBurnt === null || typeof furnaceBurnt !== "bigint" ? furnaceBurnt : backstop === "reading" || "problem" in backstop ? backstop : furnaceBurnt + backstop.burned;
 
   return (
     <div className="about">
@@ -210,6 +240,7 @@ export function About() {
         <h2>Live on {BASE.name}</h2>
         <div className="about__live-grid">
           <FurnaceCard furnace={furnace} burnt={burnt} />
+          <BackstopCard backstop={backstop} />
           <div className="about__launchpad" aria-label="The launchpad">
             <p className="about__card-head">launchpad / since v1</p>
             <dl className="about__stats">
@@ -236,7 +267,7 @@ export function About() {
               </>
             ) : null}{" "}
             Buybacks are on-chain transactions anyone can read, not a promise of anything.{" "}
-            <Link to={`/?do=coins&t=${token}`}>View {BRAND.ticker} ↗</Link>
+            <Link to={`/?do=coins&t=${token}`}>view {BRAND.ticker}</Link>
         </p>
       </section>
 
@@ -245,7 +276,7 @@ export function About() {
         <ul className="about__list">
           <li>It never holds your key. Nothing moves money without your wallet's signature.</li>
           <li>It never calls a token safe. "No red flags" means the checks found none — not that there are none.</li>
-          <li>Its launchpad, fee-sharing, furnace and BasketRouter contracts are verified on Sourcify and not audited.</li>
+          <li>Its launchpad, furnace, FeeRouter, Backstop and BasketRouter contracts are verified on Sourcify and internally reviewed (168 tests, invariants, Slither), not independently audited.</li>
           <li>Coinbase's tokenized stocks are only for eligible persons outside the U.S.</li>
         </ul>
       </section>
