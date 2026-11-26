@@ -626,7 +626,12 @@ export function BasketPanel() {
         </section>
 
         <aside className="mk__trade-box" aria-label="Buy basket">
-          <h4 className="mk__trade-title">Buy {name.trim() || "basket"} on {BASE.name}</h4>
+          <h4 className="mk__trade-title">
+            {(() => {
+              const label = name.trim() || "basket";
+              return `Buy ${label.toLowerCase().endsWith(` on ${BASE.name.toLowerCase()}`) ? label : `${label} on ${BASE.name}`}`;
+            })()}
+          </h4>
 
           <label className="group__row">
             <span>Put in</span>

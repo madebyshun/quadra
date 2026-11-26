@@ -199,7 +199,7 @@ export function About() {
         <nav aria-label="About navigation">
           <a href="#tools">The tools</a>
           <Link to="/docs">Docs</Link>
-          <Link to="/" state={{ fromPage: true }} className="about__button about__button--small">Open the computer <span aria-hidden="true">↗</span></Link>
+          <Link to="/" state={{ fromPage: true }} className="about__button about__button--small">Open the computer</Link>
         </nav>
       </header>
 
@@ -212,8 +212,8 @@ export function About() {
             <h2>An on-chain<br />supercomputer<br /><em>for Base.</em></h2>
             <p className="about__lede">Research a token. Build a basket. Launch something new. Your corner of {BASE.name}, signed in your own wallet.</p>
             <div className="about__row">
-              <Link to="/" state={{ fromPage: true }} className="about__button">Open the computer <span aria-hidden="true">↗</span></Link>
-              <a href="#tools" className="about__text-link">Take a look around <span aria-hidden="true">↓</span></a>
+              <Link to="/" state={{ fromPage: true }} className="about__button">Open the computer</Link>
+              <a href="#tools" className="about__text-link">Take a look around</a>
             </div>
             <p className="about__hero-note">Built on {BASE.name} · Your wallet holds the keys</p>
           </div>
@@ -242,7 +242,7 @@ export function About() {
             </div>
             <h3>Check before you act.</h3>
             <p>Simulate a buy and a sell, inspect the code, and read the holders and launcher. See what was checked and what could not be read.</p>
-            <Link to="/?do=safety" className="about__tool-link">Check a token <span aria-hidden="true">↗</span></Link>
+            <Link to="/?do=safety" className="about__tool-link">Check a token</Link>
           </article>
           <article className="about__tool">
             <div className="about__window" aria-hidden="true">
@@ -256,7 +256,7 @@ export function About() {
             </div>
             <h3>Make your own mix.</h3>
             <p>Choose assets and target weights, review a fresh quote, then buy a Treasury Basket. You hold the individual assets in your wallet.</p>
-            <Link to="/?do=basket" className="about__tool-link">Build a basket <span aria-hidden="true">↗</span></Link>
+            <Link to="/?do=basket" className="about__tool-link">Build a basket</Link>
           </article>
           <article className="about__tool">
             <div className="about__window" aria-hidden="true">
@@ -269,13 +269,13 @@ export function About() {
             </div>
             <h3>Give an idea a market.</h3>
             <p>Launch a fixed-supply coin paired with ETH, Base crypto, or a supported tokenized stock. Its supply starts in a Uniswap v4 pool with permanently locked liquidity.</p>
-            <Link to="/?do=launch" className="about__tool-link">Launch a coin <span aria-hidden="true">↗</span></Link>
+            <Link to="/?do=launch" className="about__tool-link">Launch a coin</Link>
           </article>
         </div>
         <div className="about__more">
           <span>Already have something in mind?</span>
-          <Link to="/?do=coins">Browse coins <span aria-hidden="true">↗</span></Link>
-          <Link to="/?do=trade">Trade on {BASE.name} <span aria-hidden="true">↗</span></Link>
+          <Link to="/?do=coins">Browse coins</Link>
+          <Link to="/?do=trade">Trade on {BASE.name}</Link>
         </div>
       </section>
 
@@ -323,8 +323,8 @@ export function About() {
         <div className="about__foot-inner">
           <p className="about__eyebrow">The desktop is yours.</p>
           <h2>Make yourself<br /><em>at home.</em></h2>
-          <Link to="/" state={{ fromPage: true }} className="about__button">Open the computer <span aria-hidden="true">↗</span></Link>
-          <div className="about__colophon"><span>{BRAND.name} · {BRAND.x} · built on {BASE.name}</span><Link to="/docs">Read the docs ↗</Link></div>
+          <Link to="/" state={{ fromPage: true }} className="about__button">Open the computer</Link>
+          <div className="about__colophon"><span>{BRAND.name} · {BRAND.x} · built on {BASE.name}</span><Link to="/docs">Read the docs</Link></div>
         </div>
       </footer>
     </div>

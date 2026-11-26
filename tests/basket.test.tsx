@@ -247,6 +247,7 @@ describe("the Treasury Basket window", () => {
     await userEvent.click(screen.getByRole("button", { name: "AI compute" }));
     expect(screen.getByLabelText("Asset 1")).toHaveValue("NVDA");
     await userEvent.click(screen.getByRole("button", { name: "AI on Base" }));
+    expect(screen.getByRole("heading", { name: "Buy AI on Base" })).toBeInTheDocument();
     expect(screen.getByLabelText("Asset 1")).toHaveValue("VVV");
     expect(screen.getByLabelText("Asset 2")).toHaveValue("VIRTUAL");
     expect(screen.getByLabelText("Asset 3")).toHaveValue("CLANKER");
