@@ -495,6 +495,7 @@ export function BasketPanel() {
             <span className="dim" aria-hidden="true">{p.picks.length}</span>
           </button>
         ))}
+        <span className="dim">Presets are starting points, not advice.</span>
       </div>
 
       {closed ? <p className="crt__amber">{RESTRICTED_TEXT} A basket of crypto only still works.</p> : null}

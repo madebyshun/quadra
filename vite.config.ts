@@ -8,6 +8,8 @@ import { chartsHandler, CHARTS_PATH } from "./src/server/charts";
 import { logoHandler, LOGO_PATH } from "./src/server/logo";
 import { weekendHandler, WEEKEND_PATH } from "./src/server/weekend";
 import { regionHandler, REGION_PATH } from "./src/server/region";
+import { EXPLAIN_PATH } from "./src/server/explainPath";
+import type { explainHandler } from "./src/server/explain";
 import { cdpFacilitator, type CdpCredentials } from "./src/server/cdp";
 import { API_PATH } from "./src/server/apiPath";
 import type { apiHandler } from "./src/server/api";
@@ -58,6 +60,26 @@ function devRoutes(): Plugin {
       server.middlewares.use(WEEKEND_PATH, asMiddleware(WEEKEND_PATH, weekendHandler()));
       /** The visitor's country — Vercel's header; none on the dev server — `src/server/region.ts`. */
       server.middlewares.use(REGION_PATH, asMiddleware(REGION_PATH, regionHandler()));
+    },
+  };
+}
+
+/**
+ * Plain-English report explanation via Venice (`src/server/explain.ts`): loaded through the SSR
+ * loader because it runs skills server-side, with ONE handler kept per loaded module for cache and rate limit.
+ */
+function devExplain(env: Record<string, string>): Plugin {
+  return {
+    name: "dev-explain",
+    configureServer(server) {
+      let held: { mod: unknown; handle: ReturnType<typeof explainHandler> } | null = null;
+      server.middlewares.use(EXPLAIN_PATH, (req, res, next) => {
+        server.ssrLoadModule("/src/server/explain.ts").then((mod) => {
+          const make = (mod as { explainHandler: typeof explainHandler }).explainHandler;
+          if (held?.mod !== make) held = { mod: make, handle: make({ apiKey: env.VENICE_API_KEY, model: env.VENICE_MODEL }) };
+          asMiddleware(EXPLAIN_PATH, held.handle)(req, res, next);
+        }, next);
+      });
     },
   };
 }
@@ -136,7 +158,7 @@ const UPSTREAM = "https://blueagent.dev";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   return {
-  plugins: [react(), devForwarder(), devRoutes(), devApi(cdpCredentials(env)), devIndexer()],
+  plugins: [react(), devForwarder(), devRoutes(), devApi(cdpCredentials(env)), devIndexer(), devExplain(env)],
   /**
    * Tests read NO .env file. MEASURED 2026-09-30: once the owner put a WalletConnect id in
    * `.env.local`, Vitest loaded it and the suite's behaviour (and coverage) depended on whose

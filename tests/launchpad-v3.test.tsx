@@ -7,7 +7,7 @@ import userEvent from "@testing-library/user-event";
 import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, encodeFunctionResult, erc20Abi, parseAbiParameters } from "viem";
 import { BASE, CONTRACTS, UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
 import { DYNAMIC_FEE_FLAG, feePercent, LAUNCH_HOOK_ABI, LAUNCHPAD_V3_ABI, LAUNCHPAD_V3_EXPECTS } from "@/config/launchpad";
-import { checkFactory, launchFactory, launchTx, LAUNCH_FEES, type Metadata, type Pair } from "@/adapters/http/launchpad";
+import { checkFactory, launchFactory, launchPairs, launchTx, LAUNCH_FEES, type Metadata, type Pair } from "@/adapters/http/launchpad";
 import { coinFeeOf, factories, isV3, launchOf, poolIdOf, v3FeeOf } from "@/skills/launchpad";
 import { NATIVE, poolKeyOf } from "@/lib/v4swap";
 import { feeOf, prepareLaunch, prepareLaunchSkill, referrerArg } from "@/skills/prepare";
@@ -711,5 +711,38 @@ describe("a referred v3 coin", () => {
     const plain = emptyState();
     applyLaunches(plain, [launched], () => 0);
     expect(snapshot(plain, OPENED).coins[0]!.referrer).toBeNull();
+  });
+});
+
+describe("VVV quote pair on v3", () => {
+  const VVV = "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf";
+
+  it("offers VVV with its symbol and 18 decimals once enabled on LaunchFactoryV3", async () => {
+    pin();
+    forgetCatalog();
+    net({
+      get: (u) => (u === `${STOCKS_PATH}/base` ? { stocks: [] } : undefined),
+      rpc: ethCalls({
+        [V3]: (data) => {
+          const d = decodeFunctionData({ abi: LAUNCHPAD_V3_ABI, data });
+          if (d.functionName === "quotes") {
+            const q = String(d.args[0]).toLowerCase();
+            if (q === ETH_Q) return encodeFunctionResult({ abi: LAUNCHPAD_V3_ABI, functionName: "quotes", result: [true, 191_200] });
+            if (q === VVV.toLowerCase()) return encodeFunctionResult({ abi: LAUNCHPAD_V3_ABI, functionName: "quotes", result: [true, 150_200] });
+            return encodeFunctionResult({ abi: LAUNCHPAD_V3_ABI, functionName: "quotes", result: [false, 0] });
+          }
+          return factory()(data);
+        },
+      }),
+    });
+    const res = await launchPairs(V3);
+    expect(res.problem).toBeNull();
+    expect(res.pairs.find((p) => p.address.toLowerCase() === VVV.toLowerCase())).toEqual({
+      address: VVV,
+      symbol: "VVV",
+      name: "Venice Token",
+      decimals: 18,
+      startTick: 150_200,
+    });
   });
 });

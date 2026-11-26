@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { Report } from "@/skills/types";
 import { useRunCommand } from "@/features/openWindow";
 import { say } from "@/lib/assistant";
 import { count } from "@/lib/achievements";
 import { depthCard, DepthShare } from "@/features/panels/DepthShare";
 import { collateralCard, CollateralShare } from "@/features/panels/CollateralShare";
+import { ExplainReport } from "@/features/panels/ExplainReport";
 import { LoanWatch } from "@/features/loanAlerts";
 
 /**
@@ -30,6 +31,7 @@ export function tipFor(report: Report): Parameters<typeof say>[0] | null {
  */
 export function ReportView({ report }: { report: Report }) {
   const run = useRunCommand();
+  const rowsId = useId();
   const [refused, setRefused] = useState<string | null>(null);
   const go = (command: string) => setRefused(run!(command));
   useEffect(() => {
@@ -41,7 +43,7 @@ export function ReportView({ report }: { report: Report }) {
   return (
     <section className="report" aria-label={report.title}>
       <h3 className="report__title">{report.title}</h3>
-      <dl className="report__rows">
+      <dl id={rowsId} className="report__rows">
         {report.rows.map((r, i) => (
           <div className={`report__row${r.tone ? ` report__row--${r.tone}` : ""}`} key={`${r.label}-${i}`}>
             <dt>{r.label}</dt>
@@ -78,6 +80,7 @@ export function ReportView({ report }: { report: Report }) {
         </div>
       ) : null}
       {refused ? <p className="tx__warn">{refused}</p> : null}
+      <ExplainReport report={report} rowsId={rowsId} />
       <Shareable report={report} />
       {report.title.endsWith("— Collateral Watch") && collateralCard(report) ? <LoanWatch wallet={collateralCard(report)!.wallet} /> : null}
     </section>

@@ -270,6 +270,25 @@ html:has(.intro), body:has(.intro) { overflow: hidden; }
   font-family: var(--font-mono);
   font-size: 10.5px;
 }
+.report__explain-wrap {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+.report__explain {
+  padding: 10px 12px;
+  border: 1px solid #bab6ae;
+  border-left: 3px solid #0a3dff;
+  background: #f4f0e6;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.report__explain p {
+  margin: 0;
+}
+.report__explain p + p {
+  margin-top: 6px;
+}
 .x402__card {
   border: 1.5px solid #292a31;
   background: #fffdf6;

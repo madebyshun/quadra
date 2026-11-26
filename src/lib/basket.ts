@@ -51,6 +51,16 @@ export const PRESETS: readonly { readonly id: string; readonly name: string; rea
       ["META", 20],
     ],
   },
+  {
+    id: "ai-on-base",
+    name: "AI on Base",
+    picks: [
+      ["VVV", 25],
+      ["VIRTUAL", 25],
+      ["CLANKER", 25],
+      ["BNKR", 25],
+    ],
+  },
 ];
 
 /** The most legs a basket takes — each is two signatures. */
