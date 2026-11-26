@@ -59,7 +59,11 @@ export type ExplainDeps = {
   readonly runSkill?: (skill: ExplainSkill, args: readonly string[]) => Promise<Report>;
 };
 
-type Cached = { readonly explanation: string; readonly model: string; readonly at: number };
+type Cached = { readonly explanation: string; readonly model: string; readonly verdict: string | null; readonly at: number };
+
+function summaryLine(report: Report): string | null {
+  return report.rows.find((r) => r.label === "Verdict" || r.label === "Decision")?.value ?? null;
+}
 
 /** Pure 64-bit FNV-1a hex digest for cache keying. */
 export function hashReport(text: string): string {
@@ -131,12 +135,15 @@ export function explainHandler(deps: ExplainDeps = {}) {
     const key = `${model}:${hashReport(`${skill}\0${args.map((a) => a.toLowerCase()).join("\0")}`)}`;
     const hit = cache.get(key);
     if (hit && t - hit.at < CACHE_TTL_MS) {
-      return jsonResponse({ explanation: hit.explanation, model: hit.model, cached: true });
+      return jsonResponse({ explanation: hit.explanation, model: hit.model, verdict: hit.verdict, cached: true });
     }
 
     let text: string;
+    let verdict: string | null;
     try {
-      text = reportText(await runSkill(skill, args)).slice(0, MAX_REPORT_CHARS);
+      const report = await runSkill(skill, args);
+      verdict = summaryLine(report);
+      text = reportText(report).slice(0, MAX_REPORT_CHARS);
     } catch (err) {
       return jsonResponse({ error: messageOf(err) }, 422);
     }
@@ -182,7 +189,7 @@ export function explainHandler(deps: ExplainDeps = {}) {
       return jsonResponse({ error: "Venice explanation was withheld because it did not follow safety wording rules." }, 502);
     }
 
-    cache.set(key, { explanation, model: usedModel, at: t });
-    return jsonResponse({ explanation, model: usedModel, cached: false });
+    cache.set(key, { explanation, model: usedModel, verdict, at: t });
+    return jsonResponse({ explanation, model: usedModel, verdict, cached: false });
   };
 }

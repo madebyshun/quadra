@@ -8410,6 +8410,9 @@ function filterExplanation(text) {
   if (!clean2 || UNNEGATED_SAFE.test(clean2) || ADVICE.test(clean2)) return null;
   return clean2;
 }
+function summaryLine(report) {
+  return report.rows.find((r) => r.label === "Verdict" || r.label === "Decision")?.value ?? null;
+}
 function hashReport(text) {
   let h = 0xcbf29ce484222325n;
   const prime = 0x100000001b3n;
@@ -8471,11 +8474,14 @@ function explainHandler(deps = {}) {
     const key = `${model}:${hashReport(`${skill}\0${args.map((a) => a.toLowerCase()).join("\0")}`)}`;
     const hit = cache.get(key);
     if (hit && t - hit.at < CACHE_TTL_MS) {
-      return jsonResponse({ explanation: hit.explanation, model: hit.model, cached: true });
+      return jsonResponse({ explanation: hit.explanation, model: hit.model, verdict: hit.verdict, cached: true });
     }
     let text;
+    let verdict;
     try {
-      text = reportText(await runSkill(skill, args)).slice(0, MAX_REPORT_CHARS);
+      const report = await runSkill(skill, args);
+      verdict = summaryLine(report);
+      text = reportText(report).slice(0, MAX_REPORT_CHARS);
     } catch (err) {
       return jsonResponse({ error: messageOf(err) }, 422);
     }
@@ -8516,8 +8522,8 @@ function explainHandler(deps = {}) {
     if (!explanation) {
       return jsonResponse({ error: "Venice explanation was withheld because it did not follow safety wording rules." }, 502);
     }
-    cache.set(key, { explanation, model: usedModel, at: t });
-    return jsonResponse({ explanation, model: usedModel, cached: false });
+    cache.set(key, { explanation, model: usedModel, verdict, at: t });
+    return jsonResponse({ explanation, model: usedModel, verdict, cached: false });
   };
 }
 

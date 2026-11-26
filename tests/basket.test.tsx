@@ -210,10 +210,15 @@ describe("a basket's arithmetic", () => {
   });
 
   it("knows Coinbase's stocks by ticker and symbol and the verified crypto, never USDC, and a paused stock as paused", () => {
-    const c = catalog(STOCKS);
+    const withVvvStock = new Map(STOCKS);
+    const sample = STOCKS.get("NVDA")!;
+    withVvvStock.set("VVV", { ...sample, ticker: "VVV", symbol: "VVVc", address: "0x0000000000000000000000000000000000000vvv".replace("vvv", "111") });
+    const c = catalog(withVvvStock);
     expect(c.get("NVDA")).toMatchObject({ symbol: "NVDAc", address: NVDA_ON_BASE, kind: "stock", paused: false });
     expect(c.get("NVDAC")).toBe(c.get("NVDA"));
     expect(c.get("CBBTC")).toMatchObject({ kind: "crypto" });
+    expect(c.get("VVV")).toMatchObject({ symbol: "VVV", kind: "crypto" });
+    expect(c.get("VVVC")).toMatchObject({ symbol: "VVVc", kind: "stock" });
     expect(c.has("USDC")).toBe(false);
     expect(c.get("DKNG")!.paused).toBe(true);
   });

@@ -85,15 +85,15 @@ const arrived = (amount: bigint, a: BasketAsset) => `arrived: ${tokenAmount(amou
 const asAsset = (a: BasketAsset): Asset => ({ kind: "erc20", address: a.address, symbol: a.symbol, decimals: a.decimals });
 const impactOf = (q: SwapQuote) => (q.impact === null ? null : Math.abs(Number(q.impact)));
 
-/** Every asset a basket may hold, by symbol (upper-cased): Coinbase's stocks by ticker and symbol, and the verified crypto. */
+/** Every asset a basket may hold, by symbol (upper-cased): Coinbase's stocks by ticker and symbol, and the verified crypto (crypto wins bare ticker collisions like VVV vs Valvoline VVVc). */
 export function catalog(stocks: ReadonlyMap<string, BaseStock>): Map<string, BasketAsset & { readonly paused: boolean }> {
   const out = new Map<string, BasketAsset & { readonly paused: boolean }>();
-  for (const c of TRADE_CRYPTO) if (!sameAddress(c.address, USDC.address)) out.set(c.symbol.toUpperCase(), { symbol: c.symbol, address: c.address, decimals: c.decimals, kind: "crypto", paused: false });
   for (const [ticker, s] of stocks) {
     const a = { symbol: s.symbol, address: s.address, decimals: s.decimals, kind: "stock" as const, paused: transfersPaused(s) };
     out.set(ticker.toUpperCase(), a);
     out.set(s.symbol.toUpperCase(), a);
   }
+  for (const c of TRADE_CRYPTO) if (!sameAddress(c.address, USDC.address)) out.set(c.symbol.toUpperCase(), { symbol: c.symbol, address: c.address, decimals: c.decimals, kind: "crypto", paused: false });
   return out;
 }
 

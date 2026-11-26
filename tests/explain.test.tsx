@@ -143,6 +143,7 @@ describe("explainHandler (server/explain.ts)", () => {
     expect(firstJson).toEqual({
       explanation: "Caution score 70/100; top 10 holders were not checked.",
       model: DEFAULT_VENICE_MODEL,
+      verdict: "Caution — 70/100",
       cached: false,
     });
     expect(JSON.stringify(firstJson)).not.toContain("secret-venice-key");
@@ -161,6 +162,7 @@ describe("explainHandler (server/explain.ts)", () => {
     expect(await second.json()).toEqual({
       explanation: "Caution score 70/100; top 10 holders were not checked.",
       model: DEFAULT_VENICE_MODEL,
+      verdict: "Caution — 70/100",
       cached: true,
     });
     expect(skillCalls).toHaveLength(1);
@@ -226,16 +228,17 @@ describe("explainHandler (server/explain.ts)", () => {
     await injected(post({ skill: "verdict", args: [TOKEN_ADDR] }));
     expect(attempts).toBe(2);
 
-    // Falls back to configured model if response omits model field
+    // Falls back to configured model if response omits model field, and returns verdict: null if report has no Verdict/Decision row
     const noModel = explainHandler({
       apiKey: "k",
       model: "custom-model",
-      runSkill,
+      runSkill: async () => ({ title: "Bare", rows: [], notes: [], sources: [] }),
       fetchImpl: (async () => new Response(JSON.stringify({ choices: [{ message: { content: "Plain summary." } }] }), { status: 200 })) as unknown as typeof fetch,
     });
     expect(await (await noModel(post({ skill: "verdict", args: [TOKEN_ADDR] }))).json()).toEqual({
       explanation: "Plain summary.",
       model: "custom-model",
+      verdict: null,
       cached: false,
     });
   });
@@ -259,10 +262,10 @@ describe("ExplainReport UI inside ReportView", () => {
       "fetch",
       vi.fn(async (_url: string, init?: RequestInit) => {
         sentBody = String(init?.body ?? "");
-        return new Response(JSON.stringify({ explanation: "Top 10 holders were not checked.", model: DEFAULT_VENICE_MODEL, cached: false }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ explanation: "Top 10 holders were not checked.", model: DEFAULT_VENICE_MODEL, verdict: "Caution — 70/100", cached: false }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
       }),
     );
 
@@ -275,9 +278,21 @@ describe("ExplainReport UI inside ReportView", () => {
     expect(screen.getByText(new RegExp(`Explanation by Venice \\(${DEFAULT_VENICE_MODEL}\\), from this report only`))).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "see the report rows" })).toHaveAttribute("href", expect.stringMatching(/^#/));
 
-    // Switching to another report resets back to the idle button
+    // Switching to another report resets back to the idle button, and a drifted server verdict shows a clear notice
     rerender(<ReportView report={SEND_CHECK_REPORT} />);
     expect(screen.getByRole("button", { name: "Explain in plain words" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Explain in plain words" }));
+    await waitFor(() => expect(screen.getByText(/Live server re-check returned/)).toBeInTheDocument());
+    expect(screen.getByText(new RegExp(`Explanation by Venice \\(${DEFAULT_VENICE_MODEL}\\), from a live server re-check`))).toBeInTheDocument();
+
+    // Report without Verdict/Decision row and response without verdict field still render cleanly
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ explanation: "Plain summary.", model: DEFAULT_VENICE_MODEL, cached: false }), { status: 200 })),
+    );
+    rerender(<ReportView report={{ title: `Token Verdict — ${TOKEN_ADDR}`, rows: [], notes: [], sources: [] }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Explain in plain words" }));
+    await waitFor(() => expect(screen.getByText("Plain summary.")).toBeInTheDocument());
 
     // Non-verdict / non-sendcheck report does not show the button
     rerender(<ReportView report={RADAR_REPORT} />);

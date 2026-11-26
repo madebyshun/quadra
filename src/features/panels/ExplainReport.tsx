@@ -29,10 +29,14 @@ export function isExplainable(report: Report): boolean {
   return explainTarget(report) !== null;
 }
 
+function reportSummary(report: Report): string | null {
+  return report.rows.find((r) => r.label === "Verdict" || r.label === "Decision")?.value ?? null;
+}
+
 type State =
   | { readonly kind: "idle" }
   | { readonly kind: "loading" }
-  | { readonly kind: "ready"; readonly explanation: string; readonly model: string }
+  | { readonly kind: "ready"; readonly explanation: string; readonly model: string; readonly verdict: string | null }
   | { readonly kind: "error"; readonly message: string };
 
 export function ExplainReport({ report, rowsId }: { report: Report; rowsId: string }) {
@@ -45,6 +49,8 @@ export function ExplainReport({ report, rowsId }: { report: Report; rowsId: stri
   const target = explainTarget(report);
   if (!target) return null;
 
+  const displayedVerdict = reportSummary(report);
+
   const explain = async () => {
     setState({ kind: "loading" });
     try {
@@ -53,7 +59,7 @@ export function ExplainReport({ report, rowsId }: { report: Report; rowsId: stri
         headers: { "content-type": "application/json", "x-quadra": "1" },
         body: JSON.stringify(target),
       });
-      const body = (await res.json()) as { explanation?: unknown; model?: unknown; error?: unknown };
+      const body = (await res.json()) as { explanation?: unknown; model?: unknown; verdict?: unknown; error?: unknown };
       if (!res.ok || typeof body.explanation !== "string" || typeof body.model !== "string") {
         setState({
           kind: "error",
@@ -61,19 +67,31 @@ export function ExplainReport({ report, rowsId }: { report: Report; rowsId: stri
         });
         return;
       }
-      setState({ kind: "ready", explanation: body.explanation, model: body.model });
+      setState({
+        kind: "ready",
+        explanation: body.explanation,
+        model: body.model,
+        verdict: typeof body.verdict === "string" ? body.verdict : null,
+      });
     } catch {
       setState({ kind: "error", message: "Could not reach the explanation service." });
     }
   };
 
+  const drifted = state.kind === "ready" && state.verdict !== null && displayedVerdict !== null && state.verdict !== displayedVerdict;
+
   return (
     <div className="report__explain-wrap">
       {state.kind === "ready" ? (
         <div className="report__explain" role="region" aria-label="Plain-English explanation">
+          {drifted ? (
+            <p className="tx__warn">
+              Live server re-check returned &ldquo;{state.verdict}&rdquo; (different from the rows above, which were read earlier in your browser).
+            </p>
+          ) : null}
           <p>{state.explanation}</p>
           <p className="dim">
-            Explanation by Venice ({state.model}), from this report only —{" "}
+            Explanation by Venice ({state.model}), {drifted ? "from a live server re-check" : "from this report only"} —{" "}
             <a href={`#${rowsId}`}>see the report rows</a>.
           </p>
         </div>
