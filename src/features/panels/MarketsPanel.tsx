@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { baseStocks, candles, spots, type BaseStock, type Candle, type Range, type Spot } from "@/adapters/http/markets";
-import { BASE, FLAGS, USDC, WETH } from "@/config/chain";
+import { BASE, FLAGS, WETH } from "@/config/chain";
 import { ROBINHOOD } from "@/config/routes";
-import { assertChecksummedAddress, sameAddress, toChecksumAddress } from "@/lib/address";
+import { assertChecksummedAddress, toChecksumAddress } from "@/lib/address";
 import { readToken } from "@/lib/erc20";
 import { messageOf } from "@/lib/errors";
 import { explorer, price } from "@/skills/format";
@@ -11,21 +11,15 @@ import { row, type Report, type Row } from "@/skills/types";
 import { Crt } from "@/ui/Crt";
 import { Gel } from "@/ui/Gel";
 import { PlatinumSelect } from "@/ui/Select";
-import { useOptionalWalletSession } from "@/ui/WalletProvider";
 import { ReportView } from "@/features/panels/ReportView";
-import { StockHealth } from "@/features/panels/StockHealth";
-import { SwapPanel, type Picked } from "@/features/panels/SwapPanel";
-import { choiceFor } from "@/features/panels/TokenPicker";
 import { formatChange, PriceChart, Sparkline } from "@/features/markets/Chart";
 import { useMarkets, type MarketRow } from "@/features/markets/MarketsProvider";
 import { depth, thin } from "@/features/markets/Rows";
 import { useRunCommand } from "@/features/openWindow";
 
 /**
- * The Markets window — rebuilt along Blue Agent's `/markets` structure (KPI strip, 24h trending
- * ticker, category filters, search, sortable dense market table with inline 24h sparklines,
- * DEX-vs-Chainlink NAV drift readout, and 1-click Trade/Check actions) in this app's Platinum +
- * Base cobalt visual identity.
+ * The Markets window — live prices, 24h sparklines, pool depth, Chainlink NAV drift, and
+ * watchlist inspection across Base crypto and tokenized stocks (trading lives in Stocks / Swap).
  */
 
 const RANGES: readonly Range[] = ["1D", "7D", "30D"];
@@ -54,20 +48,6 @@ export function pausedText(paused: readonly number[]): string {
 
 type KindFilter = "all" | "stocks" | "crypto";
 type SortKey = "depth" | "price" | "change" | "drift";
-type Side = "buy" | "sell";
-type Counter = "USDC" | "ETH";
-
-const COUNTER: Record<Counter, Picked> = {
-  USDC: { choice: "USDC", address: "", symbol: "USDC" },
-  ETH: { choice: "ETH", address: "", symbol: "ETH" },
-};
-
-function pickedOfRow(r: MarketRow): Picked | null {
-  if (r.venue !== "base" || !r.address) return null;
-  if (sameAddress(r.address, WETH.address)) return { choice: "ETH", address: "", symbol: "ETH" };
-  const choice = choiceFor(r.address);
-  return { choice, address: choice === "other" ? r.address : "", symbol: r.stock?.symbol ?? r.label };
-}
 
 function driftPct(r: MarketRow): number | null {
   const nav = r.stock?.nav ?? null;
@@ -155,11 +135,8 @@ const BASE_CRYPTO_DIRECTORY = [
 export function MarketsPanel() {
   const { rows, symbols, baseSymbols, baseCatalog, focus, select, add, remove, reset } = useMarkets();
   const runCommand = useRunCommand();
-  const walletSession = useOptionalWalletSession();
   const detailRef = useRef<HTMLElement | null>(null);
   const selected = rows.find((r) => r.key === focus) ?? rows[0] ?? null;
-  const [side, setSide] = useState<Side>("buy");
-  const [counter, setCounter] = useState<Counter>("USDC");
   const [range, setRange] = useState<Range>("1D");
   const [chart, setChart] = useState<{ key: string; range: Range; series: readonly Candle[] | string } | null>(null);
   const [kind, setKind] = useState<KindFilter>("all");
@@ -296,7 +273,6 @@ export function MarketsPanel() {
   const visibleDirKey = useMemo(() => visibleDir.map((d) => d.address.toLowerCase()).join(","), [visibleDir]);
   useEffect(() => {
     if (!visibleDirKey) return;
-    // prices are keyed by address, so a late answer for rows no longer shown is still right where it lands
     void spots("base", visibleDirKey.split(","))
       .then((found) =>
         setDirSpots((prev) => {
@@ -331,8 +307,8 @@ export function MarketsPanel() {
       <header className="mk__hero">
         <div>
           <p className="mk__eyebrow">BASE 8453 / MARKETS</p>
-          <h3 className="mk__title">Trade stock tokens</h3>
-          <p className="mk__sub">Tokenized stocks and crypto on Base — live DEX pools, 24h sparklines, and Chainlink NAV drift.</p>
+          <h3 className="mk__title">Base Markets</h3>
+          <p className="mk__sub">Live prices, 24h sparklines, pool depth, and Chainlink NAV drift across Base crypto and tokenized stocks.</p>
         </div>
         <img className="feature-banner__art" src="/brand/banners/quadra-trade-depth.svg" width="160" height="120" alt="" />
         <dl className="mk__kpis">
@@ -363,7 +339,6 @@ export function MarketsPanel() {
               onClick={() => select(r.key)}
             >
               <strong>{r.label}</strong>
-              {/* the strip lists priced rows only */}
               <span>{price(r.price!)}</span>
               {r.change !== null ? <span className={r.change >= 0 ? "up" : "down"}>{formatChange(r.change)}</span> : null}
             </button>
@@ -483,43 +458,30 @@ export function MarketsPanel() {
                       </td>
                       <td className="num">
                         <div className="mk__actions">
+                          <button
+                            type="button"
+                            className="chip"
+                            aria-pressed={selected?.key === r.key}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              select(r.key);
+                              detailRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                            }}
+                          >
+                            Inspect
+                          </button>
                           {runCommand && r.address ? (
-                            <>
-                              <button
-                                type="button"
-                                className="chip chip--mode"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  select(r.key);
-                                  detailRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                                }}
-                              >
-                                Trade
-                              </button>
-                              <button
-                                type="button"
-                                className="chip"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  runCommand(`verdict ${r.address}`);
-                                }}
-                              >
-                                Check
-                              </button>
-                            </>
-                          ) : (
                             <button
                               type="button"
                               className="chip"
-                              aria-pressed={selected?.key === r.key}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                select(r.key);
+                                runCommand(`verdict ${r.address}`);
                               }}
                             >
-                              Inspect
+                              Check
                             </button>
-                          )}
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -594,30 +556,16 @@ export function MarketsPanel() {
                             {isWatched ? "Watching" : "+ Watch"}
                           </button>
                           {runCommand ? (
-                            <>
-                              <button
-                                type="button"
-                                className="chip chip--mode"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (item.kind === "stocks") add({ kind: "basestock", symbol: item.ticker });
-                                  else add({ kind: "token", address: item.address, label: item.symbol });
-                                  setTimeout(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
-                                }}
-                              >
-                                Trade
-                              </button>
-                              <button
-                                type="button"
-                                className="chip"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  runCommand(`verdict ${item.address}`);
-                                }}
-                              >
-                                Check
-                              </button>
-                            </>
+                            <button
+                              type="button"
+                              className="chip"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                runCommand(`verdict ${item.address}`);
+                              }}
+                            >
+                              Check
+                            </button>
                           ) : null}
                         </div>
                       </td>
@@ -638,15 +586,7 @@ export function MarketsPanel() {
 
         {selected === null ? (
           <p className="panel__lede">The watchlist is empty. Add a Base stock or a Base token below, or reset it.</p>
-        ) : (() => {
-          const picked = pickedOfRow(selected);
-          const counters = (["USDC", "ETH"] as const).filter(
-            (c) => !(picked && (c === "ETH" ? picked.choice === "ETH" : picked.choice === "USDC" || (selected.address !== null && sameAddress(selected.address, USDC.address)))),
-          );
-          const using: Counter = counters.includes(counter) ? counter : counters[0]!;
-          const paused = selected.stock !== null && selected.stock.paused.includes(0);
-          const canTrade = walletSession !== null && picked !== null;
-          return (
+        ) : (
           <section ref={detailRef} className="mk__detail" aria-label={`Selected market ${selected.label}`}>
             <div className="mk__detail-head">
               <div>
@@ -690,63 +630,24 @@ export function MarketsPanel() {
               </div>
             ) : null}
 
-            <div className={canTrade ? "mk__detail-grid" : "stack"}>
-              <div className="stack">
-                {typeof series === "string" ? (
-                  <Crt label="Chart unavailable">
-                    <span className="crt__amber">{series}</span>
-                  </Crt>
-                ) : series === null ? (
-                  <p className="dim">Reading the chart…</p>
-                ) : (
-                  <PriceChart series={series} label={`${selected.label}, ${range}`} format={price} />
-                )}
+            <div className="stack">
+              {typeof series === "string" ? (
+                <Crt label="Chart unavailable">
+                  <span className="crt__amber">{series}</span>
+                </Crt>
+              ) : series === null ? (
+                <p className="dim">Reading the chart…</p>
+              ) : (
+                <PriceChart series={series} label={`${selected.label}, ${range}`} format={price} />
+              )}
 
-                <ReportView report={details(selected, Date.now())} />
-                <Gel quiet onClick={() => remove(selected.key)}>
-                  Remove {selected.label} from the watchlist
-                </Gel>
-              </div>
-
-              {canTrade ? (
-                <aside className="mk__trade-box" aria-label={`Trade ${selected.label}`}>
-                  <h4 className="mk__trade-title">Trade {selected.label} on {BASE.name}</h4>
-                  {selected.stock ? <StockHealth key={selected.stock.address} stock={selected.stock} /> : null}
-                  {paused ? (
-                    <Crt label="Trading paused">
-                      <span className="crt__amber">
-                        {selected.label}&apos;s transfers are paused on its token contract, so nothing can be bought or sold until its issuer unpauses them.
-                      </span>
-                    </Crt>
-                  ) : (
-                    <>
-                      <div className="group__row group__row--actions" role="group" aria-label="Side" style={{ marginBottom: 0 }}>
-                        {(["buy", "sell"] as const).map((s) => (
-                          <button key={s} type="button" className="chip chip--mode" aria-pressed={side === s} onClick={() => setSide(s)}>
-                            {s === "buy" ? `Buy ${selected.label}` : `Sell ${selected.label}`}
-                          </button>
-                        ))}
-                        <span className="trade__sep">{side === "buy" ? "pay with" : "receive"}</span>
-                        <span role="group" aria-label={side === "buy" ? "Pay with" : "Receive"} className="trade__counters">
-                          {counters.map((c) => (
-                            <button key={c} type="button" className="chip chip--mode" aria-pressed={using === c} onClick={() => setCounter(c)}>
-                              {c}
-                            </button>
-                          ))}
-                        </span>
-                      </div>
-                      <SwapPanel
-                        key={`${selected.key}:${side}:${using}`}
-                        fixed={side === "buy" ? { sell: COUNTER[using], buy: picked } : { sell: picked, buy: COUNTER[using] }}
-                      />
-                    </>
-                  )}
-                </aside>
-              ) : null}
+              <ReportView report={details(selected, Date.now())} />
+              <Gel quiet onClick={() => remove(selected.key)}>
+                Remove {selected.label} from the watchlist
+              </Gel>
             </div>
           </section>
-          );
-        })()}
+        )}
       </div>
 
       <fieldset className="group">

@@ -166,7 +166,7 @@ describe("the chart route", () => {
     expect(url(Q.replace(WETH_PAIR, "0x12"))).toEqual({ refused: "pool must be a 20- or 32-byte hex id." });
     expect(url(Q.replace(`token=${WETH.address}`, "token=base"))).toEqual({ refused: "token must be an address." });
     expect(url(Q.replace("aggregate=1", "aggregate=2"))).toMatchObject({ refused: expect.stringMatching(/frame\/aggregate/) });
-    expect(url(Q.replace("frame=hour", "frame=minute"))).toMatchObject({ refused: expect.stringMatching(/frame\/aggregate/) });
+    expect(url(Q.replace("frame=hour", "frame=second"))).toMatchObject({ refused: expect.stringMatching(/frame\/aggregate/) });
     expect(url(Q.replace("limit=24", "limit=500"))).toEqual({ refused: "limit must be 1–100." });
     expect(url(`pool=${TSLA_PAIR}`)).toEqual({ refused: "network must be base or robinhood." });
     // a parameter left out is refused like a wrong one
@@ -1141,16 +1141,11 @@ describe("the Markets window's table and directory", () => {
     expect(rows[1]).toHaveAttribute("aria-selected", "true");
     await userEvent.click(within(rows[0]!).getAllByRole("button")[0]!);
     expect(rows[0]).toHaveAttribute("aria-selected", "true");
-    const withActions = rows.find((r) => within(r).queryByRole("button", { name: "Trade" }))!;
-    await userEvent.click(within(withActions).getByRole("button", { name: "Trade" }));
+    const withActions = rows.find((r) => within(r).queryByRole("button", { name: "Check" }))!;
+    await userEvent.click(within(withActions).getByRole("button", { name: "Inspect" }));
     expect(withActions).toHaveAttribute("aria-selected", "true");
     await userEvent.click(within(withActions).getByRole("button", { name: "Check" }));
     expect(open).toHaveBeenLastCalledWith("safety", expect.objectContaining({ "run-safety": expect.stringMatching(/^verdict 0x/) }));
-    const inspect = rows.find((r) => within(r).queryByRole("button", { name: "Inspect" }));
-    if (inspect) {
-      await userEvent.click(within(inspect).getByRole("button", { name: "Inspect" }));
-      expect(inspect).toHaveAttribute("aria-selected", "true");
-    }
     const nvda = rows.find((r) => r.textContent?.includes("NVDA"))!;
     await userEvent.click(nvda);
     const impact = screen.queryByRole("button", { name: "Price impact" });
@@ -1162,7 +1157,7 @@ describe("the Markets window's table and directory", () => {
     }
   });
 
-  it("lists every Base market in a directory: watch one, trade one, check one, and show more", async () => {
+  it("lists every Base market in a directory: watch one, inspect a row, check one, and show more", async () => {
     markets();
     const { open } = mountWithCommands();
     await settle();
@@ -1172,11 +1167,8 @@ describe("the Markets window's table and directory", () => {
     const before = unwatched().length;
     await userEvent.click(within(unwatched()[0]!).getByRole("button", { name: "+ Watch" }));
     expect(unwatched().length).toBe(before - 1);
-    await userEvent.click(within(unwatched()[0]!).getByRole("button", { name: "Trade" }));
-    await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
-    expect(unwatched().length).toBe(before - 2);
     await userEvent.click(unwatched()[0]!);
-    expect(unwatched().length).toBe(before - 3);
+    expect(unwatched().length).toBe(before - 2);
     await userEvent.click(within(dirRows()[0]!).getByRole("button", { name: "Check" }));
     expect(open).toHaveBeenLastCalledWith("safety", expect.objectContaining({ "run-safety": expect.stringMatching(/^verdict 0x/) }));
     const stocks = dirRows().filter((r) => r.textContent?.includes("STOCK") && within(r).queryByRole("button", { name: "+ Watch" }));
@@ -1192,7 +1184,7 @@ describe("the Markets window's table and directory", () => {
   });
 });
 
-describe("the Markets window's trade box and the edges of its table", () => {
+describe("the Markets window's edges and table behavior", () => {
   function mountAll(open = vi.fn(), withCommands = true) {
     let latest: ReturnType<typeof useMarkets> | null = null;
     const inner = (
@@ -1208,22 +1200,12 @@ describe("the Markets window's trade box and the edges of its table", () => {
   }
   const watchlist = () => screen.getByRole("region", { name: "Watchlist" });
 
-  it("trades the selected Base asset on either side for either counter, and says when its transfers are paused", async () => {
+  it("omits the inline trade box from Markets (trading lives in Stocks and Swap)", async () => {
     markets();
     const m = mountAll();
     await settle();
     await act(async () => m().select("basestock:NVDA"));
-    const box = screen.getByRole("complementary", { name: "Trade NVDA" });
-    await userEvent.click(within(box).getByRole("button", { name: "Sell NVDA" }));
-    expect(within(box).getByRole("group", { name: "Receive" })).toBeInTheDocument();
-    await userEvent.click(within(box).getByRole("button", { name: "ETH" }));
-    expect(within(box).getByRole("button", { name: "ETH" })).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(within(box).getByRole("button", { name: "Buy NVDA" }));
-    expect(within(box).getByRole("group", { name: "Pay with" })).toBeInTheDocument();
-    await act(async () => m().add({ kind: "basestock", symbol: "DKNG" }));
-    await settle();
-    await act(async () => m().select("basestock:DKNG"));
-    expect(screen.getByText(/transfers are paused on its token contract/)).toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "Trade NVDA" })).toBeNull();
   });
 
   it("marks a premium and a discount to NAV, a third click turns a sort back, and a row with no change shows none", async () => {
@@ -1248,7 +1230,7 @@ describe("the Markets window's trade box and the edges of its table", () => {
     expect(price).toHaveTextContent("↓");
   });
 
-  it("offers Inspect where no command can be run, and adds a Base stock from the directory by its row or Trade", async () => {
+  it("offers Inspect where no command can be run, and adds a Base stock from the directory by its row", async () => {
     const big = copy(MARKETS_FX.coinbaseStocks) as { tokens: Json[] };
     const base = big.tokens[0]!;
     for (let i = 0; i < 30; i++) big.tokens.push({ ...base, contract_address: `0xb2000000000000000000${(1000 + i).toString(16).padStart(20, "0")}`, symbol: `ZZ${i}c`, name: `Test Co ${i}` });
@@ -1265,13 +1247,13 @@ describe("the Markets window's trade box and the edges of its table", () => {
     expect(m().rows.some((r) => r.watch.kind === "basestock" && r.watch.symbol === "ZZ0")).toBe(true);
   });
 
-  it("adds a Base stock from the directory's Trade button", async () => {
+  it("adds a Base stock from the directory's Watch button", async () => {
     markets();
     const m = mountAll();
     await settle();
     const directory = screen.getByRole("region", { name: "All Base markets" });
     const row = within(directory).getAllByRole("row").find((r) => r.textContent?.includes("STOCK") && within(r).queryByRole("button", { name: "+ Watch" }))!;
-    await userEvent.click(within(row).getByRole("button", { name: "Trade" }));
+    await userEvent.click(within(row).getByRole("button", { name: "+ Watch" }));
     expect(m().rows.filter((r) => r.watch.kind === "basestock").length).toBeGreaterThan(2);
   });
 });

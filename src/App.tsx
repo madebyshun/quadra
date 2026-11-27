@@ -171,7 +171,7 @@ function Home({ introPlayed, onIntroDone }: { introPlayed: boolean; onIntroDone:
   /** set by Home: the next sync writes the bare page, whatever the router still reports (it lags a transition) */
   const homing = useRef(false);
 
-  const WINDOW_SCOPED_PARAMS = ["t", "a", "pair", "tab", "sort", "q", "c"] as const;
+  const WINDOW_SCOPED_PARAMS = ["t", "s", "a", "pair", "tab", "sort", "q", "c"] as const;
 
   useEffect(() => {
     if (homing.current) {
