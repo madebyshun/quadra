@@ -5,7 +5,7 @@ import { CONTRACTS, UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
 import { parseCoinPage, type IndexedCoinPage } from "@/adapters/http/indexer";
 import { BLOCKSCOUT } from "@/skills/blockscout";
 import type { PoolValue } from "@/skills/launchpad";
-import { ago, autoFrame, bucket, CoinMoves, Disclosures, FeeLedger, FRAMES, inBoth, NewLaunches, TokenChart, TokenInfo, TokenStats, TokenTabs, TokenWarning, useCoinPage } from "@/features/panels/TokenPage";
+import { ago, autoFrame, bucket, CoinMoves, Disclosures, FeeLedger, FRAMES, inBoth, NewLaunches, TokenChart, TokenGuarantees, TokenInfo, TokenPosition, TokenStats, TokenTabs, TokenWarning, useCoinPage } from "@/features/panels/TokenPage";
 import { copy, FX } from "./fixtures/base";
 import { COINS } from "./fixtures/indexer";
 import { DOWN, net, useNet } from "./net";
@@ -131,32 +131,93 @@ describe("the page's cards and facts", () => {
   it("TokenChart: reading, a problem, fewer than two points, the auto frame, picking one, one candle, a chart", async () => {
     const a = render(<TokenChart page="reading" />);
     expect(screen.getByText("Reading the trades…")).toBeInTheDocument();
+    expect(a.container.querySelector("svg")).not.toBeNull();
     a.unmount();
     const b = render(<TokenChart page={{ problem: "down" }} />);
     expect(screen.getByText("No chart: down")).toBeInTheDocument();
+    expect(b.container.querySelector("svg")).not.toBeNull();
     b.unmount();
     const c = render(<TokenChart page={pageOf()} />);
     expect(screen.getByText(/^No chart yet — it starts at the launch price/)).toBeInTheDocument();
+    expect(c.container.querySelector("svg")).not.toBeNull();
     c.unmount();
     // the captured buy, its sell variant and the buy two hours later: two hourly candles, so 1h is chosen
     const p = pageOf(true);
-    const d = render(<TokenChart page={p} />);
+    const d = render(<TokenChart page={p} quoteUsd={2000} />);
     const pressed = () => screen.getAllByRole("button").filter((x) => x.getAttribute("aria-pressed") === "true").map((x) => x.textContent);
-    expect(pressed()).toEqual(["1h"]);
+    expect(pressed()).toEqual(["1h", "Price"]);
     expect(d.container.querySelector("svg")).not.toBeNull();
-    // a day holds every trade: one candle, no line
+    await userEvent.click(screen.getByRole("button", { name: "Market cap" }));
+    expect(pressed()).toEqual(["1h", "Market cap"]);
+    expect(screen.getByLabelText(/market cap in USD/)).toBeInTheDocument();
+    // a day holds every trade: one candle, placeholder frame with reference line
     const day = Math.floor(AT / 86_400) * 86_400;
     d.unmount();
     const e = render(<TokenChart page={{ ...p, points: [{ at: day + 10, price: 1 }, { at: day + 4000, price: 2 }] }} />);
-    expect(pressed()).toEqual(["1h"]);
+    expect(pressed()).toEqual(["1h", "Price"]);
+    await userEvent.click(screen.getByRole("button", { name: "Market cap" }));
+    expect(screen.getByLabelText(/market cap in ETH/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "1d" }));
-    expect(pressed()).toEqual(["1d"]);
+    expect(pressed()).toEqual(["1d", "Market cap"]);
     expect(screen.getByText("Every trade so far falls in one 1d candle — pick a finer frame.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Each trade" }));
     expect(e.container.querySelector("svg")).not.toBeNull();
     e.unmount();
     render(<TokenChart page={{ ...p, coin: { ...p.coin, symbol: null, quoteSymbol: null } }} />);
     expect(screen.getByLabelText(/^Coin price in , from its pool's opening price/)).toBeInTheDocument();
+  });
+
+  it("TokenChart: falls back to GeckoTerminal OHLCV when index is missing, and shows live slot0 reference price otherwise", async () => {
+    const pool = "0x1111111111111111111111111111111111111111111111111111111111111111";
+    const ohlcv = {
+      data: {
+        attributes: {
+          ohlcv_list: [
+            [AT, 0.00001, 0.000012, 0.000009, 0.000011, 100],
+            [AT + 3600, 0.000011, 0.000015, 0.00001, 0.000014, 200],
+          ],
+        },
+      },
+    };
+    net({
+      get: (u) => {
+        if (u.startsWith("https://api.dexscreener.com/tokens/v1/base/")) {
+          return [{ baseToken: { address: COINS.eth, symbol: "TEST", name: "Test" }, pairAddress: pool, priceUsd: "0.000014", liquidity: { usd: 5000 } }];
+        }
+        if (u.startsWith("/api/charts/ohlcv?")) return ohlcv;
+        return undefined;
+      },
+    });
+    const a = render(<TokenChart page={{ problem: "not indexed yet" }} token={COINS.eth} symbol="TEST" value={value()} quoteUsd={2000} />);
+    await waitFor(() => expect(screen.getByText("GeckoTerminal · USD")).toBeInTheDocument());
+    expect(screen.getByLabelText(/TEST price in USD, from GeckoTerminal/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Market cap" }));
+    expect(screen.getByLabelText(/TEST market cap in USD, from GeckoTerminal/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "1D" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "1D" })).toHaveAttribute("aria-pressed", "true"));
+    a.unmount();
+
+    // GeckoTerminal fallback without explicit symbol falls back to "Coin"
+    const a2 = render(<TokenChart page={{ problem: "not indexed yet" }} token={COINS.eth} value={value()} quoteUsd={2000} />);
+    await waitFor(() => expect(screen.getByLabelText(/Coin price in USD, from GeckoTerminal/)).toBeInTheDocument());
+    a2.unmount();
+
+    // GeckoTerminal returns no pool: falls back to live Uniswap v4 slot0 reference line (USD and quote-only)
+    net({ get: (u) => (u.startsWith("https://api.dexscreener.com/tokens/v1/base/") ? [] : undefined) });
+    const b = render(<TokenChart page={{ problem: "not indexed yet" }} token={COINS.eth} symbol="TEST" value={value()} quoteUsd={2000} />);
+    await waitFor(() => expect(screen.getByText("Live pool reference · Uniswap v4")).toBeInTheDocument());
+    expect(screen.getByText("No chart: not indexed yet")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Market cap" }));
+    expect(b.container.querySelector("svg")).toHaveTextContent("$10,000.00");
+    b.unmount();
+
+    // GeckoTerminal errors and quoteUsd is null: still renders frame with quote-denominated slot0 price
+    net({ get: (u) => (u.startsWith("https://api.dexscreener.com/tokens/v1/base/") ? DOWN : undefined) });
+    const c = render(<TokenChart page={pageOf()} token={COINS.eth} value={value({ quoteUsd: null })} quoteUsd={null} />);
+    await waitFor(() => expect(screen.getByText("Live pool reference · Uniswap v4")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Market cap" }));
+    expect(c.container.querySelector("svg")).toHaveTextContent("5 ETH");
+    c.unmount();
   });
 
   it("bucket and autoFrame", () => {
@@ -285,5 +346,66 @@ describe("TokenTabs", () => {
     render(<TokenTabs token={COINS.eth} page="reading" now={AT} />);
     await userEvent.click(screen.getByRole("tab", { name: "Holders" }));
     expect(await screen.findByText(/^Not checked — the holders could not be read:/)).toBeInTheDocument();
+  });
+
+  it("renders optional Fees & Info and Disclosures tabs cleanly", async () => {
+    render(
+      <TokenTabs
+        token={COINS.eth}
+        page={pageOf(true)}
+        now={AT}
+        feesTab={<p>Fees panel body</p>}
+        disclosuresTab={<p>Disclosures panel body</p>}
+      />,
+    );
+    await userEvent.click(screen.getByRole("tab", { name: "Fees & Info" }));
+    expect(screen.getByText("Fees panel body")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Disclosures" }));
+    expect(screen.getByText("Disclosures panel body")).toBeInTheDocument();
+  });
+});
+
+describe("TokenGuarantees & TokenPosition", () => {
+  it("shows version, fee status, and active v3 anti-sniper countdown", () => {
+    const v3 = CONTRACTS.launchFactoryV3!;
+    const a = render(<TokenGuarantees factory={v3} fee={{ fee: 10_000, opening: { startFee: 500_000, window: 15, openedAt: 1000 } }} launchedAt={1000} now={1005} />);
+    expect(screen.getByLabelText("Contract guarantees")).toHaveTextContent(/v3.*1% fee.*anti-sniper active · 10s left \(50% → 1%\)/);
+    a.unmount();
+    const b = render(<TokenGuarantees factory={COINS.v2} fee="reading" launchedAt={null} now={1005} />);
+    expect(screen.getByLabelText("Contract guarantees")).toHaveTextContent(/v2.*fee reading/);
+    b.unmount();
+    const c = render(<TokenGuarantees factory={COINS.v1} fee={{ problem: "rpc down" }} launchedAt={1000} now={1005} />);
+    expect(screen.getByLabelText("Contract guarantees")).toHaveTextContent(/v1.*fee not checked/);
+    c.unmount();
+  });
+
+  it("reads connected wallet balance, shows % of supply, Est. value, Sell shortcut, zero balance, and RPC failure", async () => {
+    const raw = (2_500_000n * 10n ** 18n).toString(16).padStart(64, "0");
+    net({ rpc: (m) => (m === "eth_call" ? `0x${raw}` : undefined) });
+    const onSell = vi.fn();
+    const a = render(<TokenPosition token={COINS.eth} symbol="TEST" account={COINS.owner} page={pageOf(true)} value={value()} onSell={onSell} />);
+    expect(screen.getByText("Reading your TEST balance…")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText("Your position")).toHaveTextContent(/2,500,000 TEST.*0\.25% of supply.*Est\. value:/));
+    await userEvent.click(screen.getByRole("button", { name: "Sell TEST" }));
+    expect(onSell).toHaveBeenCalledTimes(1);
+    a.unmount();
+
+    // tiny dust balance (<0.01% of supply) and poolValue fallback when page is unread
+    const dust = (1000n * 10n ** 18n).toString(16).padStart(64, "0");
+    net({ rpc: (m) => (m === "eth_call" ? `0x${dust}` : undefined) });
+    const b = render(<TokenPosition token={COINS.eth} symbol="TEST" account={COINS.owner} page="reading" value={value({ quoteUsd: null })} />);
+    await waitFor(() => expect(screen.getByLabelText("Your position")).toHaveTextContent(/<0\.01% of supply/));
+    b.unmount();
+
+    // zero balance
+    net({ rpc: (m) => (m === "eth_call" ? `0x${"0".repeat(64)}` : undefined) });
+    const c = render(<TokenPosition token={COINS.eth} symbol="TEST" account={COINS.owner} page="reading" value={null} />);
+    await waitFor(() => expect(screen.getByLabelText("Your position")).toHaveTextContent(/0 TEST.*no balance/));
+    c.unmount();
+
+    // RPC error shows amber not checked
+    net({ rpc: (m) => (m === "eth_call" ? DOWN : undefined) });
+    render(<TokenPosition token={COINS.eth} symbol="TEST" account={COINS.owner} page="reading" value={null} />);
+    expect(await screen.findByText(/^Position not checked —/)).toBeInTheDocument();
   });
 });

@@ -33,7 +33,7 @@ export function opensItself(wallet: Wallet): boolean {
   return wallet.kind === "wrongChain";
 }
 
-export function WalletStatus() {
+export function WalletStatus({ onOpen }: { onOpen?: (() => void) | undefined } = {}) {
   const { wallet, busy, switchChain, connectedWith } = useWalletSession();
   /**
    * `null` until the user touches the balloon — then `true` (opened from the tray)
@@ -85,9 +85,20 @@ export function WalletStatus() {
         </div>
       ) : null}
       {wallet.kind === "ready" ? (
-        <span className="mono" title={`Connected with ${connectedWith.name}: ${toChecksumAddress(wallet.account)}. ${BRAND.name} holds no key.`}>
-          {shortAddress(toChecksumAddress(wallet.account))}
-        </span>
+        onOpen ? (
+          <button
+            type="button"
+            className="mono taskbar__wallet"
+            onClick={onOpen}
+            title={`Connected with ${connectedWith.name}: ${toChecksumAddress(wallet.account)}. ${BRAND.name} holds no key.`}
+          >
+            {shortAddress(toChecksumAddress(wallet.account))}
+          </button>
+        ) : (
+          <span className="mono" title={`Connected with ${connectedWith.name}: ${toChecksumAddress(wallet.account)}. ${BRAND.name} holds no key.`}>
+            {shortAddress(toChecksumAddress(wallet.account))}
+          </span>
+        )
       ) : (
         <button
           type="button"

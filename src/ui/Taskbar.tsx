@@ -185,7 +185,7 @@ export function Taskbar({ windows, onToggle, onStart, onHome, onOpenFeature }: T
         <span className="menubar__nokey mono" title="No key is held by this site">
           no key held
         </span>
-        <WalletStatus />
+        <WalletStatus onOpen={onOpenFeature ? () => onOpenFeature("wallet") : undefined} />
         <SoundToggle />
         <BlockClock onOpen={onOpenFeature ? () => onOpenFeature("taskmgr") : undefined} />
         {menu(

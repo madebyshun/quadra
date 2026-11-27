@@ -236,14 +236,26 @@ describe("WalletStatus: wrong chain", () => {
 });
 
 describe("WalletStatus: ready", () => {
-  it("shows the shortened address and no banner", async () => {
+  it("shows the shortened address and no banner, and opens the wallet window when clicked if onOpen is given", async () => {
+    const user = userEvent.setup();
     stub({ eth_accounts: [ACCOUNT], eth_chainId: BASE.idHex });
-    render(<Tray />);
+    const a = render(<Tray />);
     await settle();
     // printed with its EIP-55 checksum, the way the wallet and Basescan print it
     const shown = toChecksumAddress(ACCOUNT);
     expect(screen.getByText(`${shown.slice(0, 6)}…${shown.slice(-4)}`)).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Wallet" })).not.toBeInTheDocument();
+    a.unmount();
+
+    const onOpen = vi.fn();
+    render(
+      <WalletProvider>
+        <WalletStatus onOpen={onOpen} />
+      </WalletProvider>,
+    );
+    await settle();
+    await user.click(screen.getByRole("button", { name: `${shown.slice(0, 6)}…${shown.slice(-4)}` }));
+    expect(onOpen).toHaveBeenCalledTimes(1);
   });
 });
 

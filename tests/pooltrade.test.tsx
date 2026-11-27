@@ -134,13 +134,34 @@ describe("PoolTrade", () => {
     expect(screen.getByText("Quoter reverted")).toBeInTheDocument();
   });
 
-  it("asks for a wallet first", async () => {
-    session = { wallet: { kind: "disconnected", why: "" }, signingProvider: () => provider };
+  it("opens wallet connect directly when no wallet is connected, or opens wallet window on desktop, and disables while busy", async () => {
+    const connectInjected = vi.fn();
+    session = { wallet: { kind: "disconnected", why: "" }, signingProvider: () => provider, connectInjected, busy: false } as unknown as typeof session;
     poolKeyOf.mockResolvedValue(ethPool);
+    const a = render(<PoolTrade token={TOKEN} symbol="TEST" side="buy" />);
+    await settle();
+    expect(cta()).toHaveTextContent("Connect wallet");
+    expect(cta()).toBeEnabled();
+    fireEvent.click(cta());
+    expect(connectInjected).toHaveBeenCalledTimes(1);
+    a.unmount();
+
+    const open = vi.fn();
+    const { OpenWindowProvider } = await import("@/features/openWindow");
+    const b = render(
+      <OpenWindowProvider open={open}>
+        <PoolTrade token={TOKEN} symbol="TEST" side="buy" />
+      </OpenWindowProvider>,
+    );
+    await settle();
+    fireEvent.click(cta());
+    expect(open).toHaveBeenCalledWith("wallet");
+    b.unmount();
+
+    session = { wallet: { kind: "disconnected", why: "" }, signingProvider: () => provider, connectInjected, busy: true } as unknown as typeof session;
     render(<PoolTrade token={TOKEN} symbol="TEST" side="buy" />);
     await settle();
-    fireEvent.change(amount(), { target: { value: "1" } });
-    expect(cta()).toHaveTextContent("Connect a wallet first");
+    expect(cta()).toHaveTextContent("Connecting…");
     expect(cta()).toBeDisabled();
   });
 
@@ -153,6 +174,21 @@ describe("PoolTrade", () => {
     render(<PoolTrade token={TOKEN} symbol="TEST" side="buy" />);
     await settle();
     expect(screen.getByText("The pool could not be read: rpc down")).toBeInTheDocument();
+  });
+
+  it("supports quick amount presets and inline max slippage selection", async () => {
+    poolKeyOf.mockResolvedValue(ethPool);
+    quoteV4.mockResolvedValue({ amountOut: 10n ** 24n, gasEstimate: 1n });
+    render(<PoolTrade token={TOKEN} symbol="TEST" side="buy" />);
+    await settle();
+    fireEvent.click(screen.getByRole("button", { name: "0.05 ETH" }));
+    expect(amount()).toHaveValue("0.05");
+    fireEvent.click(screen.getByRole("button", { name: "5%" }));
+    expect(screen.getByRole("button", { name: "5%" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(cta());
+    await settle();
+    expect(minOutFor).toHaveBeenCalledWith(10n ** 24n, 500);
+    expect(screen.getByText(/5% slippage/)).toBeInTheDocument();
   });
 
   it("drops a pool answer that lands after it was closed", async () => {

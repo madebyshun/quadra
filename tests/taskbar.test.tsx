@@ -115,4 +115,20 @@ describe("the Windows menu", () => {
     expect(onToggle).toHaveBeenCalledWith("swap");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
+
+  it("opens the wallet window when the connected address in the tray is clicked", async () => {
+    const user = userEvent.setup();
+    const { BASE } = await import("@/config/chain");
+    const ACCOUNT = "0xabcdef0123456789abcdef0123456789abcdef01";
+    vi.stubGlobal("ethereum", {
+      request: ({ method }: { method: string }) =>
+        method === "eth_accounts" ? Promise.resolve([ACCOUNT]) : method === "eth_chainId" ? Promise.resolve(BASE.idHex) : Promise.resolve(null),
+    });
+    const onOpenFeature = vi.fn();
+    renderTaskbar(onOpenFeature);
+    const btn = await screen.findByRole("button", { name: /^0x[0-9a-fA-F]{4}…[0-9a-fA-F]{4}$/ });
+    await user.click(btn);
+    expect(onOpenFeature).toHaveBeenCalledWith("wallet");
+    vi.unstubAllGlobals();
+  });
 });

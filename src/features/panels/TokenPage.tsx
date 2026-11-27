@@ -1,14 +1,16 @@
 import { IndexNotice } from "@/ui/IndexNotice";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { BRAND } from "@/brand";
 import { CONTRACTS, UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
 import { launchpadCoin, launchpadCoins, type IndexedCoin, type IndexedCoinPage, type IndexedTrade } from "@/adapters/http/indexer";
+import { candles, spots, type Candle, type Range } from "@/adapters/http/markets";
+import { balanceOf } from "@/lib/erc20";
 import { messageOf } from "@/lib/errors";
 import { topHolders, type Holding } from "@/skills/blockscout";
 import { compact, explorer, quoteAmountText, quoteWithUsd, short, tinyPrice, usd } from "@/skills/format";
 import { coinFeeOf, isV3, launchesBy, referrerOf, type CoinFee, type PoolValue } from "@/skills/launchpad";
 import { deepest, marketsOf, type Market } from "@/skills/dexscreener";
-import { feePercent, LAUNCHPAD_EXPECTS } from "@/config/launchpad";
+import { feePercent, LAUNCHPAD_DECIMALS, LAUNCHPAD_EXPECTS } from "@/config/launchpad";
 import { PriceChart } from "@/features/markets/Chart";
 
 /**
@@ -136,6 +138,103 @@ export function NewLaunches({ onOpen }: { onOpen: (token: string) => void }) {
   );
 }
 
+/** On-chain contract guarantees + live v3 anti-sniper countdown, rendered directly under the coin title. */
+export function TokenGuarantees({
+  factory,
+  fee,
+  launchedAt,
+  now,
+}: {
+  factory: string;
+  fee: Read<CoinFee>;
+  launchedAt: number | null;
+  now: number;
+}) {
+  const v3 = isV3(factory);
+  const version = v3 ? "v3" : factory.toLowerCase() === CONTRACTS.launchFactoryV1?.toLowerCase() ? "v1" : "v2";
+  const feeTag = fee === "reading" ? "fee reading…" : "problem" in fee ? "fee not checked" : `${feePercent(fee.fee)} fee`;
+  const remaining =
+    v3 && isDone(fee) && fee.opening && launchedAt !== null
+      ? fee.opening.window - (now - launchedAt)
+      : 0;
+  return (
+    <div className="coin__guarantees" aria-label="Contract guarantees">
+      <span className="coin__badge">{version}</span>
+      <span className="coin__badge">{feeTag}</span>
+      <span className="coin__badge">fixed 1B · no admin · LP locked</span>
+      {remaining > 0 && isDone(fee) && fee.opening ? (
+        <span className="coin__badge coin__badge--warn">
+          anti-sniper active · {remaining}s left ({feePercent(fee.opening.startFee)} → {feePercent(fee.fee)})
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/** The connected wallet's on-chain position in this coin, with one-click Sell shortcut. */
+export function TokenPosition({
+  token,
+  symbol,
+  account,
+  page,
+  value,
+  onSell,
+  fresh = 0,
+}: {
+  token: string;
+  symbol: string;
+  account: string;
+  page: Read<IndexedCoinPage>;
+  value: PoolValue | null;
+  onSell?: () => void;
+  fresh?: number;
+}) {
+  const [bal, setBal] = useState<Read<{ readonly raw: bigint }>>("reading");
+  useEffect(() => {
+    let live = true;
+    setBal("reading");
+    balanceOf({ kind: "erc20", address: token, symbol, decimals: LAUNCHPAD_DECIMALS }, account).then(
+      (raw) => live && setBal({ raw }),
+      (e: unknown) => live && setBal({ problem: messageOf(e) }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [token, symbol, account, fresh]);
+
+  if (bal === "reading") return <p className="dim coin__position">Reading your {symbol} balance…</p>;
+  if ("problem" in bal) return <p className="tx__warn coin__position">Position not checked — {bal.problem}</p>;
+  const tokens = Number(bal.raw) / 10 ** LAUNCHPAD_DECIMALS;
+  const pct = (tokens / 1e9) * 100;
+  const priceInQuote = isDone(page) && page.coin.price !== null ? page.coin.price : value ? value.supplyInQuote / 1e9 : null;
+  const qs = (isDone(page) ? page.coin.quoteSymbol : null) ?? value?.quoteSymbol ?? "";
+  const qUsd = value?.quoteUsd ?? null;
+  const estQuote = priceInQuote !== null ? tokens * priceInQuote : null;
+  return (
+    <div className="coin__position" aria-label="Your position">
+      <div className="coin__position-head">
+        <strong>Your position</strong>
+        {bal.raw > 0n && onSell ? (
+          <button type="button" className="chip chip--mode" onClick={onSell}>
+            Sell {symbol}
+          </button>
+        ) : null}
+      </div>
+      <div className="coin__position-nums">
+        <span className="mono">
+          {bal.raw === 0n ? `0 ${symbol}` : `${compact(tokens)} ${symbol}`}
+        </span>
+        <span className="dim">
+          {bal.raw === 0n ? "no balance" : `${pct < 0.01 ? "<0.01" : pct.toFixed(2)}% of supply`}
+        </span>
+      </div>
+      {bal.raw > 0n && estQuote !== null ? (
+        <span className="dim mono">Est. value: {inBoth(estQuote, qs, qUsd)}</span>
+      ) : null}
+    </div>
+  );
+}
+
 /** The warning a person reads first — what the contract rules out, and what it cannot. */
 export function TokenWarning() {
   return (
@@ -249,29 +348,185 @@ export function CreatorLaunches({ creator, current }: { creator: string; current
   return <div className="coin__creator" aria-label="Creator launches"><strong>{short(creator)} launched {result.launches.length} coin{result.launches.length === 1 ? "" : "s"}</strong>{others.length === 0 ? <span className="dim">No other launch indexed yet.</span> : others.slice(0, 5).map((l) => <a key={l.token} href={`?do=coins&t=${l.token}`}>{l.symbol ?? short(l.token)}</a>)}</div>;
 }
 
-/** The price over time, from the pool's own opening price and trades, in the frame the visitor picks. */
-export function TokenChart({ page }: { page: Read<IndexedCoinPage> }) {
-  const [picked, setPicked] = useState<Frame | null>(null);
-  if (page === "reading") return <p className="dim">Reading the trades…</p>;
-  if ("problem" in page) return <p className="tx__warn">No chart: {page.problem}</p>;
-  if (page.points.length < 2) return <p className="dim">No chart yet — it starts at the launch price and needs one trade after it.</p>;
-  const frame = picked ?? autoFrame(page.points);
-  const qs = page.coin.quoteSymbol ?? "";
-  const bars = bucket(page.points, FRAMES.find((f) => f.id === frame)!.seconds);
+export type ChartMode = "price" | "mcap";
+const FIXED_SUPPLY = 1e9;
+const GECKO_RANGES: readonly Range[] = ["1D", "7D", "30D"];
+
+function ChartCanvasPlaceholder({
+  priceLabel,
+  status,
+  tone = "dim",
+}: {
+  priceLabel: string | null;
+  status: string;
+  tone?: "dim" | "warn";
+}) {
   return (
-    <div className="stack">
-      <div className="row" role="group" aria-label="Chart frame">
-        {FRAMES.map((f) => (
-          <button key={f.id} type="button" className="chip chip--mode" aria-pressed={frame === f.id} onClick={() => setPicked(f.id)}>
-            {f.label}
-          </button>
+    <figure className="chart coin__chart-empty">
+      <svg viewBox="0 0 520 180" className="chart__svg" role="img" aria-label={status}>
+        {[36, 72, 108, 144].map((y) => (
+          <line key={y} x1="8" y1={y} x2="512" y2={y} stroke="var(--line)" strokeWidth="1" strokeDasharray="3 4" />
         ))}
+        {priceLabel ? (
+          <g>
+            <line x1="8" y1="90" x2="416" y2="90" stroke="#0a3dff" strokeWidth="1.5" strokeDasharray="4 4" />
+            <rect x="420" y="79" width="92" height="22" rx="2" fill="#0a3dff" />
+            <text x="466" y="94" textAnchor="middle" fill="#ffffff" fontSize="10" fontFamily="monospace">
+              {priceLabel}
+            </text>
+          </g>
+        ) : null}
+      </svg>
+      <figcaption className="chart__axis">
+        <span className={tone === "warn" ? "tx__warn" : "dim"}>{status}</span>
+        {priceLabel ? <span className="dim">Live pool reference · Uniswap v4</span> : null}
+      </figcaption>
+    </figure>
+  );
+}
+
+/** The price or market cap over time: launchpad index first, GeckoTerminal OHLCV fallback, or live slot0 reference frame. */
+export function TokenChart({
+  page,
+  token,
+  symbol,
+  value = null,
+  quoteUsd = null,
+}: {
+  page: Read<IndexedCoinPage>;
+  token?: string;
+  symbol?: string | null;
+  value?: PoolValue | null;
+  quoteUsd?: number | null;
+}) {
+  const [picked, setPicked] = useState<Frame | null>(null);
+  const [mode, setMode] = useState<ChartMode>("price");
+  const [geckoRange, setGeckoRange] = useState<Range>("7D");
+  const [gecko, setGecko] = useState<readonly Candle[] | "reading" | null>(null);
+
+  const hasIndex = isDone(page) && page.points.length >= 2;
+  const needGecko = Boolean(token) && page !== "reading" && !hasIndex;
+
+  useEffect(() => {
+    if (!needGecko || !token) {
+      setGecko(null);
+      return;
+    }
+    let live = true;
+    setGecko("reading");
+    spots("base", [token])
+      .then((m) => {
+        const pool = m.get(token.toLowerCase())?.pool;
+        return pool ? candles("base", pool, token, geckoRange).then((r) => r.candles) : [];
+      })
+      .then(
+        (list) => live && setGecko(list.length >= 2 ? list : null),
+        () => live && setGecko(null),
+      );
+    return () => {
+      live = false;
+    };
+  }, [needGecko, token, geckoRange]);
+
+  const metricToggle = (
+    <div className="coins__seg" role="group" aria-label="Chart metric">
+      {([["price", "Price"], ["mcap", "Market cap"]] as const).map(([id, label]) => (
+        <button key={id} type="button" className="coins__seg-btn" aria-pressed={mode === id} onClick={() => setMode(id)}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
+  // Tier 1: Launchpad index chart
+  if (hasIndex) {
+    const frame = picked ?? autoFrame(page.points);
+    const qs = page.coin.quoteSymbol ?? "";
+    const scale = mode === "mcap" ? FIXED_SUPPLY * (quoteUsd ?? 1) : 1;
+    const scaled = scale === 1 ? page.points : page.points.map((p) => ({ at: p.at, price: p.price * scale }));
+    const bars = bucket(scaled, FRAMES.find((f) => f.id === frame)!.seconds);
+    const fmt = mode === "mcap" && quoteUsd !== null ? (n: number) => usd(n) : (n: number) => quoteAmountText(n, qs);
+    const unitLabel = mode === "mcap" ? (quoteUsd !== null ? "market cap in USD" : `market cap in ${qs}`) : `price in ${qs}`;
+    return (
+      <div className="coin__chart-frame stack">
+        <div className="coin__chart-bar">
+          <div className="row" role="group" aria-label="Chart frame">
+            {FRAMES.map((f) => (
+              <button key={f.id} type="button" className="chip chip--mode" aria-pressed={frame === f.id} onClick={() => setPicked(f.id)}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          {metricToggle}
+        </div>
+        {bars.length < 2 ? (
+          <ChartCanvasPlaceholder
+            priceLabel={fmt(bars[bars.length - 1]!.c)}
+            status={`Every trade so far falls in one ${frame} candle — pick a finer frame.`}
+          />
+        ) : (
+          <PriceChart series={bars} label={`${page.coin.symbol ?? "Coin"} ${unitLabel}, from its pool's opening price and trades`} format={fmt} />
+        )}
       </div>
-      {bars.length < 2 ? (
-        <p className="dim">Every trade so far falls in one {frame} candle — pick a finer frame.</p>
-      ) : (
-        <PriceChart series={bars} label={`${page.coin.symbol ?? "Coin"} price in ${qs}, from its pool's opening price and trades`} format={(n) => quoteAmountText(n, qs)} />
-      )}
+    );
+  }
+
+  // Tier 2: GeckoTerminal OHLCV fallback when launchpad index is lagging or absent
+  if (Array.isArray(gecko) && gecko.length >= 2) {
+    const scale = mode === "mcap" ? FIXED_SUPPLY : 1;
+    const bars = scale === 1 ? gecko : gecko.map((c) => ({ ...c, o: c.o * scale, h: c.h * scale, l: c.l * scale, c: c.c * scale }));
+    const fmt = mode === "mcap" ? (n: number) => usd(n) : (n: number) => tinyPrice(n);
+    const coinLabel = symbol ?? "Coin";
+    const unitLabel = mode === "mcap" ? "market cap in USD" : "price in USD";
+    return (
+      <div className="coin__chart-frame stack">
+        <div className="coin__chart-bar">
+          <div className="row" role="group" aria-label="Chart range">
+            {GECKO_RANGES.map((r) => (
+              <button key={r} type="button" className="chip chip--mode" aria-pressed={geckoRange === r} onClick={() => setGeckoRange(r)}>
+                {r}
+              </button>
+            ))}
+            <span className="dim">GeckoTerminal · USD</span>
+          </div>
+          {metricToggle}
+        </div>
+        <PriceChart series={bars} label={`${coinLabel} ${unitLabel}, from GeckoTerminal`} format={fmt} />
+      </div>
+    );
+  }
+
+  // Tier 3: Always-on chart frame with live Uniswap v4 slot0 reference line when available
+  const qs = (isDone(page) ? page.coin.quoteSymbol : null) ?? value?.quoteSymbol ?? "";
+  const coinName = symbol ?? "Coin";
+  const mcapInQuote = value?.supplyInQuote ?? null;
+  const priceLabel =
+    mcapInQuote === null
+      ? null
+      : mode === "mcap"
+        ? quoteUsd !== null
+          ? usd(mcapInQuote * quoteUsd)
+          : quoteAmountText(mcapInQuote, qs)
+        : quoteUsd !== null
+          ? tinyPrice((mcapInQuote / FIXED_SUPPLY) * quoteUsd)
+          : quoteAmountText(mcapInQuote / FIXED_SUPPLY, qs);
+
+  const status =
+    page === "reading" || gecko === "reading"
+      ? "Reading the trades…"
+      : "problem" in page
+        ? `No chart: ${page.problem}`
+        : "No chart yet — it starts at the launch price and needs one trade after it.";
+
+  return (
+    <div className="coin__chart-frame stack">
+      <div className="coin__chart-bar">
+        <span className="dim">
+          {coinName} / {qs || "USD"} · Uniswap v4
+        </span>
+        {metricToggle}
+      </div>
+      <ChartCanvasPlaceholder priceLabel={priceLabel} status={status} tone={!isDone(page) && page !== "reading" && gecko !== "reading" ? "warn" : "dim"} />
     </div>
   );
 }
@@ -349,7 +604,7 @@ export function TokenInfo({
   );
 }
 
-type TabId = "trades" | "holders";
+type TabId = "trades" | "holders" | "fees" | "disclosures";
 
 function Trades({ page, now, quoteUsd }: { page: IndexedCoinPage; now: number; quoteUsd: number | null }) {
   const [only, setOnly] = useState<"all" | "buy" | "sell">("all");
@@ -444,20 +699,44 @@ function Holders({ token }: { token: string }) {
   );
 }
 
-/** Trades and holders, as tabs. `now` is unix seconds. */
-export function TokenTabs({ token, page, now, quoteUsd = null }: { token: string; page: Read<IndexedCoinPage>; now: number; quoteUsd?: number | null }) {
+/** Trades, holders, and optional Fees & Info / Disclosures panels, as tabs. `now` is unix seconds. */
+export function TokenTabs({
+  token,
+  page,
+  now,
+  quoteUsd = null,
+  feesTab,
+  disclosuresTab,
+}: {
+  token: string;
+  page: Read<IndexedCoinPage>;
+  now: number;
+  quoteUsd?: number | null;
+  feesTab?: ReactNode;
+  disclosuresTab?: ReactNode;
+}) {
   const [tab, setTab] = useState<TabId>("trades");
+  const tabs: readonly { readonly id: TabId; readonly label: string }[] = [
+    { id: "trades", label: "Transactions" },
+    { id: "holders", label: "Holders" },
+    ...(feesTab ? [{ id: "fees" as const, label: "Fees & Info" }] : []),
+    ...(disclosuresTab ? [{ id: "disclosures" as const, label: "Disclosures" }] : []),
+  ];
   return (
     <div className="stack">
       <div className="row" role="tablist" aria-label="Coin details">
-        {(["trades", "holders"] as const).map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} className={`chip ${tab === t ? "chip--active" : ""}`} onClick={() => setTab(t)}>
-            {t === "trades" ? "Transactions" : "Holders"}
+        {tabs.map((t) => (
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={`chip ${tab === t.id ? "chip--active" : ""}`} onClick={() => setTab(t.id)}>
+            {t.label}
           </button>
         ))}
       </div>
       {tab === "holders" ? (
         <Holders token={token} />
+      ) : tab === "fees" ? (
+        feesTab
+      ) : tab === "disclosures" ? (
+        disclosuresTab
       ) : page === "reading" ? (
         <p className="dim">Reading the trades…</p>
       ) : "problem" in page ? (

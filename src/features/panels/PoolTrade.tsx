@@ -8,6 +8,7 @@ import { chainToken } from "@/skills/chaintoken";
 import { tokenAmount } from "@/skills/format";
 import { Gel } from "@/ui/Gel";
 import { useWalletSession } from "@/ui/WalletProvider";
+import { useOpenWindow } from "@/features/openWindow";
 import { TxStepList, useTxSteps } from "@/features/panels/TxSteps";
 import { PoolTradeEth } from "@/features/panels/PoolTradeEth";
 
@@ -20,19 +21,25 @@ import { PoolTradeEth } from "@/features/panels/PoolTradeEth";
  * quote away, so what was reviewed is what is signed.
  */
 
-/** 1%: the most the swap may come in under the quote before the router refuses it. */
+/** 1%: the default slippage cap before the router refuses the swap. */
 export const SLIPPAGE_BPS = 100;
+export const SLIPPAGE_OPTIONS = [100, 200, 500] as const;
 /** How long a reviewed swap stays signable. */
 export const DEADLINE_S = 600;
+
+const ETH_PRESETS = ["0.01", "0.05", "0.1", "0.5"] as const;
+const TOKEN_PRESETS = ["1000", "10000", "100000", "1000000"] as const;
 
 type Pool = (LaunchPool & { readonly quoteSymbol: string; readonly quoteDecimals: number }) | null;
 type Review = { readonly amountIn: bigint; readonly out: bigint; readonly minOut: bigint };
 
 export function PoolTrade({ token, symbol, side }: { token: string; symbol: string; side: "buy" | "sell" }) {
-  const { wallet, signingProvider } = useWalletSession();
+  const { wallet, signingProvider, connectInjected, busy } = useWalletSession();
+  const openWindow = useOpenWindow();
   const me = wallet?.kind === "ready" ? wallet.account : null;
   const [pool, setPool] = useState<Pool | "reading" | { readonly problem: string }>("reading");
   const [amount, setAmount] = useState("");
+  const [slippageBps, setSlippageBps] = useState<number>(SLIPPAGE_BPS);
   const [review, setReview] = useState<Review | "quoting" | { readonly problem: string } | null>(null);
   // a stock-paired coin can be bought with plain ETH too: two legs, in PoolTradeEth (2026-10-29)
   const [withEth, setWithEth] = useState(false);
@@ -81,6 +88,7 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
   const inDec = side === "buy" ? pool.quoteDecimals : LAUNCHPAD_DECIMALS;
   const outDec = side === "buy" ? LAUNCHPAD_DECIMALS : pool.quoteDecimals;
   const zeroForOne = zeroForOneFor(pool, side);
+  const presets = side === "buy" && pool.quote.toLowerCase() === NATIVE ? ETH_PRESETS : side === "sell" ? TOKEN_PRESETS : null;
 
   const onReview = async () => {
     let amountIn: bigint;
@@ -92,7 +100,7 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
     setReview("quoting");
     try {
       const q = await quoteV4(pool.key, zeroForOne, amountIn);
-      setReview({ amountIn, out: q.amountOut, minOut: minOutFor(q.amountOut, SLIPPAGE_BPS) });
+      setReview({ amountIn, out: q.amountOut, minOut: minOutFor(q.amountOut, slippageBps) });
     } catch (e) {
       setReview({ problem: messageOf(e) });
     }
@@ -112,37 +120,79 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
     }
   };
   const reviewed = review !== null && review !== "quoting" && !("problem" in review) ? review : null;
-  const cta = !me ? "Connect a wallet first" : reviewed ? `${side === "buy" ? "Buy" : "Sell"} — sign in your wallet` : "Review";
+  const onConnect = () => (openWindow ? openWindow("wallet") : void connectInjected());
+  const cta = !me ? (busy ? "Connecting…" : "Connect wallet") : reviewed ? `${side === "buy" ? "Buy" : "Sell"} — sign in your wallet` : "Review";
 
   return (
     <div className="stack">
       {payWith}
-      <label className="field-label">
-        You {side === "buy" ? "pay" : "sell"} ({inSym})
-        <input
-          className="field"
-          inputMode="decimal"
-          aria-label={`Amount of ${inSym}`}
-          placeholder="0.0"
-          value={amount}
-          onChange={(e) => {
-            setAmount(e.target.value);
-            setReview(null);
-          }}
-        />
-      </label>
+      <div className="pt__box">
+        <label className="field-label">
+          <span className="pt__box-head">
+            <span>You {side === "buy" ? "pay" : "sell"} ({inSym})</span>
+            <span className="mono">{outSym} pool</span>
+          </span>
+          <input
+            className="field pt__input"
+            inputMode="decimal"
+            aria-label={`Amount of ${inSym}`}
+            placeholder="0.0"
+            value={amount}
+            onChange={(e) => {
+              setAmount(e.target.value);
+              setReview(null);
+            }}
+          />
+        </label>
+        {presets ? (
+          <div className="pt__presets" role="group" aria-label="Quick amount">
+            {presets.map((val) => (
+              <button
+                key={val}
+                type="button"
+                className="pt__preset"
+                onClick={() => {
+                  setAmount(val);
+                  setReview(null);
+                }}
+              >
+                {side === "buy" ? `${val} ETH` : Number(val).toLocaleString("en-US")}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      <div className="pt__slip">
+        <span>Max slippage</span>
+        <div className="pt__slip-btns" role="group" aria-label="Max slippage">
+          {SLIPPAGE_OPTIONS.map((bps) => (
+            <button
+              key={bps}
+              type="button"
+              className="pt__slip-btn"
+              aria-pressed={slippageBps === bps}
+              onClick={() => {
+                setSlippageBps(bps);
+                setReview(null);
+              }}
+            >
+              {bps / 100}%
+            </button>
+          ))}
+        </div>
+      </div>
       {review === "quoting" ? <p className="dim">Asking Uniswap&apos;s Quoter…</p> : null}
       {review !== null && review !== "quoting" && "problem" in review ? <p className="tx__warn">{review.problem}</p> : null}
       {reviewed ? (
-        <p>
-          You get ≈ <strong>{tokenAmount(reviewed.out, outDec, 6)} {outSym}</strong> — at least {tokenAmount(reviewed.minOut, outDec, 6)} or the swap is refused (1% slippage).
+        <p className="pt__review">
+          You get ≈ <strong>{tokenAmount(reviewed.out, outDec, 6)} {outSym}</strong> — at least {tokenAmount(reviewed.minOut, outDec, 6)} or the swap is refused ({slippageBps / 100}% slippage).
           Straight from the coin&apos;s own pool; the pool&apos;s fee is included.
         </p>
       ) : null}
       <Gel
         className="mf__cta"
-        disabled={!me || steps.running || amount.trim() === "" || review === "quoting"}
-        onClick={() => void (reviewed ? onTrade(reviewed) : onReview())}
+        disabled={!me ? busy : steps.running || amount.trim() === "" || review === "quoting"}
+        onClick={() => (!me ? onConnect() : void (reviewed ? onTrade(reviewed) : onReview()))}
       >
         {cta}
       </Gel>

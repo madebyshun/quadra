@@ -92,13 +92,15 @@ export function getRoutes(
         : u === ETH_MARKET
           ? marketsOf("WETH")
           : // the coins' markets, one request for every listed coin — all the same coin in these captures
-            u.startsWith(`https://api.dexscreener.com/tokens/v1/base/${T}`)
+            u.toLowerCase().startsWith(`https://api.dexscreener.com/tokens/v1/base/${T.toLowerCase()}`)
             ? (over.coinMarkets ?? [])
             : u.startsWith("/api/launchpad/")
               ? (over.index?.(u) ?? spa())
-              : u.startsWith(`${BLOCKSCOUT}/tokens/${T}`)
-                ? (over.blockscout?.(u) ?? DOWN)
-                : undefined;
+              : u.startsWith("/api/charts/")
+                ? spa()
+                : u.startsWith(`${BLOCKSCOUT}/tokens/${T}`)
+                  ? (over.blockscout?.(u) ?? DOWN)
+                  : undefined;
 }
 
 export function wallet(account: string | null) {

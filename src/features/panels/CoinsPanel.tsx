@@ -35,7 +35,7 @@ import { VerdictBadge } from "@/features/panels/VerdictBadge";
 import { CoinShare } from "@/features/panels/CoinShare";
 import { TxStepList, useTxSteps } from "@/features/panels/TxSteps";
 import { PairExposure } from "@/features/panels/PairExposure";
-import { Disclosures, FeeLedger, CoinMoves, CreatorLaunches, NewLaunches, TokenChart, TokenInfo, TokenStats, TokenTabs, TokenWarning, useCoinFee, useCoinPage, useCoinReferrer } from "@/features/panels/TokenPage";
+import { Disclosures, FeeLedger, CoinMoves, CreatorLaunches, NewLaunches, TokenChart, TokenGuarantees, TokenInfo, TokenPosition, TokenStats, TokenTabs, TokenWarning, useCoinFee, useCoinPage, useCoinReferrer } from "@/features/panels/TokenPage";
 import { feePercent } from "@/config/launchpad";
 import { tokenInfo } from "@/skills/blockscout";
 import { feesText, valueText } from "@/features/panels/BaseLaunch";
@@ -206,7 +206,7 @@ export function coinReport(
 }
 
 function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | null; onBack: () => void }) {
-  const { wallet, signingProvider } = useWalletSession();
+  const { wallet, signingProvider, connectInjected, busy } = useWalletSession();
   const openWindow = useOpenWindow();
   const ready = wallet?.kind === "ready" ? wallet : null;
   const [record, setRecord] = useState<LaunchRecord | null | "reading" | { readonly problem: string }>("reading");
@@ -214,6 +214,7 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
   const [value, setValue] = useState<PoolValue | null>(listed?.value ?? null);
   const [fees, setFees] = useState<Awaited<ReturnType<typeof pendingFees>> | null>(null);
   const [side, setSide] = useState<"buy" | "sell">("buy");
+  const [shareOpen, setShareOpen] = useState(false);
   const [verdict, setVerdict] = useState<Report | "running" | { readonly problem: string } | null>(null);
   const [fresh, setFresh] = useState(0);
   const collecting = useTxSteps();
@@ -307,8 +308,34 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
     <div className="stack coin-page">
       <div className="coin__topbar">
         {back}
-        <ContractAddress address={token} />
+        <div className="coin__topbar-actions">
+          <ContractAddress address={token} />
+          {facts && value ? (
+            <button
+              type="button"
+              className="chip chip--mode"
+              aria-pressed={shareOpen}
+              onClick={() => setShareOpen((v) => !v)}
+            >
+              {shareOpen ? "Close share" : "Share"}
+            </button>
+          ) : null}
+          {!ready ? (
+            <Gel
+              className="gel--quiet"
+              disabled={busy}
+              onClick={() => (openWindow ? openWindow("wallet") : void connectInjected())}
+            >
+              Connect wallet
+            </Gel>
+          ) : null}
+        </div>
       </div>
+      {shareOpen && facts && value ? (
+        <div className="coin__share-drawer">
+          <CoinShare c={{ token, name: facts.name, symbol: facts.symbol, pair: value.quoteSymbol, cap: valueText(value).replace(/^market cap ≈ /, "") }} />
+        </div>
+      ) : null}
       <NewLaunches onOpen={(t) => openWindow?.("coins", { t })} />
 
       <header className="coin__header">
@@ -331,6 +358,7 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
             )}
           </span>
         </p>
+        <TokenGuarantees factory={record.factory} fee={fee} launchedAt={launchedAt} now={now} />
       </header>
 
       <TokenWarning />
@@ -352,6 +380,18 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
             <PoolTrade key={`${token}:${side}`} token={token} symbol={symbol} side={side} />
           </fieldset>
 
+          {ready ? (
+            <TokenPosition
+              token={token}
+              symbol={symbol}
+              account={ready.account}
+              page={page}
+              value={value}
+              fresh={fresh}
+              onSell={() => setSide("sell")}
+            />
+          ) : null}
+
           {ready && ready.account.toLowerCase() === record.creatorRecipient.toLowerCase() ? (
             <fieldset className="group coin__panel">
               <legend className="mk__trade-title">Your fees</legend>
@@ -361,11 +401,6 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
               <p className="dim">80% to you, 20% to this app — the launchpad&apos;s split, in both currencies of the pool.</p>
               <TxStepList states={collecting.states} label="Collect progress" />
             </fieldset>
-          ) : null}
-
-          <CoinRewards token={token} symbol={symbol} record={record} />
-          {facts && value ? (
-            <CoinShare c={{ token, name: facts.name, symbol: facts.symbol, pair: value.quoteSymbol, cap: valueText(value).replace(/^market cap ≈ /, "") }} />
           ) : null}
 
           <fieldset className="group coin__panel">
@@ -387,24 +422,35 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
         <div className="coin__main stack">
           <TokenStats page={page} value={value} holders={holders} />
           <div className="coin__section">
-            <TokenChart page={page} />
-          </div>
-          <div className="coin__section">
-            <TokenTabs token={token} page={page} now={now} quoteUsd={value?.quoteUsd ?? null} />
+            <TokenChart page={page} token={token} symbol={symbol} value={value} quoteUsd={value?.quoteUsd ?? null} />
           </div>
           <PairExposure page={page !== "reading" && !("problem" in page) ? page : null} value={value} now={now} />
           <CoinMoves token={token} />
-          <FeeLedger page={page} fee={fee} referrer={referrer} />
           <div className="coin__section">
-            <TokenInfo page={page} creator={record.creator} launchedAt={launchedAt} quoteUsd={value?.quoteUsd ?? null} fee={fee} referrer={referrer} />
+            <TokenTabs
+              token={token}
+              page={page}
+              now={now}
+              quoteUsd={value?.quoteUsd ?? null}
+              feesTab={
+                <div className="stack">
+                  <CoinRewards token={token} symbol={symbol} record={record} />
+                  <FeeLedger page={page} fee={fee} referrer={referrer} />
+                  <TokenInfo page={page} creator={record.creator} launchedAt={launchedAt} quoteUsd={value?.quoteUsd ?? null} fee={fee} referrer={referrer} />
+                  <CreatorLaunches creator={record.creator} current={token} />
+                </div>
+              }
+              disclosuresTab={
+                <div className="stack">
+                  <Disclosures factory={record.factory} fee={fee} referrer={referrer} />
+                  <details className="trade__more">
+                    <summary>Everything about {symbol}, with sources</summary>
+                    <ReportView report={coinReport(token, facts, record, value, fees, listed)} />
+                  </details>
+                </div>
+              }
+            />
           </div>
-          <CreatorLaunches creator={record.creator} current={token} />
-          <Disclosures factory={record.factory} fee={fee} referrer={referrer} />
-
-          <details className="trade__more">
-            <summary>Everything about {symbol}, with sources</summary>
-            <ReportView report={coinReport(token, facts, record, value, fees, listed)} />
-          </details>
         </div>
       </div>
     </div>

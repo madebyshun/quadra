@@ -319,7 +319,16 @@ describe("the Coins window", () => {
     // the launcher, one click away: their profile
     await userEvent.click(screen.getByRole("button", { name: `Profile of ${ME}` }));
     expect(open).toHaveBeenCalledWith("profile", { a: ME });
-    // the full page, with its sources, folded below the trade
+    // Share button in top bar opens and closes the share drawer cleanly
+    await userEvent.click(screen.getByRole("button", { name: "Share" }));
+    expect(screen.getByRole("button", { name: "Close share" })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: "Close share" }));
+    expect(screen.getByRole("button", { name: "Share" })).toHaveAttribute("aria-pressed", "false");
+    // topbar Connect wallet opens the wallet window when desktop openWindow is present
+    await userEvent.click(screen.getAllByRole("button", { name: "Connect wallet" })[0]!);
+    expect(open).toHaveBeenCalledWith("wallet");
+    // the full page, with its sources, inside the Disclosures tab
+    await userEvent.click(screen.getByRole("tab", { name: "Disclosures" }));
     expect(screen.getByText("Everything about test, with sources")).toBeInTheDocument();
     expect(screen.getByLabelText("test (test)")).toHaveTextContent(/Fees waiting.* ETH \+ 0 tokens waiting/);
     // not the creator's wallet: no collect
@@ -335,12 +344,18 @@ describe("the Coins window", () => {
     mount(`/?do=coins&t=${T}`, null);
     await waitFor(() => expect(screen.getByText(/· by 0xD5C1…3FAB$/)).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: `Profile of ${ME}` })).not.toBeInTheDocument();
+    // outside desktop, topbar Connect wallet falls back to connectInjected
+    await userEvent.click(screen.getAllByRole("button", { name: "Connect wallet" })[0]!);
   });
 
   it("lets the creator collect from the coin's page, and runs a verdict on demand", async () => {
     const sent = wallet(ME);
-    net({ rpc: chainRoutes(), get: getRoutes() });
+    net({ rpc: chainRoutes({ holding: 1000n * 10n ** 18n }), get: getRoutes() });
     mount(`/?do=coins&t=${T}`);
+    // TokenPosition's Sell shortcut switches the Trade panel to Sell
+    const pos = await screen.findByLabelText("Your position");
+    await userEvent.click(within(pos).getByRole("button", { name: "Sell test" }));
+    expect(await screen.findByLabelText("Amount of test")).toBeInTheDocument();
     const collect = await screen.findByRole("button", { name: "Collect" });
     await waitFor(() => expect(collect).toBeEnabled());
     await userEvent.click(collect);
@@ -433,6 +448,7 @@ describe("the Coins window", () => {
     net({ rpc: chainRoutes(), get: getRoutes({ index: (u) => (u === `/api/launchpad/coin?token=${T}` ? served() : undefined), blockscout: (u) => (u === `${BLOCKSCOUT}/tokens/${T}` ? FX.tokenDegen : undefined) }) });
     mount(`/?do=coins&t=${T}`);
     await waitFor(() => expect(screen.getByLabelText("Numbers")).toHaveTextContent("Holders1,225,549"));
+    await userEvent.click(screen.getByRole("tab", { name: "Fees & Info" }));
     expect(screen.getByLabelText("Info")).toHaveTextContent("CreatedOct 2, 2026");
   });
 
@@ -455,6 +471,7 @@ describe("the Coins window", () => {
     const open = vi.fn();
     mount("/?do=coins", open);
     await userEvent.click(await screen.findByRole("button", { name: `Open ${T}` }));
+    await userEvent.click(await screen.findByRole("tab", { name: "Fees & Info" }));
     expect(await screen.findByLabelText("Info")).toHaveTextContent("Creatednot read");
     const strip = await screen.findByRole("group", { name: "Newest launches" });
     await userEvent.click(within(strip).getByRole("button"));
