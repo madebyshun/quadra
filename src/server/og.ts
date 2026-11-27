@@ -30,6 +30,13 @@ export const OG_PAGES: readonly OgPage[] = [
     lines: ["check any token before you buy", "build a basket. launch a coin.", "review it. sign in your wallet."],
   },
   {
+    id: "docs",
+    path: "quadra / docs",
+    title: "quadra docs",
+    description: "how to use quadra's tools on base, where its data comes from, and what happens before you sign.",
+    lines: ["tools and supported workflows", "wallet signatures and limitations", "where the data comes from"],
+  },
+  {
     id: "about",
     path: "quadra / about",
     title: "about quadra",
@@ -160,7 +167,7 @@ const ALIAS: Readonly<Record<string, string>> = {
   mcp: "agents",
   "folder-agents": "agents",
   api: "agents",
-  docs: "agents",
+  docs: "docs",
   about: "about",
 };
 

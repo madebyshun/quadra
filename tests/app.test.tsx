@@ -494,7 +494,8 @@ describe("the app's own menu (it holds what the Start menu held)", () => {
 describe("routing", () => {
   it("serves /docs", () => {
     renderAt("/docs");
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Docs");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Quadra Docs.");
+    expect(screen.queryByLabelText("Desktop workspace")).not.toBeInTheDocument();
   });
 
   it("serves /api", () => {
@@ -525,16 +526,16 @@ describe("routing", () => {
 
   it("uses the desktop on standalone documents and opens its tools", async () => {
     const user = userEvent.setup();
-    renderAt("/docs");
+    renderAt("/verify");
     expect(screen.getByLabelText("Desktop workspace")).toBeVisible();
     await user.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^My Computer/ }));
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("My Computer");
   });
 
-  it("closes a standalone page back to the desktop from its close light", async () => {
+  it("returns to the desktop from public docs", async () => {
     const user = userEvent.setup();
     renderAt("/docs");
-    await user.click(screen.getByRole("button", { name: "Close" }));
+    await user.click(screen.getByRole("link", { name: "Back to the desktop" }));
     expect(screen.getByLabelText("What you can do")).toBeInTheDocument();
   });
 
@@ -698,7 +699,7 @@ describe("the photo intro on a bare load", () => {
     motion();
     const user = userEvent.setup();
     renderAt("/docs");
-    await user.click(screen.getByRole("button", { name: "Close" }));
+    await user.click(screen.getByRole("link", { name: "Back to the desktop" }));
     expect(screen.queryByRole("dialog", { name: "quadra is starting" })).toBeNull();
     expect(screen.getByLabelText("What you can do")).toBeInTheDocument();
   });

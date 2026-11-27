@@ -1,34 +1,43 @@
-/**
- * Draws every page's share card to public/og/<id>.png (hand-run: `npm run build:og`, then commit
- * the PNGs). Each card is features/og/OgCard.tsx rendered to markup and photographed by headless
- * Chrome at exactly 1200x630, with Inter and JetBrains Mono loaded and the CRT photo read from public/brand/ so the picture matches the app.
- * Re-run after changing a page's copy in src/server/og.ts — tests/og.test.tsx fails while a page
- * has no picture.
- */
+/** Render the share cards and X profile banners from the same visual system. */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { renderToStaticMarkup } from "react-dom/server";
-import { OgCard, OG_H, OG_W } from "@/features/og/OgCard";
+import { OgCard, OG_H, OG_W, XHeader, XPost, X_POSTS } from "@/features/og/OgCard";
 import { OG_PAGES } from "@/server/og";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(ROOT, "public", "og");
+const BANNERS = join(ROOT, "public", "brand", "banners");
 const CHROME = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const PHOTO_FILE = `file://${join(ROOT, "public", "brand", "quadra-machine.jpg")}`;
-const FONTS = "https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=JetBrains+Mono:wght@400;500&display=block";
+const art = (path: string) => `data:image/svg+xml;base64,${readFileSync(join(ROOT, path)).toString("base64")}`;
+const machine = art("public/brand/banners/q001-dot-matrix.svg");
+const sourceCards = new Set(["home", "about", "markets"]);
 
 mkdirSync(OUT, { recursive: true });
-const work = mkdtempSync(join(tmpdir(), "og-"));
-for (const page of OG_PAGES) {
-  const html = join(work, `${page.id}.html`);
-  const artwork = join(ROOT, "public", "brand", "banners", `og-${page.id}.svg`);
-  const card = existsSync(artwork)
-    ? readFileSync(artwork, "utf8")
-    : renderToStaticMarkup(<OgCard page={page} photo={PHOTO_FILE} />);
-  writeFileSync(html, `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="${FONTS}"><style>html,body{margin:0}</style></head><body>${card}</body></html>`);
-  execFileSync(CHROME, ["--headless", "--disable-gpu", "--hide-scrollbars", "--virtual-time-budget=4000", `--window-size=${OG_W},${OG_H}`, `--screenshot=${join(OUT, `${page.id}.png`)}`, `file://${html}`], { stdio: "ignore" });
-  console.log(`og/${page.id}.png`);
+const work = mkdtempSync(join(tmpdir(), "quadra-og-"));
+function renderPng(svg: string, output: string, width: number, height: number) {
+  const html = join(work, "card.html");
+  writeFileSync(html, `<!doctype html><meta charset="utf-8"><style>html,body{margin:0}svg{display:block}</style>${svg}`);
+  execFileSync(CHROME, ["--headless", "--disable-gpu", "--hide-scrollbars", "--force-device-scale-factor=1", "--virtual-time-budget=1000", `--user-data-dir=${join(work, "profile")}`, `--window-size=${width},${height}`, `--screenshot=${output}`, pathToFileURL(html).href], { stdio: "ignore" });
+  console.log(output);
+}
+
+try {
+  for (const page of OG_PAGES) {
+    if (sourceCards.has(page.id)) {
+      writeFileSync(join(BANNERS, `og-${page.id}.svg`), renderToStaticMarkup(<OgCard page={page} artwork="./q001-dot-matrix.svg" />));
+    }
+    renderPng(renderToStaticMarkup(<OgCard page={page} artwork={machine} />), join(OUT, `${page.id}.png`), OG_W, OG_H);
+  }
+  renderPng(renderToStaticMarkup(<XHeader artwork={machine} />), join(BANNERS, "x-header-q001.png"), 1500, 500);
+  const posts = join(BANNERS, "x-posts");
+  mkdirSync(posts, { recursive: true });
+  for (const post of X_POSTS) {
+    renderPng(renderToStaticMarkup(<XPost post={post} />), join(posts, `${post.id}.png`), 1080, 1080);
+  }
+} finally {
+  rmSync(work, { recursive: true, force: true });
 }

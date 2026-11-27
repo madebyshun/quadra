@@ -1,42 +1,15 @@
 import type { OgPage } from "@/server/og";
 
-/**
- * A page's share card, 1200x630 (the size X and Open Graph draw large), redrawn 2026-11-19 to the
- * visual direction the owner chose (docs/research/2026-11-16-computer-aesthetic-visual-direction.md,
- * "a personal computer in the sky"): a computer-magazine advert page — ivory paper inside a printed
- * frame, a heavy serif masthead in electric blue, the page's folder path and three entries — and ONE
- * piece of hardware as the subject: the CRT over the sea (public/brand/computer-sky.webp). No
- * decorative windows, no live figure (the platforms keep a card for days).
- * scripts/build-og.tsx renders each to public/og/<id>.png.
- */
-
 export const OG_W = 1200;
 export const OG_H = 630;
-/** the photo, served from public/ — the build script hands Chrome a file URL instead */
-export const PHOTO = "/brand/quadra-machine.jpg";
+export const MACHINE = "/brand/banners/q001-dot-matrix.svg";
+
 const PAPER = "#f4f0e6";
-const BLUE = "#1f1fd8";
-const SKY = "#0b63c4";
-const INK = "#141414";
-const RULE = "#b9b3a6";
+const BLUE = "#2422cf";
+const INK = "#24221e";
 const SERIF = "Georgia, 'Times New Roman', serif";
-const SANS = "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif";
-const MONO = "'JetBrains Mono', Menlo, Consolas, monospace";
+const MONO = "'JetBrains Mono', Menlo, monospace";
 
-/** The pixel mark (public/brand/icon.svg), at `size` px. */
-function Mark({ x, y, size }: { x: number; y: number; size: number }) {
-  return (
-    <g transform={`translate(${x} ${y}) scale(${size / 32})`} shapeRendering="crispEdges">
-      <path fill="#000000" d="M6 5h20v1h-20zM5 6h1v1h-1zM26 6h1v1h-1zM5 7h1v1h-1zM7 7h18v1h-18zM26 7h1v1h-1zM5 8h1v1h-1zM7 8h1v1h-1zM24 8h1v1h-1zM26 8h1v1h-1zM5 9h1v1h-1zM7 9h1v1h-1zM24 9h1v1h-1zM26 9h1v1h-1zM5 10h1v1h-1zM7 10h1v1h-1zM24 10h1v1h-1zM26 10h1v1h-1zM5 11h1v1h-1zM7 11h1v1h-1zM24 11h1v1h-1zM26 11h1v1h-1zM5 12h1v1h-1zM7 12h1v1h-1zM24 12h1v1h-1zM26 12h1v1h-1zM5 13h1v1h-1zM7 13h1v1h-1zM24 13h1v1h-1zM26 13h1v1h-1zM5 14h1v1h-1zM7 14h1v1h-1zM24 14h1v1h-1zM26 14h1v1h-1zM5 15h1v1h-1zM7 15h1v1h-1zM24 15h1v1h-1zM26 15h1v1h-1zM5 16h1v1h-1zM7 16h1v1h-1zM24 16h1v1h-1zM26 16h1v1h-1zM5 17h1v1h-1zM7 17h1v1h-1zM24 17h1v1h-1zM26 17h1v1h-1zM5 18h1v1h-1zM7 18h1v1h-1zM24 18h1v1h-1zM26 18h1v1h-1zM5 19h1v1h-1zM7 19h18v1h-18zM26 19h1v1h-1zM5 20h1v1h-1zM26 20h1v1h-1zM5 21h1v1h-1zM26 21h1v1h-1zM5 22h1v1h-1zM17 22h6v1h-6zM26 22h1v1h-1zM5 23h1v1h-1zM26 23h1v1h-1zM5 24h1v1h-1zM26 24h1v1h-1zM5 25h1v1h-1zM26 25h1v1h-1zM6 26h20v1h-20zM7 27h1v1h-1zM24 27h1v1h-1zM7 28h18v1h-18z" />
-      <path fill="#e3e0d6" d="M6 6h20v1h-20zM6 7h1v1h-1zM25 7h1v1h-1zM6 8h1v1h-1zM25 8h1v1h-1zM6 9h1v1h-1zM25 9h1v1h-1zM6 10h1v1h-1zM25 10h1v1h-1zM6 11h1v1h-1zM25 11h1v1h-1zM6 12h1v1h-1zM25 12h1v1h-1zM6 13h1v1h-1zM25 13h1v1h-1zM6 14h1v1h-1zM25 14h1v1h-1zM6 15h1v1h-1zM25 15h1v1h-1zM6 16h1v1h-1zM25 16h1v1h-1zM6 17h1v1h-1zM25 17h1v1h-1zM6 18h1v1h-1zM25 18h1v1h-1zM6 19h1v1h-1zM25 19h1v1h-1zM6 20h20v1h-20zM6 21h20v1h-20zM6 22h2v1h-2zM10 22h7v1h-7zM23 22h3v1h-3zM6 23h20v1h-20zM6 24h20v1h-20z" />
-      <path fill="#0052ff" d="M8 8h16v1h-16zM8 9h5v1h-5zM19 9h5v1h-5zM8 10h4v1h-4zM14 10h4v1h-4zM20 10h4v1h-4zM8 11h3v1h-3zM13 11h6v1h-6zM21 11h3v1h-3zM8 12h3v1h-3zM13 12h6v1h-6zM21 12h3v1h-3zM8 13h3v1h-3zM13 13h6v1h-6zM21 13h3v1h-3zM8 14h3v1h-3zM13 14h3v1h-3zM18 14h1v1h-1zM21 14h3v1h-3zM8 15h3v1h-3zM13 15h4v1h-4zM20 15h4v1h-4zM8 16h4v1h-4zM14 16h4v1h-4zM20 16h4v1h-4zM8 17h5v1h-5zM19 17h1v1h-1zM22 17h2v1h-2zM8 18h16v1h-16zM8 22h2v1h-2z" />
-      <path fill="#ffffff" d="M13 9h6v1h-6zM12 10h2v1h-2zM18 10h2v1h-2zM11 11h2v1h-2zM19 11h2v1h-2zM11 12h2v1h-2zM19 12h2v1h-2zM11 13h2v1h-2zM19 13h2v1h-2zM11 14h2v1h-2zM16 14h2v1h-2zM19 14h2v1h-2zM11 15h2v1h-2zM17 15h3v1h-3zM12 16h2v1h-2zM18 16h2v1h-2zM13 17h6v1h-6zM20 17h2v1h-2z" />
-      <path fill="#9c988c" d="M6 25h20v1h-20zM8 27h16v1h-16z" />
-    </g>
-  );
-}
-
-/** Two lines from one, broken at the space nearest the middle. */
 export function splitAt(text: string): [string, string] {
   const mid = text.length / 2;
   let at = -1;
@@ -44,61 +17,97 @@ export function splitAt(text: string): [string, string] {
   return at < 0 ? [text, ""] : [text.slice(0, at), text.slice(at + 1)];
 }
 
-export function OgCard({ page, photo = PHOTO }: { page: OgPage; photo?: string }) {
+export function OgCard({ page, artwork = MACHINE }: { page: OgPage; artwork?: string }) {
   const home = page.id === "home";
+  const about = page.id === "about";
   const headline = home ? "your own on-chain computer." : `${page.path.split(" / ").at(-1)!}.`;
-  const left = 64;
-  // a headline wider than the column (about 18 characters of 46 px serif) breaks at its middle word
-  const heads = headline.length > 18 ? splitAt(headline) : [headline];
-  const px = 588;
+  const heads = about ? ["an on-chain", "supercomputer", "for Base."] : headline.length > 18 ? splitAt(headline) : [headline];
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${OG_W} ${OG_H}`} width={OG_W} height={OG_H} role="img" aria-label={`share card: ${page.path}`}>
-      <defs>
-        <clipPath id="og-photo">
-          <rect x={px} y="28" width={OG_W - px - 28} height={OG_H - 56} />
-        </clipPath>
-      </defs>
-      {/* the page: ivory paper, a printed double frame */}
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width={OG_W} height={OG_H} role="img" aria-label={`share card: ${page.path}`}>
       <rect width={OG_W} height={OG_H} fill={PAPER} />
-      <rect x="14" y="14" width={OG_W - 28} height={OG_H - 28} fill="none" stroke={INK} strokeWidth="3" />
-      <rect x="22" y="22" width={OG_W - 44} height={OG_H - 44} fill="none" stroke={INK} strokeWidth="1" />
-
-      {/* the subject: the workstation on sunlit grass against Base cobalt halftone clouds */}
-      <rect x={px} y="28" width={OG_W - px - 28} height={OG_H - 56} fill={SKY} />
-      <image href={photo} x={px} y="28" width={OG_W - px - 28} height={OG_H - 56} preserveAspectRatio="xMidYMid slice" clipPath="url(#og-photo)" />
-      <line x1={px} y1="28" x2={px} y2={OG_H - 28} stroke={INK} strokeWidth="2" />
-
-      {/* the masthead */}
-      <Mark x={left - 6} y={44} size={74} />
-      <text x={left + 76} y="104" fontFamily={SERIF} fontWeight="700" fontSize="78" fill={BLUE} letterSpacing="-2">
-        quadra
-      </text>
-      <line x1={left} y1="130" x2={px - 36} y2="130" stroke={INK} strokeWidth="3" />
-      <line x1={left} y1="137" x2={px - 36} y2="137" stroke={INK} strokeWidth="1" />
-      <text x={left} y="166" fontFamily={MONO} fontSize="18" fill={INK}>
-        {page.path}
-      </text>
-
-      {/* the page's own line, and what it does */}
-      {heads.map((h, i) => (
-        <text key={h} x={left} y={232 + i * 50} fontFamily={SERIF} fontWeight="700" fontSize="46" fill={INK} letterSpacing="-1">
-          {h}
-        </text>
+      <text x="58" y="86" fontFamily={SERIF} fontSize="52" letterSpacing="-2" fill={BLUE}>quadra</text>
+      <text x="1142" y="82" textAnchor="end" fontFamily={MONO} fontSize="15" fill={INK}>{page.path}</text>
+      <image href={artwork} x="652" y="65" width="487" height="499" preserveAspectRatio="xMidYMid meet" />
+      {heads.map((head, i) => {
+        const accent = i === heads.length - 1;
+        return <text key={head} x={about ? 56 : 58} y={about ? 243 + i * 81 : 201 + i * 71} fontFamily={SERIF} fontSize={about ? 81 : head.length > 17 ? 63 : 73} letterSpacing="-3" fill={accent ? BLUE : INK} fontStyle={accent ? "italic" : undefined}>{head}</text>;
+      })}
+      {about ? <text x="62" y="477" fontFamily="Arial, sans-serif" fontSize="22" fill={INK}>Research. Trade. Launch.</text> : page.lines.map((line, i) => (
+        <text key={line} x="62" y={248 + heads.length * 65 + i * 34} fontFamily="Arial, sans-serif" fontSize="22" fill={INK}>- {line}</text>
       ))}
-      {page.lines.map((line, i) => (
-        <text key={line} x={left} y={(heads.length > 1 ? 340 : 300) + i * 44} fontFamily={SANS} fontSize="24" fill={INK}>
-          - {line}
-        </text>
-      ))}
+      <text x="58" y="594" fontFamily={MONO} fontSize="16" fill={BLUE}>{about ? "quadracomputer.xyz" : "look first. sign when ready."}</text>
+      <text x="1142" y="594" textAnchor="end" fontFamily={MONO} fontSize="16" fill={INK}>{about ? "fig. 1 / q-001" : "base / 8453"}</text>
+    </svg>
+  );
+}
 
-      {/* the foot of the page */}
-      <line x1={left} y1={OG_H - 98} x2={px - 36} y2={OG_H - 98} stroke={RULE} strokeWidth="1" />
-      <text x={left} y={OG_H - 62} fontFamily={MONO} fontSize="18" fill={BLUE}>
-        look first. sign when ready.
-      </text>
-      <text x={px - 36} y={OG_H - 62} textAnchor="end" fontFamily={MONO} fontSize="16" fill={INK}>
-        base / 8453
-      </text>
+export function XHeader({ artwork }: { artwork: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="1500" height="500" viewBox="0 0 1500 500" role="img" aria-label="Quadra profile banner">
+      <rect width="1500" height="500" fill={PAPER} />
+      <g fontFamily={SERIF} letterSpacing="-3">
+        <text x="240" y="118" fontSize="52" fill={BLUE}>quadra</text>
+        <text x="236" y="219" fontSize="76" fill={INK}>an on-chain</text>
+        <text x="236" y="298" fontSize="76" fill={INK}>supercomputer</text>
+        <text x="236" y="377" fontSize="76" fontStyle="italic" fill={BLUE}>for Base.</text>
+      </g>
+      <image href={artwork} x="855.84" y="14.8" width="448.04" height="459.08" />
+      <text x="1291" y="470" textAnchor="end" fontFamily={MONO} fontSize="15" fill={INK}>quadracomputer.xyz</text>
+    </svg>
+  );
+}
+
+export const X_POSTS = [
+  { id: "launch", label: "Launchpad", first: "Launch a coin.", second: "Collect creator fees.", note: "Pair with ETH, Base crypto or a supported tokenized stock." },
+  { id: "stocks", label: "Tokenized stocks", first: "Stocks on Base.", second: "In your wallet.", note: "Explore tokenized stocks in Quadra Markets." },
+  { id: "pairs", label: "Base pairs", first: "Pick a Base token.", second: "Give it a pair.", note: "Choose a supported quote asset when you launch." },
+  { id: "trade", label: "Trade", first: "Find a market.", second: "Make your trade.", note: "Review the quote, then sign in your wallet." },
+  { id: "basket", label: "Treasury Basket", first: "Build a basket.", second: "Hold the assets.", note: "Choose your mix of tokenized stocks and Base crypto." },
+  { id: "quadra", label: "$QUADRA", first: "Its own pool.", second: "Its own fee flow.", note: "Follow the on-chain fee flow on Quadra About." },
+] as const;
+
+export function XPost({ post }: { post: (typeof X_POSTS)[number] }) {
+  const ticker = post.id === "stocks" ? ["AAPLc", "NVDAc"] : ["YOUR COIN", "BASE TOKEN"];
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img" aria-label={post.label}>
+      <defs>
+        <pattern id="post-dots" width="11" height="11" patternUnits="userSpaceOnUse">
+          <circle cx="5.5" cy="5.5" r="2.4" fill={BLUE} />
+        </pattern>
+      </defs>
+      <rect width="1080" height="1080" fill={PAPER} />
+      <text x="64" y="105" fill={BLUE} fontFamily={SERIF} fontSize="59" letterSpacing="-3">quadra</text>
+      <text x="1016" y="94" fill={INK} fontFamily={MONO} fontSize="21" textAnchor="end">{post.label}</text>
+      <text x="64" y="237" fontFamily={SERIF} fontSize="85" letterSpacing="-4" fill={INK}>{post.first}</text>
+      <text x="64" y="330" fontFamily={SERIF} fontSize="85" letterSpacing="-4" fontStyle="italic" fill={BLUE}>{post.second}</text>
+      <g transform="translate(120 397)" stroke={BLUE} strokeWidth="6" fill="url(#post-dots)" strokeLinejoin="round">
+        {post.id === "launch" && <path d="M217 404h406V241H512v-56h100L420 22 228 185h100v56H217z M420 92v222" />}
+        {(post.id === "stocks" || post.id === "pairs") && ticker.map((label, i) => (
+          <g key={label} transform={`translate(${i ? 535 : 300} ${i ? 260 : 145}) rotate(-12)`}>
+            <ellipse cy="24" rx="178" ry="107" />
+            <ellipse rx="178" ry="107" fill={PAPER} />
+            <ellipse rx="157" ry="89" fill="none" />
+            <text y="12" textAnchor="middle" fontFamily={MONO} fontSize={post.id === "stocks" ? 51 : 31} fill={BLUE} stroke="none">{label}</text>
+          </g>
+        ))}
+        {post.id === "trade" && <>
+          <path d="M102 60v335h635M132 334h112v-65h118v-61h118v-68h116V61h128" fill="none" strokeWidth="8" />
+          <path d="M132 334h112v-65h118v-61h118v-68h116V61h128v334H132z" stroke="none" />
+        </>}
+        {post.id === "basket" && <>
+          <path d="M108 134h237l48 44h338v218H108z" />
+          <path d="M108 134h237l48 44h338v70H108z" fill={PAPER} />
+          <path d="M173 310h105m56 0h105m56 0h105" fill="none" strokeWidth="9" />
+        </>}
+        {post.id === "quadra" && <>
+          <path d="M420 90v95M220 300V185h400v115" fill="none" />
+          <rect x="283" y="20" width="274" height="70" fill={PAPER} />
+          <path d="M94 300h91l30 24h131v93H94zM494 300h91l30 24h131v93H494z" />
+          <text x="420" y="66" textAnchor="middle" fill={BLUE} stroke="none" fontFamily={MONO} fontSize="40">$QUADRA</text>
+        </>}
+      </g>
+      <text x="64" y="964" fill={INK} fontFamily="Arial, sans-serif" fontSize="28">{post.note}</text>
+      <text x="64" y="1021" fill={BLUE} fontFamily={MONO} fontSize="20">quadracomputer.xyz</text>
     </svg>
   );
 }
