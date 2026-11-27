@@ -186,7 +186,7 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").repl
 
 /** index.html with its title and share tags set for `page`; image and URL absolute against `origin`. */
 export function injectMeta(html: string, page: OgPage, url: URL): string {
-  const image = `${url.origin}/og/${page.id}.png`;
+  const image = `${url.origin}/og/${page.id}.png?v=q001`;
   const set = (attr: "property" | "name", key: string, value: string) => {
     const tag = `<meta ${attr}="${key}" content="${esc(value)}" />`;
     const found = new RegExp(`<meta\\s+${attr}="${key.replace(/[:]/g, "\\:")}"[^>]*>`, "s");

@@ -54,8 +54,8 @@ describe("the tags written into index.html", () => {
     const url = at("/?do=basket");
     const html = injectMeta(INDEX, metaFor(url), url);
     expect(html).toContain("<title>treasury basket - quadra</title>");
-    expect(html).toContain('<meta property="og:image" content="https://quadra.test/og/basket.png" />');
-    expect(html).toContain('<meta name="twitter:image" content="https://quadra.test/og/basket.png" />');
+    expect(html).toContain('<meta property="og:image" content="https://quadra.test/og/basket.png?v=q001" />');
+    expect(html).toContain('<meta name="twitter:image" content="https://quadra.test/og/basket.png?v=q001" />');
     expect(html).toContain('<meta name="twitter:card" content="summary_large_image" />');
     expect(html).toContain('<meta property="og:url" content="https://quadra.test/?do=basket" />');
     expect(html.match(/property="og:image"/g)).toHaveLength(1);
