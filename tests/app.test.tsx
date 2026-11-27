@@ -35,11 +35,11 @@ describe("the desktop", () => {
     }
   });
 
-  it("puts Markets, Send, Swap, Check, Weekend, Coins, Launch, Wallet, Agents and My Computer on the desktop, and the Trash in its corner", async () => {
+  it("puts Markets, Stocks, Send, Swap, Check, Weekend, Coins, Launch, Profile, Wallet, Agents and My Computer on the desktop, and the Trash in its corner", async () => {
     renderAt("/");
     const cards = within(screen.getByLabelText("What you can do")).getAllByRole("button");
     expect(cards.map((c) => c.querySelector(".icon__title")!.textContent)).toEqual(desktopItems().map((e) => e.title));
-    expect(cards.map((c) => c.querySelector(".icon__title")!.textContent)).toEqual(["Markets", "Send", "Swap", "Check", "Weekend", "Coins", "Launch", "Wallet", "Agents", "My Computer"]);
+    expect(cards.map((c) => c.querySelector(".icon__title")!.textContent)).toEqual(["Markets", "Stocks", "Send", "Swap", "Check", "Weekend", "Coins", "Launch", "Profile", "Wallet", "Agents", "My Computer"]);
     expect(FEATURES.length - visibleFeatures().length).toBe(1);
     expect(screen.queryByRole("button", { name: /^Bridge/ })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Read about it")).not.toBeInTheDocument();

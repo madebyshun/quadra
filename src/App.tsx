@@ -53,6 +53,7 @@ import {
 const TALL_PANELS: ReadonlySet<WindowId> = new Set<WindowId>([
   "trade",
   "coins",
+  "stocks",
   "profile",
   "x402",
   "terminal",
@@ -79,8 +80,8 @@ const TALL_PANELS: ReadonlySet<WindowId> = new Set<WindowId>([
  * the Base card measured 452px wide at the default width, the card itself a thumbnail). Still never
  * wider than the viewport allows.
  */
-export const WIDE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["card", "coins", "launch", "readme", "markets", "trade", "basket"]);
-export const LANDSCAPE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["coins", "markets", "trade", "basket"]);
+export const WIDE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["card", "coins", "stocks", "profile", "launch", "readme", "markets", "trade", "basket"]);
+export const LANDSCAPE_PANELS: ReadonlySet<WindowId> = new Set<WindowId>(["coins", "stocks", "profile", "markets", "trade", "basket"]);
 export const WIDE_WIDTH = 760;
 export const LANDSCAPE_WIDTH = 920;
 
@@ -170,6 +171,8 @@ function Home({ introPlayed, onIntroDone }: { introPlayed: boolean; onIntroDone:
   /** set by Home: the next sync writes the bare page, whatever the router still reports (it lags a transition) */
   const homing = useRef(false);
 
+  const WINDOW_SCOPED_PARAMS = ["t", "a", "pair", "tab", "sort", "q", "c"] as const;
+
   useEffect(() => {
     if (homing.current) {
       homing.current = false;
@@ -177,14 +180,22 @@ function Home({ introPlayed, onIntroDone }: { introPlayed: boolean; onIntroDone:
       return;
     }
     const current = params.get("do");
-    if (topId === current && Object.keys(pending.current).length === 0) return;
+    const hasPending = Object.keys(pending.current).length > 0;
+    if (topId === current && !hasPending) return;
     const next = new URLSearchParams(params);
-    for (const [k, v] of Object.entries(pending.current)) next.set(k, v);
-    pending.current = {};
-    if (topId) {
-      next.set("do", topId);
-    } else {
+    if (!topId) {
       next.delete("do");
+      for (const k of WINDOW_SCOPED_PARAMS) next.delete(k);
+      pending.current = {};
+    } else {
+      if (topId !== current) {
+        for (const k of WINDOW_SCOPED_PARAMS) {
+          if (!(k in pending.current)) next.delete(k);
+        }
+      }
+      for (const [k, v] of Object.entries(pending.current)) next.set(k, v);
+      pending.current = {};
+      next.set("do", topId);
     }
     setParams(next, { replace: true });
   }, [topId, params, setParams]);
@@ -198,7 +209,18 @@ function Home({ introPlayed, onIntroDone }: { introPlayed: boolean; onIntroDone:
     return () => window.removeEventListener("keydown", onKey);
   }, [topId]);
 
-  const openFeature = useCallback((id: WindowId) => dispatch(openAction(id)), []);
+  const openFeature = useCallback(
+    (id: WindowId) => {
+      // Clicking Coins from the desktop while viewing a token returns to Coins Discover.
+      if (id === "coins" && params.has("t")) {
+        const next = new URLSearchParams(params);
+        next.delete("t");
+        setParams(next, { replace: true });
+      }
+      dispatch(openAction(id));
+    },
+    [params, setParams],
+  );
   /** Open a window with what it should show — its parameters go into the URL, where it reads them. */
   const openWith = useCallback(
     (id: WindowId, extra: Readonly<Record<string, string>> = {}) => {

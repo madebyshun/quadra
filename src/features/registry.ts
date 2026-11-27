@@ -173,7 +173,7 @@ export const FEATURES: readonly Feature[] = [
     id: "stocks",
     title: "Stocks",
     blurb: "Base tokenized stocks — launch paired with any stock",
-    window: "Stocks — Launchpad",
+    window: "Stocks",
     flag: "coins",
   },
   {
@@ -414,7 +414,7 @@ export function folderOf(id: WindowId): FolderId | null {
  * The desktop's icons since 2026-10-29: Check, Coins, Launch and Wallet — one door for each thing the app
  * does — then Agents and My Computer, which holds the rest. The Trash keeps its corner (`CORNER`).
  */
-export const DESKTOP: readonly WindowId[] = ["markets", "send", "swap", "safety", "weekend", "coins", "launch", "wallet", "folder-agents", "computer"];
+export const DESKTOP: readonly WindowId[] = ["markets", "stocks", "send", "swap", "safety", "weekend", "coins", "launch", "profile", "wallet", "folder-agents", "computer"];
 
 export function desktopItems(): readonly Entry[] {
   return DESKTOP.filter(shown).map(entryOf);

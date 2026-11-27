@@ -18,6 +18,7 @@ import { Gel } from "@/ui/Gel";
 import { useWalletSession } from "@/ui/WalletProvider";
 import { useOpenWindow, useRunCommand } from "@/features/openWindow";
 import { feesText, valueText } from "@/features/panels/BaseLaunch";
+import { CardPanel } from "@/features/panels/BaseCard";
 import { TxStepList, useTxSteps } from "@/features/panels/TxSteps";
 
 /**
@@ -575,10 +576,7 @@ export function ProfilePanel() {
                 </div>
               ) : tab === "card" ? (
                 <div className="stack">
-                  <p className="dim">A painted card of your X profile — type your handle and share it.</p>
-                  <Gel type="button" disabled={!openWindow} onClick={() => openWindow?.("card")}>
-                    Make my Base card
-                  </Gel>
+                  <CardPanel />
                 </div>
               ) : (
                 <ReadLine state={activity} what="the activity">

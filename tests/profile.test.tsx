@@ -231,15 +231,16 @@ describe("the Profile window", () => {
     expect(who).toHaveTextContent("Accountnot read");
   });
 
-  it("opens the Base card program, which asks for an X handle — no address is passed", async () => {
+  it("renders the Base card wizard inline inside Profile, asking for an X handle", async () => {
     wallet(null);
     net(routes());
     const open = vi.fn();
     mount(`/?do=profile&a=${OWNER}`, open);
     await screen.findByLabelText("Holdings");
     await userEvent.click(screen.getByRole("button", { name: "Base card" }));
-    await userEvent.click(screen.getByRole("button", { name: "Make my Base card" }));
-    expect(open).toHaveBeenCalledWith("card");
+    expect(screen.getByRole("form", { name: "Card Wizard" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "X handle" })).toBeInTheDocument();
+    expect(open).not.toHaveBeenCalled();
   });
 
   it("says when the launchpad's index ran out of pages, and shows an undated, unlinked movement plainly", async () => {

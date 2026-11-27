@@ -237,53 +237,76 @@
   overflow-wrap: anywhere;
 }
 
-/* the wizard: a modal dialog of the era — a double black border, an icon, the default button on the right */
+/* Card Wizard — Quadra Platinum + Base Cobalt layout (no emojis/icons) */
 .qdialog {
-  display: flex;
+  display: grid;
   gap: 14px;
-  max-width: 520px;
-  padding: 14px 16px;
-  border: 1px solid #000;
-  outline: 3px solid #fff;
-  outline-offset: -5px;
-  box-shadow: inset 0 0 0 5px #fff, inset 0 0 0 7px #000, 2px 2px 0 #000;
-  background: #fff;
-  color: #000;
-  font-family: var(--font-ui, Verdana, sans-serif);
-  font-size: 13px;
+  max-width: 560px;
+  padding: 16px 18px;
+  border: 1px solid #24221e;
+  background: #f4f0e6;
+  color: #171b29;
+  box-shadow: 3px 3px 0 #24221e;
 }
 
-.qdialog__art {
-  flex: none;
-  padding-top: 8px;
+.qdialog__head-block {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #d4cfc3;
+}
+
+.qdialog__head {
+  margin: 0;
+  font: 700 20px/1.15 var(--font-serif);
+  letter-spacing: -0.02em;
+  color: #171b29;
+}
+
+.qdialog__sub {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #49463f;
 }
 
 .qdialog__body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  gap: 10px;
   min-width: 0;
-  padding-top: 6px;
 }
 
 .qdialog__body p {
   margin: 0;
 }
 
-.qdialog__head {
-  font-weight: bold;
-  font-size: 15px;
+.qdialog__handle {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.qdialog__at {
+  display: grid;
+  place-items: center;
+  padding: 0 10px;
+  border: 1px solid #8c877d;
+  border-right: 0;
+  background: #ece8df;
+  font: 700 13px/1 var(--font-mono);
+  color: #2422cf;
+}
+
+.qdialog__handle .field {
+  flex: 1;
+  min-width: 0;
+  background: #fffdf6;
 }
 
 .qdialog__buttons {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 12px;
-  padding-top: 4px;
-}
-
-.qdialog__buttons .qbtn {
-  min-width: 70px;
-  justify-content: center;
+  gap: 8px;
+  padding-top: 2px;
 }

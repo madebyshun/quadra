@@ -660,28 +660,23 @@ export function CardPanel() {
         void create(text);
       }}
     >
-      <div className="qdialog__art" aria-hidden="true">
-        <svg viewBox="0 0 32 32" width="64" height="64" shapeRendering="crispEdges">
-          <rect x="3" y="5" width="22" height="25" fill="#fff" stroke="#000" strokeWidth="1.5" />
-          <rect x="6" y="8" width="16" height="15" fill="#0052ff" />
-          <rect x="11" y="12" width="2" height="3" fill="#fff" />
-          <rect x="15" y="12" width="2" height="3" fill="#fff" />
-          <path d="M10 18h1v1h6v-1h1v2h-8Z" fill="#fff" />
-          <path d="M22 2l2 4 4 1-3 3 1 4-4-2-4 2 1-4-3-3 4-1Z" fill="#ffd60a" stroke="#000" />
-        </svg>
+      <div className="qdialog__head-block">
+        <span className="mk__eyebrow">BASE IDENTITY CARD · {PAINT.toUpperCase()}</span>
+        <p className="qdialog__head">Create my Base card</p>
+        <p className="qdialog__sub">
+          Type your X handle. {BRAND.name} reads your profile picture and bio, then paints a shareable 1600×900 Base card in {PAINT}.
+        </p>
       </div>
       <div className="qdialog__body">
-        <p className="qdialog__head">Create my Base card</p>
-        <p>
-          Type your X handle. {BRAND.name} grabs your profile picture and bio, then writes something nice(ish) about you in {PAINT}.
-        </p>
-        <label className="handle">
-          <span aria-hidden="true">@</span>
+        <label className="handle qdialog__handle">
+          <span className="qdialog__at" aria-hidden="true">@</span>
           <input className="field" aria-label="X handle" placeholder="yourhandle" autoComplete="off" spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} />
         </label>
         {problem ? <p className="tx__warn">{problem}</p> : null}
         <div className="qdialog__buttons">
-          <Push
+          <button
+            type="button"
+            className="gel gel--quiet"
             onClick={() => {
               setProblem(null);
               if (last) setStage({ kind: "card", user: last });
@@ -689,11 +684,12 @@ export function CardPanel() {
             }}
           >
             Cancel
-          </Push>
-          <Push primary type="submit" disabled={text.trim() === ""}>
+          </button>
+          <button type="submit" className="gel" disabled={text.trim() === ""}>
             Create card
-          </Push>
+          </button>
         </div>
+        <p className="dim">Read live from X via FxTwitter; nothing is stored on any server.</p>
       </div>
     </form>
   );
