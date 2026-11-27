@@ -1,0 +1,17 @@
+.desktop:has(> .desktop-wallpaper) {
+  background: radial-gradient(circle at 56% 48%, #2446ff 0%, #1126e4 54%, #0b169e 100%) fixed !important;
+}
+.desktop > .desktop-wallpaper {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  display: block;
+  pointer-events: none;
+}
+.control__swatch.wallpaper--motion {
+  background-color: #1126e4;
+  background-image: radial-gradient(#f4f0e6 1.25px, transparent 1.25px);
+  background-size: 5px 5px;
+}

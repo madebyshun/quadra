@@ -6,6 +6,8 @@
  */
 
 export const WALLPAPER_KEY = "quadra.wallpaper.v1";
+export const WALLPAPER_SHAPE_KEY = "quadra.wallpaper-shape.v1";
+export const WALLPAPER_SCENE_KEY = "quadra.wallpaper-scene.v1";
 export const SAVER_KEY = "quadra.saver.v1";
 export const SAVER_MINUTES_KEY = "quadra.saver-minutes.v1";
 
@@ -14,15 +16,35 @@ export const SAVER_MINUTES_KEY = "quadra.saver-minutes.v1";
  * — saved in browsers under `WALLPAPER_KEY` — kept as ids so a saved choice never breaks; each now
  * names a Platinum desktop (`bliss`, the old default, is the calm blue-grey default).
  */
-export type WallpaperId = "bliss" | "platinum" | "teal" | "dither" | "dark" | "bricks";
+export type WallpaperId = "bliss" | "motion" | "platinum" | "teal" | "dither" | "dark" | "bricks";
 
 export const WALLPAPERS: readonly { readonly id: WallpaperId; readonly name: string }[] = [
   { id: "bliss", name: "Blue-grey" },
+  { id: "motion", name: "Halftone Motion" },
   { id: "platinum", name: "Platinum" },
   { id: "teal", name: "Teal" },
   { id: "dither", name: "Base blue" },
   { id: "dark", name: "Graphite" },
   { id: "bricks", name: "Bricks" },
+];
+
+export type DotShape = "circle" | "square" | "diamond" | "plus" | "bar";
+
+export const DOT_SHAPES: readonly { readonly id: DotShape; readonly name: string }[] = [
+  { id: "circle", name: "Circle" },
+  { id: "square", name: "Square" },
+  { id: "diamond", name: "Diamond" },
+  { id: "plus", name: "Plus" },
+  { id: "bar", name: "Scanbar" },
+];
+
+export type WallpaperScene = "q001" | "meadow" | "sky" | "studio";
+
+export const WALLPAPER_SCENES: readonly { readonly id: WallpaperScene; readonly name: string }[] = [
+  { id: "q001", name: "Q-001" },
+  { id: "meadow", name: "Sunlit Hill" },
+  { id: "sky", name: "Computer Sky" },
+  { id: "studio", name: "Studio" },
 ];
 
 /** The idle minutes the screen saver offers; 2 is what it always waited. */
@@ -63,6 +85,35 @@ export function wallpaper(): WallpaperId {
 
 export function setWallpaper(id: WallpaperId): void {
   write(WALLPAPER_KEY, id);
+}
+
+export function wallpaperShape(): DotShape {
+  const v = read(WALLPAPER_SHAPE_KEY);
+  return DOT_SHAPES.find((s) => s.id === v)?.id ?? "circle";
+}
+
+export function setWallpaperShape(shape: DotShape): void {
+  write(WALLPAPER_SHAPE_KEY, shape);
+}
+
+export function wallpaperScene(): WallpaperScene {
+  const v = read(WALLPAPER_SCENE_KEY);
+  return WALLPAPER_SCENES.find((s) => s.id === v)?.id ?? "q001";
+}
+
+export function setWallpaperScene(scene: WallpaperScene): void {
+  write(WALLPAPER_SCENE_KEY, scene);
+}
+
+let customImage: string | null = null;
+
+export function customWallpaperImage(): string | null {
+  return customImage;
+}
+
+export function setCustomWallpaperImage(dataUrl: string | null): void {
+  customImage = dataUrl;
+  listeners.forEach((l) => l());
 }
 
 /** On unless the visitor turned it off. */

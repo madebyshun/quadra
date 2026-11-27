@@ -2,14 +2,22 @@ import { useEffect, useState } from "react";
 import { onSoundChange, play, setSoundOn, soundOn } from "@/lib/sound";
 import { setWelcomeOn, welcomeOn } from "@/lib/welcome";
 import {
+  DOT_SHAPES,
   SAVER_MINUTES,
   WALLPAPERS,
+  WALLPAPER_SCENES,
+  customWallpaperImage,
   saverMinutes,
   saverOn,
+  setCustomWallpaperImage,
   setSaverMinutes,
   setSaverOn,
   setWallpaper,
+  setWallpaperScene,
+  setWallpaperShape,
   wallpaper,
+  wallpaperScene,
+  wallpaperShape,
 } from "@/lib/settings";
 import { PlatinumSelect } from "@/ui/Select";
 import { useSetting } from "@/ui/useSettings";
@@ -20,6 +28,9 @@ import { useSetting } from "@/ui/useSettings";
  */
 export function ControlPanel() {
   const paper = useSetting(wallpaper);
+  const scene = useSetting(wallpaperScene);
+  const shape = useSetting(wallpaperShape);
+  const custom = useSetting(customWallpaperImage);
   const saver = useSetting(saverOn);
   const minutes = useSetting(saverMinutes);
   const [sound, setSound] = useState(soundOn);
@@ -39,6 +50,70 @@ export function ControlPanel() {
             </label>
           ))}
         </div>
+        {paper === "motion" ? (
+          <div className="stack">
+            <div className="control__row">
+              <span>Scene</span>
+              <div className="coins__seg" role="group" aria-label="Wallpaper scene">
+                {WALLPAPER_SCENES.map((sc) => (
+                  <button
+                    key={sc.id}
+                    type="button"
+                    className="coins__seg-btn"
+                    aria-pressed={!custom && scene === sc.id}
+                    onClick={() => {
+                      setCustomWallpaperImage(null);
+                      setWallpaperScene(sc.id);
+                    }}
+                  >
+                    {sc.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="control__row">
+              <span>Photo</span>
+              <label className="chip">
+                Upload image…
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      if (typeof reader.result === "string") setCustomWallpaperImage(reader.result);
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+              </label>
+              {custom ? (
+                <button type="button" className="chip" onClick={() => setCustomWallpaperImage(null)}>
+                  Clear photo
+                </button>
+              ) : null}
+            </div>
+            <div className="control__row">
+              <span>Dot shape</span>
+              <div className="coins__seg" role="group" aria-label="Wallpaper dot shape">
+                {DOT_SHAPES.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className="coins__seg-btn"
+                    aria-pressed={shape === s.id}
+                    onClick={() => setWallpaperShape(s.id)}
+                  >
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </fieldset>
 
       <fieldset className="control__group">

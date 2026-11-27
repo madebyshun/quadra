@@ -1,3 +1,4 @@
+import { DesktopWallpaper } from "@/features/DesktopWallpaper";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useLoanAlerts } from "@/features/loanAlerts";
 import { Routes, Route, useSearchParams, useLocation } from "react-router-dom";
@@ -22,7 +23,7 @@ import { TxToast } from "@/ui/TxToast";
 import { Screensaver } from "@/ui/Screensaver";
 import { Welcome } from "@/ui/Welcome";
 import { showWelcome } from "@/lib/welcome";
-import { wallpaper } from "@/lib/settings";
+import { setWallpaper, wallpaper } from "@/lib/settings";
 import blissWallpaper from "@/assets/quadra-wallpaper.jpg";
 import { useSetting } from "@/ui/useSettings";
 import { shouldPlayIntro } from "@/intro/photo";
@@ -128,17 +129,18 @@ function Home({ introPlayed, onIntroDone }: { introPlayed: boolean; onIntroDone:
   const [params, setParams] = useSearchParams();
   const location = useLocation();
   const fromPage = Boolean((location.state as { fromPage?: boolean } | null)?.fromPage);
+  const desktopDemo = import.meta.env.DEV && params.get("wallpaper") === "motion";
   const forceIntro = params.get("intro") === "explore";
   const [state, dispatch] = useReducer(reduceWindows, EMPTY_STATE);
   const openedFromUrl = useRef(false);
   // decided once, on the first render: never replay intro when returning from /docs, /api, /verify, or /about
   const [intro, setIntro] = useState(() =>
-    forceIntro
+    !desktopDemo && (forceIntro
       ? shouldPlayIntro({ search: params.toString(), matchMedia: window.matchMedia?.bind(window) })
-      : !introPlayed && !fromPage && shouldPlayIntro({ search: params.toString(), matchMedia: window.matchMedia?.bind(window) }),
+      : !introPlayed && !fromPage && shouldPlayIntro({ search: params.toString(), matchMedia: window.matchMedia?.bind(window) })),
   );
   // decided once too: the Welcome screen follows the intro (or a bare load), never a `?do=` link or closing a page tab
-  const [welcomeAtStart] = useState(() => !fromPage && showWelcome(params.toString()));
+  const [welcomeAtStart] = useState(() => !desktopDemo && !fromPage && showWelcome(params.toString()));
   const [welcome, setWelcome] = useState(welcomeAtStart);
   const closeWelcome = useCallback(() => setWelcome(false), []);
   // the intro always hands over to the desktop (and the Welcome screen after it); it opens no window itself
@@ -292,12 +294,17 @@ function Home({ introPlayed, onIntroDone }: { introPlayed: boolean; onIntroDone:
 }
 
 export function App() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const [introPlayed, setIntroPlayed] = useState(false);
   const markIntroPlayed = useCallback(() => setIntroPlayed(true), []);
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
+  useEffect(() => {
+    if (import.meta.env.DEV && pathname === "/" && new URLSearchParams(search).get("wallpaper") === "motion") {
+      setWallpaper("motion");
+    }
+  }, [pathname, search]);
   // the Control Panel's wallpaper, applied to the whole page the moment it is picked
   const paper = useSetting(wallpaper);
   return (
@@ -312,6 +319,7 @@ export function App() {
           className={`desktop wallpaper--${paper}`}
           style={paper === "bliss" ? { backgroundImage: `url(${blissWallpaper})` } : undefined}
         >
+          {paper === "motion" && <DesktopWallpaper />}
           <Routes>
             <Route path="/" element={<Home introPlayed={introPlayed} onIntroDone={markIntroPlayed} />} />
             <Route path="/about" element={<About />} />
