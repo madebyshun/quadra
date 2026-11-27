@@ -417,6 +417,7 @@ export function TokenChart({
   const [mode, setMode] = useState<ChartMode>("price");
   const [chartStyle, setChartStyle] = useState<ChartStyle>("candles");
   const [geckoRange, setGeckoRange] = useState<Range>("15m");
+  const [userPickedRange, setUserPickedRange] = useState(false);
   const [gecko, setGecko] = useState<readonly Candle[] | "reading" | null>(null);
 
   const hasIndex = isDone(page) && page.points.length >= 2;
@@ -429,19 +430,40 @@ export function TokenChart({
     }
     let live = true;
     setGecko("reading");
+    const tryOrder: readonly Range[] = userPickedRange
+      ? [geckoRange]
+      : [geckoRange, ...(["1D", "7D", "30D"] as const).filter((r) => r !== geckoRange)];
     spots("base", [token])
-      .then((m) => {
+      .then(async (m) => {
         const pool = m.get(token.toLowerCase())?.pool;
-        return pool ? candles("base", pool, token, geckoRange).then((r) => r.candles) : [];
+        if (!pool) return { list: [] as readonly Candle[], used: geckoRange };
+        for (const r of tryOrder) {
+          try {
+            const res = await candles("base", pool, token, r);
+            if (res.candles.length >= 2) return { list: res.candles, used: r };
+          } catch {
+            // Try the next wider timeframe if this one fails or is unsupported.
+          }
+        }
+        return { list: [] as readonly Candle[], used: geckoRange };
       })
       .then(
-        (list) => live && setGecko(list.length >= 2 ? list : null),
+        ({ list, used }) => {
+          if (!live) return;
+          if (list.length >= 2 && used !== geckoRange) setGeckoRange(used);
+          setGecko(list.length >= 2 ? list : null);
+        },
         () => live && setGecko(null),
       );
     return () => {
       live = false;
     };
-  }, [needGecko, token, geckoRange]);
+  }, [needGecko, token, geckoRange, userPickedRange]);
+
+  const pickGeckoRange = (r: Range) => {
+    setUserPickedRange(true);
+    setGeckoRange(r);
+  };
 
   const styleToggle = (
     <div className="coins__seg" role="group" aria-label="Chart style">
@@ -520,7 +542,7 @@ export function TokenChart({
         <div className="coin__chart-bar">
           <div className="row" role="group" aria-label="Chart range">
             {GECKO_RANGES.map((r) => (
-              <button key={r} type="button" className="chip chip--mode" aria-pressed={geckoRange === r} onClick={() => setGeckoRange(r)}>
+              <button key={r} type="button" className="chip chip--mode" aria-pressed={geckoRange === r} onClick={() => pickGeckoRange(r)}>
                 {r}
               </button>
             ))}
@@ -567,10 +589,23 @@ export function TokenChart({
   return (
     <div className="coin__chart-frame stack">
       <div className="coin__chart-bar">
-        <span className="dim">
-          {coinName} / {qs || "USD"} · Uniswap v4
-        </span>
-        {metricToggle}
+        {token ? (
+          <div className="row" role="group" aria-label="Chart range">
+            {GECKO_RANGES.map((r) => (
+              <button key={r} type="button" className="chip chip--mode" aria-pressed={geckoRange === r} onClick={() => pickGeckoRange(r)}>
+                {r}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span className="dim">
+            {coinName} / {qs || "USD"} · Uniswap v4
+          </span>
+        )}
+        <div className="row">
+          {styleToggle}
+          {metricToggle}
+        </div>
       </div>
       <ChartCanvasPlaceholder priceLabel={priceLabel} status={status} tone={!isDone(page) && page !== "reading" && gecko !== "reading" ? "warn" : "dim"} />
     </div>
