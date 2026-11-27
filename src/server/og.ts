@@ -167,6 +167,7 @@ const ALIAS: Readonly<Record<string, string>> = {
   mcp: "agents",
   "folder-agents": "agents",
   api: "agents",
+  developers: "agents",
   docs: "docs",
   about: "about",
 };

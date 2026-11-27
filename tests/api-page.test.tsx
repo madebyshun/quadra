@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import { act, render, screen, within } from "@testing-library/react";
 import { apiLede, ApiBody, endpointBadge, ENDPOINTS, probeApi } from "@/pages/ApiPage";
 import { BRAND } from "@/brand";
-import { BLUEAGENT } from "@/config/upstream";
 import { apiHandler } from "@/server/api";
 import { API_PATH } from "@/server/apiPath";
 import type { Facilitator } from "@/server/cdp";
@@ -75,7 +74,7 @@ describe("badges and the lede", () => {
     expect(apiLede({ kind: "absent" }, "https://o.test")).toContain(`https://o.test answers no API — ${BRAND.name} is being served here without its server.`);
     expect(apiLede(live, "https://o.test")).toBe("https://o.test serves 2 skills over HTTP — the list free, each call from $0.005 over x402.");
     expect(apiLede({ ...live, usd: null }, "https://o.test")).toContain("each call priced over x402");
-    expect(apiLede({ ...live, selling: false }, "https://o.test")).toContain("payments are not switched on yet: this server has no Coinbase CDP key");
+    expect(apiLede({ ...live, selling: false }, "https://o.test")).toContain("this deployment is not accepting x402 payments");
   });
 
   it("describes both endpoints under this app's own API path, and says which is paid", () => {
@@ -87,7 +86,7 @@ describe("badges and the lede", () => {
 });
 
 describe("the page", () => {
-  it("offers no command for this origin while it answers nothing — only somebody else's that does", async () => {
+  it("offers no command while the API is unavailable", async () => {
     render(<ApiBody />);
     await settle();
     const list = screen.getByLabelText("Endpoints");
@@ -95,15 +94,14 @@ describe("the page", () => {
       const row = within(list).getByText(`${e.method} ${e.path}`).closest("li") as HTMLElement;
       expect(within(row).getByText("not served here")).toBeInTheDocument();
     }
-    const commands = screen.getAllByText(/^curl /).map((el) => el.textContent ?? "");
-    expect(commands).toEqual([`curl ${BLUEAGENT.catalog}`]);
+    expect(screen.queryByText(/^curl /)).not.toBeInTheDocument();
   });
 
   it("shows the commands, and live badges, once this origin has answered", async () => {
     served(SELLER);
     render(<ApiBody />);
     await settle();
-    expect(screen.getByLabelText("Try it")).toHaveTextContent(`curl ${location.origin}${API_PATH}`);
+    expect(screen.getByLabelText("Try it")).toHaveTextContent(`curl -fsS "${location.origin}${API_PATH}"`);
     expect(within(screen.getByLabelText("Endpoints")).getAllByText("live")).toHaveLength(2);
     expect(screen.getByText(/PAYMENT-SIGNATURE/)).toBeInTheDocument();
   });

@@ -314,7 +314,7 @@ export function About() {
           </div>
           <div className="about__closing-links">
             <Link to="/docs">Read the docs <span aria-hidden="true">↗</span></Link>
-            <Link to="/api">Explore the API <span aria-hidden="true">↗</span></Link>
+            <Link to="/developers">Explore the API <span aria-hidden="true">↗</span></Link>
           </div>
         </div>
       </section>

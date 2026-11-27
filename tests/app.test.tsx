@@ -134,6 +134,18 @@ describe("the desktop", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(BRAND.name);
   });
 
+  it("opens desktop documentation and API shortcuts without replacing the active workspace", async () => {
+    const user = userEvent.setup();
+    renderAt("/?do=folder-agents");
+    await settle();
+    const shortcuts = screen.getByRole("navigation", { name: "Product information" });
+    await user.click(within(shortcuts).getByRole("button", { name: "documentation" }));
+    expect(screen.getByRole("heading", { name: `Docs — ${BRAND.name}` })).toBeInTheDocument();
+    await user.click(within(shortcuts).getByRole("button", { name: "api" }));
+    expect(screen.getByRole("heading", { name: "API" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Agents" })).toBeInTheDocument();
+  });
+
   it("opens each doc page from a saved ?do= link, with its own body", async () => {
     const expected = [
       ["docs", `Docs — ${BRAND.name}`, /never holds a key/],
@@ -624,19 +636,17 @@ describe("how tall a window opens", () => {
  * yet been measured against a live o1.
  */
 describe("what the Docs window admits", () => {
-  it("lists what works and what does not, and claims no privacy", async () => {
+  it("lists available tools without a Not yet section", async () => {
     renderAt("/?do=docs");
     await settle();
     const works = screen.getByLabelText("Works today");
-    const notYet = screen.getByLabelText("Not yet");
+    expect(screen.queryByLabelText("Not yet")).not.toBeInTheDocument();
     expect(works).toHaveTextContent(/Research:/);
     expect(works).toHaveTextContent(/Safety:/);
     expect(works).toHaveTextContent(/The Terminal/);
     expect(works).toHaveTextContent(/Send ETH or any token.*launch a coin on this app's own launchpad/);
     // Robinhood Chain is hidden (2026-10-02): the Docs do not offer a bridge to it
     expect(works).not.toHaveTextContent(/Robinhood/);
-    expect(notYet).toHaveTextContent(/A failed read is not a successful check/);
-    expect(notYet).toHaveTextContent(/launchpad contract has not been audited/);
     /*
       The privacy model was dropped on 2026-09-30. A leftover sentence promising it would
       be a claim this build cannot keep, so the whole window is checked, not one list.

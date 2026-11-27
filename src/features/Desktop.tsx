@@ -2,7 +2,6 @@ import { BRAND } from "@/brand";
 import type { WindowId } from "@/features/registry";
 import { IconMenu } from "@/features/IconMenu";
 import { Icon } from "@/ui/icons";
-import { Link } from "react-router-dom";
 
 export type DesktopProps = {
   /** a feature icon was clicked: open (or re-focus) its window */
@@ -44,8 +43,8 @@ export function Desktop({ onOpen, onHome, obscured }: DesktopProps) {
       <nav className="home__links" aria-label="Product information" hidden={obscured}>
         <a className="icon" href="/?intro=explore"><span className="icon__glyph"><Icon id="computer" /></span><span className="icon__title">explore / desk</span></a>
         <button type="button" className="icon" onClick={() => onOpen("readme")}><span className="icon__glyph"><Icon id="docs" /></span><span className="icon__title">read me / about</span></button>
-        <Link className="icon" to="/docs"><span className="icon__glyph"><Icon id="folder-research" /></span><span className="icon__title">documentation</span></Link>
-        <Link className="icon" to="/api"><span className="icon__glyph"><Icon id="api" /></span><span className="icon__title">api</span></Link>
+        <button type="button" className="icon" onClick={() => onOpen("docs")}><span className="icon__glyph"><Icon id="folder-research" /></span><span className="icon__title">documentation</span></button>
+        <button type="button" className="icon" onClick={() => onOpen("api")}><span className="icon__glyph"><Icon id="api" /></span><span className="icon__title">api</span></button>
       </nav>
       {/* the Markets gadget left the desktop on 2026-10-29 (one door per job: Coins shows the coins);
           it lives on in the Markets window, in My Computer > Research */}

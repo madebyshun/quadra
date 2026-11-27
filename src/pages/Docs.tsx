@@ -8,7 +8,6 @@ import "./Docs.css";
 const sections = [
   { id: "overview", title: "What it does" },
   { id: "tools", title: "What works today" },
-  { id: "limitations", title: "Not yet" },
   { id: "wallet", title: "Where your money sits" },
   { id: "sources", title: "Where the answers come from" },
 ] as const;
@@ -68,14 +67,7 @@ export function DocsBody({ standalone = false }: { standalone?: boolean }) {
         </ul>
       </DocSection>
 
-      {!standalone && <DocSection index={2} standalone={standalone}>
-        <ul className="notes" aria-label="Not yet">
-          <li>Availability depends on this server and its upstream data sources. A failed read is not a successful check.</li>
-          <li>The launchpad contract has not been audited (nor have RevenueShare, {BRAND.name}Furnace or BasketRouter — all verified on Sourcify). It holds the liquidity of every coin launched through it, forever.</li>
-        </ul>
-      </DocSection>}
-
-      <DocSection index={3} standalone={standalone}>
+      <DocSection index={2} standalone={standalone}>
         <p className="panel__lede">
           In your wallet. This site never holds a key and has no field to type one into: anything
           that moves money is a transaction your own wallet shows you and you sign.
@@ -88,7 +80,7 @@ export function DocsBody({ standalone = false }: { standalone?: boolean }) {
         checked facts borrows their credibility. The token is live since 2026-10-29; the About page
         (/about) is where it is described, with its numbers read from the chain.
       */}
-      <DocSection index={4} standalone={standalone}>
+      <DocSection index={3} standalone={standalone}>
         <p className="panel__lede">
           Every report names its sources. Balances and contract reads come from {BASE.name} itself;
           the rest from services that index or scan it.
@@ -115,7 +107,7 @@ export function Docs() {
         </Link>
         <nav aria-label="Docs navigation">
           <Link to="/about">About</Link>
-          <Link to="/api">API</Link>
+          <Link to="/developers">Developers</Link>
           <Link to="/" state={{ fromPage: true }} className="about__button about__button--small">Back to the desktop</Link>
         </nav>
       </header>
@@ -126,10 +118,28 @@ export function Docs() {
         </header>
         <div className="docs__layout">
           <nav className="docs__toc" aria-label="On this page">
-            {sections.filter(({ id }) => id !== "limitations").map(({ id, title }) => <a href={`#${id}`} key={id}>{title}</a>)}
+            {sections.map(({ id, title }) => <a href={`#${id}`} key={id}>{title}</a>)}
+            <a href="#launchpad-guide">Launchpad guide</a>
+            <a href="#developer-access">Developer access</a>
           </nav>
           <article className="docs__article" aria-label="Quadra documentation">
             <DocsBody standalone />
+            <section id="launchpad-guide" className="docs__section">
+              <h2>Launchpad guide</h2>
+              <ol className="notes">
+                <li>Open Launch on Base and enter the token name and symbol. Choose a quote asset from the options shown in the app. The list can include ETH, Base crypto or supported tokenized stocks.</li>
+                <li>On v3, choose a 1% or 3% ongoing trading fee. Review the opening value, pool fee and any optional first buy before signing.</li>
+                <li>After confirmation, open the coin’s page to see its pool and fee route. Use Wallet to inspect fees from your launches.</li>
+              </ol>
+              <p>Launches start with a fixed supply of one billion tokens and permanently locked Uniswap v4 liquidity. The v3 opening fee begins at 50% and falls to the selected rate over 15 seconds.</p>
+              <p>For standard v3 launches, the creator receives 80% of pool fees. A recorded approved referrer receives 5% from the protocol share, leaving the treasury 15% with a referrer or 20% without one.</p>
+              <Link to="/?do=launch">Open Launch</Link> · <Link to="/about">See the fee flow</Link>
+            </section>
+            <section id="developer-access" className="docs__section">
+              <h2>Developer access</h2>
+              <p>Use the launchpad index for market data, the skills catalog for HTTP discovery, and the bundled MCP server for agent integrations.</p>
+              <Link to="/developers">Open the developer reference</Link>
+            </section>
           </article>
         </div>
       </main>
@@ -138,7 +148,7 @@ export function Docs() {
           <span>{BRAND.name} · built on {BASE.name}</span>
           <nav aria-label="Docs footer">
             <Link to="/about">About Quadra</Link>
-            <Link to="/api">API</Link>
+            <Link to="/developers">Developers</Link>
             <a href="#docs-top">Back to top ↑</a>
           </nav>
         </div>

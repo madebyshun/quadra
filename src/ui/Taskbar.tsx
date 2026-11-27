@@ -99,7 +99,7 @@ export function Taskbar({ windows, onToggle, onStart, onHome, onOpenFeature }: T
         {body}
       </button>
     ) : (
-      <Link to={e.doc ? e.doc.path : `/?do=${e.id}`} role="menuitem" className={className} onClick={close}>
+      <Link to={`/?do=${e.id}`} role="menuitem" className={className} onClick={close}>
         {body}
       </Link>
     );

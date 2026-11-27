@@ -10,7 +10,7 @@ import { Window } from "@/ui/Window";
 import { Taskbar } from "@/ui/Taskbar";
 import { Docs } from "@/pages/Docs";
 import { About } from "@/pages/About";
-import { ApiPage } from "@/pages/ApiPage";
+import { ApiPage, Developers } from "@/pages/ApiPage";
 import { Verify } from "@/pages/Verify";
 import { NotFound } from "@/pages/NotFound";
 import { AdaptersProvider } from "@/adapters/AdaptersProvider";
@@ -316,6 +316,7 @@ export function App() {
             <Route path="/" element={<Home introPlayed={introPlayed} onIntroDone={markIntroPlayed} />} />
             <Route path="/about" element={<About />} />
             <Route path="/docs" element={<Docs />} />
+            <Route path="/developers" element={<Developers />} />
             <Route path="/api" element={<ApiPage />} />
             <Route path="/verify" element={<Verify />} />
             <Route path="*" element={<NotFound />} />
