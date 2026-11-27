@@ -291,12 +291,11 @@ describe("TokenTabs", () => {
     render(<TokenTabs token={COINS.eth} page={pageOf(true)} now={AT + 7300} />);
     const rows = () => screen.getAllByRole("row").slice(1);
     expect(rows()).toHaveLength(3);
-    expect(rows()[0]).toHaveTextContent(/1m ago.*Buy.*ETH.*—/);
-    expect(rows()[1]).toHaveTextContent(/Sell.*TEST/);
-    expect(rows()[1]).toHaveTextContent("0xD5C1…3FAB");
-    await userEvent.click(screen.getByRole("button", { name: "Buys" }));
+    expect(rows()[0]).toHaveTextContent(/1m ago.*Buy.*—/);
+    expect(rows()[1]).toHaveTextContent(/Sell.*0xD5C1…3FAB/);
+    await userEvent.click(screen.getByRole("button", { name: "Buy" }));
     expect(rows()).toHaveLength(2);
-    await userEvent.click(screen.getByRole("button", { name: "Sells" }));
+    await userEvent.click(screen.getByRole("button", { name: "Sell" }));
     expect(rows()).toHaveLength(1);
     await userEvent.click(screen.getByRole("button", { name: "All" }));
     expect(rows()).toHaveLength(3);
@@ -309,14 +308,15 @@ describe("TokenTabs", () => {
     a.unmount();
     const b = render(<TokenTabs token={COINS.eth} page={{ ...p, coin: { ...p.coin, symbol: null, quoteSymbol: null } }} now={AT} />);
     expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toContain("coin");
-    await userEvent.click(screen.getByRole("button", { name: "Sells" }));
-    expect(screen.getByText("None of these.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Sell" }));
+    expect(screen.getByText("No trades match this filter.")).toBeInTheDocument();
     b.unmount();
     const c = render(<TokenTabs token={COINS.eth} page="reading" now={AT} />);
     expect(screen.getByText("Reading the trades…")).toBeInTheDocument();
     c.unmount();
+    net({ get: (u) => (u.startsWith("https://api.dexscreener.com/tokens/v1/base/") ? [] : undefined) });
     render(<TokenTabs token={COINS.eth} page={{ problem: "down" }} now={AT} />);
-    expect(screen.getByText("Not checked — the trades could not be read: down")).toBeInTheDocument();
+    expect(await screen.findByText("Not checked — the trades could not be read: down")).toBeInTheDocument();
   });
 
   it("Holders: the list, the PoolManager named as the pool, a label, the rest plain", async () => {
@@ -349,19 +349,23 @@ describe("TokenTabs", () => {
     expect(await screen.findByText(/^Not checked — the holders could not be read:/)).toBeInTheDocument();
   });
 
-  it("renders optional Fees & Info and Disclosures tabs cleanly", async () => {
+  it("renders optional Fees, Top traders, and Pool tabs cleanly", async () => {
     render(
       <TokenTabs
         token={COINS.eth}
         page={pageOf(true)}
         now={AT}
         feesTab={<p>Fees panel body</p>}
+        poolTab={<p>Pool details body</p>}
         disclosuresTab={<p>Disclosures panel body</p>}
       />,
     );
-    await userEvent.click(screen.getByRole("tab", { name: "Fees & Info" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Fees" }));
     expect(screen.getByText("Fees panel body")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("tab", { name: "Disclosures" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Top traders" }));
+    expect(screen.getByRole("table", { name: "Top traders" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Pool" }));
+    expect(screen.getByText("Pool details body")).toBeInTheDocument();
     expect(screen.getByText("Disclosures panel body")).toBeInTheDocument();
   });
 });

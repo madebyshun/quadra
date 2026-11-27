@@ -167,6 +167,54 @@ export async function candles(venue: Venue, pool: string, token: string, range: 
   return { candles: fillGaps(parseCandles(body), step, r.limit, now), staleSeconds: Number.isFinite(stale) && stale > 0 ? stale : null };
 }
 
+/** One recent swap from GeckoTerminal's pool trades endpoint. */
+export type PoolTradeItem = {
+  readonly at: number;
+  readonly tx: string;
+  readonly side: "buy" | "sell";
+  readonly tokens: number;
+  readonly usd: number | null;
+  readonly priceUsd: number | null;
+  readonly trader: string | null;
+};
+
+export function parsePoolTrades(body: unknown, token: string): PoolTradeItem[] {
+  const lower = token.toLowerCase();
+  const out: PoolTradeItem[] = [];
+  for (const item of listOf(isObj(body) ? body.data : null)) {
+    if (!isObj(item)) continue;
+    const attr = objAt(item, "attributes");
+    const kind = strOf(attr.kind);
+    const tx = strOf(attr.tx_hash);
+    const ts = Date.parse(strOf(attr.block_timestamp) ?? "");
+    if ((kind !== "buy" && kind !== "sell") || !tx || Number.isNaN(ts)) continue;
+    const fromAddr = strOf(attr.from_token_address)?.toLowerCase();
+    const toAddr = strOf(attr.to_token_address)?.toLowerCase();
+    const fromAmt = numOf(attr.from_token_amount) ?? 0;
+    const toAmt = numOf(attr.to_token_amount) ?? 0;
+    const tokens = toAddr === lower ? toAmt : fromAddr === lower ? fromAmt : kind === "buy" ? toAmt : fromAmt;
+    const priceUsd = toAddr === lower ? numOf(attr.price_to_in_usd) : fromAddr === lower ? numOf(attr.price_from_in_usd) : numOf(attr.price_to_in_usd);
+    out.push({
+      at: Math.floor(ts / 1000),
+      tx,
+      side: kind,
+      tokens,
+      usd: numOf(attr.volume_in_usd),
+      priceUsd,
+      trader: strOf(attr.tx_from_address),
+    });
+  }
+  return out.sort((a, b) => b.at - a.at);
+}
+
+/** Recent trades for `pool` on `venue`, through this app's server (`/api/charts/trades`). */
+export async function poolTrades(venue: Venue, pool: string, token: string): Promise<readonly PoolTradeItem[]> {
+  const q = new URLSearchParams({ network: venue, pool });
+  const res = await fetch(`${CHARTS_PATH}/trades?${q}`, { headers: { [SERVER_HEADER]: "1" } });
+  if (!res.ok) throw new Error(`Trades unavailable (HTTP ${res.status}).`);
+  return parsePoolTrades(await res.json(), token);
+}
+
 /** Percent change across the candles, first open to last close — `null` with fewer than two. */
 export function change(series: readonly Candle[]): number | null {
   const first = series[0];

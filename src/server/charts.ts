@@ -50,6 +50,15 @@ export function upstreamUrl(search: URLSearchParams): string | { readonly refuse
   return `${GECKO}/networks/${network}/pools/${pool}/ohlcv/${frame}?aggregate=${aggregate}&limit=${limit}&currency=usd&token=${token}`;
 }
 
+/** The GeckoTerminal trades URL a request stands for, or why it is refused. */
+export function tradesUpstreamUrl(search: URLSearchParams): string | { readonly refused: string } {
+  const network = search.get("network") ?? "";
+  const pool = search.get("pool") ?? "";
+  if (!NETWORKS.has(network)) return { refused: "network must be base or robinhood." };
+  if (!POOL.test(pool)) return { refused: "pool must be a 20- or 32-byte hex id." };
+  return `${GECKO}/networks/${network}/pools/${pool}/trades`;
+}
+
 export function chartsHandler(fetchImpl: typeof fetch = fetch, now: () => number = Date.now) {
   const cache = new Map<string, Entry>();
   /** one upstream request per URL at a time — ten tabs opening at once ask once */
@@ -87,12 +96,14 @@ export function chartsHandler(fetchImpl: typeof fetch = fetch, now: () => number
   return async (request: Request): Promise<Response> => {
     const url = new URL(request.url);
     if (request.headers.get("x-quadra") !== "1") return problem(403, "Requests to this server need the x-quadra: 1 header.");
-    if (url.pathname.slice(CHARTS_PATH.length) !== "/ohlcv") return problem(404, "Only /ohlcv is served here.");
-    if (request.method !== "GET") return problem(405, "/ohlcv takes GET.");
-    const target = upstreamUrl(url.searchParams);
+    const sub = url.pathname.slice(CHARTS_PATH.length);
+    if (sub !== "/ohlcv" && sub !== "/trades") return problem(404, "Only /ohlcv and /trades are served here.");
+    if (request.method !== "GET") return problem(405, `${sub} takes GET.`);
+    const target = sub === "/trades" ? tradesUpstreamUrl(url.searchParams) : upstreamUrl(url.searchParams);
     if (typeof target !== "string") return problem(400, target.refused);
+    const ttl = sub === "/trades" ? 30_000 : FRESH_MS;
     const cached = cache.get(target);
-    if (cached && now() - cached.at < FRESH_MS) return serve(cached, false);
+    if (cached && now() - cached.at < ttl) return serve(cached, false);
     let pending = inFlight.get(target);
     if (!pending) {
       pending = ask(target).finally(() => inFlight.delete(target));

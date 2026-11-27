@@ -434,6 +434,7 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
               token={token}
               page={page}
               now={now}
+              symbol={symbol}
               quoteUsd={value?.quoteUsd ?? null}
               feesTab={
                 <div className="stack">
@@ -442,6 +443,28 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
                   <TokenInfo page={page} creator={record.creator} launchedAt={launchedAt} quoteUsd={value?.quoteUsd ?? null} fee={fee} referrer={referrer} />
                   <CreatorLaunches creator={record.creator} current={token} />
                 </div>
+              }
+              poolTab={
+                <dl className="token__info" aria-label="Pool details">
+                  <dt>DEX / Pool</dt>
+                  <dd>Uniswap v4 ({symbol} / {value?.quoteSymbol ?? "ETH"}) — liquidity locked permanently</dd>
+                  <dt>Factory</dt>
+                  <dd>
+                    <a href={explorer.address(record.factory)} target="_blank" rel="noreferrer" className="mono">
+                      {short(record.factory)}
+                    </a>{" "}
+                    ({versionOf(record.factory)})
+                  </dd>
+                  <dt>Liquidity (USD)</dt>
+                  <dd>{market?.liquidityUsd != null ? usd(market.liquidityUsd) : valueText(value)}</dd>
+                  <dt>24h Volume</dt>
+                  <dd>{market?.volume24h != null ? usd(market.volume24h) : "not read"}</dd>
+                  <dt>Links</dt>
+                  <dd className="row">
+                    <a className="chip" href={explorer.token(token)} target="_blank" rel="noreferrer">Basescan ↗</a>
+                    <a className="chip" href={`https://dexscreener.com/base/${token}`} target="_blank" rel="noreferrer">DexScreener ↗</a>
+                  </dd>
+                </dl>
               }
               disclosuresTab={
                 <div className="stack">
@@ -540,9 +563,14 @@ export function CoinsPanel() {
           <p className="coins__mast-sub">Explore coins launched on {BRAND.name}. Stock-paired coins are not the stocks themselves.</p>
         </div>
         {openWindow ? (
-          <Gel onClick={() => openWindow("launch")}>
-            Launch a token
-          </Gel>
+          <div className="row">
+            <Gel className="gel--quiet" onClick={() => openWindow("stocks")}>
+              Stocks
+            </Gel>
+            <Gel onClick={() => openWindow("launch")}>
+              Launch a token
+            </Gel>
+          </div>
         ) : null}
       </header>
 

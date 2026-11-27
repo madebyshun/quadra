@@ -461,6 +461,19 @@ const GLYPHS: Record<IconId, JSX.Element> = {
       </g>
     </>
   ),
+  stocks: (
+    <>
+      {/* a ticker grid card with an upward equity bar */}
+      <g {...BODY} fill="#dfe8ff">
+        <rect x="2.8" y="4" width="18.4" height="16" rx="1.2" />
+      </g>
+      <g {...INK}>
+        <rect x="5.6" y="13.5" width="2.4" height="4" />
+        <rect x="10.8" y="10.5" width="2.4" height="7" />
+        <rect x="16" y="7.5" width="2.4" height="10" />
+      </g>
+    </>
+  ),
   profile: (
     <>
       {/* a head and shoulders on an ID card: whose wallet this is */}

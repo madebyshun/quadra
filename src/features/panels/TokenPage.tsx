@@ -2,8 +2,8 @@ import { IndexNotice } from "@/ui/IndexNotice";
 import { useEffect, useState, type ReactNode } from "react";
 import { BRAND } from "@/brand";
 import { CONTRACTS, UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
-import { launchpadCoin, launchpadCoins, type IndexedCoin, type IndexedCoinPage, type IndexedTrade } from "@/adapters/http/indexer";
-import { candles, spots, type Candle, type Range } from "@/adapters/http/markets";
+import { launchpadCoin, launchpadCoins, type IndexedCoin, type IndexedCoinPage } from "@/adapters/http/indexer";
+import { candles, poolTrades, spots, type Candle, type PoolTradeItem, type Range } from "@/adapters/http/markets";
 import { balanceOf } from "@/lib/erc20";
 import { messageOf } from "@/lib/errors";
 import { topHolders, type Holding } from "@/skills/blockscout";
@@ -685,42 +685,100 @@ export function TokenInfo({
   );
 }
 
-type TabId = "trades" | "holders" | "fees" | "disclosures";
+type TabId = "trades" | "holders" | "fees" | "traders" | "pool";
 
-function Trades({ page, now, quoteUsd }: { page: IndexedCoinPage; now: number; quoteUsd: number | null }) {
-  const [only, setOnly] = useState<"all" | "buy" | "sell">("all");
-  const qs = page.coin.quoteSymbol ?? "";
-  const sym = page.coin.symbol ?? "coin";
-  const rows = page.trades.filter((t) => only === "all" || t.side === only);
+type UnifiedTrade = {
+  readonly at: number;
+  readonly tx: string;
+  readonly side: "buy" | "sell";
+  readonly tokens: number;
+  readonly quote: number | null;
+  readonly usdValue: number | null;
+  readonly priceUsd: number | null;
+  readonly fee: number | null;
+  readonly feeIn: "quote" | "token" | null;
+  readonly trader: string | null;
+};
+
+function unifyTrades(page: Read<IndexedCoinPage>, fallback: readonly PoolTradeItem[] | null, quoteUsd: number | null): readonly UnifiedTrade[] {
+  if (isDone(page) && page.trades.length > 0) {
+    return page.trades.map((t) => ({
+      at: t.at,
+      tx: t.tx,
+      side: t.side,
+      tokens: t.tokens,
+      quote: t.quote,
+      usdValue: quoteUsd !== null ? t.quote * quoteUsd : null,
+      priceUsd: quoteUsd !== null ? t.price * quoteUsd : null,
+      fee: t.fee,
+      feeIn: t.feeIn,
+      trader: t.trader,
+    }));
+  }
+  return (fallback ?? []).map((t) => ({
+    at: t.at,
+    tx: t.tx,
+    side: t.side,
+    tokens: t.tokens,
+    quote: null,
+    usdValue: t.usd,
+    priceUsd: t.priceUsd,
+    fee: null,
+    feeIn: null,
+    trader: t.trader,
+  }));
+}
+
+function TradesTable({
+  rows,
+  allCount,
+  only,
+  setOnly,
+  now,
+  sym,
+  qs,
+  behind,
+  sourceNote,
+}: {
+  rows: readonly UnifiedTrade[];
+  allCount: number;
+  only: "all" | "buy" | "sell";
+  setOnly: (v: "all" | "buy" | "sell") => void;
+  now: number;
+  sym: string;
+  qs: string;
+  behind: number | null;
+  sourceNote?: string | null;
+}) {
   return (
     <div className="stack">
-      <IndexNotice behind={page.behind} error={null} />
+      {behind !== null ? <IndexNotice behind={behind} error={null} /> : null}
       <div className="row" role="group" aria-label="Trades shown">
         {(["all", "buy", "sell"] as const).map((o) => (
           <button key={o} type="button" className="chip chip--mode" aria-pressed={only === o} onClick={() => setOnly(o)}>
-            {o === "all" ? "All" : o === "buy" ? "Buys" : "Sells"}
+            {o === "all" ? "All" : o === "buy" ? "Buy" : "Sell"}
           </button>
         ))}
+        {sourceNote ? <span className="dim">{sourceNote}</span> : null}
       </div>
       {rows.length === 0 ? (
-        <p className="dim">{page.trades.length === 0 ? "No trades yet — the first buy sets the price moving." : "None of these."}</p>
+        <p className="dim">{allCount === 0 ? "No trades yet — the first buy sets the price moving." : "No trades match this filter."}</p>
       ) : (
         <div className="token__trades-wrap">
           <table className="token__trades">
             <thead>
               <tr>
-                <th>Time</th>
+                <th>Age</th>
                 <th>Type</th>
                 <th>{sym}</th>
-                <th>{qs}</th>
-                <th>Fee</th>
-                <th>USD</th>
+                <th>Value</th>
+                <th>Price</th>
+                {qs ? <th>{qs}</th> : null}
                 <th>Wallet</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((t: IndexedTrade, i) => (
-                // a buy and a sell of the same size in one transaction are two rows: the index keeps them apart
+              {rows.map((t, i) => (
                 <tr key={`${t.tx}:${t.side}:${i}`}>
                   <td>
                     <a href={explorer.tx(t.tx)} target="_blank" rel="noreferrer">
@@ -729,18 +787,84 @@ function Trades({ page, now, quoteUsd }: { page: IndexedCoinPage; now: number; q
                   </td>
                   <td className={t.side === "buy" ? "tone-ok" : "tone-bad"}>{t.side === "buy" ? "Buy" : "Sell"}</td>
                   <td className="mono">{compact(t.tokens)}</td>
-                  <td className="mono">{compact(t.quote)}</td>
+                  <td className="mono">{t.usdValue === null ? "—" : usd(t.usdValue)}</td>
+                  <td className="mono">{t.priceUsd === null ? "—" : tinyPrice(t.priceUsd)}</td>
+                  {qs ? <td className="mono">{t.quote === null ? "—" : compact(t.quote)}</td> : null}
                   <td className="mono">
-                    {compact(t.fee, 3)} {t.feeIn === "quote" ? qs : sym}
+                    {t.trader ? (
+                      <a href={explorer.address(t.trader)} target="_blank" rel="noreferrer">
+                        {short(t.trader)}
+                      </a>
+                    ) : (
+                      "—"
+                    )}
                   </td>
-                  <td className="mono">{quoteUsd === null ? "—" : usd(t.quote * quoteUsd)}</td>
-                  <td className="mono">{t.trader ? short(t.trader) : "—"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function TopTraders({ list, sym }: { list: readonly UnifiedTrade[]; sym: string }) {
+  const byWallet = new Map<string, { buys: number; sells: number; volUsd: number; netUsd: number; tokens: number }>();
+  for (const t of list) {
+    if (!t.trader) continue;
+    const key = t.trader.toLowerCase();
+    const cur = byWallet.get(key) ?? { buys: 0, sells: 0, volUsd: 0, netUsd: 0, tokens: 0 };
+    const v = t.usdValue ?? 0;
+    if (t.side === "buy") {
+      cur.buys += 1;
+      cur.netUsd += v;
+      cur.tokens += t.tokens;
+    } else {
+      cur.sells += 1;
+      cur.netUsd -= v;
+      cur.tokens -= t.tokens;
+    }
+    cur.volUsd += v;
+    byWallet.set(key, cur);
+  }
+  const ranked = [...byWallet.entries()]
+    .map(([wallet, s]) => ({ wallet, ...s, total: s.buys + s.sells }))
+    .sort((a, b) => b.volUsd - a.volUsd || b.total - a.total)
+    .slice(0, 20);
+
+  if (ranked.length === 0) return <p className="dim">No trader wallets indexed yet.</p>;
+  return (
+    <div className="token__trades-wrap">
+      <table className="token__trades" aria-label="Top traders">
+        <thead>
+          <tr>
+            <th>Wallet</th>
+            <th>Buys / Sells</th>
+            <th>Volume</th>
+            <th>Net {sym}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ranked.map((r) => (
+            <tr key={r.wallet}>
+              <td className="mono">
+                <a href={explorer.address(r.wallet)} target="_blank" rel="noreferrer">
+                  {short(r.wallet)}
+                </a>
+              </td>
+              <td className="mono">
+                <span className="tone-ok">{r.buys}B</span> / <span className="tone-bad">{r.sells}S</span>
+              </td>
+              <td className="mono">{r.volUsd > 0 ? usd(r.volUsd) : "—"}</td>
+              <td className={`mono ${r.tokens >= 0 ? "tone-ok" : "tone-bad"}`}>
+                {r.tokens >= 0 ? "+" : ""}
+                {compact(r.tokens)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -780,29 +904,69 @@ function Holders({ token }: { token: string }) {
   );
 }
 
-/** Trades, holders, and optional Fees & Info / Disclosures panels, as tabs. `now` is unix seconds. */
+/** Clanker-style tabs below the chart: Transactions (All/Buy/Sell), Holders, Fees, Top traders, and Pool. */
 export function TokenTabs({
   token,
   page,
   now,
+  symbol,
   quoteUsd = null,
   feesTab,
+  poolTab,
   disclosuresTab,
 }: {
   token: string;
   page: Read<IndexedCoinPage>;
   now: number;
+  symbol?: string | null;
   quoteUsd?: number | null;
   feesTab?: ReactNode;
+  poolTab?: ReactNode;
   disclosuresTab?: ReactNode;
 }) {
   const [tab, setTab] = useState<TabId>("trades");
+  const [only, setOnly] = useState<"all" | "buy" | "sell">("all");
+  const [liveTrades, setLiveTrades] = useState<readonly PoolTradeItem[] | "reading" | null>(null);
+
+  const hasIndexedTrades = isDone(page) && page.trades.length > 0;
+  const needLiveTrades = typeof page === "object" && "problem" in page;
+
+  useEffect(() => {
+    if (!needLiveTrades) {
+      setLiveTrades(null);
+      return;
+    }
+    let live = true;
+    setLiveTrades("reading");
+    spots("base", [token])
+      .then((m) => {
+        const pool = m.get(token.toLowerCase())?.pool;
+        return pool ? poolTrades("base", pool, token) : [];
+      })
+      .then(
+        (items) => live && setLiveTrades(items),
+        () => live && setLiveTrades([]),
+      );
+    return () => {
+      live = false;
+    };
+  }, [needLiveTrades, token]);
+
+  const allTrades = unifyTrades(page, Array.isArray(liveTrades) ? liveTrades : null, quoteUsd);
+  const filteredTrades = allTrades.filter((t) => only === "all" || t.side === only);
+  const sym = (isDone(page) ? page.coin.symbol : null) ?? symbol ?? "coin";
+  const qs = isDone(page) ? (page.coin.quoteSymbol ?? "") : "";
+
   const tabs: readonly { readonly id: TabId; readonly label: string }[] = [
     { id: "trades", label: "Transactions" },
     { id: "holders", label: "Holders" },
-    ...(feesTab ? [{ id: "fees" as const, label: "Fees & Info" }] : []),
-    ...(disclosuresTab ? [{ id: "disclosures" as const, label: "Disclosures" }] : []),
+    ...(feesTab ? [{ id: "fees" as const, label: "Fees" }] : []),
+    { id: "traders", label: "Top traders" },
+    ...(poolTab || disclosuresTab ? [{ id: "pool" as const, label: "Pool" }] : []),
   ];
+
+  const readingTrades = page === "reading" || (needLiveTrades && liveTrades === "reading");
+
   return (
     <div className="stack">
       <div className="row" role="tablist" aria-label="Coin details">
@@ -816,11 +980,20 @@ export function TokenTabs({
         <Holders token={token} />
       ) : tab === "fees" ? (
         feesTab
-      ) : tab === "disclosures" ? (
-        disclosuresTab
-      ) : page === "reading" ? (
+      ) : tab === "traders" ? (
+        readingTrades ? (
+          <p className="dim">Reading top traders…</p>
+        ) : (
+          <TopTraders list={allTrades} sym={sym} />
+        )
+      ) : tab === "pool" ? (
+        <div className="stack">
+          {poolTab}
+          {disclosuresTab}
+        </div>
+      ) : readingTrades ? (
         <p className="dim">Reading the trades…</p>
-      ) : "problem" in page ? (
+      ) : allTrades.length === 0 && "problem" in page ? (
         <div className="stack">
           <p className="tx__warn">Not checked — the trades could not be read: {page.problem}</p>
           <p className="row">
@@ -829,7 +1002,17 @@ export function TokenTabs({
           </p>
         </div>
       ) : (
-        <Trades page={page} now={now} quoteUsd={quoteUsd} />
+        <TradesTable
+          rows={filteredTrades}
+          allCount={allTrades.length}
+          only={only}
+          setOnly={setOnly}
+          now={now}
+          sym={sym}
+          qs={qs}
+          behind={isDone(page) ? page.behind : null}
+          sourceNote={!hasIndexedTrades && allTrades.length > 0 ? "Live swaps · GeckoTerminal" : null}
+        />
       )}
     </div>
   );

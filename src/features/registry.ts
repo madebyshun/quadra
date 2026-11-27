@@ -17,6 +17,7 @@ export type FeatureId =
   | "bridge"
   | "launch"
   | "coins"
+  | "stocks"
   | "profile"
   | "taskmgr"
   | "trash"
@@ -166,6 +167,13 @@ export const FEATURES: readonly Feature[] = [
     title: "Coins",
     blurb: "every coin launched here",
     window: "Coins",
+    flag: "coins",
+  },
+  {
+    id: "stocks",
+    title: "Stocks",
+    blurb: "Base tokenized stocks — launch paired with any stock",
+    window: "Stocks — Launchpad",
     flag: "coins",
   },
   {
@@ -363,7 +371,7 @@ export const FOLDERS: Readonly<Record<FolderId, readonly WindowId[]>> = {
   computer: ["folder-research", "folder-money", "folder-launchpad", "folder-games", "terminal", "taskmgr", "control", "readme", "soon"],
   "folder-research": ["research", "profile", "explore"],
   "folder-money": ["basket", "bridge"],
-  "folder-launchpad": ["leaderboard", "card"],
+  "folder-launchpad": ["stocks", "leaderboard", "card"],
   "folder-games": ["rugsweeper", "achievements"],
   "folder-agents": ["mcp", "x402", "api", "docs", "verify"],
 };

@@ -11,6 +11,7 @@ import { SkillWindow } from "@/features/panels/SkillWindow";
 import { SendPanel } from "@/features/panels/SendPanel";
 import { LaunchPanel } from "@/features/panels/LaunchPanel";
 import { CoinsPanel } from "@/features/panels/CoinsPanel";
+import { StocksLaunchPanel } from "@/features/panels/StocksLaunchPanel";
 import { ProfilePanel } from "@/features/panels/ProfilePanel";
 import { MarketsPanel } from "@/features/panels/MarketsPanel";
 import { SwapPanel } from "@/features/panels/SwapPanel";
@@ -96,6 +97,7 @@ const BUILT: Partial<Record<Feature["id"], () => ReactNode>> = {
   bridge: () => <BridgePanel />,
   launch: () => <LaunchPanel />,
   coins: () => <CoinsPanel />,
+  stocks: () => <StocksLaunchPanel />,
   taskmgr: () => <TaskManagerPanel />,
   trash: () => <TrashPanel />,
   soon: () => <SoonPanel />,

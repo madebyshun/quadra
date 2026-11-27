@@ -19,8 +19,8 @@ import {
   unstakeData,
   type Share,
 } from "@/lib/revenueShare";
-import { minOutFor, NATIVE, poolKeyOf, quoteV4, zeroForOneFor, type LaunchPool } from "@/lib/v4swap";
-import { buyAndBurnData, furnaceOf, harvestData, type Furnace } from "@/lib/furnace";
+import { NATIVE, poolKeyOf, type LaunchPool } from "@/lib/v4swap";
+import { furnaceOf, type Furnace } from "@/lib/furnace";
 import { chainToken } from "@/skills/chaintoken";
 import { short, tokenAmount } from "@/skills/format";
 import type { LaunchRecord } from "@/skills/launchpad";
@@ -74,13 +74,13 @@ export function CoinRewards({ token, symbol, record }: { token: string; symbol: 
 
   if (view === "reading") return <p className="dim">Reading where {symbol}&apos;s fees go…</p>;
   if ("problem" in view) return <p className="tx__warn">Where the fees go was not checked — {view.problem}</p>;
+  // Furnace harvesting is automated on-chain; hide the manual furnace/harvest block from the UI.
+  if (view.furnace) return null;
   const mine = me !== null && me.toLowerCase() === record.creatorRecipient.toLowerCase();
   return (
     <fieldset className="group">
-      <legend>{view.share ? `Stake ${symbol}, earn its fees` : view.furnace ? `${symbol}'s furnace` : "Where the 80% goes"}</legend>
-      {view.furnace ? (
-        <FurnaceBlock symbol={symbol} furnace={view.furnace} pool={view.pool} currencies={view.currencies} onDone={() => setFresh((n) => n + 1)} />
-      ) : view.share ? (
+      <legend>{view.share ? `Stake ${symbol}, earn its fees` : "Where the 80% goes"}</legend>
+      {view.share ? (
         <Staking token={token} symbol={symbol} share={view.share} currencies={view.currencies} onDone={() => setFresh((n) => n + 1)} />
       ) : (
         <p>
@@ -88,76 +88,13 @@ export function CoinRewards({ token, symbol, record }: { token: string; symbol: 
           {mine ? " — your wallet." : "."}
         </p>
       )}
-      {mine && !view.share && !view.furnace && me ? <Redirect token={token} record={record} me={me} provider={signingProvider} onDone={() => setFresh((n) => n + 1)} /> : null}
+      {mine && !view.share && me ? <Redirect token={token} record={record} me={me} provider={signingProvider} onDone={() => setFresh((n) => n + 1)} /> : null}
     </fieldset>
   );
 }
 
 /** 1% under the Quoter's figure: the least a treasury buyback accepts. */
 export const BUYBACK_SLIPPAGE_BPS = 100;
-
-function FurnaceBlock({ symbol, furnace, pool, currencies, onDone }: { symbol: string; furnace: Furnace; pool: LaunchPool | null; currencies: readonly [Currency, Currency]; onDone: () => void }) {
-  const { wallet, signingProvider } = useWalletSession();
-  const me = wallet?.kind === "ready" ? wallet.account : null;
-  const [problem, setProblem] = useState<string | null>(null);
-  const steps = useTxSteps();
-  const quote = pool && pool.tokenIs0 ? currencies[1] : currencies[0];
-  const burnt = furnace.burnedFromFees + furnace.burnedFromBuybacks;
-  const isTreasury = me !== null && me.toLowerCase() === furnace.treasury.toLowerCase();
-
-  const run = async (label: string, data: `0x${string}`) => {
-    if ((await steps.run(signingProvider(), me!, [{ label, build: () => ({ to: furnace.address, data }) }])) !== null) onDone();
-  };
-  const buyBack = async () => {
-    setProblem(null);
-    let minOut: bigint;
-    try {
-      // the floor is today's quote less 1%, read at the click: the treasury signs what it saw
-      const q = await quoteV4(pool!.key, zeroForOneFor(pool!, "buy"), furnace.toBuy);
-      minOut = minOutFor(q.amountOut, BUYBACK_SLIPPAGE_BPS);
-    } catch (e) {
-      return setProblem(messageOf(e));
-    }
-    await run(`buy back ${symbol} with ${tokenAmount(furnace.toBuy, quote.decimals, 6)} ${quote.symbol} and burn it`, buyAndBurnData(furnace.toBuy, minOut));
-  };
-
-  return (
-    <div className="stack">
-      <p>
-        Every fee this coin earns its creator goes to the furnace <span className="mono">{short(furnace.address)}</span>: {furnace.burnBps / 100}% to burning {symbol},
-        the rest to the treasury <span className="mono">{short(furnace.treasury)}</span>.
-      </p>
-      <dl className="token__facts" aria-label="Furnace">
-        <dt>{symbol} burnt</dt>
-        <dd>
-          <strong>{tokenAmount(burnt, LAUNCHPAD_DECIMALS, 0)}</strong> — {tokenAmount(furnace.burnedFromFees, LAUNCHPAD_DECIMALS, 0)} from fees,{" "}
-          {tokenAmount(furnace.burnedFromBuybacks, LAUNCHPAD_DECIMALS, 0)} bought back
-        </dd>
-        <dt>{quote.symbol} spent on buybacks</dt>
-        <dd>{tokenAmount(furnace.quoteSpent, quote.decimals, 6)}</dd>
-        <dt>Waiting to buy back</dt>
-        <dd>
-          {tokenAmount(furnace.toBuy, quote.decimals, 6)} {quote.symbol}
-        </dd>
-      </dl>
-      <div className="row">
-        <Gel quiet disabled={!me || steps.running} onClick={() => void run("harvest the pool's fees into the furnace", harvestData())}>
-          {me ? "Harvest fees" : "Connect a wallet to harvest"}
-        </Gel>
-        {isTreasury ? (
-          <Gel quiet disabled={steps.running || furnace.toBuy === 0n || pool === null} onClick={() => void buyBack()}>
-            Buy back &amp; burn
-          </Gel>
-        ) : null}
-      </div>
-      {problem ? <p className="tx__warn">{problem}</p> : null}
-      <TxStepList states={steps.states} label="Furnace progress" />
-      <p className="dim">
-        Anyone may harvest: it collects the pool&apos;s fees and splits them. Only the treasury buys back, at a floor 1% under today&apos;s quote. The furnace is not audited.
-      </p>
-    </div>
-  );
-}
 
 function Staking({ token, symbol, share, currencies, onDone }: { token: string; symbol: string; share: Share; currencies: readonly [Currency, Currency]; onDone: () => void }) {
   const { wallet, signingProvider } = useWalletSession();

@@ -1,5 +1,6 @@
 import { BRAND } from "@/brand";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { PlatinumSelect, type SelectGroup } from "@/ui/Select";
 import {
   checkFactory,
@@ -205,13 +206,21 @@ export function reviewReport(m: Metadata, review: Review, creator: string): Repo
 }
 
 export function BaseLaunch() {
+  const [params] = useSearchParams();
   const { wallet, signingProvider } = useWalletSession();
   const openWindow = useOpenWindow();
   const pinned = launchFactory();
   const [meta, setMeta] = useState<Metadata>(EMPTY);
   const [hint] = useState(() => suggestion(Math.random()));
   const [pairs, setPairs] = useState<{ readonly pairs: readonly Pair[]; readonly problem: string | null }>({ pairs: [], problem: null });
-  const [pairAt, setPairAt] = useState(ETH_QUOTE);
+  const requestedPair = params.get("pair");
+  const [pairAt, setPairAt] = useState(requestedPair && /^0x[0-9a-fA-F]{40}$/.test(requestedPair) ? requestedPair : ETH_QUOTE);
+
+  useEffect(() => {
+    if (requestedPair && /^0x[0-9a-fA-F]{40}$/.test(requestedPair)) {
+      setPairAt(requestedPair);
+    }
+  }, [requestedPair]);
   const [firstBuy, setFirstBuy] = useState("");
   const [fee, setFee] = useState<LaunchFee>(LAUNCH_FEES[0]);
   const [review, setReview] = useState<Review | null>(null);
