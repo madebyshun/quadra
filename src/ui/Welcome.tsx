@@ -1,3 +1,5 @@
+import quadraMachine from "@/assets/quadra-q001.svg";
+import { Link } from "react-router-dom";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { BRAND } from "@/brand";
 import { resolveFeature, type WindowId } from "@/features/registry";
@@ -61,7 +63,7 @@ export function Welcome({ onClose }: { onClose: () => void }) {
         </div>
         <div className="win__body welcome__body">
           <div className="welcome__sky" aria-hidden="true">
-            <img className="welcome__sky-img" src="/brand/quadra-q001.svg" width="620" height="680" alt="" />
+            <img className="welcome__sky-img" src={quadraMachine} width="620" height="680" alt="" />
             <div className="welcome__sky-copy">
               <p className="welcome__sky-title">
                 a personal computer.
@@ -76,7 +78,7 @@ export function Welcome({ onClose }: { onClose: () => void }) {
           </h1>
           {/* short, in the era's voice (2026-11-04, after c-na.dev's "The desk is ready.") */}
           <p className="welcome__lede">
-            Check a token. Launch a coin. Trade it. Your wallet signs; nothing else can. <button type="button" className="chip" onClick={go("readme")}>what is quadra /</button>
+            Check a token. Launch a coin. Trade it. Your wallet signs; nothing else can. <Link className="chip" to="/about">what is quadra /</Link>
           </p>
           <form className="welcome__check" onSubmit={check} aria-label="Check a token">
             <label className="field-label" htmlFor="welcome-token">

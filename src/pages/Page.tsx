@@ -1,3 +1,4 @@
+import { HalftoneField } from "@/ui/HalftoneField";
 import { useCallback, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Window } from "@/ui/Window";
@@ -25,6 +26,7 @@ export function Page({ title, children }: { title: string; children: ReactNode }
   return (
     <>
       <div className="page">
+        <HalftoneField variant="document" />
         <Desktop onOpen={(id) => navigate(`/?do=${id}`)} onHome={home} obscured={false} />
         <div className="shell">
           <Window

@@ -38,7 +38,7 @@ beforeEach(() => {
 describe("the About page", () => {
   it("says what the app is, and opens the computer", async () => {
     renderAt("/about");
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(BRAND.name);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/on-chain.*supercomputer/i);
     expect(screen.getAllByRole("link", { name: "Open the computer" })[0]).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Browse coins" })).toHaveAttribute("href", "/?do=coins");
     expect(screen.getByRole("link", { name: "Check a token" })).toHaveAttribute("href", "/?do=safety");
@@ -116,7 +116,7 @@ describe("the About page", () => {
     localStorage.removeItem(WELCOME_KEY);
     renderAt("/");
     await settle();
-    expect(screen.getByRole("button", { name: "what is quadra /" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "what is quadra /" })).toBeInTheDocument();
   });
 });
 
@@ -169,12 +169,12 @@ describe("in-app read me", () => {
     expect(screen.getByRole("heading", { name: "your desktop for coins and stocks on base." })).toBeInTheDocument();
   });
 
-  it("opens help from welcome without navigating to marketing", async () => {
+  it("opens the About page from welcome", async () => {
     localStorage.removeItem(WELCOME_KEY);
     renderAt("/");
     await settle();
-    await userEvent.click(screen.getByRole("button", { name: "what is quadra /" }));
+    await userEvent.click(screen.getByRole("link", { name: "what is quadra /" }));
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByRole("heading", { name: "your desktop for coins and stocks on base." })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "About navigation" })).toBeInTheDocument();
   });
 });

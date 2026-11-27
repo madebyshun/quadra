@@ -1,3 +1,4 @@
+import { AboutDisk, AboutMachine } from "./AboutMachine";
 import { IndexNotice } from "@/ui/IndexNotice";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -191,7 +192,7 @@ export function About() {
 
   return (
     <div className="about">
-      <header className="about__bar">
+      <header className="about__bar" id="about-top">
         <Link to="/" state={{ fromPage: true }} className="about__brand">
           <img src="/brand/icon.svg" width="30" height="30" alt="" />
           {BRAND.name}
@@ -203,24 +204,18 @@ export function About() {
         </nav>
       </header>
 
-      <section className="about__hero">
-        <div className="about__hero-bar">System / About {BRAND.name}</div>
+      <section className="about__hero" aria-labelledby="about-hero-title">
         <div className="about__hero-inner">
           <div>
             <p className="about__eyebrow">A personal computer. An open world.</p>
-            <h1><img src="/brand/icon.svg" width="80" height="80" alt="" />{BRAND.name}</h1>
-            <h2>An on-chain<br />supercomputer<br /><em>for Base.</em></h2>
+            <h1 id="about-hero-title">An on-chain<br />supercomputer<br /><em>for {BASE.name}.</em></h1>
             <p className="about__lede">Research a token. Build a basket. Launch something new. Your corner of {BASE.name}, signed in your own wallet.</p>
             <div className="about__row">
               <Link to="/" state={{ fromPage: true }} className="about__button">Open the computer</Link>
               <a href="#tools" className="about__text-link">Take a look around</a>
             </div>
-            <p className="about__hero-note">Built on {BASE.name} · Your wallet holds the keys</p>
           </div>
-          <figure className="about__machine">
-            <img src="/brand/quadra-q001.svg" width="620" height="680" fetchPriority="high" alt={`${BRAND.name} Q-001 compact CRT`} />
-            <figcaption>fig. 1 / q-001</figcaption>
-          </figure>
+          <AboutMachine />
         </div>
       </section>
 
@@ -311,20 +306,37 @@ export function About() {
         </ul>
       </section>
 
-      <section className="about__section">
-        <p className="about__eyebrow">Another way in</p>
-        <h2>For agents</h2>
-        <p>
-          Every check is also a tool an AI agent can call — over MCP, or paid per call in USDC over x402. See the <Link to="/docs">Docs</Link> and the <Link to="/api">API</Link>.
-        </p>
+      <section className="about__closing" aria-labelledby="about-agents-title">
+        <div className="about__section about__closing-inner">
+          <div>
+            <h2 id="about-agents-title">For agents</h2>
+            <p>Agents can call Quadra’s checks over MCP or pay per call in USDC over x402.</p>
+          </div>
+          <div className="about__closing-links">
+            <Link to="/docs">Read the docs <span aria-hidden="true">↗</span></Link>
+            <Link to="/api">Explore the API <span aria-hidden="true">↗</span></Link>
+          </div>
+        </div>
       </section>
 
-      <footer className="about__foot">
+      <footer className="about__foot" id="about-footer">
         <div className="about__foot-inner">
-          <p className="about__eyebrow">The desktop is yours.</p>
-          <h2>Make yourself<br /><em>at home.</em></h2>
-          <Link to="/" state={{ fromPage: true }} className="about__button">Open the computer</Link>
-          <div className="about__colophon"><span>{BRAND.name} · {BRAND.x} · built on {BASE.name}</span><Link to="/docs">Read the docs</Link></div>
+          <div className="about__foot-main">
+            <div>
+              <h2>Make yourself<br /><em>at home.</em></h2>
+              <Link to="/" state={{ fromPage: true }} className="about__button">Open the computer <span aria-hidden="true">↗</span></Link>
+            </div>
+            <AboutDisk />
+          </div>
+          <div className="about__colophon">
+            <span>{BRAND.name} · built on {BASE.name}</span>
+            <nav aria-label="Footer navigation">
+              <Link to="/docs">Docs</Link>
+              <Link to="/api">API</Link>
+              <a href="#about-top">Back to top <span aria-hidden="true">↑</span></a>
+              <a href={`https://x.com/${BRAND.x.slice(1)}`}>X <span aria-hidden="true">↗</span></a>
+            </nav>
+          </div>
         </div>
       </footer>
     </div>

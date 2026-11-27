@@ -1,0 +1,29 @@
+.halftone-field {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+
+.halftone-field--intro {
+  color: #f4f0e6;
+  opacity: .64;
+  mask-image: linear-gradient(90deg, #000, transparent 35%, transparent 65%, #000),
+    linear-gradient(0deg, #000, transparent 45%);
+  mask-composite: intersect;
+}
+
+.halftone-field--document {
+  position: fixed;
+  inset: auto 0 0;
+  width: 100%;
+  height: 32vh;
+  color: #2422cf;
+  opacity: .23;
+}
+
+.halftone-field:not([data-painted]) {
+  background: radial-gradient(circle, currentColor 1px, transparent 1.6px) 0 0 / 10px 10px;
+}

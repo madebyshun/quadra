@@ -34,7 +34,7 @@ function mount(p = fakePulse()) {
   const view = render(
     <PulseContext.Provider value={p.store}>
       <OpenWindowProvider open={open}>
-        <Welcome onClose={onClose} />
+        <MemoryRouter future={ROUTER_FUTURE}><Welcome onClose={onClose} /></MemoryRouter>
       </OpenWindowProvider>
     </PulseContext.Provider>,
   );

@@ -1,3 +1,4 @@
+import { HalftoneField } from "@/ui/HalftoneField";
 import { useEffect, useRef, useState } from "react";
 import { AT, blockLine, loaded, phaseAt, ZOOM_MS, type Phase } from "@/intro/photo";
 import { usePulse } from "@/ui/usePulse";
@@ -75,7 +76,9 @@ export function PhotoIntro({ onDone, clock = now }: { onDone(open: string | null
           alt="a beige early-nineties workstation seen straight on, resting on a sunlit green hill"
           onError={() => done.current(null)}
         />
+        <HalftoneField variant="intro" />
         <div className="pintro__screen" style={{ left: pct(s.left), top: pct(s.top), width: pct(s.width), height: pct(s.height) }}>
+          <div className="pintro__glass-effects" aria-hidden="true" />
           {phase === "icon" ? (
             <img className="pintro__icon" src="/brand/icon.svg" alt="" aria-hidden="true" />
           ) : (

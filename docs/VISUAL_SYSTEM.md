@@ -147,13 +147,14 @@ computer company in 1991 that happens to be about Base, it is right.
 
 ## 9 / the Q-001 computer asset
 
-Use `public/brand/quadra-q001.svg` when composing banners or share cards in code.
+Use `src/assets/quadra-q001.svg` when composing banners or share cards in code.
 The SVG is a transparent illustration with a `620 × 680` viewBox and no external
 fonts or images. Embed the SVG as an image to keep the blank cobalt screen.
 
-```html
-<img src="/brand/quadra-q001.svg" alt="Quadra Q-001 compact CRT"
-     width="620" height="680">
+```tsx
+import quadraMachine from "@/assets/quadra-q001.svg";
+
+<img src={quadraMachine} alt="Quadra Q-001 compact CRT" width="620" height="680" />
 ```
 
 For screen content, inline the SVG and insert SVG elements in

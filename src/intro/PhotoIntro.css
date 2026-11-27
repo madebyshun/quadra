@@ -303,3 +303,71 @@
     font-size: 4.8cqw;
   }
 }
+
+/* The boot signal lives inside the glass and follows the photograph into the desktop. */
+.pintro__glass-effects {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+.pintro--icon .pintro__glass-effects {
+  animation: pintro-phosphor 850ms both;
+  background: #101433;
+}
+.pintro--icon .pintro__glass-effects::before,
+.pintro--icon .pintro__glass-effects::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.pintro--icon .pintro__glass-effects::before {
+  background: #fff;
+  box-shadow: 0 0 18px 4px #aaaaff;
+  animation: pintro-beam 850ms both;
+}
+.pintro--icon .pintro__glass-effects::after {
+  background: repeating-linear-gradient(#10143338 0 1px, transparent 1px 3px),
+    linear-gradient(90deg, #f4f0e6 0 20%, #a9baff 20% 40%, #5558e8 40% 60%, #2422cf 60% 80%, #161735 80%);
+  animation: pintro-test-signal 850ms both;
+}
+.pintro--welcome .pintro__glass-effects {
+  background: repeating-linear-gradient(transparent 0 3px, #2422cf18 3px 4px);
+}
+.pintro--welcome .pintro__glass-effects::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(transparent 42%, #fff5 50%, transparent 58%);
+  animation: pintro-scan 1.8s linear infinite;
+}
+.pintro--icon .pintro__icon { animation: pintro-logo-in 850ms both; }
+
+@keyframes pintro-phosphor {
+  0%, 59% { opacity: 1; }
+  82%, 100% { opacity: 0; }
+}
+@keyframes pintro-beam {
+  0%, 12% { opacity: 0; transform: scale(.04, .01); }
+  26% { opacity: 1; transform: scale(1, .015); }
+  49% { opacity: .85; transform: scale(1); }
+  64%, 100% { opacity: 0; }
+}
+@keyframes pintro-test-signal {
+  0%, 45% { opacity: 0; }
+  53%, 68% { opacity: 1; }
+  83%, 100% { opacity: 0; }
+}
+@keyframes pintro-logo-in {
+  0%, 62% { opacity: 0; }
+  88%, 100% { opacity: 1; }
+}
+@keyframes pintro-scan {
+  from { transform: translateY(-55%); }
+  to { transform: translateY(55%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pintro__glass-effects { display: none; }
+  .pintro--icon .pintro__icon { animation: none; }
+}
