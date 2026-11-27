@@ -102,17 +102,18 @@ describe("the page's cards and facts", () => {
     expect(cards).toHaveTextContent("Holders1,234");
   });
 
-  it("TokenStats: no index — the pool's value for the cap, the rest not read; no dollar price — the quote alone", () => {
+  it("TokenStats: no index — falls back to live pool slot0 price and DexScreener 24h volume; no pool value — no trade yet", () => {
     const a = render(<TokenStats page={{ problem: "x" }} value={value({ quoteUsd: null })} holders={null} />);
     const cards = screen.getByLabelText("Numbers");
     expect(cards).toHaveTextContent("Market cap5 ETH");
-    expect(cards).toHaveTextContent("Priceno trade yet");
+    expect(cards).toHaveTextContent(/Price0\.0₈5 ETH/);
     expect(cards).toHaveTextContent("Volume 24hnot read");
     expect(cards).toHaveTextContent("Lifetime volumenot read");
     expect(cards).toHaveTextContent("Holdersnot read");
     a.unmount();
     render(<TokenStats page="reading" value={null} holders={null} />);
     expect(screen.getByLabelText("Numbers")).toHaveTextContent("Market capnot read");
+    expect(screen.getByLabelText("Numbers")).toHaveTextContent("Priceno trade yet");
   });
 
   it("TokenStats: a price without a dollar figure, and several trades", () => {

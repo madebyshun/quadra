@@ -239,7 +239,7 @@ describe("the Coins window", () => {
     expect(again).not.toHaveTextContent("market data unavailable");
   });
 
-  it("pins the app's own token above the list, marks its row official, opens it, and shows each coin's 24h move up or down", async () => {
+  it("marks the app's own token row and shows each coin's 24h move up or down", async () => {
     const own = CONTRACTS.token;
     (CONTRACTS as { token: string | null }).token = T;
     try {
@@ -253,14 +253,9 @@ describe("the Coins window", () => {
         const list = await screen.findByLabelText("Coins", { selector: "ul" });
         await waitFor(() => expect(list).toHaveTextContent(h24 > 0 ? "+3.50%" : "-2.25%"));
         expect(list.querySelector(".coins__item--official")).not.toBeNull();
-        await waitFor(() => expect(screen.getByText(/Official .* token · .*·/)).toBeInTheDocument());
-        if (h24 > 0) {
-          await userEvent.click(screen.getByRole("button", { name: `Open ${BRAND.ticker}` }));
-          await waitFor(() => expect(screen.getByLabelText("url")).toHaveTextContent(`t=${T}`));
-        }
+        expect(screen.queryByText(/Official .* token/)).toBeNull();
         view.unmount();
       }
-      // with no token set, nothing is pinned
       (CONTRACTS as { token: string | null }).token = null;
       net({ rpc: chainRoutes(), get: getRoutes() });
       mount();

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { formatUnits } from "viem";
 import { LAUNCHPAD_DECIMALS } from "@/config/launchpad";
 import { parseAmount } from "@/lib/amount";
+import { balanceOf } from "@/lib/erc20";
 import { messageOf } from "@/lib/errors";
 import { play } from "@/lib/sound";
 import { minOutFor, NATIVE, poolKeyOf, quoteV4, swapSteps, zeroForOneFor, type LaunchPool } from "@/lib/v4swap";
@@ -28,7 +30,7 @@ export const SLIPPAGE_OPTIONS = [100, 200, 500] as const;
 export const DEADLINE_S = 600;
 
 const ETH_PRESETS = ["0.01", "0.05", "0.1", "0.5"] as const;
-const TOKEN_PRESETS = ["1000", "10000", "100000", "1000000"] as const;
+const SELL_PCT_PRESETS = [25, 50, 75, 100] as const;
 
 type Pool = (LaunchPool & { readonly quoteSymbol: string; readonly quoteDecimals: number }) | null;
 type Review = { readonly amountIn: bigint; readonly out: bigint; readonly minOut: bigint };
@@ -41,9 +43,25 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
   const [amount, setAmount] = useState("");
   const [slippageBps, setSlippageBps] = useState<number>(SLIPPAGE_BPS);
   const [review, setReview] = useState<Review | "quoting" | { readonly problem: string } | null>(null);
+  const [sellBalance, setSellBalance] = useState<bigint | null>(null);
   // a stock-paired coin can be bought with plain ETH too: two legs, in PoolTradeEth (2026-10-29)
   const [withEth, setWithEth] = useState(false);
   const steps = useTxSteps();
+
+  useEffect(() => {
+    if (side !== "sell" || !me) {
+      setSellBalance(null);
+      return;
+    }
+    let live = true;
+    balanceOf({ kind: "erc20", address: token, symbol, decimals: LAUNCHPAD_DECIMALS }, me).then(
+      (raw) => live && setSellBalance(raw),
+      () => live && setSellBalance(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [side, me, token, symbol]);
 
   useEffect(() => {
     let live = true;
@@ -88,7 +106,8 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
   const inDec = side === "buy" ? pool.quoteDecimals : LAUNCHPAD_DECIMALS;
   const outDec = side === "buy" ? LAUNCHPAD_DECIMALS : pool.quoteDecimals;
   const zeroForOne = zeroForOneFor(pool, side);
-  const presets = side === "buy" && pool.quote.toLowerCase() === NATIVE ? ETH_PRESETS : side === "sell" ? TOKEN_PRESETS : null;
+  const isEthBuy = side === "buy" && pool.quote.toLowerCase() === NATIVE;
+  const isSell = side === "sell";
 
   const onReview = async () => {
     let amountIn: bigint;
@@ -144,9 +163,9 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
             }}
           />
         </label>
-        {presets ? (
+        {isEthBuy ? (
           <div className="pt__presets" role="group" aria-label="Quick amount">
-            {presets.map((val) => (
+            {ETH_PRESETS.map((val) => (
               <button
                 key={val}
                 type="button"
@@ -156,7 +175,26 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
                   setReview(null);
                 }}
               >
-                {side === "buy" ? `${val} ETH` : Number(val).toLocaleString("en-US")}
+                {val} ETH
+              </button>
+            ))}
+          </div>
+        ) : isSell ? (
+          <div className="pt__presets" role="group" aria-label="Quick sell percentage">
+            {SELL_PCT_PRESETS.map((pct) => (
+              <button
+                key={pct}
+                type="button"
+                className="pt__preset"
+                disabled={sellBalance === null || sellBalance === 0n}
+                onClick={() => {
+                  if (sellBalance === null || sellBalance === 0n) return;
+                  const raw = pct === 100 ? sellBalance : (sellBalance * BigInt(pct)) / 100n;
+                  setAmount(formatUnits(raw, LAUNCHPAD_DECIMALS));
+                  setReview(null);
+                }}
+              >
+                {pct}%
               </button>
             ))}
           </div>

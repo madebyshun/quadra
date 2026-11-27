@@ -222,6 +222,7 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
   const fee = useCoinFee(record !== null && typeof record === "object" && "factory" in record ? record.factory : "", token);
   const referrer = useCoinReferrer(record !== null && typeof record === "object" && "factory" in record ? record.factory : "", token);
   const [holders, setHolders] = useState<number | null>(null);
+  const [market, setMarket] = useState<Market | null>(listed?.market ?? null);
   const [now] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
     tokenInfo(token).then(
@@ -243,6 +244,7 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
                 chainToken(token).then((t) => ({ name: t.name, symbol: t.symbol }), () => null),
                 poolValue(r.factory, token).catch(() => null),
                 pendingFees(r.factory, token).catch(() => null),
+                marketsOf([token]).then((all) => deepest(all.filter((m) => m.base?.toLowerCase() === token.toLowerCase())), () => null),
               ]);
         if (!live) return;
         setRecord(r);
@@ -250,6 +252,7 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
           setFacts(details[0]);
           setValue(details[1]);
           setFees(details[2]);
+          setMarket(details[3]);
         }
       },
       (e: unknown) => live && setRecord({ problem: messageOf(e) }),
@@ -420,7 +423,7 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
         </div>
 
         <div className="coin__main stack">
-          <TokenStats page={page} value={value} holders={holders} />
+          <TokenStats page={page} value={value} holders={holders} market={market} />
           <div className="coin__section">
             <TokenChart page={page} token={token} symbol={symbol} value={value} quoteUsd={value?.quoteUsd ?? null} />
           </div>
@@ -528,7 +531,6 @@ export function CoinsPanel() {
   const stats = ready ? statsOf(ready.coins, ready.total, ready.complete) : null;
   const shown = ready ? sortCoins(searchCoins(filterCoins(ready.coins, tab, asset), query), sort) : [];
   const quadraToken = CONTRACTS.token;
-  const quadraListed = ready && quadraToken ? ready.coins.find((c) => c.token.toLowerCase() === quadraToken.toLowerCase()) ?? null : null;
 
   return (
     <div className="stack coins-discover">
@@ -560,20 +562,7 @@ export function CoinsPanel() {
         ))}
       </dl>
 
-      {quadraToken ? (
-        <div className="coins__official">
-          <div className="coins__official-copy">
-            <strong>{BRAND.name} ({BRAND.ticker} / ETH)</strong>
-            <span className="dim">
-              Official {BRAND.name} token · {short(quadraToken)}
-              {quadraListed?.value ? ` · ${valueText(quadraListed.value)}` : ""}
-            </span>
-          </div>
-          <button type="button" className="gel gel--quiet" onClick={() => open(quadraToken)}>
-            Open {BRAND.ticker}
-          </button>
-        </div>
-      ) : null}
+
 
       {ready && !ready.complete ? <p role="status" className="index-notice">index / partial history. Counts and recent activity may be incomplete; missing trades are not zero activity.</p> : null}
 

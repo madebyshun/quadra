@@ -257,17 +257,31 @@ function Card({ label, value, sub }: { label: string; value: string; sub?: strin
   );
 }
 
-/** The six numbers: market cap, price, 24 h volume, the quote in the pool, supply, holders. */
-export function TokenStats({ page, value, holders }: { page: Read<IndexedCoinPage>; value: PoolValue | null; holders: number | null }) {
+/** The six numbers: market cap, price, 24 h volume, lifetime volume, supply, holders. */
+export function TokenStats({
+  page,
+  value,
+  holders,
+  market = null,
+}: {
+  page: Read<IndexedCoinPage>;
+  value: PoolValue | null;
+  holders: number | null;
+  market?: Market | null;
+}) {
   const p = isDone(page) ? page.coin : null;
   const qs = p?.quoteSymbol ?? value?.quoteSymbol ?? "";
   const qUsd = value?.quoteUsd ?? null;
   const mcap = p?.mcapInQuote ?? value?.supplyInQuote ?? null;
+  const livePrice = p?.price ?? (value ? value.supplyInQuote / FIXED_SUPPLY : null);
+  const dexTrades = market && (market.buys24h !== null || market.sells24h !== null) ? (market.buys24h ?? 0) + (market.sells24h ?? 0) : null;
+  const vol24Val = p ? inBoth(p.volume24h, qs, qUsd) : market?.volume24h != null ? usd(market.volume24h) : "not read";
+  const vol24Sub = p ? trades(p.trades24h) : dexTrades !== null ? `${trades(dexTrades)} · DexScreener` : undefined;
   return (
     <div className="token__cards" aria-label="Numbers">
       <Card label="Market cap" value={mcap === null ? "not read" : qUsd === null ? quoteAmountText(mcap, qs) : usd(mcap * qUsd)} sub={mcap !== null && qUsd !== null ? quoteAmountText(mcap, qs) : undefined} />
-      <Card label="Price" value={p?.price != null && qUsd !== null ? tinyPrice(p.price * qUsd) : p?.price != null ? quoteAmountText(p.price, qs) : "no trade yet"} sub={p?.price != null && qUsd !== null ? quoteAmountText(p.price, qs) : undefined} />
-      <Card label="Volume 24h" value={p ? inBoth(p.volume24h, qs, qUsd) : "not read"} sub={p ? trades(p.trades24h) : undefined} />
+      <Card label="Price" value={livePrice != null && qUsd !== null ? tinyPrice(livePrice * qUsd) : livePrice != null ? quoteAmountText(livePrice, qs) : "no trade yet"} sub={livePrice != null && qUsd !== null ? quoteAmountText(livePrice, qs) : undefined} />
+      <Card label="Volume 24h" value={vol24Val} sub={vol24Sub} />
       <Card label="Lifetime volume" value={p ? inBoth(p.volume, qs, qUsd) : "not read"} sub={p ? trades(p.trades) : undefined} />
       <Card label="Total supply" value="1B" sub="fixed — nobody can mint" />
       <Card label="Holders" value={holders === null ? "not read" : holders.toLocaleString("en-US")} />
@@ -740,7 +754,13 @@ export function TokenTabs({
       ) : page === "reading" ? (
         <p className="dim">Reading the trades…</p>
       ) : "problem" in page ? (
-        <p className="tx__warn">Not checked — the trades could not be read: {page.problem}</p>
+        <div className="stack">
+          <p className="tx__warn">Not checked — the trades could not be read: {page.problem}</p>
+          <p className="row">
+            <a className="chip" href={explorer.token(token)} target="_blank" rel="noreferrer">View live swaps on Basescan ↗</a>
+            <a className="chip" href={`https://dexscreener.com/base/${token}`} target="_blank" rel="noreferrer">View trades on DexScreener ↗</a>
+          </p>
+        </div>
       ) : (
         <Trades page={page} now={now} quoteUsd={quoteUsd} />
       )}
