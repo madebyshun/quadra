@@ -384,15 +384,31 @@ function firstAccount(accounts: unknown): FirstAccount {
  * Short-circuiting at `disconnected` also means one request instead of two in the state
  * every first-time visitor is in.
  */
-export async function readWallet(provider = injectedProvider()): Promise<Wallet> {
+/** How long a silent background `readWallet` waits before concluding a hanging provider is not answering. */
+export const READ_TIMEOUT_MS = 1_500;
+
+const TIMED_OUT = Symbol("read-timeout");
+
+function readWithTimeout(provider: Eip1193Provider, req: Eip1193Request, ms = READ_TIMEOUT_MS): Promise<unknown> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<typeof TIMED_OUT>((resolve) => {
+    timer = setTimeout(() => resolve(TIMED_OUT), ms);
+  });
+  return Promise.race([provider.request(req), timeout]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
+}
+
+export async function readWallet(provider = injectedProvider(), timeoutMs = READ_TIMEOUT_MS): Promise<Wallet> {
   if (provider === null) return { kind: "unavailable", why: NO_WALLET_HERE };
 
   let accounts: unknown;
   try {
-    accounts = await provider.request({ method: "eth_accounts" });
+    accounts = await readWithTimeout(provider, { method: "eth_accounts" }, timeoutMs);
   } catch (err) {
     return { kind: "failed", why: unansweredAccounts(err) };
   }
+  if (accounts === TIMED_OUT) return { kind: "disconnected", why: NOT_CONNECTED };
 
   const account = firstAccount(accounts);
   if (account.kind === "none") return { kind: "disconnected", why: NOT_CONNECTED };
@@ -400,10 +416,11 @@ export async function readWallet(provider = injectedProvider()): Promise<Wallet>
 
   let rawChain: unknown;
   try {
-    rawChain = await provider.request({ method: "eth_chainId" });
+    rawChain = await readWithTimeout(provider, { method: "eth_chainId" }, timeoutMs);
   } catch (err) {
     return { kind: "failed", why: unansweredChain(err) };
   }
+  if (rawChain === TIMED_OUT) return { kind: "failed", why: unansweredChain(new Error("timed out")) };
 
   const chainId = parseChainId(rawChain);
   if (chainId === null) return { kind: "failed", why: unreadableChain(rawChain) };

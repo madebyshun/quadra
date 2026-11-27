@@ -5,7 +5,9 @@ import { BRAND } from "@/brand";
 import { resolveFeature, type WindowId } from "@/features/registry";
 import { useOpenWindow, useRunCommand } from "@/features/openWindow";
 import { checkAddress } from "@/lib/address";
+import { injectedProvider } from "@/lib/wallet";
 import { Gel } from "@/ui/Gel";
+import { useOptionalWalletSession } from "@/ui/WalletProvider";
 import { setWelcomeOn, welcomeOn } from "@/lib/welcome";
 
 /** The Base card's window — `card` once it exists, the profile (where the card began) until then. */
@@ -22,6 +24,7 @@ export function cardWindow(resolve: (id: string) => unknown = resolveFeature): W
 export function Welcome({ onClose }: { onClose: () => void }) {
   const open = useOpenWindow();
   const run = useRunCommand();
+  const session = useOptionalWalletSession();
   const [token, setToken] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
   const [again, setAgain] = useState(welcomeOn);
@@ -42,6 +45,17 @@ export function Welcome({ onClose }: { onClose: () => void }) {
   const go = (id: WindowId) => () => {
     open!(id);
     onClose();
+  };
+  const connectFromWelcome = () => {
+    open!("wallet");
+    onClose();
+    if (!session || session.busy) return;
+    if (session.wallet?.kind === "wrongChain") {
+      void session.switchChain();
+    } else if (session.wallet?.kind !== "ready") {
+      if (session.wallets.length === 1) void session.connectDiscovered(session.wallets[0]!);
+      else if (session.wallets.length === 0 && injectedProvider() !== null && session.wallet?.kind !== "unavailable") void session.connectInjected();
+    }
   };
   const check = (e: FormEvent) => {
     e.preventDefault();
@@ -110,8 +124,8 @@ export function Welcome({ onClose }: { onClose: () => void }) {
             <Gel quiet onClick={go("coins")}>
               Browse coins
             </Gel>
-            <Gel quiet onClick={go("wallet")}>
-              Your wallet
+            <Gel quiet onClick={connectFromWelcome}>
+              Connect wallet
             </Gel>
           </div>
           <label className="welcome__again">

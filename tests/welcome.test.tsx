@@ -50,7 +50,7 @@ describe("the Welcome screen", () => {
     mount();
     expect(screen.getByRole("heading", { name: `Welcome to ${BRAND.name}` }).querySelector("b")).toHaveTextContent(BRAND.name);
     expect(screen.getByRole("button", { name: "Check" })).toBeDisabled();
-    for (const name of ["Launch a coin", "Browse coins", "Your wallet"]) expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    for (const name of ["Launch a coin", "Browse coins", "Connect wallet"]) expect(screen.getByRole("button", { name })).toBeInTheDocument();
     // the playful doors moved to My Computer
     expect(screen.queryByRole("button", { name: "Next Tip" })).toBeNull();
     expect(screen.queryByRole("button", { name: "What's New" })).toBeNull();
@@ -83,7 +83,7 @@ describe("the Welcome screen", () => {
     const { open, onClose } = mount();
     click("Launch a coin");
     click("Browse coins");
-    click("Your wallet");
+    click("Connect wallet");
     expect(open.mock.calls.map((c) => c[0])).toEqual(["launch", "coins", "wallet"]);
     expect(onClose).toHaveBeenCalledTimes(3);
     fireEvent.click(document.querySelector(".welcome__win .light--close")!);
