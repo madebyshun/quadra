@@ -30,7 +30,24 @@ function urlParam<T extends string>(key: string, list: readonly { readonly id: T
   return list.some((item) => item.id === param) ? (param as T) : null;
 }
 
-export function drawGlyph(ctx: CanvasRenderingContext2D, kind: DotShape, x: number, y: number, r: number): void {
+/** Compact 3×5 dot-matrix glyphs adapted from Base Mode's Rain renderer. */
+const RAIN_GLYPHS: readonly (readonly string[])[] = [
+  ["010", "101", "101", "101", "010"], // 0
+  ["010", "110", "010", "010", "111"], // 1
+  ["000", "010", "111", "010", "000"], // +
+  ["001", "001", "010", "100", "100"], // /
+  ["010", "010", "000", "010", "010"], // :
+  ["101", "111", "101", "111", "101"], // #
+];
+
+export function drawGlyph(
+  ctx: CanvasRenderingContext2D,
+  kind: DotShape,
+  x: number,
+  y: number,
+  r: number,
+  seed = 0,
+): void {
   const hr = Math.max(0.6, r * 0.5);
   if (kind === "circle") {
     ctx.moveTo(x + hr, y);
@@ -38,23 +55,63 @@ export function drawGlyph(ctx: CanvasRenderingContext2D, kind: DotShape, x: numb
   } else if (kind === "square") {
     const s = hr * 1.72;
     ctx.rect(x - s / 2, y - s / 2, s, s);
-  } else if (kind === "diamond") {
-    const d = hr * 1.25;
-    ctx.moveTo(x, y - d);
-    ctx.lineTo(x + d, y);
-    ctx.lineTo(x, y + d);
-    ctx.lineTo(x - d, y);
-    ctx.closePath();
-  } else if (kind === "plus") {
-    const arm = hr * 1.2;
-    const thick = Math.max(0.9, hr * 0.52);
-    ctx.rect(x - arm, y - thick / 2, arm * 2, thick);
-    ctx.rect(x - thick / 2, y - arm, thick, arm * 2);
+  } else if (kind === "jumbo") {
+    // Adapted from Base Mode Jumbotron: 3 vertical LED subpixel bars with crisp gaps.
+    const totalW = hr * 2.05;
+    const totalH = hr * 1.95;
+    const gap = Math.max(0.45, totalW * 0.11);
+    const barW = Math.max(0.65, (totalW - gap * 2) / 3);
+    const left = x - totalW / 2;
+    const heights = [0.76, 0.9, 1.0];
+    for (let i = 0; i < 3; i++) {
+      const bh = totalH * heights[i]!;
+      ctx.rect(left + i * (barW + gap), y - bh / 2, barW, bh);
+    }
+  } else if (kind === "rain") {
+    // Adapted from Base Mode Rain: crisp dot-matrix pixel glyphs.
+    const glyph = RAIN_GLYPHS[Math.abs(seed) % RAIN_GLYPHS.length]!;
+    const px = Math.max(0.65, hr * 0.44);
+    const ox = x - (3 * px) / 2;
+    const oy = y - (5 * px) / 2;
+    for (let row = 0; row < 5; row++) {
+      const bits = glyph[row]!;
+      for (let col = 0; col < 3; col++) {
+        if (bits[col] === "1") {
+          ctx.rect(ox + col * px, oy + row * px, px * 0.86, px * 0.86);
+        }
+      }
+    }
   } else {
-    const w = hr * 2.4;
-    const h = Math.max(0.9, hr * 0.72);
-    ctx.rect(x - w / 2, y - h / 2, w, h);
+    // Adapted from Base Mode Blueprint: technical drafted square outline + center tick.
+    const s = hr * 1.9;
+    const t = Math.max(0.65, hr * 0.24);
+    const half = s / 2;
+    ctx.rect(x - half, y - half, s, t);
+    ctx.rect(x - half, y + half - t, s, t);
+    ctx.rect(x - half, y - half, t, s);
+    ctx.rect(x + half - t, y - half, t, s);
+    const dot = Math.max(0.7, t * 1.15);
+    ctx.rect(x - dot / 2, y - dot / 2, dot, dot);
   }
+}
+
+/** Subtle architectural drafting grid adapted from Base Mode Blueprint. */
+function drawBlueprintGrid(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+  const step = 24;
+  ctx.save();
+  ctx.strokeStyle = "rgba(244, 240, 230, 0.08)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = 0; x <= width; x += step) {
+    ctx.moveTo(x + 0.5, 0);
+    ctx.lineTo(x + 0.5, height);
+  }
+  for (let y = 0; y <= height; y += step) {
+    ctx.moveTo(0, y + 0.5);
+    ctx.lineTo(width, y + 0.5);
+  }
+  ctx.stroke();
+  ctx.restore();
 }
 
 /** Draw an image cover-fit into a target canvas/context. */
@@ -156,19 +213,25 @@ export function DesktopWallpaper() {
       }
       ctx.clearRect(0, 0, width, height);
       const kind = shapeRef.current;
+      const rainTick = Math.floor(time * 2.2);
 
       if (!customPhoto && activeScene === "q001") {
+        if (kind === "blueprint") drawBlueprintGrid(ctx, width, height);
         const driftX = Math.sin(time * 0.95) * 2.5;
         const driftY = Math.cos(time * 1.15) * 3.5;
         ctx.fillStyle = "rgba(244, 240, 230, 0.92)";
         ctx.beginPath();
-        for (const dot of dots) {
+        for (let i = 0; i < dots.length; i++) {
+          const dot = dots[i]!;
           const dx = dot.x - cursor.x, dy = dot.y - cursor.y;
           const lift = hover > .005 ? hover * Math.max(0, 1 - Math.hypot(dx, dy) / 170) ** 2 : 0;
+          const rainPulse = kind === "rain"
+            ? 0.82 + 0.34 * Math.sin(time * 2.8 - dot.x * 0.04 - dot.y * 0.03)
+            : 1;
           const x = dot.x + driftX + dx * lift * .42;
           const y = dot.y + driftY + dy * lift * .42;
-          const r = dot.radius * (1 + lift * .65);
-          drawGlyph(ctx, kind, x, y, r);
+          const r = dot.radius * rainPulse * (1 + lift * .65);
+          drawGlyph(ctx, kind, x, y, r, i + rainTick);
         }
         ctx.fill();
       } else if (photo && photo.complete && photo.naturalWidth > 0) {
@@ -176,16 +239,21 @@ export function DesktopWallpaper() {
         ctx.globalAlpha = 0.72;
         drawCover(ctx, photo, width, height);
         ctx.restore();
+        if (kind === "blueprint") drawBlueprintGrid(ctx, width, height);
         const wave = Math.sin(time * 0.9);
-        for (const dot of dots) {
+        for (let i = 0; i < dots.length; i++) {
+          const dot = dots[i]!;
           const dx = dot.x - cursor.x, dy = dot.y - cursor.y;
           const lift = hover > .005 ? hover * Math.max(0, 1 - Math.hypot(dx, dy) / 160) ** 2 : 0;
+          const rainPulse = kind === "rain"
+            ? 0.85 + 0.28 * Math.sin(time * 2.8 - dot.x * 0.04 - dot.y * 0.03)
+            : 1;
           const x = dot.x + wave * 0.8 + dx * lift * .26;
           const y = dot.y + dy * lift * .26;
-          const r = dot.radius * (1 + lift * .55);
+          const r = dot.radius * rainPulse * (1 + lift * .55);
           ctx.fillStyle = dot.color ?? "#f4f0e6";
           ctx.beginPath();
-          drawGlyph(ctx, kind, x, y, r);
+          drawGlyph(ctx, kind, x, y, r, i + rainTick);
           ctx.fill();
         }
       }

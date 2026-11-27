@@ -28,14 +28,14 @@ export const WALLPAPERS: readonly { readonly id: WallpaperId; readonly name: str
   { id: "bricks", name: "Bricks" },
 ];
 
-export type DotShape = "circle" | "square" | "diamond" | "plus" | "bar";
+export type DotShape = "circle" | "square" | "jumbo" | "rain" | "blueprint";
 
 export const DOT_SHAPES: readonly { readonly id: DotShape; readonly name: string }[] = [
   { id: "circle", name: "Circle" },
   { id: "square", name: "Square" },
-  { id: "diamond", name: "Diamond" },
-  { id: "plus", name: "Plus" },
-  { id: "bar", name: "Scanbar" },
+  { id: "jumbo", name: "Jumbotron" },
+  { id: "rain", name: "Rain" },
+  { id: "blueprint", name: "Blueprint" },
 ];
 
 export type WallpaperScene = "q001" | "meadow" | "sky" | "studio";
@@ -80,7 +80,7 @@ export function onSettingsChange(listener: () => void): () => void {
 
 export function wallpaper(): WallpaperId {
   const v = read(WALLPAPER_KEY);
-  return WALLPAPERS.find((w) => w.id === v)?.id ?? "bliss";
+  return WALLPAPERS.find((w) => w.id === v)?.id ?? "motion";
 }
 
 export function setWallpaper(id: WallpaperId): void {
@@ -89,7 +89,7 @@ export function setWallpaper(id: WallpaperId): void {
 
 export function wallpaperShape(): DotShape {
   const v = read(WALLPAPER_SHAPE_KEY);
-  return DOT_SHAPES.find((s) => s.id === v)?.id ?? "circle";
+  return DOT_SHAPES.find((s) => s.id === v)?.id ?? "square";
 }
 
 export function setWallpaperShape(shape: DotShape): void {

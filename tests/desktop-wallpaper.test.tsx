@@ -22,15 +22,15 @@ afterEach(() => {
 });
 
 describe("Halftone Motion wallpaper settings & Control Panel", () => {
-  it("persists wallpaper scene, dot shape, and custom uploaded photo", () => {
+  it("defaults to Halftone Motion, Q-001, and Square, and persists changes", () => {
     expect(wallpaperScene()).toBe("q001");
-    expect(wallpaperShape()).toBe("circle");
+    expect(wallpaperShape()).toBe("square");
     setWallpaperScene("meadow");
-    setWallpaperShape("diamond");
+    setWallpaperShape("jumbo");
     expect(localStorage.getItem(WALLPAPER_SCENE_KEY)).toBe("meadow");
-    expect(localStorage.getItem(WALLPAPER_SHAPE_KEY)).toBe("diamond");
+    expect(localStorage.getItem(WALLPAPER_SHAPE_KEY)).toBe("jumbo");
     expect(wallpaperScene()).toBe("meadow");
-    expect(wallpaperShape()).toBe("diamond");
+    expect(wallpaperShape()).toBe("jumbo");
 
     setCustomWallpaperImage("data:image/png;base64,AAA");
     expect(customWallpaperImage()).toBe("data:image/png;base64,AAA");
@@ -46,10 +46,10 @@ describe("Halftone Motion wallpaper settings & Control Panel", () => {
       lineTo: vi.fn(),
       closePath: vi.fn(),
     } as unknown as CanvasRenderingContext2D;
-    for (const s of DOT_SHAPES) drawGlyph(ctx, s.id, 10, 10, 8);
+    for (const s of DOT_SHAPES) drawGlyph(ctx, s.id, 10, 10, 8, 2);
+    expect(DOT_SHAPES.map((s) => s.id)).toEqual(["circle", "square", "jumbo", "rain", "blueprint"]);
     expect(ctx.arc).toHaveBeenCalledTimes(1);
     expect(ctx.rect).toHaveBeenCalled();
-    expect(ctx.closePath).toHaveBeenCalledTimes(1);
   });
 
   it("shows Scene, Photo upload, and Dot shape controls in ControlPanel when Halftone Motion is selected", () => {
@@ -57,8 +57,12 @@ describe("Halftone Motion wallpaper settings & Control Panel", () => {
     render(<ControlPanel />);
     fireEvent.click(screen.getByRole("button", { name: "Sunlit Hill" }));
     expect(wallpaperScene()).toBe("meadow");
-    fireEvent.click(screen.getByRole("button", { name: "Square" }));
-    expect(wallpaperShape()).toBe("square");
+    fireEvent.click(screen.getByRole("button", { name: "Blueprint" }));
+    expect(wallpaperShape()).toBe("blueprint");
+    fireEvent.click(screen.getByRole("button", { name: "Rain" }));
+    expect(wallpaperShape()).toBe("rain");
+    fireEvent.click(screen.getByRole("button", { name: "Jumbotron" }));
+    expect(wallpaperShape()).toBe("jumbo");
     act(() => setCustomWallpaperImage("data:image/png;base64,BBB"));
     fireEvent.click(screen.getByRole("button", { name: "Clear photo" }));
     expect(customWallpaperImage()).toBeNull();

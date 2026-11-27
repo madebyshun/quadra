@@ -45,7 +45,7 @@ describe("the Control Panel's settings", () => {
   });
 
   it("reads the defaults from an empty browser, and what was picked after", () => {
-    expect([wallpaper(), saverOn(), saverMinutes()]).toEqual(["bliss", true, DEFAULT_SAVER_MINUTES]);
+    expect([wallpaper(), saverOn(), saverMinutes()]).toEqual(["motion", true, DEFAULT_SAVER_MINUTES]);
     setWallpaper("teal");
     setSaverOn(false);
     setSaverMinutes(10);
@@ -57,7 +57,7 @@ describe("the Control Panel's settings", () => {
   it("reads a value it does not recognise as the default", () => {
     localStorage.setItem(WALLPAPER_KEY, "constructor");
     localStorage.setItem(SAVER_MINUTES_KEY, "7");
-    expect(wallpaper()).toBe("bliss");
+    expect(wallpaper()).toBe("motion");
     expect(saverMinutes()).toBe(DEFAULT_SAVER_MINUTES);
   });
 
@@ -68,7 +68,7 @@ describe("the Control Panel's settings", () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("blocked");
     });
-    expect([wallpaper(), saverOn(), saverMinutes()]).toEqual(["bliss", true, DEFAULT_SAVER_MINUTES]);
+    expect([wallpaper(), saverOn(), saverMinutes()]).toEqual(["motion", true, DEFAULT_SAVER_MINUTES]);
     const heard = vi.fn();
     const off = onSettingsChange(heard);
     setWallpaper("dark");
@@ -80,7 +80,7 @@ describe("the Control Panel's settings", () => {
 
   it("re-renders a component when a setting changes", () => {
     const { result } = renderHook(() => useSetting(wallpaper));
-    expect(result.current).toBe("bliss");
+    expect(result.current).toBe("motion");
     act(() => setWallpaper("dither"));
     expect(result.current).toBe("dither");
   });
@@ -92,8 +92,8 @@ describe("the Control Panel window", () => {
     renderAt("/?do=control");
     await settle();
     const desk = document.querySelector(".desktop")!;
-    expect(desk).toHaveClass("wallpaper--bliss");
-    expect(screen.getByRole("radio", { name: "Blue-grey" })).toBeChecked();
+    expect(desk).toHaveClass("wallpaper--motion");
+    expect(screen.getByRole("radio", { name: "Halftone Motion" })).toBeChecked();
     await user.click(screen.getByRole("radio", { name: "Teal" }));
     expect(desk).toHaveClass("wallpaper--teal");
     expect(localStorage.getItem(WALLPAPER_KEY)).toBe("teal");
