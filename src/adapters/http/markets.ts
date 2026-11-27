@@ -15,12 +15,15 @@ const SERVER_HEADER = "x-quadra";
  * facts and the UI keeps them apart rather than blending one into the other.
  */
 
-export type Candle = { readonly t: number; readonly o: number; readonly h: number; readonly l: number; readonly c: number };
+export type Candle = { readonly t: number; readonly o: number; readonly h: number; readonly l: number; readonly c: number; readonly v?: number };
 
 /** How far back a chart looks, as GeckoTerminal is asked for it. */
-export type Range = "1D" | "7D" | "30D";
+export type Range = "1m" | "5m" | "15m" | "1D" | "7D" | "30D";
 
-const RANGES: Record<Range, { readonly frame: "hour" | "day"; readonly aggregate: number; readonly limit: number }> = {
+const RANGES: Record<Range, { readonly frame: "minute" | "hour" | "day"; readonly aggregate: number; readonly limit: number }> = {
+  "1m": { frame: "minute", aggregate: 1, limit: 60 },
+  "5m": { frame: "minute", aggregate: 5, limit: 60 },
+  "15m": { frame: "minute", aggregate: 15, limit: 60 },
   "1D": { frame: "hour", aggregate: 1, limit: 24 },
   "7D": { frame: "hour", aggregate: 4, limit: 42 },
   "30D": { frame: "day", aggregate: 1, limit: 30 },
@@ -104,8 +107,8 @@ export function parseCandles(body: unknown): Candle[] {
   const rows = listOf(objAt(objAt(body, "data"), "attributes").ohlcv_list);
   const out: Candle[] = [];
   for (const r of rows) {
-    const [t, o, h, l, c] = listOf(r).map((x) => numOf(x));
-    if (t != null && o != null && h != null && l != null && c != null) out.push({ t: t * 1000, o, h, l, c });
+    const [t, o, h, l, c, v] = listOf(r).map((x) => numOf(x));
+    if (t != null && o != null && h != null && l != null && c != null) out.push(v != null ? { t: t * 1000, o, h, l, c, v } : { t: t * 1000, o, h, l, c });
   }
   return out.sort((a, b) => a.t - b.t);
 }
@@ -160,7 +163,7 @@ export async function candles(venue: Venue, pool: string, token: string, range: 
   }
   if (!res.ok) throw new Error(strOf(isObj(body) ? body.detail : null) ?? `The chart is unavailable right now (HTTP ${res.status}).`);
   const stale = Number(res.headers.get("x-quadra-stale"));
-  const step = (r.frame === "hour" ? 3_600_000 : 86_400_000) * r.aggregate;
+  const step = (r.frame === "minute" ? 60_000 : r.frame === "hour" ? 3_600_000 : 86_400_000) * r.aggregate;
   return { candles: fillGaps(parseCandles(body), step, r.limit, now), staleSeconds: Number.isFinite(stale) && stale > 0 ? stale : null };
 }
 

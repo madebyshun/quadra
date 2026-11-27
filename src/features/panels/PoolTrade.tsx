@@ -30,7 +30,16 @@ export const SLIPPAGE_OPTIONS = [100, 200, 500] as const;
 export const DEADLINE_S = 600;
 
 const ETH_PRESETS = ["0.01", "0.05", "0.1", "0.5"] as const;
+const STABLE_PRESETS = ["10", "50", "100", "500"] as const;
+const QUOTE_PRESETS = ["0.1", "0.5", "1", "5"] as const;
 const SELL_PCT_PRESETS = [25, 50, 75, 100] as const;
+
+function buyPresetsFor(symbol: string): readonly string[] {
+  const s = symbol.toUpperCase();
+  if (s === "ETH" || s === "WETH" || s === "CBETH") return ETH_PRESETS;
+  if (s === "USDC" || s === "EURC" || s === "USDT") return STABLE_PRESETS;
+  return QUOTE_PRESETS;
+}
 
 type Pool = (LaunchPool & { readonly quoteSymbol: string; readonly quoteDecimals: number }) | null;
 type Review = { readonly amountIn: bigint; readonly out: bigint; readonly minOut: bigint };
@@ -106,8 +115,9 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
   const inDec = side === "buy" ? pool.quoteDecimals : LAUNCHPAD_DECIMALS;
   const outDec = side === "buy" ? LAUNCHPAD_DECIMALS : pool.quoteDecimals;
   const zeroForOne = zeroForOneFor(pool, side);
-  const isEthBuy = side === "buy" && pool.quote.toLowerCase() === NATIVE;
+  const isBuy = side === "buy";
   const isSell = side === "sell";
+  const buyPresets = isBuy ? buyPresetsFor(pool.quoteSymbol) : null;
 
   const onReview = async () => {
     let amountIn: bigint;
@@ -163,9 +173,9 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
             }}
           />
         </label>
-        {isEthBuy ? (
+        {buyPresets ? (
           <div className="pt__presets" role="group" aria-label="Quick amount">
-            {ETH_PRESETS.map((val) => (
+            {buyPresets.map((val) => (
               <button
                 key={val}
                 type="button"
@@ -175,7 +185,7 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
                   setReview(null);
                 }}
               >
-                {val} ETH
+                {val} {pool.quoteSymbol}
               </button>
             ))}
           </div>

@@ -100,20 +100,40 @@ export function PoolTradeEth({ pool, symbol, now = Date.now }: { pool: Pool; sym
 
   return (
     <div className="stack">
-      <label className="field-label">
-        You pay (ETH)
-        <input
-          className="field"
-          inputMode="decimal"
-          aria-label="Amount of ETH"
-          placeholder="0.0"
-          value={amount}
-          onChange={(e) => {
-            setAmount(e.target.value);
-            setReview(null);
-          }}
-        />
-      </label>
+      <div className="pt__box">
+        <label className="field-label">
+          <span className="pt__box-head">
+            <span>You pay (ETH)</span>
+            <span className="mono">{symbol} pool</span>
+          </span>
+          <input
+            className="field pt__input"
+            inputMode="decimal"
+            aria-label="Amount of ETH"
+            placeholder="0.0"
+            value={amount}
+            onChange={(e) => {
+              setAmount(e.target.value);
+              setReview(null);
+            }}
+          />
+        </label>
+        <div className="pt__presets" role="group" aria-label="Quick amount">
+          {(["0.01", "0.05", "0.1", "0.5"] as const).map((val) => (
+            <button
+              key={val}
+              type="button"
+              className="pt__preset"
+              onClick={() => {
+                setAmount(val);
+                setReview(null);
+              }}
+            >
+              {val} ETH
+            </button>
+          ))}
+        </div>
+      </div>
       {review === "quoting" ? <p className="dim">Asking Relay for {stock.symbol}, then Uniswap&apos;s Quoter…</p> : null}
       {review !== null && review !== "quoting" && "problem" in review ? <p className="tx__warn">{review.problem}</p> : null}
       {reviewed ? (

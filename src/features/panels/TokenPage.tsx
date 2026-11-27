@@ -11,7 +11,7 @@ import { compact, explorer, quoteAmountText, quoteWithUsd, short, tinyPrice, usd
 import { coinFeeOf, isV3, launchesBy, referrerOf, type CoinFee, type PoolValue } from "@/skills/launchpad";
 import { deepest, marketsOf, type Market } from "@/skills/dexscreener";
 import { feePercent, LAUNCHPAD_DECIMALS, LAUNCHPAD_EXPECTS } from "@/config/launchpad";
-import { PriceChart } from "@/features/markets/Chart";
+import { CandleChart, type ChartStyle } from "@/features/markets/Chart";
 
 /**
  * A coin's page, the parts a launchpad site shows (owner, 2026-10-14, after reading launch.o1.exchange's
@@ -364,7 +364,7 @@ export function CreatorLaunches({ creator, current }: { creator: string; current
 
 export type ChartMode = "price" | "mcap";
 const FIXED_SUPPLY = 1e9;
-const GECKO_RANGES: readonly Range[] = ["1D", "7D", "30D"];
+const GECKO_RANGES: readonly Range[] = ["1m", "5m", "15m", "1D", "7D", "30D"];
 
 function ChartCanvasPlaceholder({
   priceLabel,
@@ -415,7 +415,8 @@ export function TokenChart({
 }) {
   const [picked, setPicked] = useState<Frame | null>(null);
   const [mode, setMode] = useState<ChartMode>("price");
-  const [geckoRange, setGeckoRange] = useState<Range>("7D");
+  const [chartStyle, setChartStyle] = useState<ChartStyle>("candles");
+  const [geckoRange, setGeckoRange] = useState<Range>("15m");
   const [gecko, setGecko] = useState<readonly Candle[] | "reading" | null>(null);
 
   const hasIndex = isDone(page) && page.points.length >= 2;
@@ -442,6 +443,16 @@ export function TokenChart({
     };
   }, [needGecko, token, geckoRange]);
 
+  const styleToggle = (
+    <div className="coins__seg" role="group" aria-label="Chart style">
+      {([["candles", "Candles"], ["line", "Line"]] as const).map(([id, label]) => (
+        <button key={id} type="button" className="coins__seg-btn" aria-pressed={chartStyle === id} onClick={() => setChartStyle(id)}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
   const metricToggle = (
     <div className="coins__seg" role="group" aria-label="Chart metric">
       {([["price", "Price"], ["mcap", "Market cap"]] as const).map(([id, label]) => (
@@ -461,6 +472,7 @@ export function TokenChart({
     const bars = bucket(scaled, FRAMES.find((f) => f.id === frame)!.seconds);
     const fmt = mode === "mcap" && quoteUsd !== null ? (n: number) => usd(n) : (n: number) => quoteAmountText(n, qs);
     const unitLabel = mode === "mcap" ? (quoteUsd !== null ? "market cap in USD" : `market cap in ${qs}`) : `price in ${qs}`;
+    const coinTitle = `${page.coin.symbol ?? "Coin"}/${qs || "USD"} · ${mode === "mcap" ? "Market cap" : "Price"}`;
     return (
       <div className="coin__chart-frame stack">
         <div className="coin__chart-bar">
@@ -471,7 +483,10 @@ export function TokenChart({
               </button>
             ))}
           </div>
-          {metricToggle}
+          <div className="row">
+            {styleToggle}
+            {metricToggle}
+          </div>
         </div>
         {bars.length < 2 ? (
           <ChartCanvasPlaceholder
@@ -479,7 +494,13 @@ export function TokenChart({
             status={`Every trade so far falls in one ${frame} candle — pick a finer frame.`}
           />
         ) : (
-          <PriceChart series={bars} label={`${page.coin.symbol ?? "Coin"} ${unitLabel}, from its pool's opening price and trades`} format={fmt} />
+          <CandleChart
+            series={bars}
+            title={coinTitle}
+            style={chartStyle}
+            label={`${page.coin.symbol ?? "Coin"} ${unitLabel}, from its pool's opening price and trades`}
+            format={fmt}
+          />
         )}
       </div>
     );
@@ -491,7 +512,9 @@ export function TokenChart({
     const bars = scale === 1 ? gecko : gecko.map((c) => ({ ...c, o: c.o * scale, h: c.h * scale, l: c.l * scale, c: c.c * scale }));
     const fmt = mode === "mcap" ? (n: number) => usd(n) : (n: number) => tinyPrice(n);
     const coinLabel = symbol ?? "Coin";
+    const qs = value?.quoteSymbol ?? "ETH";
     const unitLabel = mode === "mcap" ? "market cap in USD" : "price in USD";
+    const coinTitle = `${coinLabel}/${qs} (${mode === "mcap" ? "Market Cap" : "Price"}) · Uniswap v4`;
     return (
       <div className="coin__chart-frame stack">
         <div className="coin__chart-bar">
@@ -503,9 +526,18 @@ export function TokenChart({
             ))}
             <span className="dim">GeckoTerminal · USD</span>
           </div>
-          {metricToggle}
+          <div className="row">
+            {styleToggle}
+            {metricToggle}
+          </div>
         </div>
-        <PriceChart series={bars} label={`${coinLabel} ${unitLabel}, from GeckoTerminal`} format={fmt} />
+        <CandleChart
+          series={bars}
+          title={coinTitle}
+          style={chartStyle}
+          label={`${coinLabel} ${unitLabel}, from GeckoTerminal`}
+          format={fmt}
+        />
       </div>
     );
   }

@@ -1257,6 +1257,51 @@ html:has(.intro), body:has(.intro) { overflow: hidden; }
 .coin__chart-empty .chart__svg {
   background: #fffdf6;
 }
+.qchart {
+  margin: 0;
+  border: 1px solid #292a31;
+  background: #fffdf6;
+  overflow: hidden;
+}
+.qchart__hud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #e4e0d7;
+  background: #f4f0e6;
+  font-size: 11px;
+}
+.qchart__title {
+  font-weight: 700;
+  color: #171b29;
+}
+.qchart__ohlc {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5px;
+  color: #49463f;
+  font-variant-numeric: tabular-nums;
+}
+.qchart__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: crosshair;
+  user-select: none;
+}
+.qchart__tick {
+  fill: #5b574f;
+  font: 9.5px/1 var(--font-mono);
+}
+.qchart__pill-text {
+  fill: #fffdf6;
+  font: 700 9.5px/1 var(--font-mono);
+}
 @container (min-width: 720px) {
   .coin-page .coin__layout {
     grid-template-columns: minmax(0, 1.35fr) minmax(295px, 0.85fr);

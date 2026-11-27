@@ -146,20 +146,20 @@ describe("the page's cards and facts", () => {
     const p = pageOf(true);
     const d = render(<TokenChart page={p} quoteUsd={2000} />);
     const pressed = () => screen.getAllByRole("button").filter((x) => x.getAttribute("aria-pressed") === "true").map((x) => x.textContent);
-    expect(pressed()).toEqual(["1h", "Price"]);
+    expect(pressed()).toEqual(["1h", "Candles", "Price"]);
     expect(d.container.querySelector("svg")).not.toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Market cap" }));
-    expect(pressed()).toEqual(["1h", "Market cap"]);
+    expect(pressed()).toEqual(["1h", "Candles", "Market cap"]);
     expect(screen.getByLabelText(/market cap in USD/)).toBeInTheDocument();
     // a day holds every trade: one candle, placeholder frame with reference line
     const day = Math.floor(AT / 86_400) * 86_400;
     d.unmount();
     const e = render(<TokenChart page={{ ...p, points: [{ at: day + 10, price: 1 }, { at: day + 4000, price: 2 }] }} />);
-    expect(pressed()).toEqual(["1h", "Price"]);
+    expect(pressed()).toEqual(["1h", "Candles", "Price"]);
     await userEvent.click(screen.getByRole("button", { name: "Market cap" }));
     expect(screen.getByLabelText(/market cap in ETH/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "1d" }));
-    expect(pressed()).toEqual(["1d", "Market cap"]);
+    expect(pressed()).toEqual(["1d", "Candles", "Market cap"]);
     expect(screen.getByText("Every trade so far falls in one 1d candle — pick a finer frame.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Each trade" }));
     expect(e.container.querySelector("svg")).not.toBeNull();

@@ -20,7 +20,7 @@ export const FRESH_MS = 120_000;
 export const STALE_MS = 6 * 60 * 60_000;
 
 const NETWORKS = new Set(["base", "robinhood"]);
-const FRAMES: Record<string, readonly number[]> = { hour: [1, 4], day: [1] };
+const FRAMES: Record<string, readonly number[]> = { minute: [1, 5, 15], hour: [1, 4], day: [1] };
 const POOL = /^0x(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/;
 const TOKEN = /^0x[0-9a-fA-F]{40}$/;
 const LIMIT = /^([1-9]|[1-9][0-9]|100)$/;
