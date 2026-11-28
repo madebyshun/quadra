@@ -145,12 +145,12 @@ export function Developers() {
         <Link className="about__brand" to="/about">{BRAND.name}</Link>
         <nav aria-label="Developer navigation">
           <Link to="/docs">Docs</Link>
-          <Link to="/" state={{ fromPage: true }} className="about__button about__button--small">Open Quadra</Link>
+          <Link to="/" state={{ fromPage: true }} className="about__button about__button--small">Open {BRAND.name}</Link>
         </nav>
       </header>
       <main className="docs__main">
         <header className="docs__intro">
-          <h1>Build with <em>Quadra.</em></h1>
+          <h1>Build with <em>{BRAND.name}.</em></h1>
           <p>Read launchpad data on Base, discover available skills and connect an agent.</p>
         </header>
         <div className="docs__layout">
@@ -163,14 +163,14 @@ export function Developers() {
           <article className="docs__article">
             <section className="docs__section" id="launchpad">
               <h2>Launchpad data</h2>
-              <p>Read indexed Quadra launches on Base (chain ID 8453). Send the <code>x-quadra: 1</code> request header.</p>
+              <p>Read indexed {BRAND.name} launches on Base (chain ID 8453). Send the <code>x-quadra: 1</code> request header.</p>
               <ul className="notes">
                 <li><code>GET {INDEXER_PATH}/coins</code> — coin and creator snapshot.</li>
                 <li><code>GET {INDEXER_PATH}/creators</code> — creator snapshot.</li>
                 <li><code>GET {INDEXER_PATH}/coin?token=0x…</code> — a coin’s indexed trades and candles.</li>
               </ul>
               <Crt label="Read launches">{`curl -fsS -H 'x-quadra: 1' "${origin}${INDEXER_PATH}/coins"`}</Crt>
-              <p>To create a coin, trade or collect fees, use the corresponding Quadra app window and review the transaction in your wallet.</p>
+              <p>To create a coin, trade or collect fees, use the corresponding {BRAND.name} app window and review the transaction in your wallet.</p>
             </section>
             <section className="docs__section" id="skills">
               <h2>Skills API</h2>
@@ -179,7 +179,7 @@ export function Developers() {
             </section>
             <section className="docs__section" id="agents">
               <h2>Agent integration</h2>
-              <p>From the Quadra repository, run the bundled stdio MCP server and point your MCP client at the same command.</p>
+              <p>From the {BRAND.name} repository, run the bundled stdio MCP server and point your MCP client at the same command.</p>
               <Crt label="Start the MCP server">node tools/quadra-mcp/index.mjs</Crt>
               <p>Start with <code>quadra_list_tools</code> to discover the tools and their input requirements.</p>
             </section>
@@ -194,7 +194,7 @@ export function Developers() {
       <footer className="about__foot">
         <div className="about__foot-inner docs__footer">
           <span>{BRAND.name} · built on Base</span>
-          <nav aria-label="Developer footer"><Link to="/docs">Product docs</Link><Link to="/about">About Quadra</Link></nav>
+          <nav aria-label="Developer footer"><Link to="/docs">Product docs</Link><Link to="/about">About {BRAND.name}</Link></nav>
         </div>
       </footer>
     </div>

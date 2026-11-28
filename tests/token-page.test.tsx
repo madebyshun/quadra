@@ -6,7 +6,16 @@ import { parseCoinPage, type IndexedCoinPage } from "@/adapters/http/indexer";
 import { BLOCKSCOUT } from "@/skills/blockscout";
 import type { PoolValue } from "@/skills/launchpad";
 import { ago, autoFrame, bucket, CoinMoves, Disclosures, FeeLedger, FRAMES, inBoth, NewLaunches, TokenChart, TokenGuarantees, TokenInfo, TokenPosition, TokenStats, TokenTabs, TokenWarning, useCoinPage } from "@/features/panels/TokenPage";
+import { MemoryRouter } from "react-router-dom";
+import { WETH } from "@/config/chain";
+import { CBBTC } from "@/config/markets";
+import { OpenWindowProvider } from "@/features/openWindow";
+import { TokenWindow } from "@/features/panels/TokenWindow";
+import { WalletProvider } from "@/ui/WalletProvider";
+import { CHARTS_PATH } from "@/server/charts";
+import { STOCKS_PATH } from "@/server/stocks";
 import { copy, FX } from "./fixtures/base";
+import { MARKETS_FX, NVDA_ON_BASE } from "./fixtures/markets";
 import { COINS } from "./fixtures/indexer";
 import { DOWN, net, useNet } from "./net";
 import { AT, served } from "./indexerPage";
@@ -412,5 +421,623 @@ describe("TokenGuarantees & TokenPosition", () => {
     net({ rpc: (m) => (m === "eth_call" ? DOWN : undefined) });
     render(<TokenPosition token={COINS.eth} symbol="TEST" account={COINS.owner} page="reading" value={null} />);
     expect(await screen.findByText(/^Position not checked —/)).toBeInTheDocument();
+  });
+
+  it("renders Top traders with buys/sells and falls back to GeckoTerminal live trades when index fails", async () => {
+    const traderA = "0x1111111111111111111111111111111111111111";
+    const traderB = "0x2222222222222222222222222222222222222222";
+    const poolAddr = "0x3333333333333333333333333333333333333333";
+    net({
+      get: (u) => {
+        if (u.startsWith("https://api.dexscreener.com/")) {
+          return [{ baseToken: { address: COINS.eth, symbol: "TEST", name: "Test" }, pairAddress: poolAddr, priceUsd: "0.01", liquidity: { usd: 5000 } }];
+        }
+        if (u.startsWith("/api/charts/trades")) {
+          return {
+            data: [
+              {
+                attributes: {
+                  block_timestamp: "2026-10-02T07:59:00Z",
+                  tx_hash: `0x${"aa".repeat(32)}`,
+                  kind: "buy",
+                  to_token_amount: "1000",
+                  from_token_amount: "1",
+                  volume_in_usd: "10",
+                  price_to_in_usd: "0.01",
+                  tx_from_address: traderA,
+                },
+              },
+              {
+                attributes: {
+                  block_timestamp: "2026-10-02T07:58:00Z",
+                  tx_hash: `0x${"bb".repeat(32)}`,
+                  kind: "sell",
+                  from_token_amount: "500",
+                  to_token_amount: "0.5",
+                  volume_in_usd: "5",
+                  price_from_in_usd: "0.01",
+                  tx_from_address: traderA,
+                },
+              },
+              {
+                attributes: {
+                  block_timestamp: "2026-10-02T07:57:00Z",
+                  tx_hash: `0x${"cc".repeat(32)}`,
+                  kind: "sell",
+                  from_token_amount: "200",
+                  to_token_amount: "0.2",
+                  volume_in_usd: "2",
+                  price_from_in_usd: "0.01",
+                  tx_from_address: traderB,
+                },
+              },
+            ],
+          };
+        }
+        return undefined;
+      },
+    });
+    render(<TokenTabs token={COINS.eth} page={{ problem: "index down" }} now={Date.parse("2026-10-02T08:00:00Z") / 1000} symbol="TEST" />);
+    expect(await screen.findByText("Live swaps · GeckoTerminal")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Top traders" }));
+    const tbl = await screen.findByRole("table", { name: "Top traders" });
+    expect(tbl).toHaveTextContent("1B / 1S");
+    expect(tbl).toHaveTextContent("0B / 1S");
+  });
+});
+
+describe("TokenWindow", () => {
+  const POOL_ADDR = "0x4444444444444444444444444444444444444444";
+  const TRADER_A = "0x1111111111111111111111111111111111111111";
+  const TRADER_B = "0x2222222222222222222222222222222222222222";
+  const DKNG_ON_BASE = (MARKETS_FX.coinbaseStocks as { tokens: { symbol: string; contract_address: string }[] }).tokens.find((t) => t.symbol === "DKNGc")!.contract_address;
+
+  const poolsPayload = (token: string) => ({
+    data: [
+      {
+        attributes: {
+          address: POOL_ADDR,
+          name: "NVDAc / USDC",
+          reserve_in_usd: "150000",
+          volume_usd: { h24: "50000" },
+          base_token_price_usd: "235",
+          price_change_percentage: { h24: "2.1" },
+        },
+        relationships: { base_token: { data: { id: `base_${token.toLowerCase()}` } }, dex: { data: { id: "uniswap_v4" } } },
+      },
+      {
+        attributes: {
+          address: "0x5555555555555555555555555555555555555555",
+          name: "NVDAc / ETH",
+          reserve_in_usd: null,
+          volume_usd: { h24: null },
+          base_token_price_usd: "234",
+        },
+        relationships: { base_token: { data: { id: `base_${token.toLowerCase()}` } }, dex: { data: { id: "aerodrome" } } },
+      },
+    ],
+  });
+
+  const tradesPayload = {
+    data: [
+      {
+        attributes: {
+          block_timestamp: "2026-10-02T07:59:00Z",
+          tx_hash: `0x${"aa".repeat(32)}`,
+          kind: "buy",
+          to_token_amount: "10",
+          from_token_amount: "2350",
+          volume_in_usd: "2350",
+          price_to_in_usd: "235",
+          tx_from_address: TRADER_A,
+        },
+      },
+      {
+        attributes: {
+          block_timestamp: "2026-10-02T07:58:00Z",
+          tx_hash: `0x${"bb".repeat(32)}`,
+          kind: "sell",
+          from_token_amount: "4",
+          to_token_amount: "940",
+          volume_in_usd: "940",
+          price_from_in_usd: "235",
+          tx_from_address: TRADER_A,
+        },
+      },
+      {
+        attributes: {
+          block_timestamp: "2026-10-02T07:57:00Z",
+          tx_hash: `0x${"cc".repeat(32)}`,
+          kind: "sell",
+          from_token_amount: "5",
+          to_token_amount: "1175",
+          volume_in_usd: null,
+          price_from_in_usd: null,
+          tx_from_address: TRADER_B,
+        },
+      },
+      {
+        attributes: {
+          block_timestamp: "2026-10-02T07:56:00Z",
+          tx_hash: `0x${"dd".repeat(32)}`,
+          kind: "buy",
+          to_token_amount: "1",
+          from_token_amount: "235",
+          volume_in_usd: "235",
+          price_to_in_usd: "235",
+          tx_from_address: null,
+        },
+      },
+    ],
+  };
+
+  const ohlcvPayload = {
+    data: {
+      attributes: {
+        ohlcv_list: [
+          [AT, 230, 236, 229, 235, 1000],
+          [AT + 3600, 235, 240, 234, 238, 1200],
+        ],
+      },
+    },
+  };
+
+  it("renders a Coinbase Base stock with pools, chart range fallback, Buy/Sell, Transactions, Holders, Top traders, and Pools tabs", async () => {
+    const holdersBody = copy(FX.holdersDegen) as { items: { address: { hash: string; name: string | null } }[] };
+    holdersBody.items[0]!.address.hash = UNISWAP_V4_POOL_MANAGER;
+    let ohlcvCalls = 0;
+    net({
+      rpc: () => DOWN,
+      get: (u) => {
+        if (u === `${STOCKS_PATH}/base`) return MARKETS_FX.coinbaseStocks;
+        if (u.startsWith("https://api.dexscreener.com/tokens/v1/base/")) return MARKETS_FX.dexBase;
+        if (u.startsWith(`${CHARTS_PATH}/pools`)) return poolsPayload(NVDA_ON_BASE);
+        if (u.startsWith(`${CHARTS_PATH}/trades`)) return tradesPayload;
+        if (u.startsWith(`${CHARTS_PATH}/ohlcv`)) {
+          ohlcvCalls++;
+          return ohlcvCalls === 1 ? DOWN : ohlcvPayload;
+        }
+        if (u === `${BLOCKSCOUT}/tokens/${NVDA_ON_BASE}/holders`) return holdersBody;
+        return undefined;
+      },
+    });
+    const open = vi.fn();
+    const onTitle = vi.fn();
+    render(
+      <MemoryRouter>
+        <OpenWindowProvider open={open as never}>
+          <WalletProvider>
+            <TokenWindow address={NVDA_ON_BASE} onTitle={onTitle} />
+          </WalletProvider>
+        </OpenWindowProvider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(onTitle).toHaveBeenCalledWith("NVDA"));
+    expect(screen.getByText("Coinbase Stock · Base 8453")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Top DEX pools")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("img", { name: "NVDAc price in USD" })).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "← Stocks" }));
+    expect(open).toHaveBeenCalledWith("stocks");
+    await userEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
+    expect(open).toHaveBeenCalledWith("wallet");
+
+    await userEvent.click(screen.getByRole("button", { name: "Sell NVDA" }));
+    await userEvent.click(screen.getByRole("button", { name: "ETH" }));
+    await userEvent.click(screen.getByRole("button", { name: "Buy NVDA" }));
+    await userEvent.click(screen.getByRole("button", { name: "USDC" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "7D" }));
+    await userEvent.click(screen.getByRole("button", { name: "Line" }));
+    await userEvent.click(screen.getByRole("button", { name: "Candles" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Buy" }));
+    await userEvent.click(screen.getByRole("button", { name: "Sell" }));
+    await userEvent.click(screen.getByRole("button", { name: "All" }));
+
+    await userEvent.click(screen.getByRole("tab", { name: "Holders" }));
+    const hList = await screen.findByRole("list", { name: "Top holders" });
+    expect(hList).toHaveTextContent("— Uniswap v4 PoolManager");
+    expect(hList).toHaveTextContent("— TransparentUpgradeableProxy");
+
+    await userEvent.click(screen.getByRole("tab", { name: "Top traders" }));
+    const tTable = screen.getByRole("table", { name: "Top traders" });
+    expect(tTable).toHaveTextContent("1B / 1S");
+    expect(tTable).toHaveTextContent("0B / 1S");
+
+    await userEvent.click(screen.getByRole("tab", { name: "Pools" }));
+    expect(screen.getByRole("table", { name: "Token DEX pools" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Pool details")).toHaveTextContent("Coinbase Tokenized Stocks");
+  });
+
+  it("renders a paused stock, WETH, known crypto, and unknown ERC-20 with empty/error states", async () => {
+    net({
+      rpc: () => DOWN,
+      get: (u) => {
+        if (u === `${STOCKS_PATH}/base`) return MARKETS_FX.coinbaseStocks;
+        if (u.startsWith("https://api.dexscreener.com/")) return [];
+        if (u.startsWith(`${CHARTS_PATH}/pools`)) return DOWN;
+        if (u.startsWith(`${BLOCKSCOUT}/tokens/`)) return DOWN;
+        return undefined;
+      },
+    });
+    const a = render(
+      <MemoryRouter>
+        <TokenWindow address={DKNG_ON_BASE} />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(/transfers are paused on its token contract/)).toBeInTheDocument();
+    expect(screen.getByText(/No chart candles available/)).toBeInTheDocument();
+    expect(screen.getByText("No recent DEX swaps indexed for this pool yet.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Holders" }));
+    expect(await screen.findByText(/^Holders not checked —/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Top traders" }));
+    expect(screen.getByText("No trader wallets indexed yet.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Pools" }));
+    expect(screen.getByLabelText("Pool details")).toHaveTextContent("not read");
+    a.unmount();
+
+    net({
+      rpc: () => DOWN,
+      get: (u) => {
+        if (u === `${STOCKS_PATH}/base`) return { tokens: [] };
+        if (u.startsWith("https://api.dexscreener.com/")) return [];
+        if (u.startsWith(`${CHARTS_PATH}/pools`)) return { data: [] };
+        if (u.startsWith(`${BLOCKSCOUT}/tokens/`)) return { items: [] };
+        return undefined;
+      },
+    });
+    const open = vi.fn();
+    const onWethTitle = vi.fn();
+    const b = render(
+      <MemoryRouter>
+        <OpenWindowProvider open={open as never}>
+          <TokenWindow address={WETH.address} onTitle={onWethTitle} />
+        </OpenWindowProvider>
+      </MemoryRouter>,
+    );
+    await screen.findByText("Base 8453");
+    expect(onWethTitle).toHaveBeenCalledWith("ETH");
+    await userEvent.click(screen.getByRole("button", { name: "← Markets" }));
+    expect(open).toHaveBeenCalledWith("markets");
+    await userEvent.click(screen.getByRole("tab", { name: "Holders" }));
+    expect(await screen.findByText("No holders indexed yet.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Pools" }));
+    expect(screen.getByLabelText("Pool details")).toHaveTextContent("not read");
+    b.unmount();
+
+    const c = render(
+      <MemoryRouter>
+        <TokenWindow address={CBBTC.address} />
+      </MemoryRouter>,
+    );
+    await screen.findByText("cbBTC (cbBTC)");
+    c.unmount();
+
+    const unknownAddr = "0x9999999999999999999999999999999999999999";
+    const d = render(
+      <MemoryRouter>
+        <TokenWindow address={unknownAddr} />
+      </MemoryRouter>,
+    );
+    await screen.findByText("0x9999…9999 (0x9999…9999)");
+    d.unmount();
+
+    // 4) Connect wallet without openWindow
+    const e = render(
+      <MemoryRouter>
+        <WalletProvider>
+          <TokenWindow address={CBBTC.address} />
+        </WalletProvider>
+      </MemoryRouter>,
+    );
+    await screen.findByText("cbBTC (cbBTC)");
+    await userEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
+    e.unmount();
+
+    // 5) Launch-ready stock shows Launch with NVDA button
+    const enabledQuote = `0x${"0".repeat(63)}1${"0".repeat(64)}`;
+    net({
+      rpc: (m) => (m === "eth_call" ? enabledQuote : undefined),
+      get: (u) => {
+        if (u === `${STOCKS_PATH}/base`) return MARKETS_FX.coinbaseStocks;
+        if (u.startsWith("https://api.dexscreener.com/")) return MARKETS_FX.dexBase;
+        if (u.startsWith(`${CHARTS_PATH}/pools`)) return { data: [] };
+        if (u.startsWith(`${CHARTS_PATH}/trades`)) return { data: [] };
+        if (u.startsWith(`${CHARTS_PATH}/ohlcv`)) return DOWN;
+        return undefined;
+      },
+    });
+    const openLaunch = vi.fn();
+    const f = render(
+      <MemoryRouter>
+        <OpenWindowProvider open={openLaunch as never}>
+          <TokenWindow address={NVDA_ON_BASE} />
+        </OpenWindowProvider>
+      </MemoryRouter>,
+    );
+    await userEvent.click(await screen.findByRole("button", { name: "Launch with NVDA" }));
+    expect(openLaunch).toHaveBeenCalledWith("launch", { pair: NVDA_ON_BASE });
+    f.unmount();
+
+    // 6) AMD stock (nav: null in Pools tab) + US restricted region (stock && closed banner) + no factory
+    const { forgetRegion } = await import("@/lib/region");
+    const AMD_ON_BASE = "0xB2000000000000000000000d8Ce462E99ee7A47B";
+    const prevV3 = CONTRACTS.launchFactoryV3;
+    const prevV2 = CONTRACTS.launchFactory;
+    (CONTRACTS as { launchFactoryV3: string | null; launchFactory: string | null }).launchFactoryV3 = null;
+    (CONTRACTS as { launchFactoryV3: string | null; launchFactory: string | null }).launchFactory = null;
+    forgetRegion();
+    net({
+      rpc: () => DOWN,
+      get: (u) => {
+        if (u === "/api/region") return { country: "US" };
+        if (u === `${STOCKS_PATH}/base`) return MARKETS_FX.coinbaseStocks;
+        if (u.startsWith("https://api.dexscreener.com/")) return [];
+        if (u.startsWith(`${CHARTS_PATH}/pools`)) return { data: [] };
+        return undefined;
+      },
+    });
+    const g = render(
+      <MemoryRouter>
+        <TokenWindow address={AMD_ON_BASE} />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(/not offered where you are/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Pools" }));
+    expect(screen.getByLabelText("Pool details")).toHaveTextContent("not published");
+    g.unmount();
+    (CONTRACTS as { launchFactoryV3: string | null; launchFactory: string | null }).launchFactoryV3 = prevV3;
+    (CONTRACTS as { launchFactoryV3: string | null; launchFactory: string | null }).launchFactory = prevV2;
+    forgetRegion();
+
+    // 7) Launched coin resolution -> CoinPage + onTitle + onBack
+    const { chainRoutes, getRoutes, T: LAUNCHED_T } = await import("./launchpadChain");
+    (CONTRACTS as { launchFactoryV3: string | null; launchFactory: string | null }).launchFactoryV3 = null;
+    (CONTRACTS as { launchFactoryV3: string | null; launchFactory: string | null }).launchFactory = null;
+    try {
+      net({
+        rpc: chainRoutes(),
+        get: (u) => (u === `${STOCKS_PATH}/base` ? { tokens: [] } : getRoutes()(u)),
+      });
+      const openCoin = vi.fn();
+      const onCoinTitle = vi.fn();
+      const h = render(
+        <MemoryRouter>
+          <OpenWindowProvider open={openCoin as never}>
+            <WalletProvider>
+              <TokenWindow address={LAUNCHED_T} onTitle={onCoinTitle} />
+            </WalletProvider>
+          </OpenWindowProvider>
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(onCoinTitle).toHaveBeenCalledWith("test"));
+      await userEvent.click(await screen.findByRole("button", { name: "← All coins" }));
+      expect(openCoin).toHaveBeenCalledWith("coins");
+      h.unmount();
+    } finally {
+      (CONTRACTS as { launchFactoryV3: string | null; launchFactory: string | null }).launchFactoryV3 = prevV3;
+      (CONTRACTS as { launchFactoryV3: string | null; launchFactory: string | null }).launchFactory = prevV2;
+    }
+
+    // 8) Unknown ERC-20 where chainToken succeeds + unmount mid-fetch
+    const customAddr = "0x8888888888888888888888888888888888888888";
+    const { contractAt, ethCalls } = await import("./net");
+    const { erc20Abi } = await import("viem");
+    const customRpc = ethCalls({ [customAddr]: contractAt(erc20Abi, { name: "Custom Token", symbol: "CUST", decimals: 6, totalSupply: 1_000_000n }) });
+    net({
+      rpc: (m, p) => customRpc(m, p) ?? DOWN,
+      get: (u) => {
+        if (u === `${STOCKS_PATH}/base`) return { tokens: [] };
+        if (u.startsWith("https://api.dexscreener.com/")) return [];
+        if (u.startsWith(`${CHARTS_PATH}/pools`)) return { data: [] };
+        if (u.startsWith("https://base.blockscout.com/")) return { items: [] };
+        return undefined;
+      },
+    });
+    const i = render(
+      <MemoryRouter>
+        <TokenWindow address={customAddr} />
+      </MemoryRouter>,
+    );
+    await screen.findByText("CUST (CUST)");
+    i.unmount();
+
+    // Unmount mid-fetch
+    render(
+      <MemoryRouter>
+        <TokenWindow address={NVDA_ON_BASE} />
+      </MemoryRouter>,
+    ).unmount();
+    await act(async () => {});
+  });
+
+  it("covers remaining TokenPage branches (TokenStats market trades, TokenChart Line & Tier-3 range, TopTraders reading/empty)", async () => {
+    const mkt = { pair: POOL_ADDR, dex: "uniswap", base: COINS.eth, quote: "USDC", priceUsd: 0.01, liquidityUsd: 5000, volume24h: 1000, buys24h: 3, sells24h: null, change: { m5: null, h1: null, h6: null, h24: null }, createdAt: null, url: null, symbol: "TEST", marketCap: null };
+    const s1 = render(<TokenStats page={{ problem: "x" }} value={null} holders={null} market={mkt} />);
+    expect(screen.getByLabelText("Numbers")).toHaveTextContent("3 trades · DexScreener");
+    s1.unmount();
+    const s2 = render(<TokenStats page={{ problem: "x" }} value={null} holders={null} market={{ ...mkt, buys24h: null, sells24h: 2 }} />);
+    expect(screen.getByLabelText("Numbers")).toHaveTextContent("2 trades · DexScreener");
+    s2.unmount();
+
+    // TokenChart: click Line button + Tier 3 range button + auto-fallback 15m -> 1D
+    let calls = 0;
+    net({
+      get: (u) => {
+        if (u.startsWith("https://api.dexscreener.com/")) return [{ baseToken: { address: COINS.eth, symbol: "TEST", name: "Test" }, pairAddress: POOL_ADDR, priceUsd: "0.01", liquidity: { usd: 5000 } }];
+        if (u.startsWith(`${CHARTS_PATH}/ohlcv`)) return ++calls === 1 ? DOWN : ohlcvPayload;
+        return undefined;
+      },
+    });
+    const c1 = render(<TokenChart page={{ problem: "down" }} token={COINS.eth} symbol="TEST" value={null} />);
+    await waitFor(() => expect(screen.getByText("GeckoTerminal · USD")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Line" }));
+    c1.unmount();
+
+    net({ get: (u) => (u.startsWith("https://api.dexscreener.com/") ? [] : undefined) });
+    const c2 = render(<TokenChart page={{ problem: "down" }} token={COINS.eth} symbol="TEST" value={null} />);
+    await waitFor(() => expect(screen.getByText("No chart: down")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "7D" }));
+    c2.unmount();
+
+    // TokenTabs: Top traders while reading + empty traders
+    const t1 = render(<TokenTabs token={COINS.eth} page="reading" now={AT} />);
+    await userEvent.click(screen.getByRole("tab", { name: "Top traders" }));
+    expect(screen.getByText("Reading top traders…")).toBeInTheDocument();
+    t1.unmount();
+    const p = pageOf();
+    const t2 = render(<TokenTabs token={COINS.eth} page={{ ...p, trades: [] }} now={AT} />);
+    await userEvent.click(screen.getByRole("tab", { name: "Top traders" }));
+    expect(screen.getByText("No trader wallets indexed yet.")).toBeInTheDocument();
+    t2.unmount();
+
+    // TopTraders tie-breaker (equal volUsd = 0, different trade count) + TokenChart unmount mid-fetch
+    const t3 = render(
+      <TokenTabs
+        token={COINS.eth}
+        page={{
+          ...p,
+          trades: [
+            { at: AT, tx: "0x1", side: "buy", tokens: 10, quote: 1, price: 0.1, fee: 0, feeIn: "quote", trader: TRADER_A },
+            { at: AT + 1, tx: "0x2", side: "buy", tokens: 10, quote: 1, price: 0.1, fee: 0, feeIn: "quote", trader: TRADER_B },
+            { at: AT + 2, tx: "0x3", side: "sell", tokens: 5, quote: 0.5, price: 0.1, fee: 0, feeIn: "quote", trader: TRADER_B },
+          ],
+        }}
+        quoteUsd={null}
+        now={AT + 10}
+      />,
+    );
+    await userEvent.click(screen.getByRole("tab", { name: "Top traders" }));
+    expect(screen.getByRole("table", { name: "Top traders" })).toHaveTextContent("1B / 1S");
+    t3.unmount();
+
+    net({ get: () => new Promise<Response>(() => {}) });
+    render(<TokenChart page={{ problem: "down" }} token={COINS.eth} symbol="TEST" value={null} />).unmount();
+
+    // TokenWindow: bestPool null + spot.pool present -> "Base" title, nav!=null & navAt=null in Pools tab, trader tie-break, and unmount mid-fetch
+    const { forgetCatalog } = await import("@/adapters/http/markets");
+    forgetCatalog();
+    const noDateStocks = {
+      tokens: [{ symbol: "NVDAc", name: "NVIDIA", contract_address: NVDA_ON_BASE, decimals: 8, multiplier: 1, nav_price: 230, nav_price_updated_at: null, paused_features: [] }],
+    };
+    net({
+      rpc: () => DOWN,
+      get: (u) => {
+        if (u === `${STOCKS_PATH}/base`) return noDateStocks;
+        if (u.startsWith("https://api.dexscreener.com/")) return MARKETS_FX.dexBase;
+        if (u.startsWith(`${CHARTS_PATH}/pools`)) return { data: [] };
+        if (u.startsWith(`${CHARTS_PATH}/ohlcv`)) return ohlcvPayload;
+        if (u.startsWith(`${CHARTS_PATH}/trades`)) {
+          return {
+            data: [
+              { attributes: { block_timestamp: "2026-10-02T07:59:00Z", tx_hash: "0x1", kind: "buy", to_token_amount: "1", volume_in_usd: null, tx_from_address: TRADER_A } },
+              { attributes: { block_timestamp: "2026-10-02T07:58:00Z", tx_hash: "0x2", kind: "buy", to_token_amount: "1", volume_in_usd: null, tx_from_address: TRADER_B } },
+              { attributes: { block_timestamp: "2026-10-02T07:57:00Z", tx_hash: "0x3", kind: "sell", from_token_amount: "1", volume_in_usd: null, tx_from_address: TRADER_B } },
+            ],
+          };
+        }
+        return undefined;
+      },
+    });
+    const tw = render(
+      <MemoryRouter>
+        <TokenWindow address={NVDA_ON_BASE} />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByRole("img", { name: "NVDAc price in USD" })).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("tab", { name: "Top traders" }));
+    expect(screen.getByRole("table", { name: "Top traders" })).toHaveTextContent("1B / 1S");
+    await userEvent.click(screen.getByRole("tab", { name: "Pools" }));
+    expect(screen.getByLabelText("Pool details")).toHaveTextContent("$230.00");
+    tw.unmount();
+
+    // Deferred unmount tests to cover all 4 `if (!live) return` guards in TokenWindow
+    const { contractAt, ethCalls } = await import("./net");
+    const { erc20Abi } = await import("viem");
+    const { chainRoutes, getRoutes, T: LAUNCHED_T2 } = await import("./launchpadChain");
+
+    // 1) Unknown ERC-20 unmounted while chainToken is pending (line 108)
+    const customAddr2 = "0x7777777777777777777777777777777777777777";
+    const customRpc2 = ethCalls({ [customAddr2]: contractAt(erc20Abi, { name: "Late", symbol: "LATE", decimals: 18, totalSupply: 1n }) });
+    net({
+      rpc: (m, p) => customRpc2(m, p) ?? DOWN,
+      get: (u) => (u === `${STOCKS_PATH}/base` ? { tokens: [] } : u.startsWith("https://api.dexscreener.com/") ? [] : u.startsWith(`${CHARTS_PATH}/pools`) ? { data: [] } : undefined),
+    });
+    const baseFetch1 = globalThis.fetch;
+    let rel1!: () => void;
+    const gate1 = new Promise<void>((r) => (rel1 = r));
+    vi.stubGlobal("fetch", (u: string, i?: RequestInit) => {
+      if (typeof i?.body === "string" && i.body.toLowerCase().includes(`"to":"${customAddr2.toLowerCase()}"`)) {
+        return gate1.then(() => baseFetch1(u, i));
+      }
+      return baseFetch1(u, i);
+    });
+    const u1 = render(<MemoryRouter><TokenWindow address={customAddr2} /></MemoryRouter>);
+    for (let k = 0; k < 6; k++) await act(async () => {});
+    u1.unmount();
+    rel1();
+    for (let k = 0; k < 4; k++) await act(async () => {});
+
+    // 2) Launched coin unmounted while chainToken is pending (line 85)
+    const prevV3b = CONTRACTS.launchFactoryV3;
+    const prevV2b = CONTRACTS.launchFactory;
+    (CONTRACTS as { launchFactoryV3: string | null; launchFactory: string | null }).launchFactoryV3 = null;
+    (CONTRACTS as { launchFactoryV3: string | null; launchFactory: string | null }).launchFactory = null;
+    try {
+      net({
+        rpc: chainRoutes(),
+        get: (u) => (u === `${STOCKS_PATH}/base` ? { tokens: [] } : getRoutes()(u)),
+      });
+      const baseFetch2 = globalThis.fetch;
+      let rel2!: () => void;
+      const gate2 = new Promise<void>((r) => (rel2 = r));
+      vi.stubGlobal("fetch", (u: string, i?: RequestInit) => {
+        if (typeof i?.body === "string" && i.body.toLowerCase().includes(`"to":"${LAUNCHED_T2.toLowerCase()}"`)) {
+          return gate2.then(() => baseFetch2(u, i));
+        }
+        return baseFetch2(u, i);
+      });
+      const u2 = render(<MemoryRouter><WalletProvider><TokenWindow address={LAUNCHED_T2} /></WalletProvider></MemoryRouter>);
+      for (let k = 0; k < 6; k++) await act(async () => {});
+      u2.unmount();
+      rel2();
+      for (let k = 0; k < 4; k++) await act(async () => {});
+    } finally {
+      (CONTRACTS as { launchFactoryV3: string | null; launchFactory: string | null }).launchFactoryV3 = prevV3b;
+      (CONTRACTS as { launchFactoryV3: string | null; launchFactory: string | null }).launchFactory = prevV2b;
+    }
+
+    // 3) Stock MarketTokenDetail unmounted while launchPairs & candles are pending (lines 208 & 243)
+    forgetCatalog();
+    const enabledQuote3 = `0x${"0".repeat(63)}1${"0".repeat(64)}`;
+    net({
+      rpc: (m) => (m === "eth_call" ? enabledQuote3 : undefined),
+      get: (u) => {
+        if (u === `${STOCKS_PATH}/base`) return noDateStocks;
+        if (u.startsWith("https://api.dexscreener.com/")) return MARKETS_FX.dexBase;
+        if (u.startsWith(`${CHARTS_PATH}/pools`)) return { data: [] };
+        if (u.startsWith(`${CHARTS_PATH}/trades`)) return { data: [] };
+        if (u.startsWith(`${CHARTS_PATH}/ohlcv`)) return ohlcvPayload;
+        return undefined;
+      },
+    });
+    const baseFetch3 = globalThis.fetch;
+    let rel3!: () => void;
+    const gate3 = new Promise<void>((r) => (rel3 = r));
+    vi.stubGlobal("fetch", (u: string, i?: RequestInit) => {
+      if (String(u).startsWith(`${CHARTS_PATH}/ohlcv`) || (typeof i?.body === "string" && i.body.includes("0000000000000000000000000000000000000000"))) {
+        return gate3.then(() => baseFetch3(u, i));
+      }
+      return baseFetch3(u, i);
+    });
+    const u3 = render(<MemoryRouter><TokenWindow address={NVDA_ON_BASE} /></MemoryRouter>);
+    await screen.findByText("NVDA (NVDAc)");
+    u3.unmount();
+    rel3();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    forgetCatalog();
   });
 });

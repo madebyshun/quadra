@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, encodeFunctionResult, erc20Abi, parseAbiParameters } from "viem";
 import { BASE, CONTRACTS, UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
 import { DYNAMIC_FEE_FLAG, feePercent, LAUNCH_HOOK_ABI, LAUNCHPAD_V3_ABI, LAUNCHPAD_V3_EXPECTS } from "@/config/launchpad";
@@ -534,9 +535,11 @@ describe("the Launch window on v3", () => {
         (m === "eth_getBalance" ? `0x${(10n ** 18n).toString(16)}` : m === "eth_getTransactionReceipt" ? { status: "0x1", blockNumber: "0x5", logs: [LAUNCHED_LOG] } : calls(m, p)),
     });
     render(
-      <WalletProvider>
-        <BaseLaunch />
-      </WalletProvider>,
+      <MemoryRouter>
+        <WalletProvider>
+          <BaseLaunch />
+        </WalletProvider>
+      </MemoryRouter>,
     );
     await act(async () => {});
     const fees = screen.getByRole("group", { name: "Fee" });
@@ -570,9 +573,11 @@ describe("the Launch window on v3", () => {
     wallet();
     net({ get: () => DOWN, rpc: (m, p) => ethCalls({})(m, p) ?? DOWN });
     render(
-      <WalletProvider>
-        <BaseLaunch />
-      </WalletProvider>,
+      <MemoryRouter>
+        <WalletProvider>
+          <BaseLaunch />
+        </WalletProvider>
+      </MemoryRouter>,
     );
     await act(async () => {});
     expect(screen.queryByRole("group", { name: "Fee" })).not.toBeInTheDocument();

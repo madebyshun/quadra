@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { decodeFunctionData } from "viem";
 import { CoinRewards } from "@/features/panels/CoinRewards";
-import { FURNACE_ABI } from "@/lib/furnace";
 import { settle } from "./helpers";
 
 /**
@@ -274,47 +272,19 @@ describe("a coin's furnace", () => {
     chainToken.mockResolvedValue({ symbol: "AAPLc", decimals: 8 });
   });
 
-  it("shows what it burnt, what it spent and what waits — and anyone may harvest", async () => {
-    render(<CoinRewards token={COIN} symbol="QUADRA" record={recordTo(FURNACE)} />);
+  it("hides the manual furnace and harvest UI because harvesting is automated on-chain", async () => {
+    const { container } = render(<CoinRewards token={COIN} symbol="QUADRA" record={recordTo(FURNACE)} />);
     await settle();
-    const box = screen.getByRole("group", { name: "QUADRA's furnace" });
-    expect(box).toHaveTextContent("50% to burning QUADRA");
-    expect(screen.getByLabelText("Furnace")).toHaveTextContent(/QUADRA burnt3,000,000 — 1,000,000 from fees, 2,000,000 bought back/);
-    expect(screen.getByLabelText("Furnace")).toHaveTextContent("0.056855 AAPLc");
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole("group", { name: "QUADRA's furnace" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Harvest fees" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Buy back & burn" })).toBeNull();
-    fireEvent.click(button("Harvest fees"));
-    await settle();
-    expect(sendTransaction).toHaveBeenCalledWith(provider, ME, expect.objectContaining({ to: FURNACE }));
-    expect(furnaceOf).toHaveBeenCalledTimes(2);
   });
 
-  it("offers the buyback to the treasury alone, at a floor 1% under the quote; a quote that fails says so", async () => {
+  it("keeps the furnace block hidden for the treasury wallet too", async () => {
     session = { wallet: { kind: "ready", account: TREASURY }, signingProvider: () => provider };
-    quoteV4.mockRejectedValueOnce(new Error("Uniswap's quoter could not fill this swap")).mockResolvedValue({ amountOut: 10_000n, gasEstimate: 1n });
-    render(<CoinRewards token={COIN} symbol="QUADRA" record={recordTo(FURNACE)} />);
+    const { container } = render(<CoinRewards token={COIN} symbol="QUADRA" record={recordTo(FURNACE)} />);
     await settle();
-    fireEvent.click(button("Buy back & burn"));
-    await settle();
-    expect(screen.getByText("Uniswap's quoter could not fill this swap")).toBeInTheDocument();
-    fireEvent.click(button("Buy back & burn"));
-    await settle();
-    expect(quoteV4).toHaveBeenLastCalledWith(pool.key, true, 5_685_590n);
-    const data = (sendTransaction.mock.calls[0]![2] as { data: `0x${string}` }).data;
-    expect(decodeFunctionData({ abi: FURNACE_ABI, data })).toMatchObject({ functionName: "buyAndBurn", args: [5_685_590n, 9_900n] });
-  });
-
-  it("asks for a wallet to harvest; nothing waiting, nothing to buy back; a coin whose currency0 is the coin", async () => {
-    session = { wallet: null, signingProvider: () => provider };
-    const a = render(<CoinRewards token={COIN} symbol="QUADRA" record={recordTo(FURNACE)} />);
-    await settle();
-    expect(button("Connect a wallet to harvest")).toBeDisabled();
-    a.unmount();
-    session = { wallet: { kind: "ready", account: TREASURY }, signingProvider: () => provider };
-    furnaceOf.mockResolvedValue({ ...furnace, toBuy: 0n });
-    poolKeyOf.mockResolvedValue({ ...pool, tokenIs0: true, key: { ...pool.key, currency0: COIN, currency1: AAPL } });
-    render(<CoinRewards token={COIN} symbol="QUADRA" record={recordTo(FURNACE)} />);
-    await settle();
-    expect(button("Buy back & burn")).toBeDisabled();
-    expect(screen.getByLabelText("Furnace")).toHaveTextContent("0 AAPLc");
+    expect(container).toBeEmptyDOMElement();
   });
 });

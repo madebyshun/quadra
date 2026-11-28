@@ -207,19 +207,18 @@ export function ProfilePanel() {
     if ((await collecting.run(signingProvider(), me!, steps)) !== null) setFresh((n) => n + 1);
   };
 
-  const origin = typeof window !== "undefined" && window.location?.origin ? window.location.origin : "https://quadracomputer.xyz";
+  const origin = window.location.origin;
   const referralUrl = address ? `${origin}/?do=launch&ref=${address}` : "";
   const profileUrl = address ? `${origin}/?do=profile&a=${address}` : "";
 
   const copyText = (which: "ref" | "profile" | "addr", text: string) => {
-    navigator.clipboard?.writeText(text).catch(() => {});
+    void navigator.clipboard?.writeText(text).catch(() => {});
     setCopied(which);
     setTimeout(() => setCopied((c) => (c === which ? null : c)), 1800);
   };
 
   const onSaveMeta = () => {
-    if (!address) return;
-    saveCreatorProfile(address, meta);
+    saveCreatorProfile(address!, meta);
     setSavedNotice(true);
     setTimeout(() => setSavedNotice(false), 2000);
   };

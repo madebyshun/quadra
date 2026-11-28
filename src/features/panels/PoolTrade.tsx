@@ -116,7 +116,6 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
   const outDec = side === "buy" ? LAUNCHPAD_DECIMALS : pool.quoteDecimals;
   const zeroForOne = zeroForOneFor(pool, side);
   const isBuy = side === "buy";
-  const isSell = side === "sell";
   const buyPresets = isBuy ? buyPresetsFor(pool.quoteSymbol) : null;
 
   const onReview = async () => {
@@ -189,7 +188,7 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
               </button>
             ))}
           </div>
-        ) : isSell ? (
+        ) : (
           <div className="pt__presets" role="group" aria-label="Quick sell percentage">
             {SELL_PCT_PRESETS.map((pct) => (
               <button
@@ -198,8 +197,7 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
                 className="pt__preset"
                 disabled={sellBalance === null || sellBalance === 0n}
                 onClick={() => {
-                  if (sellBalance === null || sellBalance === 0n) return;
-                  const raw = pct === 100 ? sellBalance : (sellBalance * BigInt(pct)) / 100n;
+                  const raw = pct === 100 ? sellBalance! : (sellBalance! * BigInt(pct)) / 100n;
                   setAmount(formatUnits(raw, LAUNCHPAD_DECIMALS));
                   setReview(null);
                 }}
@@ -208,7 +206,7 @@ export function PoolTrade({ token, symbol, side }: { token: string; symbol: stri
               </button>
             ))}
           </div>
-        ) : null}
+        )}
       </div>
       <div className="pt__slip">
         <span>Max slippage</span>

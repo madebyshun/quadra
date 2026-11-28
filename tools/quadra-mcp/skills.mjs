@@ -7171,9 +7171,64 @@ async function quoteOf(factory, quote2) {
   const [enabled, startTick] = decodeFunctionResult({ abi: LAUNCHPAD_ABI, functionName: "quotes", data: await ethCall(factory, data) });
   return { enabled, startTick };
 }
-var ECOSYSTEM_QUOTES = [
-  ...CONTRACTS.token ? [{ address: toChecksumAddress(CONTRACTS.token), symbol: BRAND.ticker.replace("$", ""), name: BRAND.name, decimals: 18 }] : []
+var ECOSYSTEM_QUOTES = CONTRACTS.token ? [{ address: toChecksumAddress(CONTRACTS.token), symbol: BRAND.ticker.replace("$", ""), name: BRAND.name, decimals: 18 }] : [];
+var MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11";
+var MULTICALL3_ABI = [
+  {
+    type: "function",
+    name: "aggregate3",
+    stateMutability: "payable",
+    inputs: [
+      {
+        name: "calls",
+        type: "tuple[]",
+        components: [
+          { name: "target", type: "address" },
+          { name: "allowFailure", type: "bool" },
+          { name: "callData", type: "bytes" }
+        ]
+      }
+    ],
+    outputs: [
+      {
+        name: "returnData",
+        type: "tuple[]",
+        components: [
+          { name: "success", type: "bool" },
+          { name: "returnData", type: "bytes" }
+        ]
+      }
+    ]
+  }
 ];
+async function quotesBatch(factory, addresses) {
+  if (addresses.length === 0) return [];
+  if (addresses.length > 20) {
+    try {
+      const calls = addresses.map((addr) => ({
+        target: factory,
+        allowFailure: true,
+        callData: encodeFunctionData({ abi: LAUNCHPAD_ABI, functionName: "quotes", args: [addr] })
+      }));
+      const data = encodeFunctionData({ abi: MULTICALL3_ABI, functionName: "aggregate3", args: [calls] });
+      const raw = await ethCall(MULTICALL3, data);
+      const results = decodeFunctionResult({ abi: MULTICALL3_ABI, functionName: "aggregate3", data: raw });
+      if (results.length === addresses.length) {
+        return results.map((r) => {
+          if (!r.success || r.returnData === "0x") return { enabled: false, startTick: 0, checked: false };
+          const [enabled, startTick] = decodeFunctionResult({ abi: LAUNCHPAD_ABI, functionName: "quotes", data: r.returnData });
+          return { enabled, startTick, checked: true };
+        });
+      }
+    } catch {
+    }
+  }
+  return Promise.all(
+    addresses.map(
+      (addr) => quoteOf(factory, addr).then((q) => ({ ...q, checked: true })).catch(() => ({ enabled: false, startTick: 0, checked: false }))
+    )
+  );
+}
 async function launchPairs(factory) {
   const eth = await quoteOf(factory, ETH_QUOTE2);
   const pairs = eth.enabled ? [{ address: ETH_QUOTE2, symbol: "ETH", name: "Ether", decimals: 18, startTick: eth.startTick }] : [];
@@ -7183,19 +7238,28 @@ async function launchPairs(factory) {
   } catch (e) {
     return { pairs, problem: messageOf(e) };
   }
-  const live = stocks.filter((st) => !st.paused.includes(0) && st.nav !== null);
+  const live = stocks.filter((st) => !st.paused.includes(0));
   const tokenQuotes = [...ECOSYSTEM_QUOTES, ...TRADE_CRYPTO];
   const [cryptoQuotes, stockQuotes] = await Promise.all([
-    Promise.all(tokenQuotes.map(async (c) => ({ c, q: await quoteOf(factory, c.address).catch(() => ({ enabled: false, startTick: 0 })) }))),
-    Promise.all(live.map(async (st) => ({ st, q: await quoteOf(factory, st.address) })))
+    Promise.all(
+      tokenQuotes.map(async (c) => ({
+        c,
+        q: await quoteOf(factory, c.address).then((q) => ({ ...q, checked: true })).catch(() => ({ enabled: false, startTick: 0, checked: false }))
+      }))
+    ),
+    quotesBatch(factory, live.map((st) => st.address)).then((qs) => live.map((st, i) => ({ st, q: qs[i] })))
   ]);
+  let unchecked = 0;
   for (const { c, q } of cryptoQuotes) {
-    if (q.enabled) pairs.push({ address: c.address, symbol: c.symbol, name: c.name, decimals: c.decimals, startTick: q.startTick });
+    if (!q.checked) unchecked++;
+    else if (q.enabled) pairs.push({ address: c.address, symbol: c.symbol, name: c.name, decimals: c.decimals, startTick: q.startTick });
   }
   for (const { st, q } of stockQuotes) {
-    if (q.enabled) pairs.push({ address: st.address, symbol: st.symbol, name: st.name, decimals: st.decimals, startTick: q.startTick });
+    if (!q.checked) unchecked++;
+    else if (q.enabled) pairs.push({ address: st.address, symbol: st.symbol, name: st.name, decimals: st.decimals, startTick: q.startTick });
   }
-  return { pairs, problem: null };
+  const problem = unchecked > 0 ? `${unchecked} pair${unchecked === 1 ? "" : "s"} not checked \u2014 Base RPC did not answer.` : null;
+  return { pairs, problem };
 }
 var GETTERS2 = LAUNCHPAD_ABI.filter(
   (item) => item.type === "function" && item.stateMutability === "view" && item.inputs.length === 0

@@ -12,10 +12,16 @@ import {
   folderItems,
   folderOf,
   isFolder,
+  isTokenWindow,
+  registerTokenLabel,
+  tokenAddressOf,
+  tokenWindowId,
   visibleFeatures,
+  windowTitle,
   resolveFeature,
   isEnabled,
 } from "@/features/registry";
+import { Icon } from "@/ui/icons";
 import { FLAGS } from "@/config/chain";
 
 const flags = vi.hoisted(() => ({ robinhood: false, allOn: false }));
@@ -46,6 +52,7 @@ const SHIPPED_IDS = [
   "bridge",
   "launch",
   "coins",
+  "stocks",
   "profile",
   "taskmgr",
   "rugsweeper",
@@ -181,8 +188,8 @@ describe("visibleFeatures", () => {
 describe("the desktop's folders (2026-10-21)", () => {
   const ids = () => desktopItems().map((e) => e.id);
 
-  it("keeps Markets, Send, Swap, Check, Weekend, Coins, Launch, Wallet, Agents and My Computer on the desktop", () => {
-    expect(ids()).toEqual(["markets", "send", "swap", "safety", "weekend", "coins", "launch", "wallet", "folder-agents", "computer"]);
+  it("keeps Markets, Stocks, Send, Swap, Check, Weekend, Coins, Launch, Profile, Wallet, Agents and My Computer on the desktop", () => {
+    expect(ids()).toEqual(["markets", "stocks", "send", "swap", "safety", "weekend", "coins", "launch", "profile", "wallet", "folder-agents", "computer"]);
     expect(DESKTOP).toEqual(ids());
   });
 
@@ -241,5 +248,21 @@ describe("the desktop's folders (2026-10-21)", () => {
     } finally {
       flags.allOn = false;
     }
+  });
+
+  it("handles dynamic token window ids, labels, windowTitle, and token icons", () => {
+    const t1 = "0x1111111111111111111111111111111111111111";
+    const t2 = "0x2222222222222222222222222222222222222222";
+    expect(isTokenWindow(null)).toBe(false);
+    expect(isTokenWindow("token:bad")).toBe(false);
+    const id1 = tokenWindowId(t1);
+    expect(isTokenWindow(id1)).toBe(true);
+    expect(tokenAddressOf(id1)).toBe(t1);
+    expect(windowTitle(id1)).toBe("0x1111…1111");
+    registerTokenLabel(t1, "   ");
+    expect(windowTitle(id1)).toBe("0x1111…1111");
+    const id2 = tokenWindowId(t2, "  NVDAc  ");
+    expect(windowTitle(id2)).toBe("NVDAc");
+    expect(Icon({ id: id1 })).toBeTruthy();
   });
 });

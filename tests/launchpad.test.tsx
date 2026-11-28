@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { decodeFunctionData, encodeAbiParameters, encodeEventTopics, encodeFunctionResult, erc20Abi, parseAbiParameters } from "viem";
 import { BASE, UNISWAP_V4_POOL_MANAGER } from "@/config/chain";
 import { LAUNCHPAD_ABI, LAUNCHPAD_EXPECTS } from "@/config/launchpad";
@@ -314,8 +315,9 @@ describe("the factory on Base", () => {
       get: (u) => (u === `${STOCKS_PATH}/base` ? MARKETS_FX.coinbaseStocks : undefined),
       rpc: ethCalls({ [FACTORY]: (data) => (decodeFunctionData({ abi: LAUNCHPAD_ABI, data }).args?.[0] === unread!.address ? new RpcError("busy") : base(data)) }),
     });
-    const { pairs } = await launchPairs(FACTORY);
+    const { pairs, problem } = await launchPairs(FACTORY);
     expect(pairs.map((p) => p.symbol)).toEqual(["ETH", usdc!.symbol, "AAPLc"]);
+    expect(problem).toContain("not checked");
     forgetCatalog();
   });
 
@@ -406,7 +408,11 @@ describe("the window", () => {
   }
 
   function mount(node = <BaseLaunch />) {
-    return render(<WalletProvider>{node}</WalletProvider>);
+    return render(
+      <MemoryRouter>
+        <WalletProvider>{node}</WalletProvider>
+      </MemoryRouter>,
+    );
   }
 
   /** the launch's one call to action (the collect form below has its own button) */
@@ -639,11 +645,13 @@ describe("the window", () => {
     chain();
     const open = vi.fn();
     render(
-      <OpenWindowProvider open={open}>
-        <WalletProvider>
-          <BaseLaunch />
-        </WalletProvider>
-      </OpenWindowProvider>,
+      <MemoryRouter>
+        <OpenWindowProvider open={open}>
+          <WalletProvider>
+            <BaseLaunch />
+          </WalletProvider>
+        </OpenWindowProvider>
+      </MemoryRouter>,
     );
     await userEvent.click(await screen.findByRole("button", { name: `Open ${TOKEN}` }));
     expect(open).toHaveBeenCalledWith("coins", { t: TOKEN });
@@ -931,12 +939,110 @@ describe("the Launch window", () => {
   it("is this app's launchpad and nothing else — o1 was taken out on 2026-10-02", async () => {
     pinned.factory = null;
     render(
-      <WalletProvider>
-        <LaunchPanel />
-      </WalletProvider>,
+      <MemoryRouter>
+        <WalletProvider>
+          <LaunchPanel />
+        </WalletProvider>
+      </MemoryRouter>,
     );
     await act(async () => {});
     expect(screen.getByLabelText("Launchpad status")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "o1" })).not.toBeInTheDocument();
+  });
+
+  it("batches >20 stock quotes via Multicall3, reports failed reads as not checked, and falls back when Multicall3 reverts", async () => {
+    const MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11";
+    const MULTICALL3_ABI = [
+      {
+        type: "function",
+        name: "aggregate3",
+        stateMutability: "payable",
+        inputs: [
+          {
+            name: "calls",
+            type: "tuple[]",
+            components: [
+              { name: "target", type: "address" },
+              { name: "allowFailure", type: "bool" },
+              { name: "callData", type: "bytes" },
+            ],
+          },
+        ],
+        outputs: [
+          {
+            name: "returnData",
+            type: "tuple[]",
+            components: [
+              { name: "success", type: "bool" },
+              { name: "returnData", type: "bytes" },
+            ],
+          },
+        ],
+      },
+    ] as const;
+    const bigStocks = {
+      tokens: Array.from({ length: 22 }, (_, i) => ({
+        symbol: `STK${i}c`,
+        name: `Stock ${i}`,
+        contract_address: `0xb20000000000000000000000000000000000${(i + 1).toString(16).padStart(4, "0")}`,
+        decimals: 8,
+        multiplier: "1",
+        paused_features: [],
+      })),
+    };
+    forgetCatalog();
+    net({
+      get: (u) => (u === `${STOCKS_PATH}/base` ? bigStocks : undefined),
+      rpc: ethCalls({
+        [FACTORY]: factory({}, { [ETH_Q]: [true, LAUNCHPAD_EXPECTS.startTick] }),
+        [MULTICALL3]: (data) => {
+          const { args } = decodeFunctionData({ abi: MULTICALL3_ABI, data });
+          const calls = args[0] as readonly { callData: `0x${string}` }[];
+          const results = calls.map((_, i) => {
+            if (i === 0) return { success: true, returnData: encodeFunctionResult({ abi: LAUNCHPAD_ABI, functionName: "quotes", result: [true, STOCK_TICK] }) };
+            if (i === 1) return { success: false, returnData: "0x" as `0x${string}` };
+            if (i === 2) return { success: true, returnData: "0x" as `0x${string}` };
+            return { success: true, returnData: encodeFunctionResult({ abi: LAUNCHPAD_ABI, functionName: "quotes", result: [false, 0] }) };
+          });
+          return encodeFunctionResult({ abi: MULTICALL3_ABI, functionName: "aggregate3", result: results });
+        },
+      }),
+    });
+    const res1 = await launchPairs(FACTORY);
+    expect(res1.pairs.map((p) => p.symbol)).toEqual(["ETH", "STK0c"]);
+    expect(res1.problem).toBe("2 pairs not checked — Base RPC did not answer.");
+
+    // Fallback to direct per-quote reads when Multicall3 fails
+    forgetCatalog();
+    const firstAddr = bigStocks.tokens[0]!.contract_address.toLowerCase();
+    net({
+      get: (u) => (u === `${STOCKS_PATH}/base` ? bigStocks : undefined),
+      rpc: ethCalls({
+        [FACTORY]: factory({}, { [ETH_Q]: [true, LAUNCHPAD_EXPECTS.startTick], [firstAddr]: [true, STOCK_TICK] }),
+        [MULTICALL3]: () => DOWN as never,
+      }),
+    });
+    const res2 = await launchPairs(FACTORY);
+    expect(res2.pairs.map((p) => p.symbol)).toEqual(["ETH", "STK0c"]);
+    expect(res2.problem).toBeNull();
+    forgetCatalog();
+  });
+
+  it("pre-selects ?pair=0x... from the URL when opening BaseLaunch", async () => {
+    pinned.factory = FACTORY;
+    net({
+      get: (u) => (u === `${STOCKS_PATH}/base` ? MARKETS_FX.coinbaseStocks : undefined),
+      rpc: ethCalls({ [FACTORY]: factory() }),
+    });
+    render(
+      <MemoryRouter initialEntries={[`/?pair=${AAPL}`]}>
+        <WalletProvider>
+          <BaseLaunch />
+        </WalletProvider>
+      </MemoryRouter>,
+    );
+    await screen.findByRole("option", { name: /AAPLc/ });
+    expect(screen.getByLabelText("Paired with")).toHaveValue(AAPL);
+    pinned.factory = null;
   });
 });

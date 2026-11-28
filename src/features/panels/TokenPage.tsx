@@ -789,7 +789,7 @@ function TradesTable({
                   <td className="mono">{compact(t.tokens)}</td>
                   <td className="mono">{t.usdValue === null ? "—" : usd(t.usdValue)}</td>
                   <td className="mono">{t.priceUsd === null ? "—" : tinyPrice(t.priceUsd)}</td>
-                  {qs ? <td className="mono">{t.quote === null ? "—" : compact(t.quote)}</td> : null}
+                  {qs ? <td className="mono">{compact(t.quote!)}</td> : null}
                   <td className="mono">
                     {t.trader ? (
                       <a href={explorer.address(t.trader)} target="_blank" rel="noreferrer">

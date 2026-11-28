@@ -800,3 +800,20 @@ describe("what this module is not allowed to become", () => {
     expect('provider.request({ method: "eth_signTypedData_v4" })').not.toMatch(/\beth_sign\b/);
   });
 });
+
+describe("readWallet timeouts", () => {
+  it("returns failed (unanswered) when eth_accounts or eth_chainId hangs past timeout", async () => {
+    const hangAccounts: Eip1193Provider = { request: () => new Promise(() => {}) };
+    const r1 = await readWallet(hangAccounts, 5);
+    expect(r1.kind).toBe("failed");
+    if (r1.kind === "failed") expect(r1.why).toContain("timed out");
+
+    const hangChain: Eip1193Provider = {
+      request: ({ method }) =>
+        method === "eth_accounts" ? Promise.resolve(["0xabcdef0123456789abcdef0123456789abcdef01"]) : new Promise(() => {}),
+    };
+    const r2 = await readWallet(hangChain, 5);
+    expect(r2.kind).toBe("failed");
+    if (r2.kind === "failed") expect(r2.why).toContain("timed out");
+  });
+});

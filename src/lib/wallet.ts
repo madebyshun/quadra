@@ -408,7 +408,7 @@ export async function readWallet(provider = injectedProvider(), timeoutMs = READ
   } catch (err) {
     return { kind: "failed", why: unansweredAccounts(err) };
   }
-  if (accounts === TIMED_OUT) return { kind: "disconnected", why: NOT_CONNECTED };
+  if (accounts === TIMED_OUT) return { kind: "failed", why: unansweredAccounts(new Error("timed out")) };
 
   const account = firstAccount(accounts);
   if (account.kind === "none") return { kind: "disconnected", why: NOT_CONNECTED };

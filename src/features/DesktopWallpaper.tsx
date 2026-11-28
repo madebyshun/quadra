@@ -146,9 +146,9 @@ function samplePhotoDots(img: HTMLImageElement, width: number, height: number): 
     const xShift = row % 2 === 1 ? cell * 0.5 : 0;
     for (let col = 0; col < cols; col++) {
       const idx = (row * cols + col) * 4;
-      const r = data[idx] ?? 0;
-      const g = data[idx + 1] ?? 0;
-      const b = data[idx + 2] ?? 0;
+      const r = data[idx]!;
+      const g = data[idx + 1]!;
+      const b = data[idx + 2]!;
       const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
       const radius = cell * (0.52 + (1 - lum) * 0.42);
       out.push({
@@ -204,23 +204,22 @@ export function DesktopWallpaper() {
     }
 
     function draw(ms: number) {
-      if (!ctx) return;
       const time = motion.matches ? 0 : ms / 1000;
       hover += ((pointer && !motion.matches ? 1 : 0) - hover) * .12;
       if (pointer) {
         cursor.x += (pointer.x - cursor.x) * .2;
         cursor.y += (pointer.y - cursor.y) * .2;
       }
-      ctx.clearRect(0, 0, width, height);
+      ctx!.clearRect(0, 0, width, height);
       const kind = shapeRef.current;
       const rainTick = Math.floor(time * 2.2);
 
       if (!customPhoto && activeScene === "q001") {
-        if (kind === "blueprint") drawBlueprintGrid(ctx, width, height);
+        if (kind === "blueprint") drawBlueprintGrid(ctx!, width, height);
         const driftX = Math.sin(time * 0.95) * 2.5;
         const driftY = Math.cos(time * 1.15) * 3.5;
-        ctx.fillStyle = "rgba(244, 240, 230, 0.92)";
-        ctx.beginPath();
+        ctx!.fillStyle = "rgba(244, 240, 230, 0.92)";
+        ctx!.beginPath();
         for (let i = 0; i < dots.length; i++) {
           const dot = dots[i]!;
           const dx = dot.x - cursor.x, dy = dot.y - cursor.y;
@@ -231,15 +230,15 @@ export function DesktopWallpaper() {
           const x = dot.x + driftX + dx * lift * .42;
           const y = dot.y + driftY + dy * lift * .42;
           const r = dot.radius * rainPulse * (1 + lift * .65);
-          drawGlyph(ctx, kind, x, y, r, i + rainTick);
+          drawGlyph(ctx!, kind, x, y, r, i + rainTick);
         }
-        ctx.fill();
+        ctx!.fill();
       } else if (photo && photo.complete && photo.naturalWidth > 0) {
-        ctx.save();
-        ctx.globalAlpha = 0.72;
-        drawCover(ctx, photo, width, height);
-        ctx.restore();
-        if (kind === "blueprint") drawBlueprintGrid(ctx, width, height);
+        ctx!.save();
+        ctx!.globalAlpha = 0.72;
+        drawCover(ctx!, photo, width, height);
+        ctx!.restore();
+        if (kind === "blueprint") drawBlueprintGrid(ctx!, width, height);
         const wave = Math.sin(time * 0.9);
         for (let i = 0; i < dots.length; i++) {
           const dot = dots[i]!;
@@ -251,23 +250,22 @@ export function DesktopWallpaper() {
           const x = dot.x + wave * 0.8 + dx * lift * .26;
           const y = dot.y + dy * lift * .26;
           const r = dot.radius * rainPulse * (1 + lift * .55);
-          ctx.fillStyle = dot.color ?? "#f4f0e6";
-          ctx.beginPath();
-          drawGlyph(ctx, kind, x, y, r, i + rainTick);
-          ctx.fill();
+          ctx!.fillStyle = dot.color!;
+          ctx!.beginPath();
+          drawGlyph(ctx!, kind, x, y, r, i + rainTick);
+          ctx!.fill();
         }
       }
       if (!motion.matches) frame = requestAnimationFrame(draw);
     }
 
     function resize() {
-      if (!canvas || !ctx) return;
-      width = canvas.clientWidth;
-      height = canvas.clientHeight;
+      width = canvas!.clientWidth;
+      height = canvas!.clientHeight;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.round(width * dpr);
-      canvas.height = Math.round(height * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      canvas!.width = Math.round(width * dpr);
+      canvas!.height = Math.round(height * dpr);
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
       buildDots();
       cancelAnimationFrame(frame);
       draw(performance.now());

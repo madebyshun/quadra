@@ -136,6 +136,7 @@ function Home({ introPlayed, onIntroDone }: { introPlayed: boolean; onIntroDone:
   const forceIntro = params.get("intro") === "explore";
   const [state, dispatch] = useReducer(reduceWindows, EMPTY_STATE);
   const openedFromUrl = useRef(false);
+  const syncingInitial = useRef(false);
   // decided once, on the first render: never replay intro when returning from /docs, /api, /verify, or /about
   const [intro, setIntro] = useState(() =>
     !desktopDemo && (forceIntro
@@ -162,11 +163,15 @@ function Home({ introPlayed, onIntroDone }: { introPlayed: boolean; onIntroDone:
     const raw = params.get("do");
     const t = params.get("t");
     if (raw === "token" && t && /^0x[0-9a-fA-F]{40}$/.test(t)) {
+      syncingInitial.current = true;
       dispatch(openAction(tokenWindowId(t)));
       return;
     }
     const initial = resolveFeature(raw) ?? resolveDoc(raw);
-    if (initial) dispatch(openAction(initial.id));
+    if (initial) {
+      syncingInitial.current = true;
+      dispatch(openAction(initial.id));
+    }
   }, [params]);
 
   const topId = topWindowId(state);
@@ -184,6 +189,10 @@ function Home({ introPlayed, onIntroDone }: { introPlayed: boolean; onIntroDone:
   const WINDOW_SCOPED_PARAMS = ["t", "s", "a", "pair", "tab", "sort", "q", "c"] as const;
 
   useEffect(() => {
+    if (syncingInitial.current) {
+      if (!topId) return;
+      syncingInitial.current = false;
+    }
     if (homing.current) {
       homing.current = false;
       if (params.toString() !== "") setParams(new URLSearchParams(), { replace: true });

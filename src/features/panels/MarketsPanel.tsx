@@ -136,7 +136,6 @@ export function MarketsPanel() {
     [catalog],
   );
   useEffect(() => {
-    if (!preloadKey) return;
     let live = true;
     void spots("base", preloadKey.split(","))
       .then((found) => {

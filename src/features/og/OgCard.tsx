@@ -1,3 +1,4 @@
+import { BRAND } from "@/brand";
 import type { OgPage } from "@/server/og";
 
 export const OG_W = 1200;
@@ -43,7 +44,7 @@ export function OgCard({ page, artwork = MACHINE }: { page: OgPage; artwork?: st
 
 export function XHeader({ artwork }: { artwork: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="1500" height="500" viewBox="0 0 1500 500" role="img" aria-label="Quadra profile banner">
+    <svg xmlns="http://www.w3.org/2000/svg" width="1500" height="500" viewBox="0 0 1500 500" role="img" aria-label={`${BRAND.name} profile banner`}>
       <rect width="1500" height="500" fill={PAPER} />
       <g fontFamily={SERIF} letterSpacing="-3">
         <text x="240" y="118" fontSize="52" fill={BLUE}>quadra</text>
@@ -59,11 +60,11 @@ export function XHeader({ artwork }: { artwork: string }) {
 
 export const X_POSTS = [
   { id: "launch", label: "Launchpad", first: "Launch a coin.", second: "Collect creator fees.", note: "Pair with ETH, Base crypto or a supported tokenized stock." },
-  { id: "stocks", label: "Tokenized stocks", first: "Stocks on Base.", second: "In your wallet.", note: "Explore tokenized stocks in Quadra Markets." },
+  { id: "stocks", label: "Tokenized stocks", first: "Stocks on Base.", second: "In your wallet.", note: `Explore tokenized stocks in ${BRAND.name} Markets.` },
   { id: "pairs", label: "Base pairs", first: "Pick a Base token.", second: "Give it a pair.", note: "Choose a supported quote asset when you launch." },
   { id: "trade", label: "Trade", first: "Find a market.", second: "Make your trade.", note: "Review the quote, then sign in your wallet." },
   { id: "basket", label: "Treasury Basket", first: "Build a basket.", second: "Hold the assets.", note: "Choose your mix of tokenized stocks and Base crypto." },
-  { id: "quadra", label: "$QUADRA", first: "Its own pool.", second: "Its own fee flow.", note: "Follow the on-chain fee flow on Quadra About." },
+  { id: "quadra", label: BRAND.ticker, first: "Its own pool.", second: "Its own fee flow.", note: `Follow the on-chain fee flow on ${BRAND.name} About.` },
 ] as const;
 
 export function XPost({ post }: { post: (typeof X_POSTS)[number] }) {
@@ -103,7 +104,7 @@ export function XPost({ post }: { post: (typeof X_POSTS)[number] }) {
           <path d="M420 90v95M220 300V185h400v115" fill="none" />
           <rect x="283" y="20" width="274" height="70" fill={PAPER} />
           <path d="M94 300h91l30 24h131v93H94zM494 300h91l30 24h131v93H494z" />
-          <text x="420" y="66" textAnchor="middle" fill={BLUE} stroke="none" fontFamily={MONO} fontSize="40">$QUADRA</text>
+          <text x="420" y="66" textAnchor="middle" fill={BLUE} stroke="none" fontFamily={MONO} fontSize="40">{BRAND.ticker}</text>
         </>}
       </g>
       <text x="64" y="964" fill={INK} fontFamily="Arial, sans-serif" fontSize="28">{post.note}</text>

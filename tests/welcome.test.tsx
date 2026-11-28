@@ -13,6 +13,9 @@ import { fakePulse } from "./pulseFake";
 import { renderAt, ROUTER_FUTURE, settle } from "./helpers";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { App } from "@/App";
+import { WalletProvider } from "@/ui/WalletProvider";
+import { BASE } from "@/config/chain";
+import type { Eip1193Provider } from "@/lib/wallet";
 
 const launchActivity = vi.fn<() => Promise<Activity>>();
 const recycleBin = vi.fn<() => Promise<Bin>>();
@@ -183,5 +186,92 @@ describe("the Welcome screen on the desktop", () => {
     renderAt("/");
     await settle();
     expect(screen.queryByRole("dialog", { name: `Welcome to ${BRAND.name}` })).toBeNull();
+  });
+
+  it("connects wallet directly from Welcome for wrongChain, injected, and single EIP-6963 provider", async () => {
+    const open = vi.fn();
+    const onClose = vi.fn();
+    const wrongCalls: string[] = [];
+    const wrongProvider: Eip1193Provider = {
+      request: async ({ method }) => {
+        wrongCalls.push(method);
+        if (method === "eth_accounts") return ["0xabcdef0123456789abcdef0123456789abcdef01"];
+        if (method === "eth_chainId") return "0x1";
+        return null;
+      },
+    };
+    vi.stubGlobal("ethereum", wrongProvider);
+    const v1 = render(
+      <MemoryRouter future={ROUTER_FUTURE}>
+        <WalletProvider>
+          <OpenWindowProvider open={open}>
+            <Welcome onClose={onClose} />
+          </OpenWindowProvider>
+        </WalletProvider>
+      </MemoryRouter>,
+    );
+    await settle();
+    fireEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
+    await settle();
+    expect(wrongCalls).toContain("wallet_switchEthereumChain");
+    v1.unmount();
+
+    const injCalls: string[] = [];
+    const injProvider: Eip1193Provider = {
+      request: async ({ method }) => {
+        injCalls.push(method);
+        if (method === "eth_accounts") return [];
+        if (method === "eth_requestAccounts") return ["0xabcdef0123456789abcdef0123456789abcdef01"];
+        if (method === "eth_chainId") return BASE.idHex;
+        return null;
+      },
+    };
+    vi.stubGlobal("ethereum", injProvider);
+    const v2 = render(
+      <MemoryRouter future={ROUTER_FUTURE}>
+        <WalletProvider>
+          <OpenWindowProvider open={open}>
+            <Welcome onClose={onClose} />
+          </OpenWindowProvider>
+        </WalletProvider>
+      </MemoryRouter>,
+    );
+    await settle();
+    fireEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
+    await settle();
+    expect(injCalls.some((m) => m === "eth_requestAccounts" || m === "wallet_requestPermissions")).toBe(true);
+    v2.unmount();
+
+    vi.stubGlobal("ethereum", undefined);
+    const discCalls: string[] = [];
+    const discProvider: Eip1193Provider = {
+      request: async ({ method }) => {
+        discCalls.push(method);
+        if (method === "eth_accounts") return [];
+        if (method === "eth_requestAccounts") return ["0xabcdef0123456789abcdef0123456789abcdef01"];
+        if (method === "eth_chainId") return BASE.idHex;
+        return null;
+      },
+    };
+    render(
+      <MemoryRouter future={ROUTER_FUTURE}>
+        <WalletProvider>
+          <OpenWindowProvider open={open}>
+            <Welcome onClose={onClose} />
+          </OpenWindowProvider>
+        </WalletProvider>
+      </MemoryRouter>,
+    );
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("eip6963:announceProvider", {
+          detail: { info: { uuid: "u1", name: "Rabby", icon: "data:image/png;base64,AA==", rdns: "io.rabby" }, provider: discProvider },
+        }),
+      );
+    });
+    await settle();
+    fireEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
+    await settle();
+    expect(discCalls.some((m) => m === "eth_requestAccounts" || m === "wallet_requestPermissions")).toBe(true);
   });
 });

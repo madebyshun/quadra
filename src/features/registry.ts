@@ -196,7 +196,7 @@ export const FEATURES: readonly Feature[] = [
   {
     id: "stocks",
     title: "Stocks",
-    blurb: "Base tokenized stocks — launch paired with any stock",
+    blurb: "tokenized stocks on Base — launch paired with any stock",
     window: "Stocks",
     flag: "coins",
   },
@@ -398,9 +398,9 @@ export const ALIAS_FEATURES: ReadonlySet<FeatureId> = new Set<FeatureId>(["trade
 
 export const FOLDERS: Readonly<Record<FolderId, readonly WindowId[]>> = {
   computer: ["folder-research", "folder-money", "folder-launchpad", "folder-games", "terminal", "taskmgr", "control", "readme", "soon"],
-  "folder-research": ["research", "profile", "explore"],
+  "folder-research": ["research", "explore"],
   "folder-money": ["basket", "bridge"],
-  "folder-launchpad": ["stocks", "leaderboard", "card"],
+  "folder-launchpad": ["leaderboard", "card"],
   "folder-games": ["rugsweeper", "achievements"],
   "folder-agents": ["mcp", "x402", "api", "docs", "verify"],
 };

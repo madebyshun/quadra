@@ -140,9 +140,9 @@ export async function quoteOf(factory: string, quote: string): Promise<{ readonl
   return { enabled, startTick };
 }
 
-export const ECOSYSTEM_QUOTES: readonly { readonly address: string; readonly symbol: string; readonly name: string; readonly decimals: number }[] = [
-  ...(CONTRACTS.token ? [{ address: toChecksumAddress(CONTRACTS.token), symbol: BRAND.ticker.replace("$", ""), name: BRAND.name, decimals: 18 }] : []),
-];
+export const ECOSYSTEM_QUOTES: readonly { readonly address: string; readonly symbol: string; readonly name: string; readonly decimals: number }[] = CONTRACTS.token
+  ? [{ address: toChecksumAddress(CONTRACTS.token), symbol: BRAND.ticker.replace("$", ""), name: BRAND.name, decimals: 18 }]
+  : [];
 
 const MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11";
 const MULTICALL3_ABI = [
@@ -174,10 +174,14 @@ const MULTICALL3_ABI = [
   },
 ] as const;
 
+type QuoteRead =
+  | { readonly enabled: boolean; readonly startTick: number; readonly checked: true }
+  | { readonly enabled: false; readonly startTick: 0; readonly checked: false };
+
 async function quotesBatch(
   factory: string,
   addresses: readonly string[],
-): Promise<readonly { readonly enabled: boolean; readonly startTick: number }[]> {
+): Promise<readonly QuoteRead[]> {
   if (addresses.length === 0) return [];
   // For large catalogs (e.g. 400+ Base stocks), batch into a single Multicall3 aggregate3 call (1 RPC request).
   if (addresses.length > 20) {
@@ -192,21 +196,29 @@ async function quotesBatch(
       const results = decodeFunctionResult({ abi: MULTICALL3_ABI, functionName: "aggregate3", data: raw });
       if (results.length === addresses.length) {
         return results.map((r) => {
-          if (!r.success || r.returnData === "0x") return { enabled: false, startTick: 0 };
+          if (!r.success || r.returnData === "0x") return { enabled: false, startTick: 0, checked: false };
           const [enabled, startTick] = decodeFunctionResult({ abi: LAUNCHPAD_ABI, functionName: "quotes", data: r.returnData });
-          return { enabled, startTick };
+          return { enabled, startTick, checked: true };
         });
       }
     } catch {
       // Fallback to direct per-quote reads if Multicall3 fails
     }
   }
-  return Promise.all(addresses.map((addr) => quoteOf(factory, addr).catch(() => ({ enabled: false, startTick: 0 }))));
+  return Promise.all(
+    addresses.map((addr) =>
+      quoteOf(factory, addr)
+        .then((q): QuoteRead => ({ ...q, checked: true }))
+        .catch((): QuoteRead => ({ enabled: false, startTick: 0, checked: false })),
+    ),
+  );
 }
 
 /**
  * Every pair a launch can use right now: ETH, then each Base crypto / ecosystem token (`USDC`,
  * `cbBTC`, `AERO`, the brand token, ...) and Coinbase stock on Base that the factory has ENABLED.
+ * Any quote whose on-chain read failed is reported as not checked in `problem` rather than
+ * silently treated as disabled.
  */
 export async function launchPairs(factory: string): Promise<{ readonly pairs: readonly Pair[]; readonly problem: string | null }> {
   const eth = await quoteOf(factory, ETH_QUOTE);
@@ -223,16 +235,27 @@ export async function launchPairs(factory: string): Promise<{ readonly pairs: re
   const live = stocks.filter((st) => !st.paused.includes(0));
   const tokenQuotes = [...ECOSYSTEM_QUOTES, ...TRADE_CRYPTO];
   const [cryptoQuotes, stockQuotes] = await Promise.all([
-    Promise.all(tokenQuotes.map(async (c) => ({ c, q: await quoteOf(factory, c.address).catch(() => ({ enabled: false, startTick: 0 })) }))),
+    Promise.all(
+      tokenQuotes.map(async (c) => ({
+        c,
+        q: await quoteOf(factory, c.address)
+          .then((q): QuoteRead => ({ ...q, checked: true }))
+          .catch((): QuoteRead => ({ enabled: false, startTick: 0, checked: false })),
+      })),
+    ),
     quotesBatch(factory, live.map((st) => st.address)).then((qs) => live.map((st, i) => ({ st, q: qs[i]! }))),
   ]);
+  let unchecked = 0;
   for (const { c, q } of cryptoQuotes) {
-    if (q.enabled) pairs.push({ address: c.address, symbol: c.symbol, name: c.name, decimals: c.decimals, startTick: q.startTick });
+    if (!q.checked) unchecked++;
+    else if (q.enabled) pairs.push({ address: c.address, symbol: c.symbol, name: c.name, decimals: c.decimals, startTick: q.startTick });
   }
   for (const { st, q } of stockQuotes) {
-    if (q.enabled) pairs.push({ address: st.address, symbol: st.symbol, name: st.name, decimals: st.decimals, startTick: q.startTick });
+    if (!q.checked) unchecked++;
+    else if (q.enabled) pairs.push({ address: st.address, symbol: st.symbol, name: st.name, decimals: st.decimals, startTick: q.startTick });
   }
-  return { pairs, problem: null };
+  const problem = unchecked > 0 ? `${unchecked} pair${unchecked === 1 ? "" : "s"} not checked — Base RPC did not answer.` : null;
+  return { pairs, problem };
 }
 
 /** Collecting a token's fees — anyone may send it; the split is the contract's. */

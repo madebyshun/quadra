@@ -310,7 +310,7 @@ export function About() {
         <div className="about__section about__closing-inner">
           <div>
             <h2 id="about-agents-title">For agents</h2>
-            <p>Agents can call Quadra’s checks over MCP or pay per call in USDC over x402.</p>
+            <p>Agents can call {BRAND.name}’s checks over MCP or pay per call in USDC over x402.</p>
           </div>
           <div className="about__closing-links">
             <Link to="/docs">Read the docs <span aria-hidden="true">↗</span></Link>

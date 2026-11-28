@@ -8,7 +8,7 @@ import { parseTokenBalances } from "@/skills/blockscout";
 import type { Launch } from "@/skills/launchpad";
 import { activityOf, holdingsOf, lureOf, parseTransfers } from "@/skills/profile";
 import { OpenWindowProvider } from "@/features/openWindow";
-import { kindText, nameText, ProfilePanel } from "@/features/panels/ProfilePanel";
+import { kindText, loadCreatorProfile, nameText, ProfilePanel, saveCreatorProfile } from "@/features/panels/ProfilePanel";
 import { WalletProvider } from "@/ui/WalletProvider";
 import { USDC, WETH } from "@/config/chain";
 import { LAUNCHPAD, LX } from "./fixtures/launchpad";
@@ -332,5 +332,124 @@ describe("the Profile window", () => {
     expect(coins).toHaveTextContent("pair not read");
     expect(coins).toHaveTextContent("0xB200…0dF9");
     expect(coins).toHaveTextContent("fees could not be read");
+  });
+
+  it("loads and saves creator profile metadata, handling missing/corrupt/error storage", () => {
+    expect(loadCreatorProfile(null)).toEqual({ name: "", website: "", x: "", telegram: "", bio: "", avatar: null });
+    expect(loadCreatorProfile(OWNER)).toEqual({ name: "", website: "", x: "", telegram: "", bio: "", avatar: null });
+    saveCreatorProfile(OWNER, { name: "A".repeat(50), website: "https://example.com", x: "example", telegram: "example", bio: "B".repeat(200), avatar: "data:image/png,ok" });
+    const loaded = loadCreatorProfile(OWNER);
+    expect(loaded.name).toHaveLength(40);
+    expect(loaded.bio).toHaveLength(180);
+    expect(loaded.avatar).toBe("data:image/png,ok");
+    localStorage.setItem(`quadra.creator-profile.v1.${OWNER.toLowerCase()}`, JSON.stringify({ name: 123, website: 456, x: null, telegram: false, bio: {}, avatar: 7 }));
+    expect(loadCreatorProfile(OWNER)).toEqual({ name: "", website: "", x: "", telegram: "", bio: "", avatar: null });
+    localStorage.setItem(`quadra.creator-profile.v1.${OWNER.toLowerCase()}`, "{bad-json");
+    expect(loadCreatorProfile(OWNER)).toEqual({ name: "", website: "", x: "", telegram: "", bio: "", avatar: null });
+    const setSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("quota");
+    });
+    try {
+      expect(() => saveCreatorProfile(OWNER, loaded)).not.toThrow();
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
+
+  it("edits creator profile settings, uploads avatar, copies links, and renders Fees & Referrals tabs", async () => {
+    const sent = wallet(OWNER);
+    net(routes());
+    const open = vi.fn();
+    mount(`/?do=profile&a=${OWNER}`, open);
+    await screen.findByLabelText("Who");
+
+    await userEvent.click(screen.getByRole("button", { name: "Copy" }));
+    expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
+    const prevClip = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn().mockRejectedValue(new Error("no")) }, configurable: true });
+    await userEvent.click(screen.getByRole("button", { name: "Copied" }));
+    if (prevClip) Object.defineProperty(navigator, "clipboard", prevClip);
+    else delete (navigator as unknown as Record<string, unknown>).clipboard;
+    await userEvent.click(screen.getByRole("button", { name: "All tokens" }));
+    expect(open).toHaveBeenCalledWith("coins");
+    await userEvent.click(screen.getByRole("button", { name: "Wallet assets" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Profile settings" }));
+    const fileInput = screen.getByLabelText("Change avatar") as HTMLInputElement;
+    const big = new File([new Uint8Array(2 * 1024 * 1024 + 1)], "big.png", { type: "image/png" });
+    await userEvent.upload(fileInput, big);
+    const small = new File(["png"], "a.png", { type: "image/png" });
+    await userEvent.upload(fileInput, small);
+    await waitFor(() => expect(document.querySelector(".profile__avatar img")).not.toBeNull());
+
+    await userEvent.type(screen.getByPlaceholderText("Launch creator"), "Creator");
+    await userEvent.type(screen.getByPlaceholderText("https://yourproject.xyz"), "https://example.com");
+    await userEvent.type(screen.getByPlaceholderText("x.com/yourprofile"), "x.com/creator");
+    await userEvent.type(screen.getByPlaceholderText("t.me/yourprofile"), "t.me/creator");
+    await userEvent.type(screen.getByPlaceholderText("A short intro shown on your creator profile."), "Builder on Base");
+    await userEvent.click(screen.getByRole("button", { name: "Save profile" }));
+    expect(screen.getByRole("button", { name: "Saved" })).toBeInTheDocument();
+    expect(loadCreatorProfile(OWNER).name).toBe("Creator");
+
+    await userEvent.click(screen.getByRole("button", { name: "Referral" }));
+    expect(screen.getByRole("button", { name: "Copied referral" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Profile" }));
+    expect(screen.getByRole("button", { name: "Copied profile" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Referrals" }));
+    await userEvent.click(screen.getByRole("button", { name: "Copy referral link" }));
+    expect(screen.getByRole("button", { name: "Copied referral link" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Copy profile link" }));
+    expect(screen.getByRole("button", { name: "Copied profile link" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Fees" }));
+    const feesList = screen.getByLabelText("Fees by coin", { selector: "ul" });
+    await userEvent.click(within(feesList).getByRole("button", { name: "test (test)" }));
+    expect(open).toHaveBeenCalledWith("coins", { t: T });
+    await userEvent.click(screen.getByRole("button", { name: "Collect all — 1 with fees waiting" }));
+    await waitFor(() => expect(sent).toHaveLength(1));
+  });
+
+  it("shows empty Fees & Coins states and Launch a token CTA when address launched nothing", async () => {
+    wallet(null);
+    net(routes({ transfers: { items: [] }, holding: 0n }));
+    const open = vi.fn();
+    mount(`/?do=profile&a=${LAUNCHPAD.factory}`, open);
+    await screen.findByLabelText("Who");
+    await userEvent.click(screen.getByRole("button", { name: "Coins launched" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Launch a token" }));
+    expect(open).toHaveBeenCalledWith("launch");
+    await userEvent.click(screen.getByRole("button", { name: "Fees" }));
+    expect(await screen.findByText("No launched coins found for this wallet yet.")).toBeInTheDocument();
+  });
+
+  it("shows Fees tab for non-owner, owner with zero fees, and unreadable coin metadata", async () => {
+    wallet(OWNER);
+    const zero = `0x${"0".repeat(128)}`;
+    const r = routes();
+    net({ rpc: (m, p) => ((p[0] as { data?: string } | undefined)?.data?.startsWith("0x06ec16f8") ? zero : r.rpc(m, p)), get: r.get });
+    const a = mount("/?do=profile");
+    await screen.findByLabelText("Who");
+    await userEvent.click(screen.getByRole("button", { name: "Fees" }));
+    expect(await screen.findByRole("button", { name: "No fees waiting" })).toBeDisabled();
+    a.unmount();
+
+    wallet(null);
+    const chain = chainRoutes({ code: "0x", holding: 10n ** 24n, calls: names, pool: `0x${"0".repeat(64)}` });
+    net({
+      rpc: (m, p) => {
+        const call = p[0] as { to?: string; data?: string } | undefined;
+        const tokenRead = m === "eth_call" && call?.to?.toLowerCase() === T.toLowerCase() && !call.data!.startsWith("0x70a08231");
+        return tokenRead || call?.data?.startsWith("0x06ec16f8") ? DOWN : chain(m, p);
+      },
+      get: r.get,
+    });
+    mount(`/?do=profile&a=${OWNER}`);
+    await screen.findByLabelText("Who");
+    await userEvent.click(screen.getByRole("button", { name: "Fees" }));
+    const feesList = await screen.findByLabelText("Fees by coin", { selector: "ul" });
+    expect(feesList).toHaveTextContent("pair not read");
+    expect(feesList).toHaveTextContent("0xB200…0dF9");
+    expect(screen.queryByRole("button", { name: /Collect all|No fees waiting/ })).not.toBeInTheDocument();
   });
 });

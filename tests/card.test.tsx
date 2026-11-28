@@ -357,7 +357,7 @@ describe("the Card Wizard", () => {
     program();
     const form = screen.getByRole("form", { name: "Card Wizard" });
     expect(form).toHaveTextContent("Create my Base card");
-    expect(form).toHaveTextContent(`Type your X handle. ${BRAND.name} grabs your profile picture and bio, then writes something nice(ish) about you in ${PAINT}.`);
+    expect(form).toHaveTextContent(`Type your X handle. ${BRAND.name} reads your profile picture and bio, then paints a shareable 1600×900 Base card in ${PAINT}.`);
     const input = screen.getByLabelText("X handle");
     expect(input).toHaveValue("");
     expect(input).toHaveAttribute("placeholder", "yourhandle");

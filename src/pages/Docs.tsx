@@ -113,8 +113,8 @@ export function Docs() {
       </header>
       <main className="docs__main">
         <header className="docs__intro">
-          <h1>Quadra <em>Docs.</em></h1>
-          <p>How to use Quadra’s tools, where its data comes from, and what happens before you sign.</p>
+          <h1>{BRAND.name} <em>Docs.</em></h1>
+          <p>How to use {BRAND.name}’s tools, where its data comes from, and what happens before you sign.</p>
         </header>
         <div className="docs__layout">
           <nav className="docs__toc" aria-label="On this page">
@@ -122,7 +122,7 @@ export function Docs() {
             <a href="#launchpad-guide">Launchpad guide</a>
             <a href="#developer-access">Developer access</a>
           </nav>
-          <article className="docs__article" aria-label="Quadra documentation">
+          <article className="docs__article" aria-label={`${BRAND.name} documentation`}>
             <DocsBody standalone />
             <section id="launchpad-guide" className="docs__section">
               <h2>Launchpad guide</h2>
@@ -147,7 +147,7 @@ export function Docs() {
         <div className="about__foot-inner docs__footer">
           <span>{BRAND.name} · built on {BASE.name}</span>
           <nav aria-label="Docs footer">
-            <Link to="/about">About Quadra</Link>
+            <Link to="/about">About {BRAND.name}</Link>
             <Link to="/developers">Developers</Link>
             <a href="#docs-top">Back to top ↑</a>
           </nav>

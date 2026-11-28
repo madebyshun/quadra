@@ -18,19 +18,25 @@ import {
   STOCK_PAGES,
   parseBaseStocks,
   parseCandles,
+  parsePoolTrades,
   parseQuotes,
   parseSpots,
+  parseTokenPools,
+  poolTrades,
   spots,
   stockQuotes,
+  tokenPools,
   type Candle,
 } from "@/adapters/http/markets";
 import { COINBASE_STOCKS, stocksHandler, STOCKS_PATH } from "@/server/stocks";
-import { chartsHandler, CHARTS_PATH, FRESH_MS, STALE_MS as SERVER_STALE_MS, upstreamUrl } from "@/server/charts";
+import { chartsHandler, CHARTS_PATH, FRESH_MS, poolsUpstreamUrl, STALE_MS as SERVER_STALE_MS, tradesUpstreamUrl, upstreamUrl } from "@/server/charts";
 import { loadWatch, saveWatch, WATCH_KEY } from "@/lib/watchlist";
-import { direction, formatChange, points, PriceChart, Sparkline } from "@/features/markets/Chart";
+import { CandleChart, direction, formatChange, points, PriceChart, Sparkline } from "@/features/markets/Chart";
 import { MarketsProvider, REFRESH_MS, useMarkets } from "@/features/markets/MarketsProvider";
 import { MarketsGadget } from "@/features/markets/MarketsGadget";
 import { MarketsPanel, pausedText } from "@/features/panels/MarketsPanel";
+import { categoriesOf, StocksLaunchPanel } from "@/features/panels/StocksLaunchPanel";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { copy } from "./fixtures/base";
 import { AAPL_ON_BASE, CAPTURED_AT, MARKETS_FX, NVDA_ON_BASE, SPY, TSLA, TSLA_PAIR, WETH_PAIR } from "./fixtures/markets";
 import { contractAt, DOWN, ethCalls, json, net, useNet } from "./net";
@@ -234,6 +240,23 @@ describe("the chart route", () => {
     expect(bad.status).toBe(400);
     expect(await bad.json()).toMatchObject({ detail: "limit must be 1–100." });
     expect(typeof chartsHandler()).toBe("function");
+  });
+
+  it("validates and serves /trades and /pools routes", async () => {
+    expect(tradesUpstreamUrl(new URLSearchParams())).toEqual({ refused: "network must be base or robinhood." });
+    expect(tradesUpstreamUrl(new URLSearchParams("network=base"))).toEqual({ refused: "pool must be a 20- or 32-byte hex id." });
+    expect(tradesUpstreamUrl(new URLSearchParams(`network=eth&pool=${WETH_PAIR}`))).toEqual({ refused: "network must be base or robinhood." });
+    expect(tradesUpstreamUrl(new URLSearchParams("network=base&pool=bad"))).toEqual({ refused: "pool must be a 20- or 32-byte hex id." });
+    expect(tradesUpstreamUrl(new URLSearchParams(`network=base&pool=${WETH_PAIR}`))).toContain(`/networks/base/pools/${WETH_PAIR}/trades`);
+    expect(poolsUpstreamUrl(new URLSearchParams())).toEqual({ refused: "network must be base or robinhood." });
+    expect(poolsUpstreamUrl(new URLSearchParams("network=base"))).toEqual({ refused: "token must be an address." });
+    expect(poolsUpstreamUrl(new URLSearchParams(`network=eth&token=${WETH.address}`))).toEqual({ refused: "network must be base or robinhood." });
+    expect(poolsUpstreamUrl(new URLSearchParams("network=base&token=bad"))).toEqual({ refused: "token must be an address." });
+    expect(poolsUpstreamUrl(new URLSearchParams(`network=base&token=${WETH.address}`))).toContain(`/networks/base/tokens/${WETH.address.toLowerCase()}/pools?page=1`);
+    const handle = chartsHandler((async () => json({ data: [] })) as unknown as typeof fetch);
+    expect((await handle(req(`network=base&pool=${WETH_PAIR}`, { path: "/trades" }))).status).toBe(200);
+    expect((await handle(req(`network=base&token=${WETH.address}`, { path: "/pools" }))).status).toBe(200);
+    expect((await handle(req("network=base&pool=bad", { path: "/trades" }))).status).toBe(400);
   });
 });
 
@@ -1085,5 +1108,366 @@ describe("the Markets window's edges and table behavior", () => {
     const row = within(directory).getAllByRole("row").find((r) => r.textContent?.includes("STOCK") && within(r).queryByRole("button", { name: "+ Watch" }))!;
     await userEvent.click(within(row).getByRole("button", { name: "+ Watch" }));
     expect(m().rows.filter((r) => r.watch.kind === "basestock").length).toBeGreaterThan(2);
+    const wlRows = within(watchlist()).getAllByRole("row").slice(1);
+    await userEvent.click(wlRows[0]!);
+    await userEvent.click(within(wlRows[0]!).getAllByRole("button")[0]!);
+    const dirRows = within(directory).getAllByRole("row").slice(1);
+    await userEvent.click(dirRows[0]!);
+    await userEvent.click(within(directory).getAllByRole("button", { name: "Unwatch" })[0]!);
+  });
+
+  it("parses and fetches ranked tokenPools and poolTrades, and exercises CandleChart line/candles/volume/crosshair", async () => {
+    const p1 = "0x1111111111111111111111111111111111111111";
+    const p2 = "0x2222222222222222222222222222222222222222";
+    const p3 = "0x3333333333333333333333333333333333333333";
+    const poolsBody = {
+      data: [
+        null,
+        { attributes: { address: "bad" } },
+        {
+          attributes: { address: p1, name: null, reserve_in_usd: "5000", volume_usd: { h24: "0" }, quote_token_price_usd: "10" },
+          relationships: { base_token: { data: { id: "base_0x9999" } }, dex: {} },
+        },
+        {
+          attributes: { address: p2, name: "WETH / USDC", reserve_in_usd: "1000", volume_usd: { h24: "200" }, base_token_price_usd: "2500", price_change_percentage: { h24: "1.5" } },
+          relationships: { base_token: { data: { id: `base_${WETH.address.toLowerCase()}` } }, dex: { data: { id: "uniswap_v4" } } },
+        },
+        {
+          attributes: { address: p3, name: "WETH / ETH", reserve_in_usd: "2000", volume_usd: { h24: "100" }, base_token_price_usd: "2500", price_change_percentage: { h24: "-1" } },
+          relationships: { base_token: { data: { id: `base_${WETH.address.toLowerCase()}` } }, dex: { data: { id: "aerodrome" } } },
+        },
+      ],
+    };
+    const ranked = parseTokenPools(poolsBody, WETH.address);
+    expect(ranked.map((r) => r.address)).toEqual([p3, p2, p1]);
+    expect(ranked[2]!.name).toBe("0x1111…1111");
+    expect(ranked[2]!.isBase).toBe(false);
+    expect(parseTokenPools(null, WETH.address)).toEqual([]);
+
+    markets({ get: (u) => (u.startsWith(`${CHARTS_PATH}/pools`) ? poolsBody : u.startsWith(`${CHARTS_PATH}/trades`) ? { data: [] } : undefined) });
+    expect((await tokenPools("base", WETH.address)).length).toBe(3);
+    expect(await poolTrades("base", p2, WETH.address)).toEqual([]);
+    markets({ get: (u) => (u.startsWith(`${CHARTS_PATH}/pools`) || u.startsWith(`${CHARTS_PATH}/trades`) ? json({}, 502) : undefined) });
+    await expect(tokenPools("base", WETH.address)).rejects.toThrow("Pools unavailable (HTTP 502).");
+    await expect(poolTrades("base", p2, WETH.address)).rejects.toThrow("Trades unavailable (HTTP 502).");
+
+    const flipped = parsePoolTrades(
+      {
+        data: [
+          null,
+          { attributes: { kind: "weird", tx_hash: "0x1", block_timestamp: "bad" } },
+          {
+            attributes: {
+              kind: "buy",
+              tx_hash: "0xaa",
+              block_timestamp: "2026-10-02T07:59:00Z",
+              from_token_address: WETH.address,
+              to_token_address: p1,
+              from_token_amount: "2",
+              to_token_amount: "5000",
+              volume_in_usd: "5000",
+              price_from_in_usd: "2500",
+              tx_from_address: p2,
+            },
+          },
+          {
+            attributes: {
+              kind: "sell",
+              tx_hash: "0xbb",
+              block_timestamp: "2026-10-02T07:58:00Z",
+              from_token_address: p1,
+              to_token_address: WETH.address,
+              from_token_amount: "1000",
+              to_token_amount: "0.4",
+              volume_in_usd: "1000",
+              price_to_in_usd: "2500",
+              tx_from_address: p2,
+            },
+          },
+        ],
+      },
+      WETH.address,
+      false,
+    );
+    expect(flipped.map((t) => t.side)).toEqual(["sell", "buy"]);
+
+    const { rerender } = render(<CandleChart series={[]} label="empty" format={String} />);
+    expect(screen.getByText(/fewer than two candles/)).toBeInTheDocument();
+    const multiDay: Candle[] = [
+      { t: Date.parse("2026-10-01T00:00:00Z"), o: 100, h: 110, l: 95, c: 105, v: 500 },
+      { t: Date.parse("2026-10-02T00:00:00Z"), o: 105, h: 108, l: 90, c: 92, v: 300 },
+      { t: Date.parse("2026-10-03T00:00:00Z"), o: 92, h: 100, l: 91, c: 95, v: 0 },
+      { t: Date.parse("2026-10-04T00:00:00Z"), o: 95, h: 120, l: 91, c: 115 },
+    ];
+    rerender(<CandleChart series={multiDay} title="ETH/USD" label="ETH candles" format={(n) => `$${n.toFixed(0)}`} style="candles" />);
+    const svg = screen.getByRole("img", { name: "ETH candles" });
+    vi.spyOn(svg, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 640, height: 268, right: 640, bottom: 268, x: 0, y: 0, toJSON: () => {} });
+    const { fireEvent } = await import("@testing-library/react");
+    fireEvent.mouseMove(svg, { clientX: 200, clientY: 100 });
+    fireEvent.mouseMove(svg, { clientX: 620, clientY: 100 });
+    fireEvent.mouseLeave(svg);
+
+    rerender(<CandleChart series={multiDay} label="ETH line up" format={String} style="line" />);
+    const downSeries: Candle[] = [
+      { t: Date.parse("2026-10-01T00:00:00Z"), o: 120, h: 125, l: 100, c: 105 },
+      { t: Date.parse("2026-10-01T01:00:00Z"), o: 105, h: 106, l: 90, c: 95 },
+    ];
+    rerender(<CandleChart series={downSeries} label="ETH line down" format={String} style="line" />);
+    // flat zero and flat non-zero series cover padSpan & zero-open pct branches
+    rerender(<CandleChart series={[{ t: 1, o: 0, h: 0, l: 0, c: 0 }, { t: 2, o: 0, h: 0, l: 0, c: 0 }]} label="flat zero" format={String} style="candles" />);
+    rerender(<CandleChart series={[{ t: 1, o: 5, h: 5, l: 5, c: 5 }, { t: 2, o: 5, h: 5, l: 5, c: 5 }]} label="flat five" format={String} style="candles" />);
+
+    // Additional markets.ts parser edge branches
+    expect(parseCandles({ data: { attributes: { ohlcv_list: [[1000, 1, 2, 1, 2]] } } })).toEqual([{ t: 1_000_000, o: 1, h: 2, l: 1, c: 2 }]);
+    expect(parsePoolTrades(null, WETH.address)).toEqual([]);
+    expect(
+      parsePoolTrades(
+        {
+          data: [
+            { attributes: { kind: "buy", tx_hash: "0x1", block_timestamp: "2026-10-02T07:59:00Z" } },
+            { attributes: { kind: "sell", tx_hash: "0x2", block_timestamp: "2026-10-02T07:58:00Z" } },
+          ],
+        },
+        WETH.address,
+      ).map((t) => [t.side, t.tokens]),
+    ).toEqual([["buy", 0], ["sell", 0]]);
+    const tiePools = parseTokenPools(
+      {
+        data: [
+          { attributes: { address: p1, name: "A", reserve_in_usd: null, volume_usd: { h24: "50" } } },
+          { attributes: { address: p2, name: "B", reserve_in_usd: null, volume_usd: { h24: "150" } } },
+          { attributes: { address: p3, name: "C", reserve_in_usd: null, volume_usd: {} } },
+        ],
+      },
+      WETH.address,
+    );
+    expect(tiePools.map((x) => x.address)).toEqual([p2, p1, p3]);
+  });
+});
+
+describe("StocksLaunchPanel", () => {
+  const mkStock = (ticker: string, name: string) => ({
+    ticker,
+    symbol: `${ticker}c`,
+    name,
+    address: NVDA_ON_BASE,
+    decimals: 8,
+    multiplier: 1,
+    paused: [],
+    nav: 100,
+    navAt: null,
+    icon: null,
+  });
+
+  it("categorizes stocks by exact ticker and name keywords, falling back to consumer", () => {
+    expect(categoriesOf(mkStock("NVDA", "NVIDIA Corporation"))).toEqual(["big-tech", "ai-chips"]);
+    expect(categoriesOf(mkStock("ZZ1", "Acme Semiconductor Corp"))).toEqual(["ai-chips"]);
+    expect(categoriesOf(mkStock("ZZ2", "Global Bitcoin Mining"))).toEqual(["crypto"]);
+    expect(categoriesOf(mkStock("ZZ3", "Orbital Rocket Satellite"))).toEqual(["space-defense"]);
+    expect(categoriesOf(mkStock("ZZ4", "Acme Cloud Software"))).toEqual(["cloud"]);
+    expect(categoriesOf(mkStock("ZZ5", "First National Bank Holdings"))).toEqual(["finance"]);
+    expect(categoriesOf(mkStock("ZZ6", "Solar Energy Power"))).toEqual(["energy"]);
+    expect(categoriesOf(mkStock("ZZ7", "Bio Therapeutics Health"))).toEqual(["health"]);
+    expect(categoriesOf(mkStock("ZZ8", "Auto Mobility Corp"))).toEqual(["mobility"]);
+    expect(categoriesOf(mkStock("ZZ9", "Global Media Streaming"))).toEqual(["media"]);
+    expect(categoriesOf(mkStock("ZZ10", "Heavy Industrial Logistics"))).toEqual(["industrials"]);
+    expect(categoriesOf(mkStock("ZZ11", "Plain Bakery Co"))).toEqual(["consumer"]);
+  });
+
+  function Where() {
+    const l = useLocation();
+    return <output aria-label="stocks-url">{l.search}</output>;
+  }
+
+  function mountStocks(path = "/?do=stocks", open = vi.fn()) {
+    return {
+      open,
+      ...render(
+        <MemoryRouter initialEntries={[path]}>
+          <OpenWindowProvider open={open as never}>
+            <StocksLaunchPanel />
+            <Where />
+          </OpenWindowProvider>
+        </MemoryRouter>,
+      ),
+    };
+  }
+
+  it("shows error when Coinbase stocks fail to load", async () => {
+    markets({ get: (u) => (u === `${STOCKS_PATH}/base` ? DOWN : undefined), rpc: () => DOWN });
+    const v = mountStocks();
+    await settle();
+    expect(screen.getByText(/Could not read the stocks directory:/)).toBeInTheDocument();
+    v.unmount();
+  });
+
+  it("filters, sorts, searches, toggles grid/list views, paginates with Show more, and deep-links ?s=NVDA", async () => {
+    const big = copy(MARKETS_FX.coinbaseStocks) as { tokens: Json[] };
+    const base = big.tokens[0]!;
+    for (let i = 0; i < 50; i++) {
+      big.tokens.push({
+        ...base,
+        contract_address: `0xb2000000000000000000${(2000 + i).toString(16).padStart(20, "0")}`,
+        symbol: `STK${i}c`,
+        name: `Sample Co ${i}`,
+        nav_price: i === 0 ? null : 10 + i,
+      });
+    }
+    const dex = copy(MARKETS_FX.dexBase) as (Json & { baseToken: { symbol: string }; priceChange?: Json; volume?: Json })[];
+    dex.find((p) => p.baseToken.symbol === "NVDAc")!.volume = { h24: 120_000 };
+    dex.find((p) => p.baseToken.symbol === "NVDAc")!.priceChange = { h24: 2.5 };
+    markets({
+      get: (u) => (u === `${STOCKS_PATH}/base` ? big : u.startsWith(`${DEXSCREENER}/base/`) ? dex : undefined),
+      rpc: () => DOWN,
+    });
+    const { open, unmount } = mountStocks();
+    await settle();
+
+    expect(screen.getByRole("list", { name: "Stocks grid" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Show more/ }));
+
+    await userEvent.click(screen.getByRole("button", { name: /AI & chips/ }));
+    expect(screen.getByRole("button", { name: "Show all categories" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /AI & chips/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Big tech/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Show all categories" }));
+
+    await userEvent.click(screen.getByRole("button", { name: /^Launch ready/ }));
+    expect(screen.getByText("No stock matches that filter.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Liquidity ≥ \$5K/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^All \d+/ }));
+
+    for (const label of ["Vol 24h", "Price", "A–Z", "Liquidity"]) {
+      await userEvent.click(screen.getByRole("button", { name: label }));
+    }
+
+    await userEvent.type(screen.getByLabelText("Search stocks"), "NVDA");
+    await userEvent.click(screen.getByRole("button", { name: "Trade NVDA" }));
+    expect(open).toHaveBeenLastCalledWith(`token:${NVDA_ON_BASE.toLowerCase()}`);
+    await userEvent.click(screen.getByRole("button", { name: "NVDA" }));
+    expect(open).toHaveBeenLastCalledWith(`token:${NVDA_ON_BASE.toLowerCase()}`);
+
+    await userEvent.click(screen.getByRole("button", { name: "List" }));
+    const tbl = screen.getByRole("table", { name: "Stocks table" });
+    const row = within(tbl).getAllByRole("row")[1]!;
+    await userEvent.click(row);
+    await userEvent.click(within(row).getByRole("button", { name: "NVDA" }));
+    await userEvent.click(within(row).getByRole("button", { name: "Trade NVDA" }));
+    expect(open).toHaveBeenLastCalledWith(`token:${NVDA_ON_BASE.toLowerCase()}`);
+    unmount();
+
+    const deep = mountStocks("/?do=stocks&s=NVDA");
+    await settle();
+    expect(deep.open).toHaveBeenCalledWith(`token:${NVDA_ON_BASE.toLowerCase()}`);
+    expect(screen.getByLabelText("stocks-url")).not.toHaveTextContent("s=");
+    deep.unmount();
+
+    // Unknown ?s= ticker is ignored cleanly, and enabled launchReady stock shows Launch buttons in Grid and List
+    const dexNeg = copy(MARKETS_FX.dexBase) as (Json & { baseToken: { symbol: string }; priceChange?: Json })[];
+    dexNeg.find((p) => p.baseToken.symbol === "NVDAc")!.priceChange = { h24: -3.25 };
+    const enabledQuote = `0x${"0".repeat(63)}1${"0".repeat(64)}`;
+    markets({
+      get: (u) => (u === `${STOCKS_PATH}/base` ? MARKETS_FX.coinbaseStocks : u.startsWith(`${DEXSCREENER}/base/`) ? dexNeg : undefined),
+      rpc: (m) => (m === "eth_call" ? enabledQuote : undefined),
+    });
+    const ready = mountStocks("/?do=stocks&s=NO_SUCH");
+    await settle();
+    expect(ready.open).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Launch with NVDA" }));
+    expect(ready.open).toHaveBeenLastCalledWith("launch", { pair: NVDA_ON_BASE });
+    await userEvent.click(screen.getByRole("button", { name: "List" }));
+    const listTbl = screen.getByRole("table", { name: "Stocks table" });
+    await userEvent.click(within(listTbl).getAllByRole("button", { name: "Launch" })[0]!);
+    expect(ready.open).toHaveBeenLastCalledWith("launch", { pair: expect.stringMatching(/^0x/) });
+    ready.unmount();
+
+    // Unmount mid-fetch (!live branches), no factory configured (!factoryAt), and US restricted region (closed banner)
+    const { CONTRACTS } = await import("@/config/chain");
+    const { forgetRegion } = await import("@/lib/region");
+    const prevV3 = CONTRACTS.launchFactoryV3;
+    const prevV2 = CONTRACTS.launchFactory;
+    (CONTRACTS as { launchFactoryV3: string | null; launchFactory: string | null }).launchFactoryV3 = null;
+    (CONTRACTS as { launchFactoryV3: string | null; launchFactory: string | null }).launchFactory = null;
+    forgetRegion();
+    forgetCatalog();
+    markets({
+      get: (u) => (u === "/api/region" ? { country: "US" } : u === `${STOCKS_PATH}/base` ? MARKETS_FX.coinbaseStocks : undefined),
+      rpc: () => DOWN,
+    });
+    const closedView = mountStocks();
+    await settle();
+    expect(screen.getByText(/not offered where you are/)).toBeInTheDocument();
+    closedView.unmount();
+    (CONTRACTS as { launchFactoryV3: string | null; launchFactory: string | null }).launchFactoryV3 = prevV3;
+    (CONTRACTS as { launchFactoryV3: string | null; launchFactory: string | null }).launchFactory = prevV2;
+    forgetRegion();
+
+    // Unmount before baseStocks/launchPairs settle
+    forgetCatalog();
+    markets({ rpc: (m) => (m === "eth_call" ? enabledQuote : undefined) });
+    mountStocks().unmount();
+    await settle();
+
+    // Markets.ts remaining branch (both pools with null volume24hUsd)
+    expect(parsePoolTrades({ data: [{ attributes: { kind: "buy", tx_hash: "0x1" } }] }, WETH.address)).toEqual([]);
+    expect(
+      parseTokenPools(
+        {
+          data: [
+            { attributes: { address: "0x1111111111111111111111111111111111111111", name: "A", reserve_in_usd: "100", volume_usd: {} } },
+            { attributes: { address: "0x2222222222222222222222222222222222222222", name: "B", reserve_in_usd: "200", volume_usd: {} } },
+          ],
+        },
+        WETH.address,
+      ),
+    ).toHaveLength(2);
+
+    // MarketsPanel remaining branches: thin market + volume24h in Watchlist, openWindow=null click, Vol 24h sort, preloadKey empty
+    forgetCatalog();
+    const thinDex = dexAt(604.1) as (Json & { volume?: Json })[];
+    thinDex[0]!.volume = { h24: 5000 };
+    markets({
+      get: (u) => {
+        if (u === `${STOCKS_PATH}/base`) return { tokens: [] };
+        if (u.startsWith(`${DEXSCREENER}/base/`)) {
+          const addrs = u.slice(`${DEXSCREENER}/base/`.length).split(",");
+          return [
+            ...thinDex,
+            ...addrs.map((a) => ({
+              baseToken: { address: a, symbol: "T", name: "T" },
+              pairAddress: "0x3333333333333333333333333333333333333333",
+              priceUsd: "1",
+              liquidity: { usd: 604.1 },
+              volume: { h24: 1000 },
+            })),
+          ];
+        }
+        return undefined;
+      },
+    });
+    const vThin = render(
+      <WalletProvider>
+        <MarketsProvider onOpen={vi.fn()}>
+          <MarketsPanel />
+        </MarketsProvider>
+      </WalletProvider>,
+    );
+    await settle();
+    const wl = screen.getByRole("region", { name: "Watchlist" });
+    const firstRow = within(wl).getAllByRole("row")[1]!;
+    await userEvent.click(firstRow);
+    await userEvent.click(within(wl).getByRole("button", { name: /^Vol 24h/ }));
+    vThin.unmount();
+
+    // Empty spots response + unmount mid-preload
+    markets({ get: (u) => (u.startsWith(`${DEXSCREENER}/base/`) ? [] : undefined) });
+    render(
+      <WalletProvider>
+        <MarketsProvider onOpen={vi.fn()}>
+          <MarketsPanel />
+        </MarketsProvider>
+      </WalletProvider>,
+    ).unmount();
+    await settle();
   });
 });

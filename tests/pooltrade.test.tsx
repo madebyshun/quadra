@@ -21,6 +21,11 @@ vi.mock("@/lib/v4swap", async (orig) => ({
 }));
 const chainToken = vi.fn();
 vi.mock("@/skills/chaintoken", () => ({ chainToken: (a: string) => chainToken(a) }));
+const mockBalanceOf = vi.fn<(...args: unknown[]) => Promise<bigint>>(async () => 0n);
+vi.mock("@/lib/erc20", async (orig) => ({
+  ...(await orig<typeof import("@/lib/erc20")>()),
+  balanceOf: (...a: unknown[]) => mockBalanceOf(...a),
+}));
 const sendTransaction = vi.fn();
 const waitForReceipt = vi.fn();
 vi.mock("@/lib/transact", () => ({ sendTransaction: (...a: unknown[]) => sendTransaction(...a), waitForReceipt: (...a: unknown[]) => waitForReceipt(...a) }));
@@ -197,5 +202,26 @@ describe("PoolTrade", () => {
       render(<PoolTrade token={TOKEN} symbol="TEST" side="buy" />).unmount();
       await settle();
     }
+  });
+
+  it("fills quick sell percentage presets (25% and 100%) from the wallet's token balance", async () => {
+    mockBalanceOf.mockResolvedValueOnce(1000n * 10n ** 18n);
+    render(<PoolTrade token={TOKEN} symbol="TEST" side="sell" />);
+    await settle();
+    fireEvent.click(screen.getByRole("button", { name: "25%" }));
+    expect(screen.getByLabelText("Amount of TEST")).toHaveValue("250");
+    fireEvent.click(screen.getByRole("button", { name: "100%" }));
+    expect(screen.getByLabelText("Amount of TEST")).toHaveValue("1000");
+    mockBalanceOf.mockRejectedValueOnce(new Error("rpc"));
+    render(<PoolTrade token={TOKEN} symbol="TEST" side="sell" />);
+    await settle();
+  });
+
+  it("shows stablecoin presets when buying with USDC", async () => {
+    poolKeyOf.mockResolvedValue({ ...ethPool, quote: STOCK, key: { ...key, currency0: STOCK }, tokenIs0: true });
+    chainToken.mockResolvedValue({ symbol: "USDC", decimals: 6 });
+    render(<PoolTrade token={TOKEN} symbol="TEST" side="buy" />);
+    await settle();
+    expect(screen.getByRole("button", { name: "10 USDC" })).toBeInTheDocument();
   });
 });

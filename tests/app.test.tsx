@@ -61,7 +61,7 @@ describe("the desktop", () => {
     await user.dblClick(within(screen.getByRole("list", { name: "My Computer" })).getByRole("button", { name: "Research" }));
     const folder = screen.getByRole("list", { name: "Research" });
     const win = windowFrame("Research");
-    expect(within(win).getByRole("status")).toHaveTextContent("3 objects");
+    expect(within(win).getByRole("status")).toHaveTextContent("2 objects");
     const radar = within(folder).getByRole("button", { name: "Radar" });
     await user.click(radar);
     expect(radar).toHaveAttribute("aria-pressed", "true");
@@ -69,9 +69,9 @@ describe("the desktop", () => {
     expect(screen.queryByLabelText("Radar · Collateral · Depth", { selector: "section" })).not.toBeInTheDocument();
     await user.dblClick(radar);
     expect(windowFrame("Radar · Collateral · Depth")).toBeInTheDocument();
-    within(folder).getByRole("button", { name: "Profile" }).focus();
+    within(folder).getByRole("button", { name: "Explore Base" }).focus();
     await user.keyboard("{Enter}");
-    expect(windowFrame("Profile")).toBeInTheDocument();
+    expect(windowFrame("Explore Base")).toBeInTheDocument();
   });
 
   it("files every folder's programs where the folder says, each one openable", async () => {
@@ -712,5 +712,28 @@ describe("the photo intro on a bare load", () => {
     await user.click(screen.getByRole("link", { name: "Back to the desktop" }));
     expect(screen.queryByRole("dialog", { name: "quadra is starting" })).toBeNull();
     expect(screen.getByLabelText("What you can do")).toBeInTheDocument();
+  });
+
+  it("opens ?do=token&t=0x... directly, switches between Coins and Token window, and activates motion wallpaper", async () => {
+    const t = "0x1111111111111111111111111111111111111111";
+    vi.stubGlobal("fetch", () => Promise.reject(new TypeError("offline")));
+    renderAt(`/?do=token&t=${t}&wallpaper=motion`);
+    await settle();
+    const tokWin = windowFrame("0x1111…1111");
+    expect(tokWin).toBeInTheDocument();
+    await userEvent.click(within(screen.getByLabelText("What you can do")).getByRole("button", { name: /^Coins/ }));
+    await settle();
+    expect(windowFrame("Coins")).toBeInTheDocument();
+    await userEvent.click(tokWin);
+    await settle();
+    vi.unstubAllGlobals();
+  });
+
+  it("renders bliss wallpaper with backgroundImage", async () => {
+    const { setWallpaper } = await import("@/lib/settings");
+    setWallpaper("bliss");
+    renderAt("/");
+    await settle();
+    expect(document.querySelector(".wallpaper--bliss")).toBeInTheDocument();
   });
 });

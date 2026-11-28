@@ -65,7 +65,7 @@ export function PriceChart({ series, label, format }: { series: readonly Candle[
 export type ChartStyle = "candles" | "line";
 
 /**
- * Quadra Platinum pro OHLCV candlestick & line chart: right-side Y-axis scale, live current-price
+ * Platinum pro OHLCV candlestick & line chart: right-side Y-axis scale, live current-price
  * reference pill, volume histogram, top OHLCV readout, and interactive hover crosshair.
  */
 export function CandleChart({
@@ -100,7 +100,7 @@ export function CandleChart({
   const padSpan = (rawMax - rawMin) * 0.08 || rawMax * 0.02 || 1;
   const lo = Math.max(0, rawMin - padSpan);
   const hi = rawMax + padSpan;
-  const span = hi - lo || 1;
+  const span = hi - lo;
 
   const maxVol = Math.max(0, ...series.map((c) => c.v ?? 0));
   const yOf = (price: number) => padT + priceH - ((price - lo) / span) * priceH;

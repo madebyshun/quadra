@@ -4,7 +4,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { injectMeta, metaFor, OG_PAGES } from "@/server/og";
-import { OgCard, MACHINE, splitAt } from "@/features/og/OgCard";
+import { OgCard, MACHINE, splitAt, XHeader, XPost, X_POSTS } from "@/features/og/OgCard";
 import middleware, { config } from "../scripts/og-middleware-draft";
 
 /**
@@ -122,7 +122,16 @@ describe("the edge middleware", () => {
   });
 });
 
-it("renders the home brand in its share card", () => {
+it("renders the home brand, about card, long headline, X header, and all X post graphics", () => {
   render(<OgCard page={OG_PAGES[0]!} />);
   expect(screen.getByRole("img", { name: "share card: quadra / desktop" })).toHaveTextContent("quadra");
+  render(<OgCard page={{ ...OG_PAGES[0]!, id: "long", path: "x / supercalifragilisticexpialidocious" }} />);
+  render(<OgCard page={OG_PAGES.find((p) => p.id === "about")!} />);
+  expect(screen.getByRole("img", { name: "share card: quadra / about" })).toHaveTextContent("Research. Trade. Launch.");
+  render(<XHeader artwork={MACHINE} />);
+  expect(screen.getByRole("img", { name: /profile banner/ })).toHaveTextContent("supercomputer");
+  for (const post of X_POSTS) {
+    render(<XPost post={post} />);
+    expect(screen.getByRole("img", { name: post.label })).toHaveTextContent(post.first);
+  }
 });

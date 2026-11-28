@@ -60,18 +60,12 @@ function knownCrypto(addr: string): { symbol: string; name: string; decimals: nu
 
 /**
  * Unified per-token window for every asset on Base:
- * - Launched coins (Quadra LaunchFactory) -> full CoinPage (PoolTrade + TokenChart + TokenTabs + Token Verdict)
+ * - Launched coins (LaunchFactory) -> full CoinPage (PoolTrade + TokenChart + TokenTabs + Token Verdict)
  * - Coinbase tokenized stocks -> Stock Detail & Trade (no Token Verdict, full Blue Agent GeckoTerminal pools + trades + KPIs)
  * - Base crypto tokens -> Crypto Detail & Trade (full GeckoTerminal pools + trades + Relay SwapPanel)
  */
 export function TokenWindow({ address, onTitle }: { address: string; onTitle?: (title: string) => void }) {
-  const checksummed = useMemo(() => {
-    try {
-      return toChecksumAddress(address.toLowerCase());
-    } catch {
-      return address;
-    }
-  }, [address]);
+  const checksummed = useMemo(() => toChecksumAddress(address.toLowerCase()), [address]);
   const openWindow = useOpenWindow();
   const [resolved, setResolved] = useState<TokenKind>({ kind: "loading" });
 

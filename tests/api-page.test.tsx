@@ -1,7 +1,8 @@
 import { SKILLS } from "@/skills";
 import { describe, expect, it, vi } from "vitest";
 import { act, render, screen, within } from "@testing-library/react";
-import { apiLede, ApiBody, endpointBadge, ENDPOINTS, probeApi } from "@/pages/ApiPage";
+import { MemoryRouter } from "react-router-dom";
+import { apiLede, ApiBody, Developers, endpointBadge, ENDPOINTS, probeApi } from "@/pages/ApiPage";
 import { BRAND } from "@/brand";
 import { apiHandler } from "@/server/api";
 import { API_PATH } from "@/server/apiPath";
@@ -120,5 +121,17 @@ describe("the page", () => {
     view.unmount();
     release(new Response(JSON.stringify({ skills: [] })));
     await settle();
+  });
+
+  it("renders the standalone Developers page with launchpad, skills, and MCP instructions", async () => {
+    served(SELLER);
+    render(
+      <MemoryRouter>
+        <Developers />
+      </MemoryRouter>,
+    );
+    await settle();
+    expect(screen.getByRole("heading", { name: new RegExp(`Build with ${BRAND.name}`) })).toBeInTheDocument();
+    expect(screen.getByLabelText("Start the MCP server")).toHaveTextContent("node tools/quadra-mcp/index.mjs");
   });
 });

@@ -48,7 +48,7 @@ function DotMatrixArt({ variant }: { variant: "machine" | "disk" }) {
       };
       const poses = [samplePose(-.045, .97), samplePose(.065, .91)];
       const dotSize = (pixels: Uint8ClampedArray, offset: number) => {
-        const light = (pixels[offset] ?? 255) * .21 + (pixels[offset + 1] ?? 255) * .72 + (pixels[offset + 2] ?? 255) * .07;
+        const light = pixels[offset]! * .21 + pixels[offset + 1]! * .72 + pixels[offset + 2]! * .07;
         const density = disk ? (light - 8) / 180 : (247 - light) / 168;
         return Math.round(Math.min(1, Math.max(0, density)) * 4) / 4;
       };
@@ -66,24 +66,23 @@ function DotMatrixArt({ variant }: { variant: "machine" | "disk" }) {
       }).filter(dot => dot.sizes.some(size => size > 0));
 
       function draw(now: number) {
-        if (!canvas || !context) return;
-        const w = canvas.width;
-        const h = canvas.height;
+        const w = canvas!.width;
+        const h = canvas!.height;
         const time = motion.matches ? 0 : (now / 1000) * (disk ? 1 : 1.75);
         const phase = time % 12;
         const progress = Math.max(0, Math.min(1, phase - 4, 10 - phase));
         const mix = progress * progress * (3 - 2 * progress);
         const pitch = w / columns;
         const rowPitch = h / rows;
-        context.clearRect(0, 0, w, h);
-        context.fillStyle = disk ? "#f4f0e6" : "#2521c7";
-        context.beginPath();
+        context!.clearRect(0, 0, w, h);
+        context!.fillStyle = disk ? "#f4f0e6" : "#2521c7";
+        context!.beginPath();
         const cursor = pointer.current;
         hover = motion.matches ? 0 : hover + ((cursor.active ? 1 : 0) - hover) * .14;
         const hoverRadius = w * .13;
         const transitioning = mix > 0 && mix < 1;
         for (const { x, y, sizes, seed } of dots) {
-          const size = sizes[seed < mix ? 1 : 0] ?? 0;
+          const size = sizes[seed < mix ? 1 : 0]!;
           if (!size) continue;
           const dissolve = transitioning ? Math.min(1, Math.abs(seed - mix) / .095) : 1;
           const glitch = transitioning && (y + Math.floor(time * 7) * 13) % 47 === 0 ? 2 : 0;
@@ -101,10 +100,10 @@ function DotMatrixArt({ variant }: { variant: "machine" | "disk" }) {
             cy += dy * lift * .42;
           }
           const radius = pitch * .49 * size * dissolve * shimmer * (1 + lift * .9);
-          context.moveTo(cx + radius, cy);
-          context.arc(cx, cy, radius, 0, Math.PI * 2);
+          context!.moveTo(cx + radius, cy);
+          context!.arc(cx, cy, radius, 0, Math.PI * 2);
         }
-        context.fill();
+        context!.fill();
         if (!motion.matches) frame = requestAnimationFrame(draw);
       }
 

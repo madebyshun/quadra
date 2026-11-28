@@ -301,8 +301,12 @@ describe("the Coins window", () => {
     wallet(null);
     net({ rpc: chainRoutes(), get: getRoutes() });
     const open = vi.fn();
-    mount("/?do=coins", open);
+    const listView = mount("/?do=coins", open);
     await userEvent.click(await screen.findByRole("button", { name: `Open ${T}` }));
+    expect(open).toHaveBeenCalledWith(`token:${T.toLowerCase()}`);
+    listView.unmount();
+
+    mount(`/?do=coins&t=${T}`, open);
     expect(screen.getByLabelText("url")).toHaveTextContent(`t=${T}`);
     await waitFor(() => expect(screen.getByText(/· vs ETH · market cap ≈/)).toBeInTheDocument());
     expect(screen.getByText("test (test)", { selector: "strong" })).toBeInTheDocument();
@@ -322,8 +326,8 @@ describe("the Coins window", () => {
     // topbar Connect wallet opens the wallet window when desktop openWindow is present
     await userEvent.click(screen.getAllByRole("button", { name: "Connect wallet" })[0]!);
     expect(open).toHaveBeenCalledWith("wallet");
-    // the full page, with its sources, inside the Disclosures tab
-    await userEvent.click(screen.getByRole("tab", { name: "Disclosures" }));
+    // the full page, with its sources, inside the Pool tab
+    await userEvent.click(screen.getByRole("tab", { name: "Pool" }));
     expect(screen.getByText("Everything about test, with sources")).toBeInTheDocument();
     expect(screen.getByLabelText("test (test)")).toHaveTextContent(/Fees waiting.* ETH \+ 0 tokens waiting/);
     // not the creator's wallet: no collect
@@ -443,7 +447,7 @@ describe("the Coins window", () => {
     net({ rpc: chainRoutes(), get: getRoutes({ index: (u) => (u === `/api/launchpad/coin?token=${T}` ? served() : undefined), blockscout: (u) => (u === `${BLOCKSCOUT}/tokens/${T}` ? FX.tokenDegen : undefined) }) });
     mount(`/?do=coins&t=${T}`);
     await waitFor(() => expect(screen.getByLabelText("Numbers")).toHaveTextContent("Holders1,225,549"));
-    await userEvent.click(screen.getByRole("tab", { name: "Fees & Info" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Fees" }));
     expect(screen.getByLabelText("Info")).toHaveTextContent("CreatedOct 2, 2026");
   });
 
@@ -464,12 +468,42 @@ describe("the Coins window", () => {
     const row = (served() as { coin: unknown }).coin;
     net({ rpc: chainRoutes(), get: (u) => (u === V1_LOGS ? untimed : getRoutes({ index: (x) => (x === "/api/launchpad/coins" ? { coins: [row] } : undefined) })(u)) });
     const open = vi.fn();
-    mount("/?do=coins", open);
-    await userEvent.click(await screen.findByRole("button", { name: `Open ${T}` }));
-    await userEvent.click(await screen.findByRole("tab", { name: "Fees & Info" }));
+    mount(`/?do=coins&t=${T}`, open);
+    await userEvent.click(await screen.findByRole("tab", { name: "Fees" }));
     expect(await screen.findByLabelText("Info")).toHaveTextContent("Creatednot read");
     const strip = await screen.findByRole("group", { name: "Newest launches" });
     await userEvent.click(within(strip).getByRole("button"));
-    expect(open).toHaveBeenCalledWith("coins", { t: T });
+    expect(open).toHaveBeenCalledWith(`token:${T.toLowerCase()}`);
+  });
+
+  it("opens Stocks from the header button and opens a coin inline when outside desktop", async () => {
+    wallet(null);
+    net({ rpc: chainRoutes(), get: getRoutes() });
+    const open = vi.fn();
+    const v1 = mount("/?do=coins", open);
+    await screen.findByLabelText("Coins", { selector: "ul" });
+    await userEvent.click(screen.getByRole("button", { name: "Stocks" }));
+    expect(open).toHaveBeenCalledWith("stocks");
+    v1.unmount();
+
+    mount("/?do=coins", null);
+    await userEvent.click(await screen.findByRole("button", { name: `Open ${T}` }));
+    expect(screen.getByLabelText("url")).toHaveTextContent(`t=${T}`);
+  });
+
+  it("displays DexScreener liquidity and 24h volume in the Pool tab when available", async () => {
+    wallet(null);
+    const base = getRoutes();
+    net({
+      rpc: chainRoutes(),
+      get: (u) =>
+        u.startsWith("https://api.dexscreener.com/tokens/v1/base/") && u.toLowerCase().includes(T.toLowerCase())
+          ? [{ baseToken: { address: T, symbol: "test", name: "test" }, pairAddress: `0x${"11".repeat(20)}`, priceUsd: "0.01", liquidity: { usd: 12345 }, volume: { h24: 6789 } }]
+          : base(u),
+    });
+    mount(`/?do=coins&t=${T}`);
+    await userEvent.click(await screen.findByRole("tab", { name: "Pool" }));
+    expect(await screen.findByText("$12,345.00")).toBeInTheDocument();
+    expect(screen.getAllByText("$6,789.00").length).toBeGreaterThan(0);
   });
 });

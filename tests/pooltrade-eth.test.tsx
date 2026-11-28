@@ -138,8 +138,10 @@ describe("buying a stock-paired coin with ETH", () => {
     expect(screen.getByRole("status")).toHaveTextContent('The AAPLc stays in your wallet — buy TEST with it from the "Pay with AAPLc" tab.');
   });
 
-  it("keeps time from the clock by default", async () => {
+  it("keeps time from the clock by default and supports quick ETH amount presets", async () => {
     render(<PoolTradeEth pool={pool} symbol="TEST" />);
+    fireEvent.click(screen.getByRole("button", { name: "0.05 ETH" }));
+    expect(screen.getByLabelText("Amount of ETH")).toHaveValue("0.05");
     type("0.01");
     fireEvent.click(cta());
     await settle();
