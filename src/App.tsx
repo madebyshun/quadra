@@ -6,7 +6,8 @@ import { OpenWindowProvider } from "@/features/openWindow";
 import { Desktop } from "@/features/Desktop";
 import { FeaturePanel } from "@/features/FeaturePanel";
 import { DocWindow } from "@/features/DocWindow";
-import { comingSoon, folderItems, isFolder, resolveDoc, resolveFeature, windowTitle, type WindowId } from "@/features/registry";
+import { TokenWindow } from "@/features/panels/TokenWindow";
+import { comingSoon, folderItems, isFolder, isTokenWindow, resolveDoc, resolveFeature, tokenAddressOf, tokenWindowId, windowTitle, type WindowId } from "@/features/registry";
 import { Window } from "@/ui/Window";
 import { Taskbar } from "@/ui/Taskbar";
 import { Docs } from "@/pages/Docs";
@@ -93,7 +94,8 @@ function compactFolderHeight(id: WindowId): number | null {
 }
 
 function openAction(id: WindowId): { type: "open"; id: WindowId; origin: Origin; height: number } {
-  const tall = TALL_PANELS.has(id);
+  const tokenWin = isTokenWindow(id);
+  const tall = tokenWin || TALL_PANELS.has(id);
   const folderH = compactFolderHeight(id);
   /**
    * A tall panel never opens SHORTER than an ordinary one. `pageHeight` fits prose to the
@@ -110,8 +112,8 @@ function openAction(id: WindowId): { type: "open"; id: WindowId; origin: Origin;
         ? Math.max(DEFAULT_HEIGHT, pageHeight(window.innerHeight))
         : DEFAULT_HEIGHT;
   const origin = centeredOrigin(window.innerWidth, window.innerHeight, height);
-  if (!WIDE_PANELS.has(id)) return { type: "open", id, origin, height };
-  const targetWidth = LANDSCAPE_PANELS.has(id) ? LANDSCAPE_WIDTH : WIDE_WIDTH;
+  if (!tokenWin && !WIDE_PANELS.has(id)) return { type: "open", id, origin, height };
+  const targetWidth = tokenWin || LANDSCAPE_PANELS.has(id) ? LANDSCAPE_WIDTH : WIDE_WIDTH;
   // centeredOrigin always fits a width to the viewport; a wide window takes more of it, never less
   const width = Math.max(origin.width!, Math.min(targetWidth, window.innerWidth - 16));
   const x = Math.max(8, Math.round((window.innerWidth - width) / 2));
@@ -150,11 +152,19 @@ function Home({ introPlayed, onIntroDone }: { introPlayed: boolean; onIntroDone:
     setIntro(false);
   }, [onIntroDone]);
 
+  const [, setTitleTick] = useState(0);
+  const bumpTitles = useCallback(() => setTitleTick((n) => n + 1), []);
+
   /** Reads `?do=` exactly once, on mount — after that, the URL follows the topmost window, not the other way round. */
   useEffect(() => {
     if (openedFromUrl.current) return;
     openedFromUrl.current = true;
     const raw = params.get("do");
+    const t = params.get("t");
+    if (raw === "token" && t && /^0x[0-9a-fA-F]{40}$/.test(t)) {
+      dispatch(openAction(tokenWindowId(t)));
+      return;
+    }
     const initial = resolveFeature(raw) ?? resolveDoc(raw);
     if (initial) dispatch(openAction(initial.id));
   }, [params]);
@@ -180,15 +190,23 @@ function Home({ introPlayed, onIntroDone }: { introPlayed: boolean; onIntroDone:
       return;
     }
     const current = params.get("do");
+    const currentT = params.get("t")?.toLowerCase() ?? null;
+    const expectedDo = topId ? (isTokenWindow(topId) ? "token" : topId) : null;
+    const expectedT = topId && isTokenWindow(topId) ? tokenAddressOf(topId).toLowerCase() : null;
     const hasPending = Object.keys(pending.current).length > 0;
-    if (topId === current && !hasPending) return;
+    if (expectedDo === current && (!expectedT || expectedT === currentT) && !hasPending) return;
     const next = new URLSearchParams(params);
     if (!topId) {
       next.delete("do");
       for (const k of WINDOW_SCOPED_PARAMS) next.delete(k);
       pending.current = {};
+    } else if (isTokenWindow(topId)) {
+      for (const k of WINDOW_SCOPED_PARAMS) next.delete(k);
+      pending.current = {};
+      next.set("do", "token");
+      next.set("t", tokenAddressOf(topId));
     } else {
-      if (topId !== current) {
+      if (expectedDo !== current) {
         for (const k of WINDOW_SCOPED_PARAMS) {
           if (!(k in pending.current)) next.delete(k);
         }
@@ -287,7 +305,13 @@ function Home({ introPlayed, onIntroDone }: { introPlayed: boolean; onIntroDone:
               onResize: (width, height) => dispatch({ type: "resize", id: w.id, width, height }),
             }}
           >
-            {doc ? <DocWindow id={doc.id} /> : <FeaturePanel feature={resolveFeature(w.id)!} />}
+            {isTokenWindow(w.id) ? (
+              <TokenWindow address={tokenAddressOf(w.id)} onTitle={bumpTitles} />
+            ) : doc ? (
+              <DocWindow id={doc.id} />
+            ) : (
+              <FeaturePanel feature={resolveFeature(w.id)!} />
+            )}
           </Window>
         );
       })}

@@ -5,8 +5,7 @@ import { OpenWindowProvider } from "@/features/openWindow";
 import userEvent from "@testing-library/user-event";
 import { erc20Abi } from "viem";
 import { WETH } from "@/config/chain";
-import { CBBTC, DEFAULT_WATCH, THIN_MARKET_USD, watchKey } from "@/config/markets";
-import { ROBINHOOD } from "@/config/routes";
+import { CBBTC, DEFAULT_WATCH, watchKey } from "@/config/markets";
 import {
   baseStocks,
   stocksUrl,
@@ -31,7 +30,7 @@ import { loadWatch, saveWatch, WATCH_KEY } from "@/lib/watchlist";
 import { direction, formatChange, points, PriceChart, Sparkline } from "@/features/markets/Chart";
 import { MarketsProvider, REFRESH_MS, useMarkets } from "@/features/markets/MarketsProvider";
 import { MarketsGadget } from "@/features/markets/MarketsGadget";
-import { MarketsPanel, pausedText, STALE_MS } from "@/features/panels/MarketsPanel";
+import { MarketsPanel, pausedText } from "@/features/panels/MarketsPanel";
 import { copy } from "./fixtures/base";
 import { AAPL_ON_BASE, CAPTURED_AT, MARKETS_FX, NVDA_ON_BASE, SPY, TSLA, TSLA_PAIR, WETH_PAIR } from "./fixtures/markets";
 import { contractAt, DOWN, ethCalls, json, net, useNet } from "./net";
@@ -229,7 +228,7 @@ describe("the chart route", () => {
   it("refuses without the header, off the route, with the wrong method, or with a bad parameter", async () => {
     const handle = chartsHandler((() => Promise.reject(new Error("must not be called"))) as unknown as typeof fetch);
     expect((await handle(req(Q, { header: false }))).status).toBe(403);
-    expect((await handle(req(Q, { path: "/pools" }))).status).toBe(404);
+    expect((await handle(req(Q, { path: "/unknown" }))).status).toBe(404);
     expect((await handle(req(Q, { method: "POST" }))).status).toBe(405);
     const bad = await handle(req(Q.replace("limit=24", "limit=0")));
     expect(bad.status).toBe(400);
@@ -244,7 +243,7 @@ describe("DexScreener prices", () => {
   it("reads each token's deepest pair where it is the base token", () => {
     const got = parseSpots(MARKETS_FX.dexBase);
     expect([...got.keys()]).toEqual([WETH.address, CBBTC.address, NVDA_ON_BASE, AAPL_ON_BASE, "0x0b3e328455c4059eeb9e3f84b5543f74e24e7e1b"].map((a) => a.toLowerCase()));
-    expect(got.get(WETH.address.toLowerCase())).toEqual({ price: 2670.91, change: -1.7, depth: 4963660.28, pool: WETH_PAIR, symbol: "WETH", name: "Wrapped Ether" });
+    expect(got.get(WETH.address.toLowerCase())).toMatchObject({ price: 2670.91, change: -1.7, depth: 4963660.28, pool: WETH_PAIR, symbol: "WETH", name: "Wrapped Ether" });
     // a v4 pool id is 32 bytes
     expect(parseSpots(MARKETS_FX.dexRobinhood).get(TSLA.toLowerCase())!.pool).toBe(TSLA_PAIR);
   });
@@ -891,129 +890,6 @@ describe("the desktop gadget", () => {
 });
 
 describe("the Markets window", () => {
-  it("shows the selected asset's chart and every fact about it, with sources", async () => {
-    markets({ get: (u) => (u.includes("network=robinhood") ? trend(MARKETS_FX.tslaOhlcv, 2) : undefined) });
-    const { markets: m } = mountMarkets(<MarketsPanel />);
-    await settle();
-    await act(async () => m().select("stock:TSLA"));
-    expect(screen.getByRole("img", { name: "TSLA, 1D" })).toBeInTheDocument();
-    const facts = screen.getByRole("region", { name: "TSLA" });
-    expect(facts).toHaveTextContent("Robinhood's quote for the share (bid/ask mid)");
-    expect(facts).toHaveTextContent(`${ROBINHOOD.name} (${ROBINHOOD.id})`);
-    expect(within(facts).getByRole("link", { name: TSLA })).toHaveAttribute("href", `${ROBINHOOD.explorer}/token/${TSLA}`);
-    expect(facts).toHaveTextContent("Bid / ask");
-    expect(facts).toHaveTextContent("trading");
-    expect(facts).toHaveTextContent("Sources: Robinhood Stock Token API, DexScreener (price), GeckoTerminal via this app's server (chart)");
-    expect(facts).toHaveTextContent("Market depth$430,097 in the deepest pool");
-    expect(facts).not.toHaveTextContent("thin");
-    expect(facts).not.toHaveTextContent("stale");
-    expect(within(facts).getByText("−1.70% — DexScreener").closest(".report__row")).toHaveClass("report__row--warn");
-  });
-
-  it("marks a stale or halted quote and a missing day range", async () => {
-    markets({
-      get: (u) =>
-        u === `${STOCKS_PATH}/prices`
-          ? freshPrices((q) => Object.assign(q, { isTradingHalt: true, dailyHigh: null, generatedAt: new Date(Date.now() - STALE_MS - 60_000).toISOString() }))
-          : undefined,
-    });
-    const { markets: m } = mountMarkets(<MarketsPanel />);
-    await settle();
-    await act(async () => m().select("stock:TSLA"));
-    const facts = screen.getByRole("region", { name: "TSLA" });
-    expect(facts).toHaveTextContent("trading halted");
-    expect(facts).toHaveTextContent("— stale");
-    expect(facts).toHaveTextContent("Day rangenot reported");
-  });
-
-  it("shows a Base token's facts, and a longer range read for it alone from its own pool", async () => {
-    const rising = copy(MARKETS_FX.dexBase) as { priceChange: Json }[];
-    rising[0]!.priceChange.h24 = 3;
-    const calls = markets({ get: (u) => (u.startsWith(`${DEXSCREENER}/base/`) ? rising : undefined) });
-    mountMarkets(<MarketsPanel />);
-    await settle();
-    const facts = screen.getByRole("region", { name: "ETH" });
-    expect(facts).toHaveTextContent("its deepest DEX pair (DexScreener)");
-    expect(within(facts).getByText("+3.00% — DexScreener").closest(".report__row")).toHaveClass("report__row--ok");
-    expect(facts).not.toHaveTextContent("Bid / ask");
-    expect(within(facts).getByRole("link", { name: WETH.address })).toHaveAttribute("href", `https://basescan.org/token/${WETH.address}`);
-    await userEvent.click(screen.getByRole("button", { name: "7D" }));
-    await waitFor(() => expect(screen.getByRole("img", { name: "ETH, 7D" })).toBeInTheDocument());
-    expect(calls.some((c) => c.url.includes(`pool=${WETH_PAIR}`) && c.url.includes("aggregate=4&limit=42"))).toBe(true);
-  });
-
-  it("says a chart could not be read, says when one is still being read, and says a chart is remembered", async () => {
-    const stale = () => new Response(JSON.stringify(MARKETS_FX.wethOhlcv), { headers: { "x-quadra-stale": "1200" } });
-    markets({ get: (u) => (u.includes("aggregate=4") ? json({ detail: "GeckoTerminal answered 503." }, 502) : u.includes("network=base") ? stale() : undefined) });
-    const answered = globalThis.fetch;
-    vi.stubGlobal("fetch", (u: string, i?: RequestInit) => (u.includes("limit=30") ? new Promise<Response>(() => {}) : answered(u, i)));
-    mountMarkets(<MarketsPanel />);
-    await settle();
-    expect(screen.getByRole("region", { name: "ETH" })).toHaveTextContent("The chart is this app's remembered copy, 20 min old");
-    await userEvent.click(screen.getByRole("button", { name: "7D" }));
-    expect(await screen.findByLabelText("Chart unavailable")).toHaveTextContent("GeckoTerminal answered 503.");
-    await userEvent.click(screen.getByRole("button", { name: "30D" }));
-    expect(screen.getByText("Reading the chart…")).toBeInTheDocument();
-  });
-
-  it("shows a Coinbase stock by its name, shares per token, status and NAV — and says who may hold it", async () => {
-    markets();
-    const { markets: m } = mountMarkets(<MarketsPanel />);
-    await settle();
-    await act(async () => m().select("basestock:NVDA"));
-    const facts = screen.getByRole("region", { name: "NVDA" });
-    expect(facts).toHaveTextContent("NameNVIDIA Corporation");
-    expect(facts).toHaveTextContent("Shares per token1 — one token is not always one share");
-    expect(within(facts).getByText("nothing paused").closest(".report__row")).toHaveClass("report__row--ok");
-    expect(facts).toHaveTextContent(/Reference \(NAV\)\$231\.28 per token — Chainlink, .*; not a trade price/);
-    expect(facts).toHaveTextContent("Base (8453)");
-    expect(within(facts).getByRole("link", { name: NVDA_ON_BASE })).toHaveAttribute("href", `https://basescan.org/token/${NVDA_ON_BASE}`);
-    expect(facts).toHaveTextContent("only for persons in eligible jurisdictions outside the U.S.");
-    expect(facts).toHaveTextContent("Sources: Coinbase Tokenized Stocks API, DexScreener (price)");
-  });
-
-  it("marks a paused stock, a multiplier that is not one, and a NAV with no time or none at all", async () => {
-    const cb = copy(MARKETS_FX.coinbaseStocks) as { tokens: Json[] };
-    cb.tokens.find((t) => t.symbol === "GOOGLc")!.nav_price_updated_at = null;
-    markets({ get: (u) => (u === `${STOCKS_PATH}/base` ? cb : undefined) });
-    localStorage.setItem(WATCH_KEY, JSON.stringify([{ kind: "basestock", symbol: "DKNG" }, { kind: "basestock", symbol: "GOOGL" }, { kind: "basestock", symbol: "AMD" }]));
-    const { markets: m } = mountMarkets(<MarketsPanel />);
-    await settle();
-    const dkng = screen.getByRole("region", { name: "DKNG" });
-    expect(within(dkng).getByText("paused: transfers, minting, burning").closest(".report__row")).toHaveClass("report__row--bad");
-    await act(async () => m().select("basestock:GOOGL"));
-    const googl = screen.getByRole("region", { name: "GOOGL" });
-    expect(within(googl).getByText(/^1\.0003\d* — one token is not always one share$/).closest(".report__row")).toHaveClass("report__row--warn");
-    expect(googl).toHaveTextContent("time not reported");
-    await act(async () => m().select("basestock:AMD"));
-    expect(screen.getByRole("region", { name: "AMD" })).toHaveTextContent("Reference (NAV)not published");
-  });
-
-  it("warns that a thin market's price is rough", async () => {
-    markets({ get: (u) => (u.startsWith(`${DEXSCREENER}/base/`) ? dexAt(604.1) : undefined) });
-    localStorage.setItem(WATCH_KEY, JSON.stringify([{ kind: "basestock", symbol: "AAPL" }]));
-    mountMarkets(<MarketsPanel />);
-    await settle();
-    const facts = screen.getByRole("region", { name: "AAPL" });
-    expect(within(facts).getByText("$604 in the deepest pool — thin").closest(".report__row")).toHaveClass("report__row--warn");
-    expect(facts).toHaveTextContent(`Under $${THIN_MARKET_USD.toLocaleString("en-US")} of liquidity`);
-  });
-
-  it("shows a stock its list does not name as unnamed, with its reason", async () => {
-    markets();
-    localStorage.setItem(WATCH_KEY, JSON.stringify([{ kind: "basestock", symbol: "NOPE" }, { kind: "stock", symbol: "NOPE2" }]));
-    const { markets: m } = mountMarkets(<MarketsPanel />);
-    await settle();
-    const facts = screen.getByRole("region", { name: "NOPE" });
-    expect(facts).toHaveTextContent("not named by Coinbase's list of stocks on Base");
-    expect(facts).toHaveTextContent("Pricenot available");
-    expect(facts).toHaveTextContent("Market depthnot read");
-    await userEvent.click(screen.getByRole("button", { name: "7D" }));
-    expect(screen.getByText("Reading the chart…")).toBeInTheDocument();
-    await act(async () => m().select("stock:NOPE2"));
-    expect(screen.getByRole("region", { name: "NOPE2" })).toHaveTextContent("not named by Robinhood's list");
-  });
-
   it("adds a Base stock from Coinbase's list, before anything from Robinhood", async () => {
     markets();
     const { markets: m } = mountMarkets(<MarketsPanel />);
@@ -1054,7 +930,7 @@ describe("the Markets window", () => {
     expect(screen.getByLabelText("Base token address")).toHaveValue("");
   });
 
-  it("removes the selected asset, empties to a message, and resets", async () => {
+  it("removes a watched asset, empties to a message, and resets", async () => {
     markets();
     localStorage.setItem(WATCH_KEY, JSON.stringify([{ kind: "stock", symbol: "TSLA" }]));
     mountMarkets(<MarketsPanel />);
@@ -1066,14 +942,12 @@ describe("the Markets window", () => {
     expect(screen.getAllByRole("button", { name: /ETH|TSLA/ }).length).toBeGreaterThan(0);
   });
 
-  it("selects an asset from its own list", async () => {
+  it("renders no bottom detail panel and no Check buttons", async () => {
     markets();
     mountMarkets(<MarketsPanel />);
     await settle();
-    const list = within(screen.getByRole("region", { name: "Watchlist" }));
-    await userEvent.click(list.getByRole("button", { name: /SPY/ }));
-    expect(list.getByRole("button", { name: /SPY/ })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("region", { name: "SPY" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Check" })).toBeNull();
+    expect(screen.queryByRole("region", { name: /Selected market/ })).toBeNull();
   });
 });
 
@@ -1101,7 +975,7 @@ describe("the Markets window's table and directory", () => {
   const watchlist = () => screen.getByRole("region", { name: "Watchlist" });
   const marketNames = () => within(watchlist()).queryAllByRole("row").slice(1).map((r) => r.querySelector("strong")?.textContent);
 
-  it("filters by kind and by a search, sorts by each column both ways, and says when nothing matches", async () => {
+  it("filters by kind and by a search, sorts by Price, 24h Change, Vol 24h, Liquidity, and Oracle Gap, and says when nothing matches", async () => {
     markets();
     mountWithCommands();
     await settle();
@@ -1113,7 +987,7 @@ describe("the Markets window's table and directory", () => {
     expect(marketNames()).toContain("ETH");
     expect(marketNames()).not.toContain("NVDA");
     await userEvent.click(screen.getByRole("button", { name: "All" }));
-    for (const column of ["Price", "24h Change", "Liquidity", "Oracle Gap"]) {
+    for (const column of ["Price", "24h Change", "Vol 24h", "Liquidity", "Oracle Gap"]) {
       await userEvent.click(within(watchlist()).getByRole("button", { name: new RegExp(`^${column}`) }));
       const once = marketNames();
       await userEvent.click(within(watchlist()).getByRole("button", { name: new RegExp(`^${column}`) }));
@@ -1129,35 +1003,19 @@ describe("the Markets window's table and directory", () => {
     expect(screen.getByText("No markets match that filter.")).toBeInTheDocument();
   });
 
-  it("selects from the active strip, a row, its name or its actions, and runs Check, Price impact and Verdict as commands", async () => {
+  it("opens an independent token window when clicking an active pill, watchlist row, or Trade button", async () => {
     markets();
     const { open } = mountWithCommands();
     await settle();
     const pills = screen.getAllByRole("button", { pressed: false }).filter((b) => b.classList.contains("mk__pill"));
     await userEvent.click(pills[0]!);
-    expect(pills[0]).toHaveAttribute("aria-pressed", "true");
+    expect(open).toHaveBeenLastCalledWith(expect.stringMatching(/^token:0x[0-9a-f]{40}$/));
     const rows = within(watchlist()).getAllByRole("row").slice(1);
-    await userEvent.click(rows[1]!);
-    expect(rows[1]).toHaveAttribute("aria-selected", "true");
-    await userEvent.click(within(rows[0]!).getAllByRole("button")[0]!);
-    expect(rows[0]).toHaveAttribute("aria-selected", "true");
-    const withActions = rows.find((r) => within(r).queryByRole("button", { name: "Check" }))!;
-    await userEvent.click(within(withActions).getByRole("button", { name: "Inspect" }));
-    expect(withActions).toHaveAttribute("aria-selected", "true");
-    await userEvent.click(within(withActions).getByRole("button", { name: "Check" }));
-    expect(open).toHaveBeenLastCalledWith("safety", expect.objectContaining({ "run-safety": expect.stringMatching(/^verdict 0x/) }));
-    const nvda = rows.find((r) => r.textContent?.includes("NVDA"))!;
-    await userEvent.click(nvda);
-    const impact = screen.queryByRole("button", { name: "Price impact" });
-    if (impact) {
-      await userEvent.click(impact);
-      expect(open).toHaveBeenLastCalledWith("research", expect.objectContaining({ "run-research": expect.stringMatching(/^depth 0x/) }));
-      await userEvent.click(screen.getByRole("button", { name: "Token Verdict" }));
-      expect(open).toHaveBeenLastCalledWith("safety", expect.objectContaining({ "run-safety": expect.stringMatching(/^verdict 0x/) }));
-    }
+    await userEvent.click(within(rows[0]!).getByRole("button", { name: "Trade" }));
+    expect(open).toHaveBeenLastCalledWith(expect.stringMatching(/^token:0x[0-9a-f]{40}$/));
   });
 
-  it("lists every Base market in a directory: watch one, inspect a row, check one, and show more", async () => {
+  it("lists every Base market in a directory with Price, Vol 24h, Watch toggle, Trade token window, and Show more", async () => {
     markets();
     const { open } = mountWithCommands();
     await settle();
@@ -1167,20 +1025,9 @@ describe("the Markets window's table and directory", () => {
     const before = unwatched().length;
     await userEvent.click(within(unwatched()[0]!).getByRole("button", { name: "+ Watch" }));
     expect(unwatched().length).toBe(before - 1);
-    await userEvent.click(unwatched()[0]!);
-    expect(unwatched().length).toBe(before - 2);
-    await userEvent.click(within(dirRows()[0]!).getByRole("button", { name: "Check" }));
-    expect(open).toHaveBeenLastCalledWith("safety", expect.objectContaining({ "run-safety": expect.stringMatching(/^verdict 0x/) }));
-    const stocks = dirRows().filter((r) => r.textContent?.includes("STOCK") && within(r).queryByRole("button", { name: "+ Watch" }));
-    if (stocks[0]) {
-      await userEvent.click(within(stocks[0]).getByRole("button", { name: "+ Watch" }));
-    }
-    const more = within(directory).queryByRole("button", { name: /^Show more/ });
-    if (more) {
-      const n = dirRows().length;
-      await userEvent.click(more);
-      expect(dirRows().length).toBeGreaterThan(n);
-    }
+    await userEvent.click(within(dirRows()[0]!).getByRole("button", { name: "Trade" }));
+    expect(open).toHaveBeenLastCalledWith(expect.stringMatching(/^token:0x[0-9a-f]{40}$/));
+    expect(within(directory).queryByRole("button", { name: "Check" })).toBeNull();
   });
 });
 
@@ -1200,7 +1047,7 @@ describe("the Markets window's edges and table behavior", () => {
   }
   const watchlist = () => screen.getByRole("region", { name: "Watchlist" });
 
-  it("omits the inline trade box from Markets (trading lives in Stocks and Swap)", async () => {
+  it("omits the inline trade box from Markets (trading lives in independent Token windows)", async () => {
     markets();
     const m = mountAll();
     await settle();
@@ -1208,19 +1055,15 @@ describe("the Markets window's edges and table behavior", () => {
     expect(screen.queryByRole("complementary", { name: "Trade NVDA" })).toBeNull();
   });
 
-  it("marks a premium and a discount to NAV, a third click turns a sort back, and a row with no change shows none", async () => {
+  it("marks a premium and a discount to NAV in the Watchlist table and toggles column sort arrows", async () => {
     const dex = copy(MARKETS_FX.dexBase) as { baseToken: { symbol: string }; priceUsd: string; priceChange: Json }[];
     dex.find((p) => p.baseToken.symbol === "NVDAc")!.priceUsd = "240";
     delete dex.find((p) => p.baseToken.symbol === "cbBTC")!.priceChange.h24;
     markets({ get: (u) => (u.startsWith(`${DEXSCREENER}/base/`) ? dex : undefined) });
-    const m = mountAll();
+    mountAll();
     await settle();
     expect(within(watchlist()).getByText(/^\+3\.\d\d%$/)).toBeInTheDocument();
     expect(within(watchlist()).getByText(/^-0\.\d\d%$/)).toBeInTheDocument();
-    await act(async () => m().select("basestock:NVDA"));
-    expect(screen.getByText(/% \(premium\)/)).toBeInTheDocument();
-    await act(async () => m().select("basestock:AAPL"));
-    expect(screen.getByText(/% \(discount\)/)).toBeInTheDocument();
     const price = within(watchlist()).getByRole("button", { name: /^Price/ });
     await userEvent.click(price);
     expect(price).toHaveTextContent("↓");
@@ -1230,28 +1073,15 @@ describe("the Markets window's edges and table behavior", () => {
     expect(price).toHaveTextContent("↓");
   });
 
-  it("offers Inspect where no command can be run, and adds a Base stock from the directory by its row", async () => {
+  it("expands the Base directory with Show more and adds a Base stock via + Watch", async () => {
     const big = copy(MARKETS_FX.coinbaseStocks) as { tokens: Json[] };
     const base = big.tokens[0]!;
-    for (let i = 0; i < 30; i++) big.tokens.push({ ...base, contract_address: `0xb2000000000000000000${(1000 + i).toString(16).padStart(20, "0")}`, symbol: `ZZ${i}c`, name: `Test Co ${i}` });
+    for (let i = 0; i < 40; i++) big.tokens.push({ ...base, contract_address: `0xb2000000000000000000${(1000 + i).toString(16).padStart(20, "0")}`, symbol: `ZZ${i}c`, name: `Test Co ${i}` });
     markets({ get: (u) => (u === `${STOCKS_PATH}/base` ? big : undefined) });
-    const m = mountAll(vi.fn(), false);
-    await settle();
-    const inspect = within(watchlist()).getAllByRole("button", { name: "Inspect" })[0]!;
-    await userEvent.click(inspect);
-    expect(inspect).toHaveAttribute("aria-pressed", "true");
-    const directory = screen.getByRole("region", { name: "All Base markets" });
-    await userEvent.click(within(directory).getByRole("button", { name: /^Show more/ }));
-    const stockRow = (sym: string) => within(directory).getAllByRole("row").find((r) => r.querySelector("strong")?.textContent === sym)!;
-    await userEvent.click(stockRow("ZZ0c"));
-    expect(m().rows.some((r) => r.watch.kind === "basestock" && r.watch.symbol === "ZZ0")).toBe(true);
-  });
-
-  it("adds a Base stock from the directory's Watch button", async () => {
-    markets();
     const m = mountAll();
     await settle();
     const directory = screen.getByRole("region", { name: "All Base markets" });
+    await userEvent.click(within(directory).getByRole("button", { name: /^Show more/ }));
     const row = within(directory).getAllByRole("row").find((r) => r.textContent?.includes("STOCK") && within(r).queryByRole("button", { name: "+ Watch" }))!;
     await userEvent.click(within(row).getByRole("button", { name: "+ Watch" }));
     expect(m().rows.filter((r) => r.watch.kind === "basestock").length).toBeGreaterThan(2);

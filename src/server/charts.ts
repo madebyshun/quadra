@@ -59,6 +59,15 @@ export function tradesUpstreamUrl(search: URLSearchParams): string | { readonly 
   return `${GECKO}/networks/${network}/pools/${pool}/trades`;
 }
 
+/** The GeckoTerminal token-pools URL a request stands for, or why it is refused. */
+export function poolsUpstreamUrl(search: URLSearchParams): string | { readonly refused: string } {
+  const network = search.get("network") ?? "";
+  const token = search.get("token") ?? "";
+  if (!NETWORKS.has(network)) return { refused: "network must be base or robinhood." };
+  if (!TOKEN.test(token)) return { refused: "token must be an address." };
+  return `${GECKO}/networks/${network}/tokens/${token.toLowerCase()}/pools?page=1`;
+}
+
 export function chartsHandler(fetchImpl: typeof fetch = fetch, now: () => number = Date.now) {
   const cache = new Map<string, Entry>();
   /** one upstream request per URL at a time — ten tabs opening at once ask once */
@@ -97,9 +106,14 @@ export function chartsHandler(fetchImpl: typeof fetch = fetch, now: () => number
     const url = new URL(request.url);
     if (request.headers.get("x-quadra") !== "1") return problem(403, "Requests to this server need the x-quadra: 1 header.");
     const sub = url.pathname.slice(CHARTS_PATH.length);
-    if (sub !== "/ohlcv" && sub !== "/trades") return problem(404, "Only /ohlcv and /trades are served here.");
+    if (sub !== "/ohlcv" && sub !== "/trades" && sub !== "/pools") return problem(404, "Only /ohlcv, /trades, and /pools are served here.");
     if (request.method !== "GET") return problem(405, `${sub} takes GET.`);
-    const target = sub === "/trades" ? tradesUpstreamUrl(url.searchParams) : upstreamUrl(url.searchParams);
+    const target =
+      sub === "/trades"
+        ? tradesUpstreamUrl(url.searchParams)
+        : sub === "/pools"
+          ? poolsUpstreamUrl(url.searchParams)
+          : upstreamUrl(url.searchParams);
     if (typeof target !== "string") return problem(400, target.refused);
     const ttl = sub === "/trades" ? 30_000 : FRESH_MS;
     const cached = cache.get(target);

@@ -1,43 +1,29 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { baseStocks, candles, spots, type BaseStock, type Candle, type Range, type Spot } from "@/adapters/http/markets";
+import { useEffect, useMemo, useState } from "react";
+import { baseStocks, spots, type BaseStock, type Spot } from "@/adapters/http/markets";
 import { BASE, FLAGS, WETH } from "@/config/chain";
 import { ROBINHOOD } from "@/config/routes";
 import { assertChecksummedAddress, toChecksumAddress } from "@/lib/address";
 import { readToken } from "@/lib/erc20";
 import { messageOf } from "@/lib/errors";
-import { explorer, price } from "@/skills/format";
-import { THIN_MARKET_USD, TRADE_CRYPTO } from "@/config/markets";
-import { row, type Report, type Row } from "@/skills/types";
+import { compact, price } from "@/skills/format";
+import { TRADE_CRYPTO } from "@/config/markets";
 import { Crt } from "@/ui/Crt";
 import { Gel } from "@/ui/Gel";
 import { PlatinumSelect } from "@/ui/Select";
-import { ReportView } from "@/features/panels/ReportView";
-import { formatChange, PriceChart, Sparkline } from "@/features/markets/Chart";
+import { formatChange, Sparkline } from "@/features/markets/Chart";
 import { useMarkets, type MarketRow } from "@/features/markets/MarketsProvider";
 import { depth, thin } from "@/features/markets/Rows";
-import { useRunCommand } from "@/features/openWindow";
+import { useOpenWindow } from "@/features/openWindow";
+import { tokenWindowId } from "@/features/registry";
 
 /**
- * The Markets window — live prices, 24h sparklines, pool depth, Chainlink NAV drift, and
- * watchlist inspection across Base crypto and tokenized stocks (trading lives in Stocks / Swap).
+ * The Markets window — live prices, 24h volume, 24h sparklines, pool depth, and Chainlink NAV
+ * drift across Base crypto and tokenized stocks. Clicking any asset opens its own independent
+ * Token window so users can view and trade multiple tokens simultaneously.
  */
-
-const RANGES: readonly Range[] = ["1D", "7D", "30D"];
 
 /** A stock quote older than this is shown as stale — a price is a claim about a moment. */
 export const STALE_MS = 10 * 60_000;
-
-const UNLISTED = {
-  token: "",
-  basestock: "not named by Coinbase's list of stocks on Base",
-  stock: "not named by Robinhood's list",
-} as const;
-
-const SOURCE = {
-  token: null,
-  basestock: "Coinbase Tokenized Stocks API",
-  stock: "Robinhood Stock Token API",
-} as const;
 
 /** B20's pausable features, by number (docs.base.org, B20 "Pause Transfers"). */
 export const B20_FEATURES = ["transfers", "minting", "burning", "seizing"] as const;
@@ -47,84 +33,12 @@ export function pausedText(paused: readonly number[]): string {
 }
 
 type KindFilter = "all" | "stocks" | "crypto";
-type SortKey = "depth" | "price" | "change" | "drift";
+type SortKey = "depth" | "volume" | "price" | "change" | "drift";
 
 function driftPct(r: MarketRow): number | null {
   const nav = r.stock?.nav ?? null;
   if (r.price === null || nav === null || nav <= 0) return null;
   return ((r.price - nav) / nav) * 100;
-}
-
-function details(r: MarketRow, now: number): Report {
-  const chain = r.venue === "base" ? `${BASE.name} (${BASE.id})` : `${ROBINHOOD.name} (${ROBINHOOD.id})`;
-  const link =
-    r.address === null ? null : r.venue === "base" ? explorer.token(r.address) : `${ROBINHOOD.explorer}/token/${r.address}`;
-  const q = r.quote;
-  const kind = r.watch.kind;
-  const b = r.stock;
-  const rows: Row[] = [
-    ...(r.name ? [row("Name", r.name)] : []),
-    row(
-      "Price",
-      r.price === null
-        ? "not available"
-        : `${price(r.price)} — ${q ? "Robinhood's quote for the share (bid/ask mid)" : "its deepest DEX pair (DexScreener)"}`,
-    ),
-    row("24h change", `${formatChange(r.change)} — DexScreener`, r.change === null ? {} : { tone: r.change >= 0 ? "ok" : "warn" }),
-    row(
-      "Market depth",
-      r.depth === null ? "not read" : `${depth(r.depth)} in the deepest pool${r.depth < THIN_MARKET_USD ? " — thin" : ""}`,
-      thin(r) ? { tone: "warn" } : {},
-    ),
-    ...(b
-      ? [
-          row("Shares per token", `${b.multiplier} — one token is not always one share`, b.multiplier === 1 ? {} : { tone: "warn" }),
-          row("Status", pausedText(b.paused), b.paused.length ? { tone: "bad" } : { tone: "ok" }),
-          row(
-            "Reference (NAV)",
-            b.nav === null
-              ? "not published"
-              : `${price(b.nav)} per token — Chainlink, ${b.navAt ? b.navAt.toLocaleString() : "time not reported"}; not a trade price`,
-          ),
-        ]
-      : []),
-    row("Chain", chain),
-    row("Contract", r.address === null ? UNLISTED[kind] : toChecksumAddress(r.address), link ? { href: link } : {}),
-    ...(q
-      ? [
-          row("Bid / ask", `${price(q.bid)} / ${price(q.ask)}`),
-          row("Day range", q.low === null || q.high === null ? "not reported" : `${price(q.low)} – ${price(q.high)}`),
-          row("Status", q.halted ? "trading halted" : "trading", q.halted ? { tone: "bad" } : {}),
-          row(
-            "Quoted",
-            `${q.at.toLocaleTimeString()}${now - q.at.getTime() > STALE_MS ? " — stale" : ""}`,
-            now - q.at.getTime() > STALE_MS ? { tone: "warn" } : {},
-          ),
-        ]
-      : []),
-  ];
-  return {
-    title: r.label,
-    rows,
-    notes: [
-      ...(r.problem ? [r.problem] : []),
-      ...(thin(r) ? [`Under ${depth(THIN_MARKET_USD)} of liquidity: a small trade can move this price a long way, so read it as a rough figure.`] : []),
-      ...(r.staleSeconds !== null
-        ? [`The chart is this app's remembered copy, ${Math.round(r.staleSeconds / 60)} min old — GeckoTerminal is not answering right now.`]
-        : []),
-      ...(kind === "basestock"
-        ? [
-            "A Coinbase tokenized stock on Base (B20), identified by Coinbase's own list — never by a ticker on a DEX. Its price is its DEX market on Base, which can drift from the NAV. Coinbase tokenized stocks are only for persons in eligible jurisdictions outside the U.S.",
-          ]
-        : []),
-      ...(q
-        ? [
-            "A stock's price is Robinhood's quote for the underlying share, not multiplied by the token's corporate-action multiplier. Its chart is trades of the token on Robinhood Chain, which can drift from the quote.",
-          ]
-        : []),
-    ],
-    sources: [SOURCE[kind], "DexScreener (price)", "GeckoTerminal via this app's server (chart)"].filter((s): s is string => s !== null),
-  };
 }
 
 const BASE_CRYPTO_DIRECTORY = [
@@ -134,17 +48,17 @@ const BASE_CRYPTO_DIRECTORY = [
 
 export function MarketsPanel() {
   const { rows, symbols, baseSymbols, baseCatalog, focus, select, add, remove, reset } = useMarkets();
-  const runCommand = useRunCommand();
-  const detailRef = useRef<HTMLElement | null>(null);
-  const selected = rows.find((r) => r.key === focus) ?? rows[0] ?? null;
-  const [range, setRange] = useState<Range>("1D");
-  const [chart, setChart] = useState<{ key: string; range: Range; series: readonly Candle[] | string } | null>(null);
+  const openWindow = useOpenWindow();
   const [kind, setKind] = useState<KindFilter>("all");
   const [query, setQuery] = useState("");
-  const [dirLimit, setDirLimit] = useState(24);
+  const [dirLimit, setDirLimit] = useState(32);
   const [dirSpots, setDirSpots] = useState<Map<string, Spot>>(new Map());
   const [extraStocks, setExtraStocks] = useState<readonly BaseStock[]>([]);
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "depth", dir: -1 });
+  const [stock, setStock] = useState("");
+  const [baseStock, setBaseStock] = useState("");
+  const [token, setToken] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (baseCatalog.length > 0) return;
@@ -158,40 +72,17 @@ export function MarketsPanel() {
       live = false;
     };
   }, [baseCatalog.length]);
-  const [stock, setStock] = useState("");
-  const [baseStock, setBaseStock] = useState("");
-  const [token, setToken] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
-  const key = selected?.key ?? null;
-  const venue = selected?.venue ?? null;
-  const pool = selected?.pool ?? null;
-  const address = selected?.address ?? null;
-  useEffect(() => {
-    if (key === null || range === "1D" || pool === null || address === null || venue === null) return;
-    let live = true;
-    candles(venue, pool, address, range).then(
-      (c) => live && setChart({ key, range, series: c.candles }),
-      (e: unknown) => live && setChart({ key, range, series: messageOf(e) }),
-    );
-    return () => {
-      live = false;
-    };
-  }, [key, venue, pool, address, range]);
-
-  const series: readonly Candle[] | string | null =
-    selected === null
-      ? null
-      : range === "1D"
-        ? (selected.series ?? selected.chartProblem)
-        : chart?.key === selected.key && chart.range === range
-          ? chart.series
-          : null;
+  const openToken = (address: string | null, label: string) => {
+    if (!address || !openWindow) return;
+    openWindow(tokenWindowId(address, label));
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const val = (r: MarketRow): number | null => {
       if (sort.key === "depth") return r.depth;
+      if (sort.key === "volume") return r.volume24h ?? null;
       if (sort.key === "price") return r.price;
       if (sort.key === "change") return r.change;
       return driftPct(r);
@@ -207,7 +98,7 @@ export function MarketsPanel() {
         return (
           r.label.toLowerCase().includes(q) ||
           (r.name?.toLowerCase().includes(q) ?? false) ||
-          (r.address?.toLowerCase() === q)
+          r.address?.toLowerCase() === q
         );
       })
       .sort((a, b) => {
@@ -238,6 +129,30 @@ export function MarketsPanel() {
   const stockCount = allBaseSymbols.length || rows.filter((r) => r.watch.kind === "basestock").length;
 
   const watchedAddrs = useMemo(() => new Set(rows.map((r) => r.address?.toLowerCase()).filter(Boolean)), [rows]);
+
+  // Pre-fetch DexScreener spots for crypto + first 120 Base stocks so the directory populates Price, Vol 24h, Change, and Liquidity.
+  const preloadKey = useMemo(
+    () => [...BASE_CRYPTO_DIRECTORY.map((c) => c.address.toLowerCase()), ...catalog.slice(0, 120).map((s) => s.address.toLowerCase())].join(","),
+    [catalog],
+  );
+  useEffect(() => {
+    if (!preloadKey) return;
+    let live = true;
+    void spots("base", preloadKey.split(","))
+      .then((found) => {
+        if (!live) return;
+        setDirSpots((prev) => {
+          const next = new Map(prev);
+          for (const [k, v] of found) next.set(k, v);
+          return next;
+        });
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [preloadKey]);
+
   const directory = useMemo(() => {
     const q = query.trim().toLowerCase();
     const cryptoItems = BASE_CRYPTO_DIRECTORY.map((c) => ({
@@ -259,30 +174,54 @@ export function MarketsPanel() {
       nav: s.nav,
     }));
     const all = kind === "crypto" ? cryptoItems : kind === "stocks" ? stockItems : [...cryptoItems, ...stockItems];
-    return all.filter(
-      (item) =>
-        !q ||
-        item.ticker.toLowerCase().includes(q) ||
-        item.symbol.toLowerCase().includes(q) ||
-        item.name.toLowerCase().includes(q) ||
-        item.address.toLowerCase() === q,
-    );
-  }, [catalog, kind, query]);
+    return all
+      .filter(
+        (item) =>
+          !q ||
+          item.ticker.toLowerCase().includes(q) ||
+          item.symbol.toLowerCase().includes(q) ||
+          item.name.toLowerCase().includes(q) ||
+          item.address.toLowerCase() === q,
+      )
+      .sort((a, b) => {
+        const sa = dirSpots.get(a.address.toLowerCase());
+        const sb = dirSpots.get(b.address.toLowerCase());
+        const la = sa?.depth ?? -1;
+        const lb = sb?.depth ?? -1;
+        if (la !== lb) return lb - la;
+        const pa = sa?.price ?? a.nav ?? -1;
+        const pb = sb?.price ?? b.nav ?? -1;
+        if (pa !== pb) return pb - pa;
+        return a.symbol.localeCompare(b.symbol);
+      });
+  }, [catalog, kind, query, dirSpots]);
 
   const visibleDir = useMemo(() => directory.slice(0, dirLimit), [directory, dirLimit]);
-  const visibleDirKey = useMemo(() => visibleDir.map((d) => d.address.toLowerCase()).join(","), [visibleDir]);
+  const missingVisibleKey = useMemo(
+    () =>
+      visibleDir
+        .filter((d) => !dirSpots.has(d.address.toLowerCase()))
+        .map((d) => d.address.toLowerCase())
+        .join(","),
+    [visibleDir, dirSpots],
+  );
   useEffect(() => {
-    if (!visibleDirKey) return;
-    void spots("base", visibleDirKey.split(","))
-      .then((found) =>
+    if (!missingVisibleKey) return;
+    let live = true;
+    void spots("base", missingVisibleKey.split(","))
+      .then((found) => {
+        if (!live || found.size === 0) return;
         setDirSpots((prev) => {
           const next = new Map(prev);
           for (const [k, v] of found) next.set(k, v);
           return next;
-        }),
-      )
+        });
+      })
       .catch(() => {});
-  }, [visibleDirKey]);
+    return () => {
+      live = false;
+    };
+  }, [missingVisibleKey]);
 
   const toggleSort = (next: SortKey) =>
     setSort((cur) => ({ key: next, dir: cur.key === next ? (cur.dir === -1 ? 1 : -1) : -1 }));
@@ -300,15 +239,13 @@ export function MarketsPanel() {
     }
   };
 
-  const selectedDrift = selected ? driftPct(selected) : null;
-
   return (
     <div className="stack">
       <header className="mk__hero">
         <div>
           <p className="mk__eyebrow">BASE 8453 / MARKETS</p>
           <h3 className="mk__title">Base Markets</h3>
-          <p className="mk__sub">Live prices, 24h sparklines, pool depth, and Chainlink NAV drift across Base crypto and tokenized stocks.</p>
+          <p className="mk__sub">Live prices, 24h volume, sparklines, and liquidity across Base crypto and tokenized stocks. Click any asset to open its own trading window.</p>
         </div>
         <img className="feature-banner__art" src="/brand/banners/quadra-trade-depth.svg" width="160" height="120" alt="" />
         <dl className="mk__kpis">
@@ -335,8 +272,11 @@ export function MarketsPanel() {
               key={`tr:${r.key}`}
               type="button"
               className="mk__pill"
-              aria-pressed={selected?.key === r.key}
-              onClick={() => select(r.key)}
+              aria-pressed={focus === r.key}
+              onClick={() => {
+                select(r.key);
+                openToken(r.address, r.label);
+              }}
             >
               <strong>{r.label}</strong>
               <span>{price(r.price!)}</span>
@@ -370,7 +310,11 @@ export function MarketsPanel() {
 
       <div className="markets">
         <div className="mk__table-wrap" aria-label="Watchlist" role="region">
-          {rows.length === 0 ? null : filtered.length === 0 ? (
+          {rows.length === 0 ? (
+            <p className="panel__lede" style={{ padding: "12px" }}>
+              The watchlist is empty. Add a Base stock or a Base token below, or reset it.
+            </p>
+          ) : filtered.length === 0 ? (
             <p className="panel__lede" style={{ padding: "12px" }}>
               No markets match that filter.
             </p>
@@ -388,6 +332,11 @@ export function MarketsPanel() {
                   <th className="num">
                     <button type="button" className="mk__sort" onClick={() => toggleSort("change")}>
                       24h Change {arrow("change")}
+                    </button>
+                  </th>
+                  <th className="num">
+                    <button type="button" className="mk__sort" onClick={() => toggleSort("volume")}>
+                      Vol 24h {arrow("volume")}
                     </button>
                   </th>
                   <th className="num">
@@ -410,8 +359,11 @@ export function MarketsPanel() {
                   return (
                     <tr
                       key={r.key}
-                      aria-selected={selected?.key === r.key}
-                      onClick={() => select(r.key)}
+                      aria-selected={focus === r.key}
+                      onClick={() => {
+                        select(r.key);
+                        openToken(r.address, r.label);
+                      }}
                     >
                       <td className="mono dim">{idx + 1}</td>
                       <td>
@@ -420,10 +372,11 @@ export function MarketsPanel() {
                             <button
                               type="button"
                               className="mk__sort"
-                              aria-pressed={selected?.key === r.key}
+                              aria-pressed={focus === r.key}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 select(r.key);
+                                openToken(r.address, r.label);
                               }}
                             >
                               <strong>{r.label}</strong>
@@ -445,6 +398,7 @@ export function MarketsPanel() {
                           {r.series ? <Sparkline series={r.series} label={`${r.label}, last 24 hours`} /> : <span className="spark--none">—</span>}
                         </div>
                       </td>
+                      <td className="num">{r.volume24h === null ? "—" : `$${compact(r.volume24h)}`}</td>
                       <td className="num">{r.depth === null ? "—" : depth(r.depth)}</td>
                       <td className="num">
                         {gap === null ? (
@@ -458,30 +412,30 @@ export function MarketsPanel() {
                       </td>
                       <td className="num">
                         <div className="mk__actions">
-                          <button
-                            type="button"
-                            className="chip"
-                            aria-pressed={selected?.key === r.key}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              select(r.key);
-                              detailRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                            }}
-                          >
-                            Inspect
-                          </button>
-                          {runCommand && r.address ? (
+                          {r.address && openWindow ? (
                             <button
                               type="button"
                               className="chip"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                runCommand(`verdict ${r.address}`);
+                                select(r.key);
+                                openToken(r.address, r.label);
                               }}
                             >
-                              Check
+                              Trade
                             </button>
                           ) : null}
+                          <button
+                            type="button"
+                            className="chip"
+                            aria-label={`Remove ${r.label} from the watchlist`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              remove(r.key);
+                            }}
+                          >
+                            Watching
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -506,6 +460,7 @@ export function MarketsPanel() {
                   <th>Asset</th>
                   <th className="num">Price</th>
                   <th className="num">24h Change</th>
+                  <th className="num">Vol 24h</th>
                   <th className="num">Liquidity</th>
                   <th className="num">Action</th>
                 </tr>
@@ -518,10 +473,7 @@ export function MarketsPanel() {
                   return (
                     <tr
                       key={item.key}
-                      onClick={() => {
-                        if (item.kind === "stocks") add({ kind: "basestock", symbol: item.ticker });
-                        else add({ kind: "token", address: item.address, label: item.symbol });
-                      }}
+                      onClick={() => openToken(item.address, item.ticker)}
                     >
                       <td>
                         <div className="mk__asset">
@@ -540,9 +492,22 @@ export function MarketsPanel() {
                           <span className="dim">—</span>
                         )}
                       </td>
+                      <td className="num">{sp?.volume24h != null ? `$${compact(sp.volume24h)}` : <span className="dim">—</span>}</td>
                       <td className="num">{sp?.depth != null ? depth(sp.depth) : <span className="dim">—</span>}</td>
                       <td className="num">
                         <div className="mk__actions">
+                          {openWindow ? (
+                            <button
+                              type="button"
+                              className="chip"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openToken(item.address, item.ticker);
+                              }}
+                            >
+                              Trade
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             className="chip"
@@ -555,18 +520,6 @@ export function MarketsPanel() {
                           >
                             {isWatched ? "Watching" : "+ Watch"}
                           </button>
-                          {runCommand ? (
-                            <button
-                              type="button"
-                              className="chip"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                runCommand(`verdict ${item.address}`);
-                              }}
-                            >
-                              Check
-                            </button>
-                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -583,71 +536,6 @@ export function MarketsPanel() {
             ) : null}
           </div>
         </section>
-
-        {selected === null ? (
-          <p className="panel__lede">The watchlist is empty. Add a Base stock or a Base token below, or reset it.</p>
-        ) : (
-          <section ref={detailRef} className="mk__detail" aria-label={`Selected market ${selected.label}`}>
-            <div className="mk__detail-head">
-              <div>
-                <h3 className="mk__detail-title">
-                  {selected.label}
-                  {selected.name ? ` — ${selected.name}` : ""}
-                </h3>
-                <span className="mono dim">
-                  {selected.price !== null ? price(selected.price) : "—"} · 24h {formatChange(selected.change)}
-                  {selected.depth !== null ? ` · depth ${depth(selected.depth)}` : ""}
-                </span>
-              </div>
-              <div className="group__row group__row--actions" role="group" aria-label="Range" style={{ margin: 0 }}>
-                {RANGES.map((r) => (
-                  <button key={r} type="button" className="chip chip--mode" aria-pressed={r === range} onClick={() => setRange(r)}>
-                    {r}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {selectedDrift !== null && selected.stock?.nav != null ? (
-              <div className="mk__drift">
-                <span>
-                  DEX vs Chainlink NAV ({price(selected.stock.nav)}):{" "}
-                  <strong className={selectedDrift >= 0 ? "up" : "down"}>
-                    {selectedDrift >= 0 ? "+" : ""}
-                    {selectedDrift.toFixed(2)}% ({selectedDrift >= 0 ? "premium" : "discount"})
-                  </strong>
-                </span>
-                {runCommand && selected.address ? (
-                  <div className="mk__actions">
-                    <button type="button" className="chip" onClick={() => runCommand(`depth ${selected.address}`)}>
-                      Price impact
-                    </button>
-                    <button type="button" className="chip" onClick={() => runCommand(`verdict ${selected.address}`)}>
-                      Token Verdict
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            <div className="stack">
-              {typeof series === "string" ? (
-                <Crt label="Chart unavailable">
-                  <span className="crt__amber">{series}</span>
-                </Crt>
-              ) : series === null ? (
-                <p className="dim">Reading the chart…</p>
-              ) : (
-                <PriceChart series={series} label={`${selected.label}, ${range}`} format={price} />
-              )}
-
-              <ReportView report={details(selected, Date.now())} />
-              <Gel quiet onClick={() => remove(selected.key)}>
-                Remove {selected.label} from the watchlist
-              </Gel>
-            </div>
-          </section>
-        )}
       </div>
 
       <fieldset className="group">

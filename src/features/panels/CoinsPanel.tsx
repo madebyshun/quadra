@@ -10,6 +10,7 @@ import { chainToken } from "@/skills/chaintoken";
 import { explorer, short, usd } from "@/skills/format";
 import { deepest, marketsOf, type Market } from "@/skills/dexscreener";
 import { useOpenWindow } from "@/features/openWindow";
+import { tokenWindowId } from "@/features/registry";
 import {
   isV3,
   launchesBy,
@@ -205,7 +206,7 @@ export function coinReport(
   };
 }
 
-function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | null; onBack: () => void }) {
+export function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | null; onBack: () => void }) {
   const { wallet, signingProvider, connectInjected, busy } = useWalletSession();
   const openWindow = useOpenWindow();
   const ready = wallet?.kind === "ready" ? wallet : null;
@@ -339,7 +340,7 @@ function CoinPage({ token, listed, onBack }: { token: string; listed: Listed | n
           <CoinShare c={{ token, name: facts.name, symbol: facts.symbol, pair: value.quoteSymbol, cap: valueText(value).replace(/^market cap ≈ /, "") }} />
         </div>
       ) : null}
-      <NewLaunches onOpen={(t) => openWindow?.("coins", { t })} />
+      <NewLaunches onOpen={(t) => openWindow?.(tokenWindowId(t))} />
 
       <header className="coin__header">
         <p className="coin__head">
@@ -538,7 +539,11 @@ export function CoinsPanel() {
     );
   }, []);
 
-  const open = (token: string | null) => {
+  const open = (token: string | null, symbol?: string) => {
+    if (token && openWindow) {
+      openWindow(tokenWindowId(token, symbol));
+      return;
+    }
     const next = new URLSearchParams(params);
     if (token) next.set("t", token);
     else next.delete("t");
@@ -658,7 +663,7 @@ export function CoinsPanel() {
               return (
                 <li key={`${c.token}:${c.tx}`} className={`coins__item${isOfficial ? " coins__item--official" : ""}`}>
                   <div className="coins__cell-main">
-                    <button type="button" className="coins__name-btn" aria-label={`Open ${c.token}`} onClick={() => open(c.token)}>
+                    <button type="button" className="coins__name-btn" aria-label={`Open ${c.token}`} onClick={() => open(c.token, c.facts?.symbol)}>
                       {c.facts ? `${c.facts.name} (${c.facts.symbol})` : short(c.token)}
                     </button>
                     <div className="coins__sub-actions">

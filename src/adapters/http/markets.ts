@@ -49,6 +49,10 @@ export type Spot = {
   readonly change: number | null;
   /** USD liquidity of that pair */
   readonly depth: number | null;
+  /** 24h USD trading volume of that pair */
+  readonly volume24h?: number | null;
+  /** DEX identifier from DexScreener */
+  readonly dexId?: string | null;
   /** the pair's address — GeckoTerminal's pool id for the same market */
   readonly pool: string;
   readonly symbol: string | null;
@@ -63,10 +67,14 @@ export function parseSpots(body: unknown): Map<string, Spot> {
     const token = strOf(base.address)?.toLowerCase();
     const pool = strOf(p.pairAddress);
     if (!token || !pool || !POOL_ID.test(pool)) continue;
+    const vol = numOf(objAt(p, "volume").h24);
+    const dexId = strOf(p.dexId);
     const spot: Spot = {
       price: numOf(p.priceUsd),
       change: numOf(objAt(p, "priceChange").h24),
       depth: numOf(objAt(p, "liquidity").usd),
+      ...(vol !== null ? { volume24h: vol } : {}),
+      ...(dexId !== null ? { dexId } : {}),
       pool,
       symbol: strOf(base.symbol),
       name: strOf(base.name),
@@ -178,7 +186,7 @@ export type PoolTradeItem = {
   readonly trader: string | null;
 };
 
-export function parsePoolTrades(body: unknown, token: string): PoolTradeItem[] {
+export function parsePoolTrades(body: unknown, token: string, isBase?: boolean): PoolTradeItem[] {
   const lower = token.toLowerCase();
   const out: PoolTradeItem[] = [];
   for (const item of listOf(isObj(body) ? body.data : null)) {
@@ -192,12 +200,14 @@ export function parsePoolTrades(body: unknown, token: string): PoolTradeItem[] {
     const toAddr = strOf(attr.to_token_address)?.toLowerCase();
     const fromAmt = numOf(attr.from_token_amount) ?? 0;
     const toAmt = numOf(attr.to_token_amount) ?? 0;
-    const tokens = toAddr === lower ? toAmt : fromAddr === lower ? fromAmt : kind === "buy" ? toAmt : fromAmt;
+    const side: "buy" | "sell" =
+      isBase === false ? (kind === "buy" ? "sell" : "buy") : kind;
+    const tokens = toAddr === lower ? toAmt : fromAddr === lower ? fromAmt : side === "buy" ? toAmt : fromAmt;
     const priceUsd = toAddr === lower ? numOf(attr.price_to_in_usd) : fromAddr === lower ? numOf(attr.price_from_in_usd) : numOf(attr.price_to_in_usd);
     out.push({
       at: Math.floor(ts / 1000),
       tx,
-      side: kind,
+      side,
       tokens,
       usd: numOf(attr.volume_in_usd),
       priceUsd,
@@ -208,11 +218,74 @@ export function parsePoolTrades(body: unknown, token: string): PoolTradeItem[] {
 }
 
 /** Recent trades for `pool` on `venue`, through this app's server (`/api/charts/trades`). */
-export async function poolTrades(venue: Venue, pool: string, token: string): Promise<readonly PoolTradeItem[]> {
+export async function poolTrades(venue: Venue, pool: string, token: string, isBase?: boolean): Promise<readonly PoolTradeItem[]> {
   const q = new URLSearchParams({ network: venue, pool });
   const res = await fetch(`${CHARTS_PATH}/trades?${q}`, { headers: { [SERVER_HEADER]: "1" } });
   if (!res.ok) throw new Error(`Trades unavailable (HTTP ${res.status}).`);
-  return parsePoolTrades(await res.json(), token);
+  return parsePoolTrades(await res.json(), token, isBase);
+}
+
+/** One GeckoTerminal pool for a token — mirrors Blue Agent's multi-pool ranking. */
+export type TokenPoolInfo = {
+  readonly address: string;
+  readonly name: string;
+  readonly dex: string;
+  readonly liquidityUsd: number | null;
+  readonly volume24hUsd: number | null;
+  readonly priceUsd: number | null;
+  readonly change24hPct: number | null;
+  /** True when our token is the pool's base token. */
+  readonly isBase: boolean;
+};
+
+export function parseTokenPools(body: unknown, token: string): TokenPoolInfo[] {
+  const lower = token.toLowerCase();
+  const items: TokenPoolInfo[] = [];
+  for (const item of listOf(isObj(body) ? body.data : null)) {
+    if (!isObj(item)) continue;
+    const attr = objAt(item, "attributes");
+    const rel = objAt(item, "relationships");
+    const addr = strOf(attr.address);
+    if (!addr || !POOL_ID.test(addr)) continue;
+    const baseId = strOf(objAt(objAt(rel, "base_token"), "data").id)?.toLowerCase() ?? "";
+    const isBase = baseId.endsWith(lower);
+    const dex = strOf(objAt(objAt(rel, "dex"), "data").id) ?? "dex";
+    const liq = numOf(attr.reserve_in_usd);
+    const vol = numOf(objAt(attr, "volume_usd").h24);
+    const px = numOf(isBase ? attr.base_token_price_usd : attr.quote_token_price_usd);
+    const chg = isBase ? numOf(objAt(attr, "price_change_percentage").h24) : null;
+    items.push({
+      address: addr,
+      name: strOf(attr.name) ?? shortPoolName(addr),
+      dex,
+      liquidityUsd: liq,
+      volume24hUsd: vol,
+      priceUsd: px,
+      change24hPct: chg,
+      isBase,
+    });
+  }
+  // Same ranking as Blue Agent: prefer pools with actual 24h volume, then highest liquidity.
+  return items.sort((a, b) => {
+    const va = a.volume24hUsd ?? 0;
+    const vb = b.volume24hUsd ?? 0;
+    if ((va > 0) !== (vb > 0)) return vb > 0 ? 1 : -1;
+    const la = a.liquidityUsd ?? 0;
+    const lb = b.liquidityUsd ?? 0;
+    return lb - la || vb - va;
+  });
+}
+
+function shortPoolName(addr: string): string {
+  return addr.length > 12 ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr;
+}
+
+/** Ranked GeckoTerminal pools for `token` on `venue`, through `/api/charts/pools`. */
+export async function tokenPools(venue: Venue, token: string): Promise<readonly TokenPoolInfo[]> {
+  const q = new URLSearchParams({ network: venue, token: token.toLowerCase() });
+  const res = await fetch(`${CHARTS_PATH}/pools?${q}`, { headers: { [SERVER_HEADER]: "1" } });
+  if (!res.ok) throw new Error(`Pools unavailable (HTTP ${res.status}).`);
+  return parseTokenPools(await res.json(), token);
 }
 
 /** Percent change across the candles, first open to last close — `null` with fewer than two. */

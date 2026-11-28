@@ -67,8 +67,32 @@ export type DocPage = {
   path: string;
 };
 
-/** Every id `?do=` accepts: a feature or a doc page. */
-export type WindowId = FeatureId | DocId;
+/** A dynamic per-token window (`token:0x...`), so multiple tokens can be opened and traded simultaneously. */
+export type TokenWindowId = `token:${string}`;
+
+/** Every id a desktop window can hold: a feature, a doc page, or a per-token window. */
+export type WindowId = FeatureId | DocId | TokenWindowId;
+
+const TOKEN_LABELS = new Map<string, string>();
+
+export function isTokenWindow(id: string | null | undefined): id is TokenWindowId {
+  return typeof id === "string" && id.startsWith("token:") && /^token:0x[0-9a-fA-F]{40}$/.test(id);
+}
+
+export function tokenAddressOf(id: TokenWindowId): string {
+  return id.slice(6);
+}
+
+export function registerTokenLabel(address: string, label: string): void {
+  if (!label.trim()) return;
+  TOKEN_LABELS.set(address.toLowerCase(), label.trim());
+}
+
+export function tokenWindowId(address: string, label?: string): TokenWindowId {
+  const lower = address.toLowerCase();
+  if (label) registerTokenLabel(lower, label);
+  return `token:${lower}`;
+}
 
 export type Feature = {
   id: FeatureId;
@@ -329,6 +353,11 @@ export function resolveDoc(raw: string | null): DocPage | null {
  * taskbar cannot disagree about what a window is called.
  */
 export function windowTitle(id: WindowId): string {
+  if (isTokenWindow(id)) {
+    const addr = tokenAddressOf(id);
+    const label = TOKEN_LABELS.get(addr.toLowerCase());
+    return label ?? `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+  }
   const doc = resolveDoc(id);
   return doc ? doc.window : resolveFeature(id)!.window;
 }

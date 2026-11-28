@@ -566,10 +566,11 @@ const GLYPHS: Record<IconId, JSX.Element> = {
   ),
 };
 
-export function Icon({ id }: { id: IconId }) {
+export function Icon({ id }: { id: IconId | `token:${string}` }) {
+  const key: IconId = id.startsWith("token:") ? "coins" : (id as IconId);
   return (
     <svg viewBox="0 0 24 24" width="32" height="32" aria-hidden="true">
-      {GLYPHS[id]}
+      {GLYPHS[key]}
     </svg>
   );
 }

@@ -32,6 +32,8 @@ export type MarketRow = {
   readonly staleSeconds: number | null;
   /** USD liquidity of that pair — `null` until read */
   readonly depth: number | null;
+  /** 24h USD trading volume of that pair — `null` until read */
+  readonly volume24h?: number | null;
   /** the pair's address, where charts are read — `null` until read */
   readonly pool: string | null;
   /** the company, for a stock on either chain; `null` for a plain token */
@@ -217,6 +219,7 @@ export function MarketsProvider({ children, onOpen }: { children: ReactNode; onO
             series,
             staleSeconds: typeof chart === "object" ? chart.staleSeconds : null,
             depth: spot?.depth ?? null,
+            volume24h: spot?.volume24h ?? null,
             pool: spot?.pool ?? null,
             name: stock?.name ?? null,
             quote,
