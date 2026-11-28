@@ -144,6 +144,66 @@ export const ECOSYSTEM_QUOTES: readonly { readonly address: string; readonly sym
   ...(CONTRACTS.token ? [{ address: toChecksumAddress(CONTRACTS.token), symbol: BRAND.ticker.replace("$", ""), name: BRAND.name, decimals: 18 }] : []),
 ];
 
+const MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11";
+const MULTICALL3_ABI = [
+  {
+    type: "function",
+    name: "aggregate3",
+    stateMutability: "payable",
+    inputs: [
+      {
+        name: "calls",
+        type: "tuple[]",
+        components: [
+          { name: "target", type: "address" },
+          { name: "allowFailure", type: "bool" },
+          { name: "callData", type: "bytes" },
+        ],
+      },
+    ],
+    outputs: [
+      {
+        name: "returnData",
+        type: "tuple[]",
+        components: [
+          { name: "success", type: "bool" },
+          { name: "returnData", type: "bytes" },
+        ],
+      },
+    ],
+  },
+] as const;
+
+async function quotesBatch(
+  factory: string,
+  addresses: readonly string[],
+): Promise<readonly { readonly enabled: boolean; readonly startTick: number }[]> {
+  if (addresses.length === 0) return [];
+  // For large catalogs (e.g. 400+ Base stocks), batch into a single Multicall3 aggregate3 call (1 RPC request).
+  if (addresses.length > 20) {
+    try {
+      const calls = addresses.map((addr) => ({
+        target: factory as `0x${string}`,
+        allowFailure: true,
+        callData: encodeFunctionData({ abi: LAUNCHPAD_ABI, functionName: "quotes", args: [addr as `0x${string}`] }),
+      }));
+      const data = encodeFunctionData({ abi: MULTICALL3_ABI, functionName: "aggregate3", args: [calls] });
+      const raw = await ethCall(MULTICALL3, data);
+      const results = decodeFunctionResult({ abi: MULTICALL3_ABI, functionName: "aggregate3", data: raw });
+      if (results.length === addresses.length) {
+        return results.map((r) => {
+          if (!r.success || r.returnData === "0x") return { enabled: false, startTick: 0 };
+          const [enabled, startTick] = decodeFunctionResult({ abi: LAUNCHPAD_ABI, functionName: "quotes", data: r.returnData });
+          return { enabled, startTick };
+        });
+      }
+    } catch {
+      // Fallback to direct per-quote reads if Multicall3 fails
+    }
+  }
+  return Promise.all(addresses.map((addr) => quoteOf(factory, addr).catch(() => ({ enabled: false, startTick: 0 }))));
+}
+
 /**
  * Every pair a launch can use right now: ETH, then each Base crypto / ecosystem token (`USDC`,
  * `cbBTC`, `AERO`, the brand token, ...) and Coinbase stock on Base that the factory has ENABLED.
@@ -157,15 +217,14 @@ export async function launchPairs(factory: string): Promise<{ readonly pairs: re
   } catch (e) {
     return { pairs, problem: messageOf(e) };
   }
-  // a stock whose TRANSFER feature (0) is paused cannot trade at all — B20 reverts it — so a pool of it would be dead
-  // and only a stock with a NAV can have been enabled: the quote admin opens each pair at its NAV
-  // (`scripts/quote-ticks.ts`). MEASURED 2026-10-29: 218 stocks, 12 with a NAV — asking the factory
-  // about all 218 at once is a burst the public RPC answers with 429s
-  const live = stocks.filter((st) => !st.paused.includes(0) && st.nav !== null);
+  // A stock whose TRANSFER feature (0) is paused cannot trade at all — B20 reverts it.
+  // Check ALL non-paused stocks via Multicall3 (1 RPC call) so every stock enabled on-chain shows up immediately,
+  // whether or not Coinbase has published a Chainlink NAV for it.
+  const live = stocks.filter((st) => !st.paused.includes(0));
   const tokenQuotes = [...ECOSYSTEM_QUOTES, ...TRADE_CRYPTO];
   const [cryptoQuotes, stockQuotes] = await Promise.all([
     Promise.all(tokenQuotes.map(async (c) => ({ c, q: await quoteOf(factory, c.address).catch(() => ({ enabled: false, startTick: 0 })) }))),
-    Promise.all(live.map(async (st) => ({ st, q: await quoteOf(factory, st.address) }))),
+    quotesBatch(factory, live.map((st) => st.address)).then((qs) => live.map((st, i) => ({ st, q: qs[i]! }))),
   ]);
   for (const { c, q } of cryptoQuotes) {
     if (q.enabled) pairs.push({ address: c.address, symbol: c.symbol, name: c.name, decimals: c.decimals, startTick: q.startTick });

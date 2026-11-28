@@ -378,7 +378,6 @@ function MarketTokenDetail({
         <div className="coin__side stack">
           <fieldset className="group coin__panel">
             <legend className="mk__trade-title">Trade {ticker}</legend>
-            {stock ? <StockHealth key={address} stock={stock} /> : null}
             {paused ? (
               <Crt label="Trading paused">
                 <span className="crt__amber">
@@ -434,6 +433,13 @@ function MarketTokenDetail({
                 ))}
               </div>
             </fieldset>
+          ) : null}
+
+          {stock ? (
+            <details className="trade__more">
+              <summary>Stock health &amp; oracle details</summary>
+              <StockHealth key={address} stock={stock} />
+            </details>
           ) : null}
         </div>
 

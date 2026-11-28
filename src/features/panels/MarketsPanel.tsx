@@ -434,7 +434,7 @@ export function MarketsPanel() {
                               remove(r.key);
                             }}
                           >
-                            Watching
+                            Unwatch
                           </button>
                         </div>
                       </td>
@@ -510,15 +510,21 @@ export function MarketsPanel() {
                           ) : null}
                           <button
                             type="button"
-                            className="chip"
-                            disabled={isWatched}
+                            className={isWatched ? "chip chip--mode" : "chip"}
+                            aria-pressed={isWatched}
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (item.kind === "stocks") add({ kind: "basestock", symbol: item.ticker });
-                              else add({ kind: "token", address: item.address, label: item.symbol });
+                              if (isWatched) {
+                                const key = rows.find((r) => r.address?.toLowerCase() === item.address.toLowerCase())?.key;
+                                if (key) remove(key);
+                              } else if (item.kind === "stocks") {
+                                add({ kind: "basestock", symbol: item.ticker });
+                              } else {
+                                add({ kind: "token", address: item.address, label: item.symbol });
+                              }
                             }}
                           >
-                            {isWatched ? "Watching" : "+ Watch"}
+                            {isWatched ? "Unwatch" : "+ Watch"}
                           </button>
                         </div>
                       </td>
