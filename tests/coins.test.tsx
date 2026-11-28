@@ -506,4 +506,13 @@ describe("the Coins window", () => {
     expect(await screen.findByText("$12,345.00")).toBeInTheDocument();
     expect(screen.getAllByText("$6,789.00").length).toBeGreaterThan(0);
   });
+
+  it("stays on the discover list when a standalone TokenWindow is active (?do=token&t=...)", async () => {
+    wallet(null);
+    net({ rpc: chainRoutes(), get: getRoutes() });
+    mount(`/?do=token&t=${T}`);
+    const list = await screen.findByLabelText("Coins", { selector: "ul" });
+    await waitFor(() => expect(list).toHaveTextContent("test (test)"));
+    expect(screen.queryByRole("button", { name: "← All coins" })).not.toBeInTheDocument();
+  });
 });

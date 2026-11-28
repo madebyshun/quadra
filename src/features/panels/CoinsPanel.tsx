@@ -487,7 +487,8 @@ export function CoinPage({ token, listed, onBack }: { token: string; listed: Lis
 export function CoinsPanel() {
   const [params, setParams] = useSearchParams();
   const openWindow = useOpenWindow();
-  const raw = params.get("t");
+  // When a standalone TokenWindow is active (?do=token&t=0x…), CoinsPanel stays on the discover list.
+  const raw = params.get("do") === "token" ? null : params.get("t");
   // a link's token goes through the EIP-55 door; a malformed or mistyped one opens the list instead
   const kind = raw ? checkAddress(raw).kind : "malformed";
   const linked = raw && kind !== "malformed" && kind !== "mismatch" ? toChecksumAddress(raw) : null;
