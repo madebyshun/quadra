@@ -108,8 +108,7 @@ export function StocksLaunchPanel() {
         const list = [...catalog.values()];
         if (!live) return;
         setStocks(list);
-        const addrs = list.slice(0, 120).map((s) => s.address);
-        spots("base", addrs)
+        spots("base", list.map((s) => s.address))
           .then((m) => live && setSpotMap(m))
           .catch(() => {});
       },

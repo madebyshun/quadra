@@ -130,9 +130,9 @@ export function MarketsPanel() {
 
   const watchedAddrs = useMemo(() => new Set(rows.map((r) => r.address?.toLowerCase()).filter(Boolean)), [rows]);
 
-  // Pre-fetch DexScreener spots for crypto + first 120 Base stocks so the directory populates Price, Vol 24h, Change, and Liquidity.
+  // Pre-fetch DexScreener spots for crypto + full Base stock catalog so all live DEX stocks populate Price, Vol 24h, Change, and Liquidity.
   const preloadKey = useMemo(
-    () => [...BASE_CRYPTO_DIRECTORY.map((c) => c.address.toLowerCase()), ...catalog.slice(0, 120).map((s) => s.address.toLowerCase())].join(","),
+    () => [...BASE_CRYPTO_DIRECTORY.map((c) => c.address.toLowerCase()), ...catalog.map((s) => s.address.toLowerCase())].join(","),
     [catalog],
   );
   useEffect(() => {

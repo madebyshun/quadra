@@ -18,6 +18,7 @@ import { ethUsd } from "../src/skills/dexscreener";
 const args = process.argv.slice(2);
 const factory = args.find((a) => /^0x[0-9a-fA-F]{40}$/.test(a)) ?? CONTRACTS.launchFactoryV3 ?? "<factory>";
 const onlyMissing = args.includes("--only-missing");
+const stocksOnly = args.includes("--stocks-only");
 const minLiqArg = args.find((a) => a.startsWith("--min-liq="));
 const minLiq = minLiqArg ? Number(minLiqArg.split("=")[1]) : 0;
 
@@ -59,21 +60,23 @@ for (const s of allStocks) {
   lines.push(`base-cast send ${factory} "setQuote(address,bool,int24)" ${s.address} true ${tick} --rpc-url https://mainnet.base.org --account quadra-deployer`);
 }
 
-console.log(`\n# Ecosystem & Base crypto quotes (supply target ≈ $${Math.round(targetUsd).toLocaleString("en-US")}):`);
-for (const q of [...ECOSYSTEM_QUOTES, ...TRADE_CRYPTO]) {
-  if (onlyMissing && /^0x[0-9a-fA-F]{40}$/.test(factory)) {
-    const existing = await quoteOf(factory, q.address).catch(() => ({ enabled: false, startTick: 0 }));
-    if (existing.enabled) continue;
+if (!stocksOnly) {
+  console.log(`\n# Ecosystem & Base crypto quotes (supply target ≈ $${Math.round(targetUsd).toLocaleString("en-US")}):`);
+  for (const q of [...ECOSYSTEM_QUOTES, ...TRADE_CRYPTO]) {
+    if (onlyMissing && /^0x[0-9a-fA-F]{40}$/.test(factory)) {
+      const existing = await quoteOf(factory, q.address).catch(() => ({ enabled: false, startTick: 0 }));
+      if (existing.enabled) continue;
+    }
+    const res = await fetch(`https://api.dexscreener.com/tokens/v1/base/${q.address}`).then((r) => r.json()).catch(() => []) as { priceUsd?: string }[];
+    const px = Number(res[0]?.priceUsd ?? (q.symbol === "USDC" ? 1 : 0));
+    if (!Number.isFinite(px) || px <= 0) {
+      console.log(`${q.symbol.padEnd(10)} skipped — price not read from DexScreener`);
+      continue;
+    }
+    const tick = startTickFor(targetUsd, px, q.decimals);
+    console.log(`${q.symbol.padEnd(10)} $${px.toFixed(6).padStart(11)}  ${q.decimals} dp  tick ${tick}  opens ≈ ${openingValue(tick, q.decimals).toFixed(2)} ${q.symbol}`);
+    lines.push(`base-cast send ${factory} "setQuote(address,bool,int24)" ${q.address} true ${tick} --rpc-url https://mainnet.base.org --account quadra-deployer`);
   }
-  const res = await fetch(`https://api.dexscreener.com/tokens/v1/base/${q.address}`).then((r) => r.json()).catch(() => []) as { priceUsd?: string }[];
-  const px = Number(res[0]?.priceUsd ?? (q.symbol === "USDC" ? 1 : 0));
-  if (!Number.isFinite(px) || px <= 0) {
-    console.log(`${q.symbol.padEnd(10)} skipped — price not read from DexScreener`);
-    continue;
-  }
-  const tick = startTickFor(targetUsd, px, q.decimals);
-  console.log(`${q.symbol.padEnd(10)} $${px.toFixed(6).padStart(11)}  ${q.decimals} dp  tick ${tick}  opens ≈ ${openingValue(tick, q.decimals).toFixed(2)} ${q.symbol}`);
-  lines.push(`base-cast send ${factory} "setQuote(address,bool,int24)" ${q.address} true ${tick} --rpc-url https://mainnet.base.org --account quadra-deployer`);
 }
 
 console.log(`\n# Summary: ${lines.length} quotes to enable${onlyMissing ? ` (${enabledAlready} already enabled on-chain)` : ""}`);
